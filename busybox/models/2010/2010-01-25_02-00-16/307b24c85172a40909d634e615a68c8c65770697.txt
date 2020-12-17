@@ -1,0 +1,48 @@
+2010-01-25 02:00:16 +0100
+diff --git a/libbb/unicode.c b/libbb/unicode.c
+index 844c154..39b173e 100644
+--- a/libbb/unicode.c
++++ b/libbb/unicode.c
+@@ -203,11 +203,13 @@ size_t FAST_FUNC mbstowcs(wchar_t *dest, const char *src, size_t n)
+ 
+ 	while (n) {
+ 		wchar_t wc;
+-		const char *rc = mbstowc_internal(dest ? dest : &wc, src);
+-		if (rc == NULL) /* error */
++		src = mbstowc_internal(&wc, src);
++		if (src == NULL) /* error */
+ 			return (size_t) -1L;
+ 		if (dest)
+-			dest++;
++			*dest++ = wc;
++		if (wc == 0) /* end-of-string */
++			break;
+ 		n--;
+ 	}
+ 
+diff --git a/testsuite/date/date-works-1 b/testsuite/date/date-works-1
+index bd984c0..1b3e47a 100644
+--- a/testsuite/date/date-works-1
++++ b/testsuite/date/date-works-1
+@@ -126,4 +126,4 @@ test x"$res" = xOK
+ 
+ # This should error out (by showing usage text). Testing for that
+ dt=`busybox date -d 012311332000.30 %+c 2>&1 | head -n 1`
+-test x"${dt#BusyBox * multi-call binary}" = x
++test x"${dt##BusyBox * multi-call binary*}" = x""
+diff --git a/testsuite/mdev.tests b/testsuite/mdev.tests
+index 319c670..036738e 100755
+--- a/testsuite/mdev.tests
++++ b/testsuite/mdev.tests
+@@ -7,9 +7,9 @@
+ # ls -ln is showing date. Need to remove that, it's variable
+ # sed: (1) "maj, min" -> "maj,min" (2) coalesce spaces
+ # cut: remove date
+-FILTER_LS="sed -e 's/,  */,/g' -e 's/  */ /g' | cut -d' ' -f 1-5,9-"
++FILTER_LS="grep -v '^total ' | sed -e 's/,  */,/g' -e 's/  */ /g' | cut -d' ' -f 1-5,9-"
+ # cut: remove size+date
+-FILTER_LS2="sed -e 's/,  */,/g' -e 's/  */ /g' | cut -d' ' -f 1-4,9-"
++FILTER_LS2="grep -v '^total ' | sed -e 's/,  */,/g' -e 's/  */ /g' | cut -d' ' -f 1-4,9-"
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 

@@ -1,0 +1,17 @@
+2007-09-13 20:20:44 +0000
+diff --git a/docs/busybox.net/header.html b/docs/busybox.net/header.html
+index 73beea2..2b4673a 100644
+--- a/docs/busybox.net/header.html
++++ b/docs/busybox.net/header.html
+@@ -81,8 +81,9 @@
+         <li><a href="http://busybox.net/~landley">Rob</a></li>
+         <li><a href="http://busybox.net/~aldot">Bernhard</a></li>
+ 	<li><a href="http://busybox.net/~vda">Denis</a>
+-	  (<a href=http://busybox.net/~vda/mboot/>mboot</a>,
+-	  <a href=http://busybox.net/~vda/linld/>linld</a>)
++	 <br>-<a href=http://busybox.net/~vda/mboot/>mboot</a>
++	 <br>-<a href=http://busybox.net/~vda/linld/>linld</a>
++	 <br>-<a href=http://busybox.net/~vda/init_vs_runsv.html>init must die</a>
+ 	</li>
+     </ul>
+ 

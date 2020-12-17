@@ -1,0 +1,122 @@
+2010-03-21 02:22:07 +0100
+diff --git a/examples/udhcp/udhcpd.conf b/examples/udhcp/udhcpd.conf
+index a27a053..354e6e1 100644
+--- a/examples/udhcp/udhcpd.conf
++++ b/examples/udhcp/udhcpd.conf
+@@ -45,9 +45,12 @@ interface	eth0
+ #notify_file	dumpleases	# useful for debugging
+ 
+ # The following are bootp specific options
+-#siaddr		192.168.0.22		#default: 0.0.0.0
+-#sname		zorak			#default: none
+-#boot_file	/var/nfs_root		#default: none
++# next server to use in bootstrap
++#siaddr		192.168.0.22	# default: 0.0.0.0 (none)
++# tftp server name
++#sname		zorak		# default: none
++# tftp file to download (e.g. kernel image)
++#boot_file	/var/nfs_root	# default: none
+ 
+ # Static leases map
+ #static_lease 00:60:08:11:CE:4E 192.168.0.54
+@@ -56,7 +59,7 @@ interface	eth0
+ # The remainder of options are DHCP options and can be specified with the
+ # keyword 'opt' or 'option'. If an option can take multiple items, such
+ # as the dns option, they can be listed on the same line, or multiple
+-# lines. The only option with a default is 'lease'.
++# lines.
+ # Examples:
+ opt	dns	192.168.10.2 192.168.10.10
+ option	subnet	255.255.255.0
+@@ -64,7 +67,7 @@ opt	router	192.168.10.2
+ opt	wins	192.168.10.10
+ option	dns	129.219.13.81	# appended to above DNS servers for a total of 3
+ option	domain	local
+-option	lease	864000		# 10 days
++option	lease	864000		# default: 10 days
+ 
+ # Currently supported options (for more info, see options.c):
+ #opt lease      NUM
+@@ -73,18 +76,18 @@ option	lease	864000		# 10 days
+ #opt router     IP_LIST
+ #opt ipttl      NUM
+ #opt mtu        NUM
+-#opt hostname   STRING      - client's hostname
+-#opt domain     STRING      - client's domain name
+-#opt search     STRING_LIST - search domains
++#opt hostname   STRING		# client's hostname
++#opt domain     STRING		# client's domain suffix
++#opt search     STRING_LIST	# search domains
+ #opt nisdomain  STRING
+-#opt timezone   NUM    - (localtime - UTC_time) in seconds. signed
+-#opt tftp       STRING - TFTP server name
+-#opt bootfile   STRING - file (kernel image) to load for booting
+-#opt bootsize   NUM    - size of that file
+-#opt rootpath   STRING - (NFS) path to mount as root fs
++#opt timezone   NUM		# (localtime - UTC_time) in seconds. signed
++#opt tftp       STRING		# tftp server name
++#opt bootfile   STRING		# tftp file to download (e.g. kernel image)
++#opt bootsize   NUM		# size of that file
++#opt rootpath   STRING		# (NFS) path to mount as root fs
+ #opt wpad       STRING
+-#opt serverid   IP     - by default, server's IP
+-#opt message    STRING - error message (udhcpd sends it on success too)
++#opt serverid   IP		# default: server's IP
++#opt message    STRING		# error message (udhcpd sends it on success too)
+ # Options specifying server(s)
+ #opt dns        IP_LIST
+ #opt wins       IP_LIST
+@@ -93,7 +96,7 @@ option	lease	864000		# 10 days
+ #opt lprsrv     IP_LIST
+ #opt swapsrv    IP
+ # Obsolete options, no longer supported
+-#opt logsrv     IP_LIST - 704/UDP log server (not syslog!)
+-#opt namesrv    IP_LIST - IEN 116 name server, obsolete (August 1979!!!)
+-#opt cookiesrv  IP_LIST - RFC 865 "quote of the day" server, rarely (never?) used
+-#opt timesrv    IP_LIST - RFC 868 time server, rarely (never?) used
++#opt logsrv     IP_LIST	# 704/UDP log server (not syslog!)
++#opt namesrv    IP_LIST	# IEN 116 name server, obsolete (August 1979!!!)
++#opt cookiesrv  IP_LIST	# RFC 865 "quote of the day" server, rarely (never?) used
++#opt timesrv    IP_LIST	# RFC 868 time server, rarely (never?) used
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index cc4cb92..f594bad 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -319,7 +319,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 	bb_info_msg("%s (v"BB_VER") started", applet_name);
+ 
+ 	option = find_option(server_config.options, DHCP_LEASE_TIME);
+-	server_config.max_lease_sec = LEASE_TIME;
++	server_config.max_lease_sec = DEFAULT_LEASE_TIME;
+ 	if (option) {
+ 		move_from_unaligned32(server_config.max_lease_sec, option->data + OPT_DATA);
+ 		server_config.max_lease_sec = ntohl(server_config.max_lease_sec);
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index b55fd6c..2f2f5b3 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -7,8 +7,8 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ /* Defaults you may want to tweak */
+ /* Default max_lease_sec */
+-#define LEASE_TIME      (60*60*24 * 10)
+-#define LEASES_FILE     CONFIG_DHCPD_LEASES_FILE
++#define DEFAULT_LEASE_TIME      (60*60*24 * 10)
++#define LEASES_FILE             CONFIG_DHCPD_LEASES_FILE
+ /* Where to find the DHCP server configuration file */
+ #define DHCPD_CONF_FILE         "/etc/udhcpd.conf"
+ 
+diff --git a/networking/udhcp/options.h b/networking/udhcp/options.h
+index b7c9d8f..05090f1 100644
+--- a/networking/udhcp/options.h
++++ b/networking/udhcp/options.h
+@@ -35,7 +35,8 @@ enum {
+ /* DHCP protocol. See RFC 2131 */
+ #define DHCP_MAGIC		0x63825363
+ 
+-/* DHCP option codes (partial list). See RFC 2132.
++/* DHCP option codes (partial list). See RFC 2132 and
++ * http://www.iana.org/assignments/bootp-dhcp-parameters/
+  * Commented out options are handled by common option machinery,
+  * uncommented ones have spacial cases (grep for them to see).
+  */

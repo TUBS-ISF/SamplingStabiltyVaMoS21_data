@@ -1,0 +1,13 @@
+2008-11-19 09:35:00 +0000
+diff --git a/sysklogd/klogd.c b/sysklogd/klogd.c
+index a0e0bf7..c54e80a 100644
+--- a/sysklogd/klogd.c
++++ b/sysklogd/klogd.c
+@@ -89,6 +89,7 @@ int klogd_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 		/* klogctl buffer parsing modelled after code in dmesg.c */
+ 		/* Process each newline-terminated line in the buffer */
++		start = log_buffer;
+ 		while (1) {
+ 			char *newline = strchrnul(start, '\n');
+ 

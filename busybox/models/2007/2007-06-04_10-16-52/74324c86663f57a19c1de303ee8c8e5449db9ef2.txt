@@ -1,0 +1,701 @@
+2007-06-04 10:16:52 +0000
+diff --git a/archival/tar.c b/archival/tar.c
+index 4323553..adcedf6 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -28,6 +28,8 @@
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
++#define block_buf bb_common_bufsiz1
++
+ #if ENABLE_FEATURE_TAR_CREATE
+ 
+ /* Tar file constants  */
+@@ -475,8 +477,8 @@ static int writeFileToTarball(const char *fileName, struct stat *statbuf,
+ 		/* Pad the file up to the tar block size */
+ 		/* (a few tricks here in the name of code size) */
+ 		readSize = (-(int)statbuf->st_size) & (TAR_BLOCK_SIZE-1);
+-		memset(bb_common_bufsiz1, 0, readSize);
+-		xwrite(tbInfo->tarFd, bb_common_bufsiz1, readSize);
++		memset(block_buf, 0, readSize);
++		xwrite(tbInfo->tarFd, block_buf, readSize);
+ 	}
+ 
+ 	return TRUE;
+@@ -570,8 +572,8 @@ static int writeTarFile(const int tar_fd, const int verboseFlag,
+ 		include = include->link;
+ 	}
+ 	/* Write two empty blocks to the end of the archive */
+-	memset(bb_common_bufsiz1, 0, 2*TAR_BLOCK_SIZE);
+-	xwrite(tbInfo.tarFd, bb_common_bufsiz1, 2*TAR_BLOCK_SIZE);
++	memset(block_buf, 0, 2*TAR_BLOCK_SIZE);
++	xwrite(tbInfo.tarFd, block_buf, 2*TAR_BLOCK_SIZE);
+ 
+ 	/* To be pedantically correct, we would check if the tarball
+ 	 * is smaller than 20 tar blocks, and pad it if it was smaller,
+diff --git a/coreutils/catv.c b/coreutils/catv.c
+index 2d2229f..cc61233 100644
+--- a/coreutils/catv.c
++++ b/coreutils/catv.c
+@@ -33,13 +33,14 @@ int catv_main(int argc, char **argv)
+ 		else for (;;) {
+ 			int i, res;
+ 
+-			res = read(fd, bb_common_bufsiz1, sizeof(bb_common_bufsiz1));
++#define read_buf bb_common_bufsiz1
++			res = read(fd, read_buf, COMMON_BUFSIZE);
+ 			if (res < 0)
+ 				retval = EXIT_FAILURE;
+ 			if (res < 1)
+ 				break;
+ 			for (i = 0; i < res; i++) {
+-				char c = bb_common_bufsiz1[i];
++				char c = read_buf[i];
+ 
+ 				if (c > 126 && (flags & CATV_OPT_v)) {
+ 					if (c == 127) {
+diff --git a/coreutils/cksum.c b/coreutils/cksum.c
+index 865bea0..987f5f3 100644
+--- a/coreutils/cksum.c
++++ b/coreutils/cksum.c
+@@ -27,8 +27,9 @@ int cksum_main(int argc, char **argv)
+ 		crc = 0;
+ 		length = 0;
+ 
+-		while ((bytes_read = fread(bb_common_bufsiz1, 1, BUFSIZ, fp)) > 0) {
+-			cp = bb_common_bufsiz1;
++#define read_buf bb_common_bufsiz1
++		while ((bytes_read = fread(read_buf, 1, BUFSIZ, fp)) > 0) {
++			cp = read_buf;
+ 			length += bytes_read;
+ 			while (bytes_read--)
+ 				crc = (crc << 8) ^ crc32_table[((crc >> 24) ^ (*cp++)) & 0xffL];
+diff --git a/coreutils/date.c b/coreutils/date.c
+index 57c826a..cec8854 100644
+--- a/coreutils/date.c
++++ b/coreutils/date.c
+@@ -222,9 +222,10 @@ int date_main(int argc, char **argv)
+ 			date_fmt = (char*)"%a %b %e %H:%M:%S %Z %Y";
+ 	}
+ 
++#define date_buf bb_common_bufsiz1
+ 	if (*date_fmt == '\0') {
+ 		/* With no format string, just print a blank line */
+-		*bb_common_bufsiz1 = 0;
++		date_buf[0] = '\0';
+ 	} else {
+ 		/* Handle special conversions */
+ 
+@@ -233,9 +234,9 @@ int date_main(int argc, char **argv)
+ 		}
+ 
+ 		/* Generate output string */
+-		strftime(bb_common_bufsiz1, 200, date_fmt, &tm_time);
++		strftime(date_buf, sizeof(date_buf), date_fmt, &tm_time);
+ 	}
+-	puts(bb_common_bufsiz1);
++	puts(date_buf);
+ 
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/coreutils/dos2unix.c b/coreutils/dos2unix.c
+index b053a0c..86adcd9 100644
+--- a/coreutils/dos2unix.c
++++ b/coreutils/dos2unix.c
+@@ -14,17 +14,20 @@
+ 
+ #include "libbb.h"
+ 
+-enum ConvType {
++enum {
+ 	CT_UNIX2DOS = 1,
+ 	CT_DOS2UNIX
+-} ConvType;
++};
+ 
+ /* if fn is NULL then input is stdin and output is stdout */
+-static int convert(char *fn)
++static int convert(char *fn, int ConvType)
+ {
+ 	FILE *in, *out;
+ 	int i;
++#define name_buf bb_common_bufsiz1
+ 
++	in = stdin;
++	out = stdout;
+ 	if (fn != NULL) {
+ 		in = xfopen(fn, "rw");
+ 		/*
+@@ -32,24 +35,17 @@ static int convert(char *fn)
+ 		   permissions 0666 for glibc 2.0.6 and earlier or
+ 		   0600 for glibc 2.0.7 and later.
+ 		 */
+-		snprintf(bb_common_bufsiz1, sizeof(bb_common_bufsiz1), "%sXXXXXX", fn);
+-		/*
+-		   sizeof bb_common_bufsiz1 is 4096, so it should be big enough to
+-		   hold the full path.  However if the output is truncated the
+-		   subsequent call to mkstemp would fail.
+-		 */
+-		i = mkstemp(&bb_common_bufsiz1[0]);
+-		if (i == -1 || chmod(bb_common_bufsiz1, 0600) == -1) {
++		snprintf(name_buf, sizeof(name_buf), "%sXXXXXX", fn);
++		i = mkstemp(&name_buf[0]);
++		if (i == -1 || chmod(name_buf, 0600) == -1) {
+ 			bb_perror_nomsg_and_die();
+ 		}
+ 		out = fdopen(i, "w+");
+ 		if (!out) {
+ 			close(i);
+-			remove(bb_common_bufsiz1);
++			remove(name_buf);
++			return -2;
+ 		}
+-	} else {
+-		in = stdin;
+-		out = stdout;
+ 	}
+ 
+ 	while ((i = fgetc(in)) != EOF) {
+@@ -67,14 +63,14 @@ static int convert(char *fn)
+ 	if (fn != NULL) {
+ 		if (fclose(in) < 0 || fclose(out) < 0) {
+ 			bb_perror_nomsg();
+-			remove(bb_common_bufsiz1);
++			remove(name_buf);
+ 			return -2;
+ 		}
+ 		/* Assume they are both on the same filesystem (which
+ 		 * should be true since we put them into the same directory
+ 		 * so we _should_ be ok, but you never know... */
+-		if (rename(bb_common_bufsiz1, fn) < 0) {
+-			bb_perror_msg("cannot rename '%s' as '%s'", bb_common_bufsiz1, fn);
++		if (rename(name_buf, fn) < 0) {
++			bb_perror_msg("cannot rename '%s' as '%s'", name_buf, fn);
+ 			return -1;
+ 		}
+ 	}
+@@ -85,13 +81,13 @@ static int convert(char *fn)
+ int dos2unix_main(int argc, char **argv);
+ int dos2unix_main(int argc, char **argv)
+ {
+-	int o;
++	int o, ConvType;
+ 
+ 	/* See if we are supposed to be doing dos2unix or unix2dos */
+ 	if (applet_name[0] == 'd') {
+-		ConvType = CT_DOS2UNIX;	/*2 */
++		ConvType = CT_DOS2UNIX;	/* 2 */
+ 	} else {
+-		ConvType = CT_UNIX2DOS;	/*1 */
++		ConvType = CT_UNIX2DOS;	/* 1 */
+ 	}
+ 	/* -u and -d are mutally exclusive */
+ 	opt_complementary = "?:u--d:d--u";
+@@ -105,12 +101,13 @@ int dos2unix_main(int argc, char **argv)
+ 	if (o)
+ 		ConvType = o;
+ 
+-	if (optind < argc) {
+-		while (optind < argc)
+-			if ((o = convert(argv[optind++])) < 0)
+-				break;
+-	} else
+-		o = convert(NULL);
++	do {
++		/* might be convert(NULL) if there is no filename given */
++		o = convert(argv[optind], ConvType);
++		if (o < 0)
++			break;
++		optind++;
++	} while (optind < argc);
+ 
+ 	return o;
+ }
+diff --git a/coreutils/split.c b/coreutils/split.c
+index 27f9cfd..7b4f8c2 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -49,7 +49,7 @@ static char *next_file(char *old, unsigned suffix_len)
+ }
+ 
+ #define read_buffer bb_common_bufsiz1
+-enum { READ_BUFFER_SIZE = sizeof(bb_common_bufsiz1) - 1 };
++enum { READ_BUFFER_SIZE = COMMON_BUFSIZE - 1 };
+ 
+ #define SPLIT_OPT_l (1<<0)
+ #define SPLIT_OPT_b (1<<1)
+diff --git a/coreutils/tr.c b/coreutils/tr.c
+index 7e89e9a..c0d0dfa 100644
+--- a/coreutils/tr.c
++++ b/coreutils/tr.c
+@@ -25,41 +25,9 @@
+ #define TR_OPT_complement	(1<<0)
+ #define TR_OPT_delete		(1<<1)
+ #define TR_OPT_squeeze_reps	(1<<2)
+-/* some "globals" shared across this file */
+-/* these last are pointers to static buffers declared in tr_main */
+-static char *poutput, *pvector, *pinvec, *poutvec;
+ 
+-static void ATTRIBUTE_NORETURN convert(const smalluint flags)
+-{
+-	size_t read_chars = 0, in_index = 0, out_index = 0, c, coded, last = -1;
+-
+-	for (;;) {
+-		/* If we're out of input, flush output and read more input. */
+-		if (in_index == read_chars) {
+-			if (out_index) {
+-				xwrite(STDOUT_FILENO, (char *)poutput, out_index);
+-				out_index = 0;
+-			}
+-			if ((read_chars = read(STDIN_FILENO, bb_common_bufsiz1, BUFSIZ)) <= 0) {
+-				if (write(STDOUT_FILENO, (char *)poutput, out_index) != out_index)
+-					bb_perror_msg(bb_msg_write_error);
+-				exit(EXIT_SUCCESS);
+-			}
+-			in_index = 0;
+-		}
+-		c = bb_common_bufsiz1[in_index++];
+-		coded = pvector[c];
+-		if ((flags & TR_OPT_delete) && pinvec[c])
+-			continue;
+-		if ((flags & TR_OPT_squeeze_reps) && last == coded &&
+-			(pinvec[c] || poutvec[coded]))
+-			continue;
+-		poutput[out_index++] = last = coded;
+-	}
+-	/* NOTREACHED */
+-}
+-
+-static void map(unsigned char *string1, unsigned int string1_len,
++static void map(char *pvector,
++		unsigned char *string1, unsigned int string1_len,
+ 		unsigned char *string2, unsigned int string2_len)
+ {
+ 	char last = '0';
+@@ -121,9 +89,9 @@ static unsigned int expand(const char *arg, char *buffer)
+ 			if (ENABLE_FEATURE_TR_CLASSES && i == ':') {
+ 				smalluint j;
+ 				{ /* not really pretty.. */
+-				char *tmp = xstrndup(arg, 7); // warning: xdigit needs 8, not 7
+-				j = index_in_str_array(classes, tmp) + 1;
+-				free(tmp);
++					char *tmp = xstrndup(arg, 7); // warning: xdigit needs 8, not 7
++					j = index_in_str_array(classes, tmp) + 1;
++					free(tmp);
+ 				}
+ 				if (j == CLASS_alnum || j == CLASS_digit) {
+ 					for (i = '0'; i <= '9'; i++)
+@@ -183,7 +151,7 @@ static unsigned int expand(const char *arg, char *buffer)
+ 
+ static int complement(char *buffer, int buffer_len)
+ {
+-	short i, j, ix;
++	int i, j, ix;
+ 	char conv[ASCII + 2];
+ 
+ 	ix = 0;
+@@ -206,17 +174,12 @@ int tr_main(int argc, char **argv)
+ 	int idx = 1;
+ 	int i;
+ 	smalluint flags = 0;
++	size_t read_chars = 0, in_index = 0, out_index = 0, c, coded, last = -1;
+ 	RESERVE_CONFIG_UBUFFER(output, BUFSIZ);
+ 	RESERVE_CONFIG_BUFFER(vector, ASCII+1);
+ 	RESERVE_CONFIG_BUFFER(invec,  ASCII+1);
+ 	RESERVE_CONFIG_BUFFER(outvec, ASCII+1);
+ 
+-	/* ... but make them available globally */
+-	poutput = output;
+-	pvector = vector;
+-	pinvec  = invec;
+-	poutvec = outvec;
+-
+ 	if (argc > 1 && argv[idx][0] == '-') {
+ 		for (ptr = (unsigned char *) &argv[idx][1]; *ptr; ptr++) {
+ 			if (*ptr == 'c')
+@@ -235,21 +198,47 @@ int tr_main(int argc, char **argv)
+ 		invec[i] = outvec[i] = FALSE;
+ 	}
+ 
++#define tr_buf bb_common_bufsiz1
+ 	if (argv[idx] != NULL) {
+-		input_length = expand(argv[idx++], bb_common_bufsiz1);
++		input_length = expand(argv[idx++], tr_buf);
+ 		if (flags & TR_OPT_complement)
+-			input_length = complement(bb_common_bufsiz1, input_length);
++			input_length = complement(tr_buf, input_length);
+ 		if (argv[idx] != NULL) {
+ 			if (*argv[idx] == '\0')
+ 				bb_error_msg_and_die("STRING2 cannot be empty");
+ 			output_length = expand(argv[idx], output);
+-			map(bb_common_bufsiz1, input_length, output, output_length);
++			map(vector, tr_buf, input_length, output, output_length);
+ 		}
+ 		for (i = 0; i < input_length; i++)
+-			invec[(unsigned char)bb_common_bufsiz1[i]] = TRUE;
++			invec[(unsigned char)tr_buf[i]] = TRUE;
+ 		for (i = 0; i < output_length; i++)
+ 			outvec[output[i]] = TRUE;
+ 	}
+-	convert(flags);
++
++	for (;;) {
++		/* If we're out of input, flush output and read more input. */
++		if (in_index == read_chars) {
++			if (out_index) {
++				xwrite(STDOUT_FILENO, (char *)output, out_index);
++				out_index = 0;
++			}
++			read_chars = read(STDIN_FILENO, tr_buf, BUFSIZ);
++			if (read_chars <= 0) {
++				if (write(STDOUT_FILENO, (char *)output, out_index) != out_index)
++					bb_perror_msg(bb_msg_write_error);
++				exit(EXIT_SUCCESS);
++			}
++			in_index = 0;
++		}
++		c = tr_buf[in_index++];
++		coded = vector[c];
++		if ((flags & TR_OPT_delete) && invec[c])
++			continue;
++		if ((flags & TR_OPT_squeeze_reps) && last == coded &&
++			(invec[c] || outvec[coded]))
++			continue;
++		output[out_index++] = last = coded;
++	}
++	/* NOTREACHED */
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/debianutils/readlink.c b/debianutils/readlink.c
+index b6b4965..d454cbf 100644
+--- a/debianutils/readlink.c
++++ b/debianutils/readlink.c
+@@ -43,7 +43,7 @@ int readlink_main(int argc, char **argv)
+ 		return EXIT_FAILURE;
+ 	puts(buf);
+ 
+-	if (ENABLE_FEATURE_CLEAN_UP && buf != bb_common_bufsiz1)
++	if (ENABLE_FEATURE_CLEAN_UP && !opt)
+ 		free(buf);
+ 
+ 	fflush_stdout_and_exit(EXIT_SUCCESS);
+diff --git a/editors/ed.c b/editors/ed.c
+index 731aef1..e6576b4 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -9,9 +9,11 @@
+ 
+ #include "libbb.h"
+ 
++#define searchString bb_common_bufsiz1
++
+ enum {
+-	USERSIZE = sizeof(bb_common_bufsiz1) > 1024 ? 1024
+-	         : sizeof(bb_common_bufsiz1) - 1, /* max line length typed in by user */
++	USERSIZE = sizeof(searchString) > 1024 ? 1024
++	         : sizeof(searchString) - 1, /* max line length typed in by user */
+ 	INITBUF_SIZE = 1024, /* initial buffer size */
+ };
+ 
+@@ -22,8 +24,6 @@ typedef struct LINE {
+ 	char data[1];
+ } LINE;
+ 
+-#define searchString bb_common_bufsiz1
+-
+ static LINE lines, *curLine;
+ static int curNum, lastNum, marks[26], dirty;
+ static char *bufBase, *bufPtr, *fileName;
+diff --git a/editors/sed.c b/editors/sed.c
+index d49627f..d0c2ca7 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -118,8 +118,14 @@ struct globals {
+ 		int len;	/* Space allocated */
+ 	} pipeline;
+ };
+-
+ #define G (*(struct globals*)&bb_common_bufsiz1)
++void BUG_sed_globals_too_big(void);
++#define INIT_G() do { \
++	if (sizeof(struct globals) > COMMON_BUFSIZE) \
++		BUG_sed_globals_too_big(); \
++	G.sed_cmd_tail = &G.sed_cmd_head; \
++} while (0)
++
+ 
+ #if ENABLE_FEATURE_CLEAN_UP
+ static void sed_free_and_close_stuff(void)
+@@ -1210,8 +1216,6 @@ static void add_cmd_block(char *cmdstr)
+ 	free(sv);
+ }
+ 
+-void BUG_sed_globals_too_big(void);
+-
+ int sed_main(int argc, char **argv);
+ int sed_main(int argc, char **argv)
+ {
+@@ -1222,10 +1226,7 @@ int sed_main(int argc, char **argv)
+ 	llist_t *opt_e, *opt_f;
+ 	int status = EXIT_SUCCESS;
+ 
+-	if (sizeof(struct globals) > sizeof(bb_common_bufsiz1))
+-		BUG_sed_globals_too_big();
+-
+-	G.sed_cmd_tail = &G.sed_cmd_head;
++	INIT_G();
+ 
+ 	/* destroy command strings on exit */
+ 	if (ENABLE_FEATURE_CLEAN_UP) atexit(sed_free_and_close_stuff);
+diff --git a/include/libbb.h b/include/libbb.h
+index 385b30f..0136337 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -954,7 +954,8 @@ extern const int const_int_1;
+ #define BUFSIZ 4096
+ #endif
+ /* Providing hard guarantee on minimum size (think of BUFSIZ == 128) */
+-extern char bb_common_bufsiz1[(BUFSIZ > 256*sizeof(void*) ? BUFSIZ : 256*sizeof(void*)) + 1];
++enum { COMMON_BUFSIZE = (BUFSIZ >= 256*sizeof(void*) ? BUFSIZ+1 : 256*sizeof(void*)) };
++extern char bb_common_bufsiz1[COMMON_BUFSIZE];
+ /* This struct is deliberately not defined. */
+ /* See docs/keep_data_small.txt */
+ struct globals;
+diff --git a/libbb/messages.c b/libbb/messages.c
+index 3febe76..fbd882c 100644
+--- a/libbb/messages.c
++++ b/libbb/messages.c
+@@ -54,7 +54,7 @@ WTMP_FILE;
+ # error unknown path to wtmp file
+ #endif
+ 
+-char bb_common_bufsiz1[(BUFSIZ > 256*sizeof(void*) ? BUFSIZ : 256*sizeof(void*)) + 1];
++char bb_common_bufsiz1[COMMON_BUFSIZE];
+ 
+ struct globals;
+ /* Make it reside in R/W memory: */
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index 82a4381..916a25b 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -182,15 +182,14 @@ int adduser_main(int argc, char **argv)
+ 	/* check for min, max and missing args and exit on error */
+ 	opt_complementary = "-1:?1:?";
+ 	getopt32(argc, argv, "h:g:s:G:DSH", &pw.pw_dir, &pw.pw_gecos, &pw.pw_shell, &usegroup);
++	argv += optind;
+ 
+-	/* create string for $HOME if not specified already */
++	/* create a passwd struct */
++	pw.pw_name = argv[0];
+ 	if (!pw.pw_dir) {
+-		snprintf(bb_common_bufsiz1, BUFSIZ, "/home/%s", argv[optind]);
+-		pw.pw_dir = bb_common_bufsiz1;
++		/* create string for $HOME if not specified already */
++		pw.pw_dir = xasprintf("/home/%s", argv[0]);
+ 	}
+-
+-	/* create a passwd struct */
+-	pw.pw_name = argv[optind];
+ 	pw.pw_passwd = (char *)"x";
+ 	pw.pw_uid = 0;
+ 	pw.pw_gid = usegroup ? xgroup2gid(usegroup) : 0; /* exits on failure */
+diff --git a/miscutils/dc.c b/miscutils/dc.c
+index 872b814..ced5149 100644
+--- a/miscutils/dc.c
++++ b/miscutils/dc.c
+@@ -8,7 +8,7 @@
+ 
+ /* Tiny RPN calculator, because "expr" didn't give me bitwise operations. */
+ 
+-enum { STACK_SIZE = sizeof(bb_common_bufsiz1) / sizeof(double) };
++enum { STACK_SIZE = COMMON_BUFSIZE / sizeof(double) };
+ 
+ #define stack ((double*)&bb_common_bufsiz1)
+ static unsigned int pointer;
+diff --git a/modutils/rmmod.c b/modutils/rmmod.c
+index 4c792d3..f78f96c 100644
+--- a/modutils/rmmod.c
++++ b/modutils/rmmod.c
+@@ -44,6 +44,8 @@ int rmmod_main(int argc, char **argv)
+ 	int n, ret = EXIT_SUCCESS;
+ 	unsigned int flags = O_NONBLOCK|O_EXCL;
+ 
++#define misc_buf bb_common_bufsiz1
++
+ 	/* Parse command line. */
+ 	n = getopt32(argc, argv, "wfa");
+ 	if (n & 1)	// --wait
+@@ -65,7 +67,7 @@ int rmmod_main(int argc, char **argv)
+ 			pnmod = nmod;
+ 			// the 1 here is QM_MODULES.
+ 			if (ENABLE_FEATURE_QUERY_MODULE_INTERFACE && query_module(NULL,
+-					1, bb_common_bufsiz1, sizeof(bb_common_bufsiz1),
++					1, misc_buf, sizeof(misc_buf),
+ 					&nmod))
+ 			{
+ 				bb_perror_msg_and_die("QM_MODULES");
+@@ -84,10 +86,10 @@ int rmmod_main(int argc, char **argv)
+ 			afterslash = strrchr(argv[n], '/');
+ 			if (!afterslash) afterslash = argv[n];
+ 			else afterslash++;
+-			filename2modname(bb_common_bufsiz1, afterslash);
++			filename2modname(misc_buf, afterslash);
+ 		}
+ 
+-		if (syscall(__NR_delete_module, ENABLE_FEATURE_2_6_MODULES ? bb_common_bufsiz1 : argv[n], flags)) {
++		if (syscall(__NR_delete_module, ENABLE_FEATURE_2_6_MODULES ? misc_buf : argv[n], flags)) {
+ 			bb_perror_msg("%s", argv[n]);
+ 			ret = EXIT_FAILURE;
+ 		}
+diff --git a/networking/hostname.c b/networking/hostname.c
+index 50ef7b5..862bbdf 100644
+--- a/networking/hostname.c
++++ b/networking/hostname.c
+@@ -29,12 +29,13 @@ static void do_sethostname(char *s, int isfile)
+ 		}
+ 	} else {
+ 		f = xfopen(s, "r");
+-		while (fgets(bb_common_bufsiz1, sizeof(bb_common_bufsiz1), f) != NULL) {
+-			if (bb_common_bufsiz1[0] == '#') {
++#define strbuf bb_common_bufsiz1
++		while (fgets(strbuf, sizeof(strbuf), f) != NULL) {
++			if (strbuf[0] == '#') {
+ 				continue;
+ 			}
+-			chomp(bb_common_bufsiz1);
+-			do_sethostname(bb_common_bufsiz1, 0);
++			chomp(strbuf);
++			do_sethostname(strbuf, 0);
+ 		}
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			fclose(f);
+diff --git a/networking/nc.c b/networking/nc.c
+index 1fb38f8..e7bd519 100644
+--- a/networking/nc.c
++++ b/networking/nc.c
+@@ -174,11 +174,10 @@ int nc_main(int argc, char **argv)
+ 		if (select(FD_SETSIZE, &testfds, NULL, NULL, NULL) < 0)
+ 			bb_perror_msg_and_die("select");
+ 
++#define iobuf bb_common_bufsiz1
+ 		for (fd = 0; fd < FD_SETSIZE; fd++) {
+ 			if (FD_ISSET(fd, &testfds)) {
+-				nread = safe_read(fd, bb_common_bufsiz1,
+-							sizeof(bb_common_bufsiz1));
+-
++				nread = safe_read(fd, iobuf, sizeof(iobuf));
+ 				if (fd == cfd) {
+ 					if (nread < 1)
+ 						exit(0);
+@@ -192,8 +191,7 @@ int nc_main(int argc, char **argv)
+ 					}
+ 					ofd = cfd;
+ 				}
+-
+-				xwrite(ofd, bb_common_bufsiz1, nread);
++				xwrite(ofd, iobuf, nread);
+ 				if (delay > 0) sleep(delay);
+ 			}
+ 		}
+diff --git a/networking/telnet.c b/networking/telnet.c
+index caca89d..a634d7a 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -52,7 +52,6 @@ enum {
+ 
+ typedef unsigned char byte;
+ 
+-
+ struct globals {
+ 	int	netfd; /* console fd:s are 0 and 1 (and 2) */
+ 	short	iaclen; /* could even use byte */
+@@ -78,9 +77,13 @@ struct globals {
+ 	struct termios termios_def;
+ 	struct termios termios_raw;
+ };
+-
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+-
++void BUG_telnet_globals_too_big(void);
++#define INIT_G() do { \
++	if (sizeof(G) > COMMON_BUFSIZE) \
++		BUG_telnet_globals_too_big(); \
++	/* memset(&G, 0, sizeof G); - already is */ \
++} while (0)
+ 
+ /* Function prototypes */
+ static void rawmode(void);
+@@ -547,8 +550,6 @@ static void cookmode(void)
+ 		tcsetattr(0, TCSADRAIN, &G.termios_def);
+ }
+ 
+-void BUG_telnet_globals_too_big(void);
+-
+ int telnet_main(int argc, char** argv);
+ int telnet_main(int argc, char** argv)
+ {
+@@ -562,9 +563,7 @@ int telnet_main(int argc, char** argv)
+ 	int maxfd;
+ #endif
+ 
+-	if (sizeof(G) > sizeof(bb_common_bufsiz1))
+-		BUG_telnet_globals_too_big();
+-	/* memset(&G, 0, sizeof G); - already is */
++	INIT_G();
+ 
+ #if ENABLE_FEATURE_AUTOWIDTH
+ 	get_terminal_width_height(0, &G.win_width, &G.win_height);
+diff --git a/scripts/find_bad_common_bufsiz b/scripts/find_bad_common_bufsiz
+new file mode 100755
+index 0000000..e80cf62
+--- /dev/null
++++ b/scripts/find_bad_common_bufsiz
+@@ -0,0 +1,13 @@
++#!/bin/sh
++
++# This script finds applets with multiple uses of bb_common_bufsiz1
++# (== possible bugs).
++# Currently (2007-06-04) reports 3 false positives:
++# ./coreutils/diff.c:7
++# ./loginutils/getty.c:2
++# ./util-linux/mount.c:5
++
++find -name '*.c' \
++| while read name; do
++    grep -Hc bb_common_bufsiz1 "$name"
++done | grep -v ':[01]$'
+diff --git a/scripts/find_stray_communal_vars b/scripts/find_stray_communal_vars
+index 9f999d7..95563d1 100755
+--- a/scripts/find_stray_communal_vars
++++ b/scripts/find_stray_communal_vars
+@@ -1,6 +1,6 @@
+ #!/bin/sh
+ 
+-# Communal variables are elusize, then don't show in size output!
++# Communal variables are elusive, they don't show up in size output!
+ # This script will show all communals in *.o, sorted by size
+ 
+ find -name '*.o' \
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index 971a6be..d9c3e50 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -106,12 +106,13 @@ int logger_main(int argc, char **argv)
+ 	argc -= optind;
+ 	argv += optind;
+ 	if (!argc) {
+-		while (fgets(bb_common_bufsiz1, BUFSIZ, stdin)) {
+-			if (bb_common_bufsiz1[0]
+-			 && NOT_LONE_CHAR(bb_common_bufsiz1, '\n')
++#define strbuf bb_common_bufsiz1
++		while (fgets(strbuf, BUFSIZ, stdin)) {
++			if (strbuf[0]
++			 && NOT_LONE_CHAR(strbuf, '\n')
+ 			) {
+ 				/* Neither "" nor "\n" */
+-				syslog(i, "%s", bb_common_bufsiz1);
++				syslog(i, "%s", strbuf);
+ 			}
+ 		}
+ 	} else {

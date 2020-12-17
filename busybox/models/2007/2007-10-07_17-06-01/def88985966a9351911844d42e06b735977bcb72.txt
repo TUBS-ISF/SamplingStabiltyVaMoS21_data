@@ -1,0 +1,229 @@
+2007-10-07 17:06:01 +0000
+diff --git a/Config.in b/Config.in
+index 450c4a6..64281f0 100644
+--- a/Config.in
++++ b/Config.in
+@@ -292,31 +292,30 @@ config BUILD_LIBBUSYBOX
+ 	  binary serves no purpose (and increases the size).  You should
+ 	  almost certainly say "no" to this right now.
+ 
+-config FEATURE_FULL_LIBBUSYBOX
+-	bool "Feature-complete libbusybox"
+-	default n if !FEATURE_SHARED_BUSYBOX
+-	depends on BUILD_LIBBUSYBOX
+-	help
+-	  Build a libbusybox with the complete feature-set, disregarding
+-	  the actually selected config.
+-
+-	  Normally, libbusybox will only contain the features which are
+-	  used by busybox itself. If you plan to write a separate
+-	  standalone application which uses libbusybox say 'Y'.
+-
+-	  Note: libbusybox is GPL, not LGPL, and exports no stable API that
+-	  might act as a copyright barrier.  We can and will modify the
+-	  exported function set between releases (even minor version number
+-	  changes), and happily break out-of-tree features.
+-
+-	  Say 'N' if in doubt.
++### config FEATURE_FULL_LIBBUSYBOX
++###	bool "Feature-complete libbusybox"
++###	default n if !FEATURE_SHARED_BUSYBOX
++###	depends on BUILD_LIBBUSYBOX
++###	help
++###	  Build a libbusybox with the complete feature-set, disregarding
++###	  the actually selected config.
++###
++###	  Normally, libbusybox will only contain the features which are
++###	  used by busybox itself. If you plan to write a separate
++###	  standalone application which uses libbusybox say 'Y'.
++###
++###	  Note: libbusybox is GPL, not LGPL, and exports no stable API that
++###	  might act as a copyright barrier.  We can and will modify the
++###	  exported function set between releases (even minor version number
++###	  changes), and happily break out-of-tree features.
++###
++###	  Say 'N' if in doubt.
+ 
+ config FEATURE_SHARED_BUSYBOX
+-	bool "Use shared libbusybox for busybox"
++	bool "Produce additional busybox binary linked against libbusybox"
+ 	default y if BUILD_LIBBUSYBOX
+ 	depends on !STATIC && BUILD_LIBBUSYBOX
+ 	help
+-	  Use libbusybox.so also for busybox itself.
+ 	  You need to have a working dynamic linker to use this variant.
+ 
+ config LFS
+@@ -331,24 +330,24 @@ config LFS
+ 	  cp, mount, tar, and many others.  If you want to access files larger
+ 	  than 2 Gigabytes, enable this option.  Otherwise, leave it set to 'N'.
+ 
+-config BUILD_AT_ONCE
+-	bool "Compile all sources at once"
+-	default n
+-	help
+-	  Normally each source-file is compiled with one invocation of
+-	  the compiler.
+-	  If you set this option, all sources are compiled at once.
+-	  This gives the compiler more opportunities to optimize which can
+-	  result in smaller and/or faster binaries.
+-
+-	  Setting this option will consume alot of memory, e.g. if you
+-	  enable all applets with all features, gcc uses more than 300MB
+-	  RAM during compilation of busybox.
+-
+-	  This option is most likely only beneficial for newer compilers
+-	  such as gcc-4.1 and above.
+-
+-	  Say 'N' unless you know what you are doing.
++### config BUILD_AT_ONCE
++###	bool "Compile all sources at once"
++###	default n
++###	help
++###	  Normally each source-file is compiled with one invocation of
++###	  the compiler.
++###	  If you set this option, all sources are compiled at once.
++###	  This gives the compiler more opportunities to optimize which can
++###	  result in smaller and/or faster binaries.
++###
++###	  Setting this option will consume alot of memory, e.g. if you
++###	  enable all applets with all features, gcc uses more than 300MB
++###	  RAM during compilation of busybox.
++###
++###	  This option is most likely only beneficial for newer compilers
++###	  such as gcc-4.1 and above.
++###
++###	  Say 'N' unless you know what you are doing.
+ 
+ endmenu
+ 
+diff --git a/Makefile.flags b/Makefile.flags
+index 764ce16..5294915 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -3,6 +3,7 @@
+ # ==========================================================================
+ 
+ BB_VER = $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
++export BB_VER
+ SKIP_STRIP = n
+ 
+ # -std=gnu99 needed for [U]LLONG_MAX on some systems
+@@ -59,7 +60,7 @@ ifeq ($(CONFIG_STATIC),y)
+ LDFLAGS += -static
+ endif
+ 
+-LDLIBS = m crypt
++LDLIBS += m crypt
+ 
+ ifeq ($(CONFIG_PAM),y)
+ LDLIBS += pam pam_misc
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index ca478b3..21b496c 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -260,7 +260,7 @@ int udhcpc_main(int argc, char **argv)
+ 	if (opt & OPT_t)
+ 		client_config.retries = xatoi_u(str_t);
+ 	if (opt & OPT_v) {
+-		printf("version %s\n", BB_VER);
++		puts("version "BB_VER);
+ 		return 0;
+ 	}
+ 
+@@ -283,7 +283,7 @@ int udhcpc_main(int argc, char **argv)
+ 	/* if (!..) bb_perror_msg("cannot create pidfile %s", pidfile); */
+ 
+ 	/* Goes to stdout and possibly syslog */
+-	bb_info_msg("%s (v%s) started", applet_name, BB_VER);
++	bb_info_msg("%s (v"BB_VER") started", applet_name);
+ 
+ 	/* if not set, and not suppressed, setup the default client ID */
+ 	if (!client_config.clientid && !(opt & OPT_C)) {
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 3466312..4343f1c 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -62,7 +62,7 @@ int udhcpd_main(int argc, char **argv)
+ 	write_pidfile(server_config.pidfile);
+ 	/* if (!..) bb_perror_msg("cannot create pidfile %s", pidfile); */
+ 
+-	bb_info_msg("%s (v%s) started", applet_name, BB_VER);
++	bb_info_msg("%s (v"BB_VER") started", applet_name);
+ 
+ 	option = find_option(server_config.options, DHCP_LEASE_TIME);
+ 	server_config.lease = LEASE_TIME;
+diff --git a/scripts/trylink b/scripts/trylink
+index c621b7c..de60a2c 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -101,35 +101,50 @@ else
+ 	    >/dev/null
+ fi
+ 
+-mkdir 0lib 2>/dev/null
+-test -d 0lib || exit 1
+-ln -s libbusybox.so.1.8.0 0lib/libbusybox.so 2>/dev/null
++. .config
+ 
+-EXE="0lib/libbusybox.so.1.8.0"
+-try $CC $LDFLAGS \
++sharedlib_dir="0_lib"
++
++if test "$CONFIG_BUILD_LIBBUSYBOX" = y; then
++    mkdir "$sharedlib_dir" 2>/dev/null
++    test -d "$sharedlib_dir" || {
++	echo "Cannot make directory $sharedlib_dir"
++	exit 1
++    }
++    ln -s "libbusybox.so.$BB_VER" "$sharedlib_dir"/libbusybox.so 2>/dev/null
++
++    EXE="$sharedlib_dir/libbusybox.so.${BB_VER}_unstripped"
++    try $CC $LDFLAGS \
+ 	-o $EXE -Wl,-Map -Wl,$EXE.map \
+ 	-shared -fPIC -Wl,--enable-new-dtags \
+ 	-Wl,--start-group -Wl,--whole-archive $A_FILES -Wl,--no-whole-archive -Wl,--end-group \
+ 	$l_list -Wl,--verbose \
+-	-Wl,-soname="libbusybox.so.1.8.0" \
++	-Wl,-soname="libbusybox.so.$BB_VER" \
+ 	-Wl,-z,combreloc \
+ 	>/dev/null \
+-|| {
+-    echo "Linking $EXE failed"
+-    exit 1
+-}
+-strip -s --remove-section=.note --remove-section=.comment $EXE
++    || {
++	echo "Linking $EXE failed"
++	cat $EXE.out
++	exit 1
++    }
++    strip -s --remove-section=.note --remove-section=.comment $EXE -o "$sharedlib_dir/libbusybox.so.$BB_VER"
++    echo "libbusybox: $sharedlib_dir/libbusybox.so.$BB_VER"
++fi
+ 
+-EXE="0lib/busybox"
+-try $CC $LDFLAGS \
++if test "$CONFIG_FEATURE_SHARED_BUSYBOX" = y; then
++    EXE="$sharedlib_dir/busybox_unstripped"
++    try $CC $LDFLAGS \
+ 	-o $EXE -Wl,-Map -Wl,$EXE.map \
+ 	-Wl,--warn-common -Wl,--sort-common -Wl,--gc-sections \
+ 	-Wl,--start-group $O_FILES -Wl,--end-group \
+ 	$l_list -Wl,--verbose \
+-	-L"0lib" -lbusybox \
++	-L"$sharedlib_dir" -lbusybox \
+ 	>/dev/null \
+-|| {
+-    echo "Linking $EXE failed"
+-    exit 1
+-}
+-strip -s --remove-section=.note --remove-section=.comment $EXE
++    || {
++	echo "Linking $EXE failed"
++	cat $EXE.out
++	exit 1
++    }
++    strip -s --remove-section=.note --remove-section=.comment $EXE -o "$sharedlib_dir/busybox"
++    echo "busybox linked against libbusybox: $sharedlib_dir/busybox"
++fi

@@ -1,0 +1,615 @@
+2007-05-30 00:29:55 +0000
+diff --git a/archival/libunarchive/decompress_bunzip2.c b/archival/libunarchive/decompress_bunzip2.c
+index 3f0b0f6..a9d5d68 100644
+--- a/archival/libunarchive/decompress_bunzip2.c
++++ b/archival/libunarchive/decompress_bunzip2.c
+@@ -692,8 +692,8 @@ int start_bunzip(bunzip_data **bdp, int in_fd, const unsigned char *inbuf,
+ 
+ void dealloc_bunzip(bunzip_data *bd)
+ {
+-        free(bd->dbuf);
+-        free(bd);
++	free(bd->dbuf);
++	free(bd);
+ }
+ 
+ 
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index 488a7f8..e6d054f 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -632,7 +632,7 @@ static void display_speed(const struct termios *mode, int fancy)
+ 	ospeed = ispeed = cfgetispeed(mode);
+ 	if (ispeed == 0 || ispeed == (ospeed = cfgetospeed(mode))) {
+ 		ispeed = ospeed;                /* in case ispeed was 0 */
+-	                 //0123 4 5 6 7 8 9
++		         //0123 4 5 6 7 8 9
+ 		fmt_str = "%lu\n\0\0\0\0\0speed %lu baud;";
+ 	}
+ 	if (fancy) fmt_str += 9;
+diff --git a/docs/new-applet-HOWTO.txt b/docs/new-applet-HOWTO.txt
+index 2bc938f..05ff92f 100644
+--- a/docs/new-applet-HOWTO.txt
++++ b/docs/new-applet-HOWTO.txt
+@@ -97,15 +97,15 @@ int function(char *a)
+ 
+ ----end example code------
+ 
+-Add <function_name>.o in the right alphabetically sorted place 
+-in libbb/Kbuild. You should look at the conditional part of 
++Add <function_name>.o in the right alphabetically sorted place
++in libbb/Kbuild. You should look at the conditional part of
+ libbb/Kbuild aswell.
+ 
+-You should also try to find a suitable place in include/libbb.h for 
++You should also try to find a suitable place in include/libbb.h for
+ the function declaration. If not, add it somewhere anyway, with or without
+ ifdefs to include or not.
+ 
+-You can look at libbb/Config.in and try to find out if the function is 
++You can look at libbb/Config.in and try to find out if the function is
+ tuneable and add it there if it is.
+ 
+ 
+@@ -170,10 +170,10 @@ The Grand Announcement
+ 
+ Then create a diff by adding the new files with svn (remember your libbb files)
+ 	svn add <where you put it>/mu.c
+-eventually also: 
++eventually also:
+ 	svn add libbb/function.c
+ then
+-	svn diff 
++	svn diff
+ and send it to the mailing list:
+ 	busybox@busybox.net
+ 	http://busybox.net/mailman/listinfo/busybox
+diff --git a/docs/nofork_noexec.txt b/docs/nofork_noexec.txt
+index 51bbcba..d4abdf4 100644
+--- a/docs/nofork_noexec.txt
++++ b/docs/nofork_noexec.txt
+@@ -12,7 +12,7 @@ are exactly those applets which are eligible for these tricks.
+ 
+ Applet will be subject to NOFORK/NOEXEC tricks if it is marked as such
+ in applets.h. CONFIG_FEATURE_PREFER_APPLETS is a config option which
+-globally enables usage of NOFORK/NOEXEC tricks. 
++globally enables usage of NOFORK/NOEXEC tricks.
+ 
+ If you want to call a program and wait for it, use spawn_and_wait(argv).
+ It will check whether argv[0] is an applet name and will optionally
+diff --git a/editors/sed.c b/editors/sed.c
+index b3c4430..d49627f 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1223,7 +1223,7 @@ int sed_main(int argc, char **argv)
+ 	int status = EXIT_SUCCESS;
+ 
+ 	if (sizeof(struct globals) > sizeof(bb_common_bufsiz1))
+-	        BUG_sed_globals_too_big();
++		BUG_sed_globals_too_big();
+ 
+ 	G.sed_cmd_tail = &G.sed_cmd_head;
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index 4561ef6..5e0b438 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -590,7 +590,7 @@ void *llist_pop(llist_t **elm);
+ void llist_unlink(llist_t **head, llist_t *elm);
+ void llist_free(llist_t *elm, void (*freeit)(void *data));
+ llist_t *llist_rev(llist_t *list);
+-/* BTW, surprisingly, changing API to 
++/* BTW, surprisingly, changing API to
+  *   llist_t *llist_add_to(llist_t *old_head, void *data)
+  * etc does not result in smaller code... */
+ 
+diff --git a/include/usage.h b/include/usage.h
+index 4a18d6a..085bbdd 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -578,10 +578,10 @@
+        "Deallocate unused virtual terminal /dev/ttyN"
+ 
+ #define delgroup_trivial_usage \
+-        USE_FEATURE_DEL_USER_FROM_GROUP("[USER] ")"GROUP"
++	USE_FEATURE_DEL_USER_FROM_GROUP("[USER] ")"GROUP"
+ #define delgroup_full_usage \
+        "Delete group GROUP from the system" \
+-        USE_FEATURE_DEL_USER_FROM_GROUP(" or user USER from group GROUP")
++	USE_FEATURE_DEL_USER_FROM_GROUP(" or user USER from group GROUP")
+ 
+ #define deluser_trivial_usage \
+        "USER"
+@@ -966,7 +966,7 @@
+ 	) USE_FEATURE_FIND_EXEC( \
+        "\n	-exec CMD	Execute CMD with all instances of {} replaced by the" \
+        "\n			files matching EXPRESSION" \
+-        ) USE_FEATURE_FIND_USER( \
++	) USE_FEATURE_FIND_USER( \
+        "\n	-user NAME	File is owned by user NAME (numeric user ID allowed)" \
+ 	) USE_FEATURE_FIND_GROUP( \
+        "\n	-group NAME	File belongs to group NAME (numeric group ID allowed)" \
+@@ -976,9 +976,9 @@
+        "\n	-size N		File size is N" \
+ 	) USE_FEATURE_FIND_PRUNE( \
+        "\n	-prune		Stop traversing current subtree" \
+-        ) USE_FEATURE_FIND_DELETE( \
++	) USE_FEATURE_FIND_DELETE( \
+        "\n	-delete		Delete files; Turns on -depth option" \
+-        ) USE_FEATURE_FIND_PATH( \
++	) USE_FEATURE_FIND_PATH( \
+        "\n	-path		Path matches PATTERN" \
+ 	) USE_FEATURE_FIND_PAREN( \
+        "\n	(EXPR)		Group an expression" \
+diff --git a/ipsvd/ipsvd_perhost.c b/ipsvd/ipsvd_perhost.c
+index ed802f0..d4c0d79 100644
+--- a/ipsvd/ipsvd_perhost.c
++++ b/ipsvd/ipsvd_perhost.c
+@@ -31,7 +31,7 @@ unsigned ipsvd_perhost_add(char *ip, unsigned maxconn, struct hcc **hccpp)
+ 	for (i = 0; i < cclen; ++i) {
+ 		if (!cc[i].ip) {
+ 			freepos = i;
+-    			continue;
++			continue;
+ 		}
+ 		if (strcmp(cc[i].ip, ip) == 0) {
+ 			conn++;
+diff --git a/ipsvd/ipsvd_perhost.h b/ipsvd/ipsvd_perhost.h
+index cf08000..afe2c29 100644
+--- a/ipsvd/ipsvd_perhost.h
++++ b/ipsvd/ipsvd_perhost.h
+@@ -8,8 +8,8 @@
+  */
+ 
+ struct hcc {
+-        char *ip;
+-        int pid;
++	char *ip;
++	int pid;
+ };
+ 
+ void ipsvd_perhost_init(unsigned);
+diff --git a/libbb/match_fstype.c b/libbb/match_fstype.c
+index 7698ceb..bd4dbb0 100644
+--- a/libbb/match_fstype.c
++++ b/libbb/match_fstype.c
+@@ -19,7 +19,7 @@ int match_fstype(const struct mntent *mt, const char *fstype)
+ 
+ 	if (!mt)
+ 		return -1;
+-		  
++
+ 	if (!fstype)
+ 		return 0;
+ 
+diff --git a/libbb/udp_io.c b/libbb/udp_io.c
+index d834a23..7e48d32 100644
+--- a/libbb/udp_io.c
++++ b/libbb/udp_io.c
+@@ -51,7 +51,7 @@ send_to_from(int fd, void *buf, size_t len, int flags,
+ 		/* ANY local address */
+ 		return sendto(fd, buf, len, flags, to, tolen);
+ 	}
+-	
++
+ 	/* man recvmsg and man cmsg is needed to make sense of code below */
+ 
+ 	iov[0].iov_base = buf;
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index 919091e..cab7a11 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -79,7 +79,7 @@ config FEATURE_DEL_USER_FROM_GROUP
+ 	default n
+ 	depends on DELGROUP
+ 	help
+-	  If called with two non-option arguments, deluser 
++	  If called with two non-option arguments, deluser
+ 	  or delgroup will remove an user from a specified group.
+ 
+ config ADDUSER
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index 2487aad..b29b665 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -23,7 +23,7 @@ static void xgroup_study(struct group *g)
+ 		goto error;
+ 	}
+ 
+-	/* Check if the desired gid is free or 
++	/* Check if the desired gid is free or
+ 	   find the first free one */
+ 	do {
+ 		if (g->gr_gid == max) { /* out of bounds: exit */
+@@ -147,7 +147,7 @@ int addgroup_main(int argc, char **argv)
+ #if ENABLE_FEATURE_ADDUSER_TO_GROUP
+ 	if (argc == 2) {
+ 		struct group *gr;
+-		
++
+ 		/* check if group and user exist */
+ 		xuname2uid(argv[0]); /* unknown user: exit */
+ 		xgroup2gid(argv[1]); /* unknown group: exit */
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index 0c298c5..dd73046 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -1,7 +1,7 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+  * cryptpw.c
+- * 
++ *
+  * Cooked from passwd.c by Thomas Lundquist <thomasez@zelow.no>
+  */
+ 
+diff --git a/loginutils/deluser.c b/loginutils/deluser.c
+index 59e69b9..0e4f02d 100644
+--- a/loginutils/deluser.c
++++ b/loginutils/deluser.c
+@@ -96,14 +96,14 @@ static void del_line_matching(char **args,
+ int deluser_main(int argc, char **argv);
+ int deluser_main(int argc, char **argv)
+ {
+-	if (argc == 2 
+-	 || (ENABLE_FEATURE_DEL_USER_FROM_GROUP 
++	if (argc == 2
++	 || (ENABLE_FEATURE_DEL_USER_FROM_GROUP
+ 	    && (applet_name[3] == 'g' && argc == 3))
+ 	) {
+ 		if (geteuid())
+ 			bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+-		
+-		if ((ENABLE_FEATURE_DEL_USER_FROM_GROUP && argc != 3) 
++
++		if ((ENABLE_FEATURE_DEL_USER_FROM_GROUP && argc != 3)
+ 		 || ENABLE_DELUSER
+ 		 || (ENABLE_DELGROUP && ENABLE_DESKTOP)
+ 		) {
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 181ac5f..fe4c67a 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -39,7 +39,7 @@
+ #define LENGTH_FW_REV		 4  /*  4 words (8 bytes or characters) */
+ #define START_MODEL		27  /* ASCII model number */
+ #define LENGTH_MODEL		20  /* 20 words (40 bytes or characters) */
+-#define SECTOR_XFER_MAX	        47  /* r/w multiple: max sectors xfered */
++#define SECTOR_XFER_MAX		47  /* r/w multiple: max sectors xfered */
+ #define DWORD_IO		48  /* can do double-word IO (ATA-1 only) */
+ #define CAPAB_0			49  /* capabilities */
+ #define CAPAB_1			50
+@@ -48,7 +48,7 @@
+ #define WHATS_VALID		53  /* what fields are valid */
+ #define LCYLS_CUR		54  /* current logical cylinders */
+ #define LHEADS_CUR		55  /* current logical heads */
+-#define LSECTS_CUR	        56  /* current logical sectors/track */
++#define LSECTS_CUR		56  /* current logical sectors/track */
+ #define CAPACITY_LSB		57  /* current capacity in sectors */
+ #define CAPACITY_MSB		58
+ #define SECTOR_XFER_CUR		59  /* r/w multiple: current sectors xfered */
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 8e8341e..2b748f1 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -484,7 +484,7 @@ static int dhcp_up(struct interface_defn_t *ifd, execfn *exec)
+ 			ifd, exec);
+ #else
+ 	return 0; /* no dhcp support */
+-#endif 
++#endif
+ }
+ 
+ static int dhcp_down(struct interface_defn_t *ifd, execfn *exec)
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 3e333b7..5096e32 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -350,7 +350,7 @@ create new one, and bind() it. TODO */
+ 				close(rr);
+ 				goto again;
+ 			}
+-			
++
+ 		} else
+ 			bb_error_msg_and_die("timeout");
+ 		unarm();
+@@ -720,7 +720,7 @@ int nc_main(int argc, char **argv)
+ 	}
+ 	proggie = NULL;
+  e_found:
+-		
++
+ 	// -g -G -t -r deleted, unimplemented -a deleted too
+ 	opt_complementary = "?2:vv"; /* max 2 params, -v is a counter */
+ 	getopt32(argc, argv, "hnp:s:uvw:" USE_NC_SERVER("l")
+diff --git a/networking/netstat.c b/networking/netstat.c
+index 38091ae..d6c10b0 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -98,13 +98,13 @@ static void build_ipv6_addr(char* local_addr, struct sockaddr_in6* localaddr)
+ {
+ 	char addr6[INET6_ADDRSTRLEN];
+ 	struct in6_addr in6;
+-		
++
+ 	sscanf(local_addr, "%08X%08X%08X%08X",
+ 		   &in6.s6_addr32[0], &in6.s6_addr32[1],
+ 		   &in6.s6_addr32[2], &in6.s6_addr32[3]);
+ 	inet_ntop(AF_INET6, &in6, addr6, sizeof(addr6));
+ 	inet_pton(AF_INET6, addr6, (struct sockaddr *) &localaddr->sin6_addr);
+-		
++
+ 	localaddr->sin6_family = AF_INET6;
+ }
+ #endif
+@@ -154,7 +154,7 @@ static void snprint_ip_port(char *ip_port, int size, struct sockaddr *addr, int
+ 			0xffffffff);
+ 	}
+ 	port_name = get_sname(htons(port), proto, numeric);
+-	
++
+ 	max_len = (option_mask32 & OPT_widedisplay)
+ 			? (PRINT_IP_MAX_SIZE_WIDE - 1)
+ 			: (PRINT_IP_MAX_SIZE - 1);
+@@ -292,7 +292,7 @@ static void udp_do_one(int lnr, const char *line)
+ 				(struct sockaddr *) &remaddr, rem_port,
+ 				"udp", flags & NETSTAT_NUMERIC);
+ 			printf(net_conn_line,
+-				"udp", rxq, txq, local_addr, rem_addr, state_str);	
++				"udp", rxq, txq, local_addr, rem_addr, state_str);
+ 		}
+ 	}
+ }
+diff --git a/networking/tftp.c b/networking/tftp.c
+index e1e278a..8517830 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -353,7 +353,7 @@ static int tftp( USE_GETPUT(const int cmd,)
+ 				/* Server lost our TFTP_ACK.  Resend it */
+ 				block_nr = recv_blk;
+ 				continue;
+-			} 
++			}
+ 		}
+ 
+ 		if (CMD_PUT(cmd) && (opcode == TFTP_ACK)) {
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 9f96e8b..778121b 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -37,8 +37,8 @@ int udhcpd_main(int argc, char **argv)
+ //Huh, dhcpd don't have --foreground, --syslog options?? TODO
+ 
+ 	if (!ENABLE_FEATURE_UDHCP_DEBUG) {
+-    		bb_daemonize_or_rexec(DAEMON_CHDIR_ROOT, argv);
+-    		logmode &= ~LOGMODE_STDIO;
++		bb_daemonize_or_rexec(DAEMON_CHDIR_ROOT, argv);
++		logmode &= ~LOGMODE_STDIO;
+ 	}
+ 
+ 	if (ENABLE_FEATURE_UDHCP_SYSLOG) {
+diff --git a/scripts/basic/docproc.c b/scripts/basic/docproc.c
+index a1b761b..e178d72 100644
+--- a/scripts/basic/docproc.c
++++ b/scripts/basic/docproc.c
+@@ -123,7 +123,7 @@ int symfilecnt = 0;
+ void add_new_symbol(struct symfile *sym, char * symname)
+ {
+ 	sym->symbollist =
+-          realloc(sym->symbollist, (sym->symbolcnt + 1) * sizeof(char *));
++	  realloc(sym->symbollist, (sym->symbolcnt + 1) * sizeof(char *));
+ 	sym->symbollist[sym->symbolcnt++].name = strdup(symname);
+ }
+ 
+@@ -182,7 +182,7 @@ void find_export_symbols(char * filename)
+ 			char *p;
+ 			char *e;
+ 			if (((p = strstr(line, "EXPORT_SYMBOL_GPL")) != 0) ||
+-                            ((p = strstr(line, "EXPORT_SYMBOL")) != 0)) {
++			    ((p = strstr(line, "EXPORT_SYMBOL")) != 0)) {
+ 				/* Skip EXPORT_SYMBOL{_GPL} */
+ 				while (isalnum(*p) || *p == '_')
+ 					p++;
+@@ -256,24 +256,24 @@ void extfunc(char * filename) { docfunctions(filename, FUNCTION);   }
+ void singfunc(char * filename, char * line)
+ {
+ 	char *vec[200]; /* Enough for specific functions */
+-        int i, idx = 0;
+-        int startofsym = 1;
++	int i, idx = 0;
++	int startofsym = 1;
+ 	vec[idx++] = KERNELDOC;
+ 	vec[idx++] = DOCBOOK;
+ 
+-        /* Split line up in individual parameters preceeded by FUNCTION */
+-        for (i=0; line[i]; i++) {
+-                if (isspace(line[i])) {
+-                        line[i] = '\0';
+-                        startofsym = 1;
+-                        continue;
+-                }
+-                if (startofsym) {
+-                        startofsym = 0;
+-                        vec[idx++] = FUNCTION;
+-                        vec[idx++] = &line[i];
+-                }
+-        }
++	/* Split line up in individual parameters preceeded by FUNCTION */
++	for (i=0; line[i]; i++) {
++		if (isspace(line[i])) {
++			line[i] = '\0';
++			startofsym = 1;
++			continue;
++		}
++		if (startofsym) {
++			startofsym = 0;
++			vec[idx++] = FUNCTION;
++			vec[idx++] = &line[i];
++		}
++	}
+ 	vec[idx++] = filename;
+ 	vec[idx] = NULL;
+ 	exec_kernel_doc(vec);
+@@ -307,14 +307,14 @@ void parse_file(FILE *infile)
+ 					break;
+ 				case 'D':
+ 					while (*s && !isspace(*s)) s++;
+-                                        *s = '\0';
+-                                        symbolsonly(line+2);
+-                                        break;
++					*s = '\0';
++					symbolsonly(line+2);
++					break;
+ 				case 'F':
+ 					/* filename */
+ 					while (*s && !isspace(*s)) s++;
+ 					*s++ = '\0';
+-                                        /* function names */
++					/* function names */
+ 					while (isspace(*s))
+ 						s++;
+ 					singlefunctions(line +2, s);
+@@ -340,11 +340,11 @@ int main(int argc, char **argv)
+ 	}
+ 	/* Open file, exit on error */
+ 	infile = fopen(argv[2], "r");
+-        if (infile == NULL) {
+-                fprintf(stderr, "docproc: ");
+-                perror(argv[2]);
+-                exit(2);
+-        }
++	if (infile == NULL) {
++		fprintf(stderr, "docproc: ");
++		perror(argv[2]);
++		exit(2);
++	}
+ 
+ 	if (strcmp("doc", argv[1]) == 0)
+ 	{
+diff --git a/scripts/kconfig/conf.c b/scripts/kconfig/conf.c
+index 02693b7..2a1a59f 100644
+--- a/scripts/kconfig/conf.c
++++ b/scripts/kconfig/conf.c
+@@ -536,7 +536,7 @@ int main(int ac, char **av)
+ 			exit(0);
+ 		}
+ 	}
+-  	name = av[i];
++	name = av[i];
+ 	if (!name) {
+ 		printf(_("%s: Kconfig file missing\n"), av[0]);
+ 	}
+diff --git a/scripts/kconfig/expr.c b/scripts/kconfig/expr.c
+index 30e4f9d..6f39e7a 100644
+--- a/scripts/kconfig/expr.c
++++ b/scripts/kconfig/expr.c
+@@ -824,7 +824,7 @@ bool expr_depends_symbol(struct expr *dep, struct symbol *sym)
+ 	default:
+ 		;
+ 	}
+- 	return false;
++	return false;
+ }
+ 
+ struct expr *expr_extract_eq_and(struct expr **ep1, struct expr **ep2)
+diff --git a/scripts/kconfig/gconf.c b/scripts/kconfig/gconf.c
+index 6d37299..fd3002b 100644
+--- a/scripts/kconfig/gconf.c
++++ b/scripts/kconfig/gconf.c
+@@ -1516,7 +1516,7 @@ static void display_tree(struct menu *menu)
+ 		    && (tree == tree2))
+ 			continue;
+ /*
+-                if (((menu != &rootmenu) && !(menu->flags & MENU_ROOT))
++		if (((menu != &rootmenu) && !(menu->flags & MENU_ROOT))
+ 		    || (view_mode == FULL_VIEW)
+ 		    || (view_mode == SPLIT_VIEW))*/
+ 		if (((view_mode == SINGLE_VIEW) && (menu->flags & MENU_ROOT))
+diff --git a/scripts/kconfig/kconfig_load.c b/scripts/kconfig/kconfig_load.c
+index dbdcaad..5e87dd5 100644
+--- a/scripts/kconfig/kconfig_load.c
++++ b/scripts/kconfig/kconfig_load.c
+@@ -25,8 +25,8 @@ void kconfig_load(void)
+ #define P(name,type,arg)			\
+ {						\
+ 	name ## _p = dlsym(handle, #name);	\
+-        if ((error = dlerror()))  {		\
+-                fprintf(stderr, "%s\n", error);	\
++	if ((error = dlerror()))  {		\
++		fprintf(stderr, "%s\n", error);	\
+ 		exit(1);			\
+ 	}					\
+ }
+diff --git a/shell/hush.c b/shell/hush.c
+index 6844f06..7aad6e6 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -415,7 +415,7 @@ enum { run_list_level = 0 };
+ #define shell_ver        (G.shell_ver       )
+ #if ENABLE_FEATURE_SH_STANDALONE
+ #define nofork_save      (G.nofork_save     )
+-#endif                     
++#endif
+ #if ENABLE_HUSH_JOB
+ #define toplevel_jb      (G.toplevel_jb     )
+ #endif
+@@ -1876,7 +1876,7 @@ static int run_pipe_real(struct pipe *pi)
+ 	return -1;
+ }
+ 
+-#ifndef debug_print_tree	
++#ifndef debug_print_tree
+ static void debug_print_tree(struct pipe *pi, int lvl)
+ {
+ 	static const char *PIPE[] = {
+@@ -1929,7 +1929,7 @@ static void debug_print_tree(struct pipe *pi, int lvl)
+ 			if (argv) while (*argv) {
+ 				fprintf(stderr, " '%s'", *argv);
+ 				argv++;
+-			}				
++			}
+ 			fprintf(stderr, "\n");
+ 			prn++;
+ 		}
+@@ -2114,7 +2114,7 @@ static int run_list_real(struct pipe *pi)
+ 			 * try "{ { sleep 10; echo DEEP; } & echo HERE; } &".
+ 			 * I'm NOT treating inner &'s as jobs */
+ #if ENABLE_HUSH_JOB
+-			if (run_list_level == 1) 
++			if (run_list_level == 1)
+ 				insert_bg_job(pi);
+ #endif
+ 			rcode = EXIT_SUCCESS;
+diff --git a/shell/msh.c b/shell/msh.c
+index ac49af1..d81a001 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -58,10 +58,10 @@ static char *utoa_to_buf(unsigned n, char *buf, unsigned buflen)
+ 		for (i = 1000000000; i; i /= 10) {
+ 			res = n / i;
+ 			if (res || out || i == 1) {
+-	    			if (!--buflen) break;
+-	    			out++;
+-	    			n -= res*i;
+-	    			*buf++ = '0' + res;
++				if (!--buflen) break;
++				out++;
++				n -= res*i;
++				*buf++ = '0' + res;
+ 			}
+ 		}
+ 	}
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index b4749c1..06c3488 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -287,7 +287,7 @@ int getopt_main(int argc, char *argv[])
+ 	char *name = NULL;
+ 	unsigned opt;
+ 	const char *compatible;
+-	char *s_arg; 
++	char *s_arg;
+ #if ENABLE_GETOPT_LONG
+ 	struct option *long_options = NULL;
+ 	llist_t *l_arg = NULL;

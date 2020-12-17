@@ -1,0 +1,169 @@
+2007-08-23 10:52:52 +0000
+diff --git a/console-tools/chvt.c b/console-tools/chvt.c
+index 86d3f2d..b1f81a2 100644
+--- a/console-tools/chvt.c
++++ b/console-tools/chvt.c
+@@ -25,8 +25,9 @@ int chvt_main(int argc, char **argv)
+ 	}
+ 
+ 	fd = get_console_fd();
+-	num = xatoul_range(argv[1], 1, 63);
+-	xioctl(fd, VT_ACTIVATE, (void *)num);
+-	xioctl(fd, VT_WAITACTIVE, (void *)num);
++	num = xatou_range(argv[1], 1, 63);
++	/* double cast suppresses "cast to ptr from int of different size */
++	xioctl(fd, VT_ACTIVATE, (void *)(ptrdiff_t)num);
++	xioctl(fd, VT_WAITACTIVE, (void *)(ptrdiff_t)num);
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/console-tools/deallocvt.c b/console-tools/deallocvt.c
+index a690266..bf2bac1 100644
+--- a/console-tools/deallocvt.c
++++ b/console-tools/deallocvt.c
+@@ -23,7 +23,7 @@ int deallocvt_main(int argc, char **argv)
+ 
+ 	switch (argc) {
+ 	case 2:
+-		num = xatoul_range(argv[1], 1, 63);
++		num = xatou_range(argv[1], 1, 63);
+ 		/* Fallthrough */
+ 	case 1:
+ 		break;
+@@ -31,6 +31,7 @@ int deallocvt_main(int argc, char **argv)
+ 		bb_show_usage();
+ 	}
+ 
+-	xioctl(get_console_fd(), VT_DISALLOCATE, (void *)num);
++	/* double cast suppresses "cast to ptr from int of different size */
++	xioctl(get_console_fd(), VT_DISALLOCATE, (void *)(ptrdiff_t)num);
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/findutils/find.c b/findutils/find.c
+index 86f787d..2158468 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -881,7 +881,9 @@ USE_FEATURE_FIND_MAXDEPTH(OPT_MAXDEPTH,)
+ 				fileAction,     /* file action */
+ 				fileAction,     /* dir action */
+ #if ENABLE_FEATURE_FIND_MAXDEPTH
+-				(void*)maxdepth,/* user data */
++				/* double cast suppresses
++				 * "cast to ptr from int of different size" */
++				(void*)(ptrdiff_t)maxdepth,/* user data */
+ #else
+ 				NULL,           /* user data */
+ #endif
+diff --git a/networking/udhcp/socket.c b/networking/udhcp/socket.c
+index 79ddfb1..2cbd4aa 100644
+--- a/networking/udhcp/socket.c
++++ b/networking/udhcp/socket.c
+@@ -91,7 +91,7 @@ int listen_socket(/*uint32_t ip,*/ int port, const char *inf)
+ 	struct ifreq interface;
+ 	struct sockaddr_in addr;
+ 
+-	DEBUG("Opening listen socket on 0x%08x:%d %s", ip, port, inf);
++	DEBUG("Opening listen socket on *:%d %s", port, inf);
+ 	fd = xsocket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+ 
+ 	setsockopt_reuseaddr(fd);
+diff --git a/procps/top.c b/procps/top.c
+index 494509c..c02a959 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -212,6 +212,31 @@ static void do_stats(void)
+ }
+ #endif /* FEATURE_TOP_CPU_USAGE_PERCENTAGE */
+ 
++#if ENABLE_FEATURE_TOP_CPU_GLOBAL_PERCENTS && ENABLE_FEATURE_TOP_DECIMALS
++/* formats 7 char string (8 with terminating NUL) */
++static char *fmt_100percent_8(char pbuf[8], unsigned value, unsigned total)
++{
++	unsigned t;
++	if (value >= total) { /* 100% ? */
++		strcpy(pbuf, "  100% ");
++		return pbuf;
++	}
++	/* else generate " [N/space]N.N% " string */
++	value = 1000 * value / total;
++	t = value / 100;
++	value = value % 100;
++	pbuf[0] = ' ';
++	pbuf[1] = t ? t + '0' : ' ';
++	pbuf[2] = '0' + (value / 10);
++	pbuf[3] = '.';
++	pbuf[4] = '0' + (value % 10);
++	pbuf[5] = '%';
++	pbuf[6] = ' ';
++	pbuf[7] = '\0';
++	return pbuf;
++}
++#endif
++
+ /* display generic info (meminfo / loadavg) */
+ static unsigned long display_generic(int scr_width)
+ {
+@@ -219,37 +244,10 @@ static unsigned long display_generic(int scr_width)
+ 	char buf[80];
+ 	char scrbuf[80];
+ 	unsigned long total, used, mfree, shared, buffers, cached;
+-#if ENABLE_FEATURE_TOP_DECIMALS || ENABLE_FEATURE_TOP_CPU_GLOBAL_PERCENTS
++#if ENABLE_FEATURE_TOP_CPU_GLOBAL_PERCENTS
+ 	unsigned total_diff;
+ #endif
+ 
+-#if ENABLE_FEATURE_TOP_DECIMALS
+-	/* formats 7 char string (8 with terminating NUL) */
+-	/* using GCCism (nested function) - we need to access total_diff */
+-	/* This produces more than 100 bytes smaller code */
+-	char *fmt_100percent_8(char pbuf[8], unsigned value)
+-	{
+-		unsigned t;
+-		if (value >= total_diff) { /* 100% ? */
+-			strcpy(pbuf, "  100% ");
+-			return pbuf;
+-		}
+-		/* else generate " [N/space]N.N% " string */
+-		value = 1000 * value / total_diff;
+-		t = value / 100;
+-		value = value % 100;
+-		pbuf[0] = ' ';
+-		pbuf[1] = t ? t + '0' : ' ';
+-		pbuf[2] = '0' + (value / 10);
+-		pbuf[3] = '.';
+-		pbuf[4] = '0' + (value % 10);
+-		pbuf[5] = '%';
+-		pbuf[6] = ' ';
+-		pbuf[7] = '\0';
+-		return pbuf;
+-	}
+-#endif
+-
+ 	/* read memory info */
+ 	fp = xfopen("meminfo", "r");
+ 
+@@ -316,7 +314,7 @@ static unsigned long display_generic(int scr_width)
+ #if ENABLE_FEATURE_TOP_DECIMALS
+ /* Generated code is approx +0.3k */
+ #define CALC_STAT(xxx) char xxx[8]
+-#define SHOW_STAT(xxx) fmt_100percent_8(xxx, (unsigned)(jif.xxx - prev_jif.xxx))
++#define SHOW_STAT(xxx) fmt_100percent_8(xxx, (unsigned)(jif.xxx - prev_jif.xxx), total_diff)
+ #define FMT "%s"
+ #else
+ #define CALC_STAT(xxx) unsigned xxx = 100 * (unsigned)(jif.xxx - prev_jif.xxx) / total_diff
+diff --git a/runit/runit_lib.h b/runit/runit_lib.h
+index c73befc..c644f5b 100644
+--- a/runit/runit_lib.h
++++ b/runit/runit_lib.h
+@@ -86,9 +86,9 @@ extern unsigned pmatch(const char *, const char *, unsigned);
+  * runsv / supervise / sv stuff
+  */
+ typedef struct svstatus_t {
+-	uint64_t time_be64;
+-	uint32_t time_nsec_be32;
+-	uint32_t pid_le32;
++	uint64_t time_be64 ATTRIBUTE_PACKED;
++	uint32_t time_nsec_be32 ATTRIBUTE_PACKED;
++	uint32_t pid_le32 ATTRIBUTE_PACKED;
+ 	uint8_t  paused;
+ 	uint8_t  want;
+ 	uint8_t  got_term;

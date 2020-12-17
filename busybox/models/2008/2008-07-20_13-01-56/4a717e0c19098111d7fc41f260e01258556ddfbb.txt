@@ -1,0 +1,138 @@
+2008-07-20 13:01:56 +0000
+diff --git a/libbb/parse_config.c b/libbb/parse_config.c
+index 8d7c97e..68caa2c 100644
+--- a/libbb/parse_config.c
++++ b/libbb/parse_config.c
+@@ -25,7 +25,7 @@ int parse_main(int argc UNUSED_PARAM, char **argv)
+ 		if (p) {
+ 			int n;
+ 			char **t = xmalloc(sizeof(char *) * ntokens);
+-			while ((n = config_read(p, t, ntokens, mintokens, delims, flags)) > 0) {
++			while ((n = config_read(p, t, ntokens, mintokens, delims, flags)) != 0) {
+ 				for (int i = 0; i < n; ++i)
+ 					printf("[%s]", t[i]);
+ 				puts("");
+@@ -114,10 +114,8 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 	int ntokens = flags & 0xFF;
+ 	int mintokens = (flags & 0xFF00) >> 8;
+ 
+-	/*
+ 	// N.B. this could only be used in read-in-one-go version, or when tokens use xstrdup(). TODO
+-	if (!parser->lineno || !(flags & PARSE_DONT_NULL))
+-	*/
++	//if (!parser->lineno || !(flags & PARSE_DONT_NULL))
+ 		memset(tokens, 0, sizeof(tokens[0]) * ntokens);
+ 	config_free_data(parser);
+ 
+@@ -171,7 +169,7 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 			break;
+ 
+  next_line:
+-		/* skip empty line */
++		// skip empty line
+ 		free(line);
+ 	}
+ 
+@@ -183,9 +181,9 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 		parser->data = xstrdup(line);
+ 	}
+ 
+-	/* now split line to tokens */
++	// split line to tokens
+ 	ntokens--; // now it's max allowed token no
+-	// N.B, non-empty remainder is also a token,
++	// N.B. non-empty remainder is also a token,
+ 	// so if ntokens <= 1, we just return the whole line
+ 	// N.B. if PARSE_LAST_IS_GREEDY is set the remainder of the line is stuck to the last token
+ 	for (ii = 0; *line && ii <= ntokens; ) {
+@@ -193,7 +191,10 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 		// get next token
+ 		// at the last token and need greedy token ->
+ 		if ((flags & PARSE_LAST_IS_GREEDY) && (ii == ntokens)) {
+-			// ... don't cut the line
++			// skip possible delimiters
++			if (!(flags & PARSE_DONT_REDUCE))
++				line += strspn(line, delims);
++			// don't cut the line
+ 			q = line + strlen(line);
+ 		} else {
+ 			// vanilla token. cut the line at the first delim
+diff --git a/procps/sysctl.c b/procps/sysctl.c
+index 3607a23..6e582b0 100644
+--- a/procps/sysctl.c
++++ b/procps/sysctl.c
+@@ -88,56 +88,32 @@ int sysctl_main(int argc UNUSED_PARAM, char **argv)
+  * preload the sysctl's from a conf file
+  * - we parse the file and then reform it (strip out whitespace)
+  */
+-#define PRELOAD_BUF 256
+ 
+ static int sysctl_preload_file_and_exit(const char *filename)
+ {
+-	int lineno;
+-	char oneline[PRELOAD_BUF];
+-	char buffer[PRELOAD_BUF];
+-	char *name, *value;
+-	FILE *fp;
++	char *token[2];
++	parser_t *parser;
+ 
+-	fp = xfopen(filename, "r");
+-
+-	lineno = 0;
+-	while (fgets(oneline, sizeof(oneline) - 1, fp)) {
+-		lineno++;
+-		trim(oneline);
+-		if (oneline[0] == '#' || oneline[0] == ';')
+-			continue;
+-		if (!oneline[0] || !oneline[1])
+-			continue;
+-
+-		name = strtok(oneline, "=");
+-		if (!name) {
+-			bb_error_msg(WARN_BAD_LINE, filename, lineno);
+-			continue;
+-		}
+-		trim(name);
+-		if (!*name) {
+-			bb_error_msg(WARN_BAD_LINE, filename, lineno);
+-			continue;
+-		}
++	parser = config_open(filename);
++	if (!parser)
++		return 1;
+ 
+-		value = strtok(NULL, "\n\r");
+-		if (!value) {
+-			bb_error_msg(WARN_BAD_LINE, filename, lineno);
+-			continue;
+-		}
+-		while (*value == ' ' || *value == '\t')
+-			value++;
+-		if (!*value) {
+-			bb_error_msg(WARN_BAD_LINE, filename, lineno);
+-			continue;
++	while (config_read(parser, token, 2, 0, "# \t=", PARSE_LAST_IS_GREEDY)) { // TODO: ';' is comment char too
++		if (!token[1]) {
++			bb_error_msg(WARN_BAD_LINE, filename, parser->lineno);
++		} else {
++#if 0
++			char *s = xasprintf("%s=%s", token[0], token[1]);
++			sysctl_write_setting(s);
++			free(s);
++#else // PLAY_WITH_FIRE for -4 bytes?
++			sprintf(parser->line, "%s=%s", token[0], token[1]); // must have room by definition
++			sysctl_write_setting(parser->line);
++#endif
+ 		}
+-
+-		/* safe because sizeof(oneline) == sizeof(buffer) */
+-		sprintf(buffer, "%s=%s", name, value);
+-		sysctl_write_setting(buffer);
+ 	}
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+-		fclose(fp);
++		config_close(parser);
+ 	return 0;
+ } /* end sysctl_preload_file_and_exit() */
+ 

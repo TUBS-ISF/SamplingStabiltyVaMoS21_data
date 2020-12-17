@@ -1,0 +1,81 @@
+2008-10-29 13:16:28 +0000
+diff --git a/editors/vi.c b/editors/vi.c
+index 9f9a199..93e5647 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -270,7 +270,8 @@ struct globals {
+ #define INIT_G() do { \
+ 	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ 	last_file_modified = -1; \
+-	last_search_pattern = xzalloc(2); /* "" but has space for 2 chars */ \
++	/* "" but has space for 2 chars: */ \
++	USE_FEATURE_VI_SEARCH(last_search_pattern = xzalloc(2);) \
+ } while (0)
+ 
+ 
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 68b7c6c..b5d225a 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -272,7 +272,9 @@ static void re_wrap(void)
+ 	last_line_pos = new_line_pos;
+ 	cur_fline = new_cur_fline;
+ 	/* max_lineno is screen-size independent */
++#if ENABLE_FEATURE_LESS_REGEXP
+ 	pattern_valid = 0;
++#endif
+ }
+ #endif
+ 
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index ef6e03b..9602b89 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -261,11 +261,15 @@ int sendmail_main(int argc UNUSED_PARAM, char **argv)
+ 		OPT_N = 1 << 4,         // request notification
+ 		OPT_f = 1 << 5,         // sender address
+ 		OPT_F = 1 << 6,         // sender name, overrides $NAME
++#if ENABLE_FEATURE_SENDMAIL_MAILX
+ 		OPT_s = 1 << 7,         // subject
+ 		OPT_j = 1 << 8,         // assumed charset
+ 		OPT_a = 1 << 9,         // attachment(s)
++#if ENABLE_FEATURE_SENDMAIL_MAILXX
+ 		OPT_c = 1 << 10,        // carbon copy
+ 		OPT_e = 1 << 11,        // errors-to address
++#endif
++#endif
+ 	};
+ 
+ 	// init global variables
+@@ -405,10 +409,12 @@ int sendmail_main(int argc UNUSED_PARAM, char **argv)
+ 			} else if (0 == strncmp("Subject: ", s, 9)) {
+ 				// we read subject -> use it verbatim unless it is specified
+ 				// on command line
+-				if (!(opts & OPT_s))
+-					llist_add_to_end(&headers, s);
+-				else
++#if ENABLE_FEATURE_SENDMAIL_MAILX
++				if (opts & OPT_s)
+ 					free(s);
++				else
++#endif
++					llist_add_to_end(&headers, s);
+ 			} else if (s[0]) {
+ 				// misc header
+ 				llist_add_to_end(&headers, s);
+@@ -430,6 +436,7 @@ int sendmail_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	// put (possibly encoded) subject
++#if ENABLE_FEATURE_SENDMAIL_MAILX
+ 	if (opts & OPT_j)
+ 		sane((char *)opt_charset);
+ 	if (opts & OPT_s) {
+@@ -443,6 +450,7 @@ int sendmail_main(int argc UNUSED_PARAM, char **argv)
+ 		}
+ 		printf("\r\n");
+ 	}
++#endif
+ 
+ 	// put sender name, $NAME is the default
+ 	if (!(opts & OPT_F))

@@ -1,0 +1,80 @@
+2008-05-12 14:35:56 +0000
+diff --git a/miscutils/eject.c b/miscutils/eject.c
+index 42e0719..91cf98f 100644
+--- a/miscutils/eject.c
++++ b/miscutils/eject.c
+@@ -57,7 +57,7 @@ static void eject_scsi(const char *dev)
+ 	io_hdr.timeout = 2000;
+ 
+ 	for (i = 0; i < 3; i++) {
+-		io_hdr.cmdp = (char*)sg_commands[i];
++		io_hdr.cmdp = (void *)sg_commands[i];
+ 		ioctl_or_perror_and_die(dev_fd, SG_IO, (void *)&io_hdr, "%s", dev);
+ 	}
+ 
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index dd94a14..4ba726e 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -374,7 +374,7 @@ create new one, and bind() it. TODO */
+ 	 thing to emerge after all the intervening crud.  Doesn't work for UDP on
+ 	 any machines I've tested, but feel free to surprise me. */
+ 		char optbuf[40];
+-		int x = sizeof(optbuf);
++		socklen_t x = sizeof(optbuf);
+ 
+ 		rr = getsockopt(netfd, IPPROTO_IP, IP_OPTIONS, optbuf, &x);
+ 		if (rr < 0)
+@@ -487,7 +487,7 @@ static void oprint(int direction, unsigned char *p, unsigned bc)
+ 			memset(&stage[11], ' ', 16*3);
+ 			x = bc;
+ 		}
+-		sprintf(&stage[1], " %8.8x ", obc);  /* xxx: still slow? */
++		sprintf((char *)&stage[1], " %8.8x ", obc);  /* xxx: still slow? */
+ 		bc -= x;          /* fix current count */
+ 		obc += x;         /* fix current offset */
+ 		op = &stage[11];  /* where hex starts */
+@@ -627,8 +627,8 @@ Debug("got %d from the net, errno %d", rr, errno);
+ 		if (rnleft) {
+ 			rr = write(1, np, rnleft);
+ 			if (rr > 0) {
+-				if (o_ofile)
+-					oprint('<', np, rr);                /* log the stdout */
++				if (o_ofile) /* log the stdout */
++					oprint('<', (unsigned char *)np, rr);
+ 				np += rr;                        /* fix up ptrs and whatnot */
+ 				rnleft -= rr;                        /* will get sanity-checked above */
+ 				wrote_out += rr;                /* global count */
+@@ -642,8 +642,8 @@ Debug("wrote %d to stdout, errno %d", rr, errno);
+ 				rr = rzleft;
+ 			rr = write(netfd, zp, rr);        /* one line, or the whole buffer */
+ 			if (rr > 0) {
+-				if (o_ofile)
+-					oprint('>', zp, rr);                /* log what got sent */
++				if (o_ofile) /* log what got sent */
++					oprint('>', (unsigned char *)zp, rr);
+ 				zp += rr;
+ 				rzleft -= rr;
+ 				wrote_net += rr;                /* global count */
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index e0e8b12..b13367d 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -93,7 +93,7 @@ static void attach_option(struct option_set **opt_list,
+ #if ENABLE_FEATURE_RFC3397
+ 		if ((option->flags & TYPE_MASK) == OPTION_STR1035)
+ 			/* reuse buffer and length for RFC1035-formatted string */
+-			buffer = dname_enc(NULL, 0, buffer, &length);
++			buffer = (char *)dname_enc(NULL, 0, buffer, &length);
+ #endif
+ 
+ 		/* make a new option */
+@@ -122,7 +122,7 @@ static void attach_option(struct option_set **opt_list,
+ #if ENABLE_FEATURE_RFC3397
+ 		if ((option->flags & TYPE_MASK) == OPTION_STR1035)
+ 			/* reuse buffer and length for RFC1035-formatted string */
+-			buffer = dname_enc(existing->data + 2,
++			buffer = (char *)dname_enc(existing->data + 2,
+ 					existing->data[OPT_LEN], buffer, &length);
+ #endif
+ 		if (existing->data[OPT_LEN] + length <= 255) {

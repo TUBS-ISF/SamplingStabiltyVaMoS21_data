@@ -1,0 +1,9 @@
+2008-06-16 12:53:33 +0000
+diff --git a/shell/hush_test/hush-bugs/glob_and_vars.tests b/shell/hush_test/hush-bugs/glob_and_vars.tests
+deleted file mode 100755
+index 482cf9d..0000000
+--- a/shell/hush_test/hush-bugs/glob_and_vars.tests
++++ /dev/null
+@@ -1,2 +0,0 @@
+-v=.
+-echo $v/glob_and_vars.[tr]*

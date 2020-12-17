@@ -1,0 +1,93 @@
+2007-08-09 08:27:24 +0000
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index f47ec20..920fad8 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -811,7 +811,7 @@ int ls_main(int argc, char **argv)
+ 
+ #if ENABLE_FEATURE_AUTOWIDTH
+ 	/* Obtain the terminal width */
+-	get_terminal_width_height(STDOUT_FILENO, &terminal_width, NULL);
++	get_terminal_width_height(STDIN_FILENO, &terminal_width, NULL);
+ 	/* Go one less... */
+ 	terminal_width--;
+ #endif
+diff --git a/include/libbb.h b/include/libbb.h
+index 546bbaf..a14d6be 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -803,7 +803,8 @@ extern int crypt_make_salt(char *p, int cnt, int rnd);
+ extern int update_passwd(const char *filename, const char *username,
+ 			const char *new_pw);
+ 
+-int get_terminal_width_height(const int fd, int *width, int *height);
++/* NB: typically you want to pass fd 0, not 1. Think 'applet | grep something' */
++int get_terminal_width_height(int fd, int *width, int *height);
+ 
+ int ioctl_or_perror(int fd, int request, void *argp, const char *fmt,...) __attribute__ ((format (printf, 4, 5)));
+ void ioctl_or_perror_and_die(int fd, int request, void *argp, const char *fmt,...) __attribute__ ((format (printf, 4, 5)));
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 177247c..67c9866 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -612,7 +612,7 @@ void selinux_or_die(void)
+ 
+ /* It is perfectly ok to pass in a NULL for either width or for
+  * height, in which case that value will not be set.  */
+-int get_terminal_width_height(const int fd, int *width, int *height)
++int get_terminal_width_height(int fd, int *width, int *height)
+ {
+ 	struct winsize win = { 0, 0, 0, 0 };
+ 	int ret = ioctl(fd, TIOCGWINSZ, &win);
+diff --git a/procps/ps.c b/procps/ps.c
+index 50b6a6c..5150a08 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -322,7 +322,7 @@ int ps_main(int argc, char **argv)
+ 	 * and such large widths */
+ 	terminal_width = MAX_WIDTH;
+ 	if (isatty(1)) {
+-		get_terminal_width_height(1, &terminal_width, NULL);
++		get_terminal_width_height(0, &terminal_width, NULL);
+ 		if (--terminal_width > MAX_WIDTH)
+ 			terminal_width = MAX_WIDTH;
+ 	}
+@@ -364,7 +364,7 @@ int ps_main(int argc, char **argv)
+ 	if (w_count) {
+ 		terminal_width = (w_count==1) ? 132 : MAX_WIDTH;
+ 	} else {
+-		get_terminal_width_height(1, &terminal_width, NULL);
++		get_terminal_width_height(0, &terminal_width, NULL);
+ 		/* Go one less... */
+ 		if (--terminal_width > MAX_WIDTH)
+ 			terminal_width = MAX_WIDTH;
+diff --git a/procps/watch.c b/procps/watch.c
+index 2ad0564..b2adcd5 100644
+--- a/procps/watch.c
++++ b/procps/watch.c
+@@ -28,7 +28,7 @@ int watch_main(int argc, char **argv)
+ {
+ 	unsigned opt;
+ 	unsigned period = 2;
+-	unsigned cmdlen = 1; // 1 for terminal NUL
++	unsigned cmdlen;
+ 	char *header = NULL;
+ 	char *cmd;
+ 	char *tmp;
+@@ -42,6 +42,7 @@ int watch_main(int argc, char **argv)
+ 	argv += optind;
+ 
+ 	p = argv;
++	cmdlen = 1; // 1 for terminal NUL
+ 	while (*p)
+ 		cmdlen += strlen(*p++) + 1;
+ 	tmp = cmd = xmalloc(cmdlen);
+@@ -58,7 +59,7 @@ int watch_main(int argc, char **argv)
+ 			char *thyme;
+ 			time_t t;
+ 
+-			get_terminal_width_height(STDOUT_FILENO, &width, 0);
++			get_terminal_width_height(STDIN_FILENO, &width, 0);
+ 			header = xrealloc(header, width--);
+ 			// '%-*s' pads header with spaces to the full width
+ 			snprintf(header, width, "Every %ds: %-*s", period, width, cmd);

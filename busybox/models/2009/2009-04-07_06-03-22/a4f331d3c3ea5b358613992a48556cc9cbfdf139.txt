@@ -1,0 +1,369 @@
+2009-04-07 06:03:22 +0000
+diff --git a/shell/Kbuild b/shell/Kbuild
+index 2b461b3..8b693ec 100644
+--- a/shell/Kbuild
++++ b/shell/Kbuild
+@@ -6,7 +6,7 @@
+ 
+ lib-y:=
+ lib-$(CONFIG_ASH)      += ash.o ash_ptr_hack.o
+-lib-$(CONFIG_HUSH)     += hush.o
++lib-$(CONFIG_HUSH)     += hush.o match.o
+ lib-$(CONFIG_MSH)      += msh.o
+ lib-$(CONFIG_CTTYHACK) += cttyhack.o
+ lib-$(CONFIG_SH_MATH_SUPPORT) += math.o
+diff --git a/shell/hush.c b/shell/hush.c
+index 7928869..1740187 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -43,7 +43,6 @@
+  *      Here Documents ( << word )
+  *      Functions
+  *      Tilde Expansion
+- *      Parameter Expansion for substring processing ${var#word} ${var%word}
+  *
+  * Bash stuff (maybe optionally enable?):
+  *      &> and >& redirection of stdout+stderr
+@@ -76,6 +75,7 @@
+ #include <fnmatch.h>
+ #endif
+ #include "math.h"
++#include "match.h"
+ 
+ #ifdef WANT_TO_TEST_NOMMU
+ # undef BB_MMU
+@@ -1667,8 +1667,9 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 	char first_ch, ored_ch;
+ 	int i;
+ 	const char *val;
+-	char *p;
++	char *dyn_val, *p;
+ 
++	dyn_val = NULL;
+ 	ored_ch = 0;
+ 
+ 	debug_printf_expand("expand_vars_to_list: arg '%s'\n", arg);
+@@ -1844,7 +1845,7 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 				++var;
+ 			} else {
+ 				/* maybe handle parameter expansion */
+-				exp_off = strcspn(var, ":-=+?");
++				exp_off = strcspn(var, ":-=+?%#");
+ 				if (!var[exp_off])
+ 					exp_off = 0;
+ 				if (exp_off) {
+@@ -1873,29 +1874,45 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 				val = utoa(val ? strlen(val) : 0);
+ 				debug_printf_expand("%s\n", val);
+ 			} else if (exp_off) {
+-				/* we need to do an expansion */
+-				int exp_test = (!val || (exp_null && !val[0]));
+-				if (exp_op == '+')
+-					exp_test = !exp_test;
+-				debug_printf_expand("expand: op:%c (null:%s) test:%i\n", exp_op,
+-					exp_null ? "true" : "false", exp_test);
+-				if (exp_test) {
+-					if (exp_op == '?')
+-						maybe_die(var, *exp_word ? exp_word : "parameter null or not set");
++				if (exp_op == '%' || exp_op == '#') {
++					/* we need to do a pattern match */
++					bool zero;
++					char *loc;
++					scan_t scan = pick_scan(exp_op, *exp_word, &zero);
++					if (exp_op == *exp_word)	/* ## or %% */
++						++exp_word;
++					val = dyn_val = xstrdup(val);
++					loc = scan(dyn_val, exp_word, zero);
++					if (zero)
++						val = loc;
+ 					else
+-						val = exp_word;
+-
+-					if (exp_op == '=') {
+-						if (isdigit(var[0]) || var[0] == '#') {
+-							maybe_die(var, "special vars cannot assign in this way");
+-							val = NULL;
+-						} else {
+-							char *new_var = xmalloc(strlen(var) + strlen(val) + 2);
+-							sprintf(new_var, "%s=%s", var, val);
+-							set_local_var(new_var, -1, 0);
++						*loc = '\0';
++				} else {
++					/* we need to do an expansion */
++					int exp_test = (!val || (exp_null && !val[0]));
++					if (exp_op == '+')
++						exp_test = !exp_test;
++					debug_printf_expand("expand: op:%c (null:%s) test:%i\n", exp_op,
++						exp_null ? "true" : "false", exp_test);
++					if (exp_test) {
++						if (exp_op == '?')
++							maybe_die(var, *exp_word ? exp_word : "parameter null or not set");
++						else
++							val = exp_word;
++
++						if (exp_op == '=') {
++							if (isdigit(var[0]) || var[0] == '#') {
++								maybe_die(var, "special vars cannot assign in this way");
++								val = NULL;
++							} else {
++								char *new_var = xmalloc(strlen(var) + strlen(val) + 2);
++								sprintf(new_var, "%s=%s", var, val);
++								set_local_var(new_var, -1, 0);
++							}
+ 						}
+ 					}
+ 				}
++
+ 				var[exp_off] = exp_save;
+ 			}
+ 
+@@ -1921,6 +1938,8 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 		if (val) {
+ 			o_addQstr(output, val, strlen(val));
+ 		}
++		free(dyn_val);
++		dyn_val = NULL;
+ 		/* Do the check to avoid writing to a const string */
+ 		if (*p != SPECIAL_VAR_SYMBOL)
+ 			*p = SPECIAL_VAR_SYMBOL;
+@@ -4428,7 +4447,6 @@ static int handle_dollar(o_string *as_string,
+ 						break;
+ 					}
+ 					goto case_default;
+-#if 0 /* not implemented yet :( */
+ 				case '#': /* remove prefix */
+ 				case '%': /* remove suffix */
+ 					if (expansion == 0) {
+@@ -4437,7 +4455,6 @@ static int handle_dollar(o_string *as_string,
+ 						break;
+ 					}
+ 					goto case_default;
+-#endif
+ 				case '-': /* default value */
+ 				case '=': /* assign default */
+ 				case '+': /* alternative */
+diff --git a/shell/hush_test/hush-vars/var_posix1.right b/shell/hush_test/hush-vars/var_posix1.right
+new file mode 100644
+index 0000000..55f3579
+--- /dev/null
++++ b/shell/hush_test/hush-vars/var_posix1.right
+@@ -0,0 +1,17 @@
++abcdcd
++abcdcd
++abcdcd
++cdcd
++babcdcd
++babcdcd
++ababcdcd
++
++ababcd
++ababcd
++ababcd
++abab
++ababcdc
++ababcdc
++ababcdcd
++
++end
+diff --git a/shell/hush_test/hush-vars/var_posix1.tests b/shell/hush_test/hush-vars/var_posix1.tests
+new file mode 100755
+index 0000000..4139e2c
+--- /dev/null
++++ b/shell/hush_test/hush-vars/var_posix1.tests
+@@ -0,0 +1,21 @@
++var=ababcdcd
++
++echo ${var#ab}
++echo ${var##ab}
++echo ${var#a*b}
++echo ${var##a*b}
++echo ${var#?}
++echo ${var##?}
++echo ${var#*}
++echo ${var##*}
++
++echo ${var%cd}
++echo ${var%%cd}
++echo ${var%c*d}
++echo ${var%%c*d}
++echo ${var%?}
++echo ${var%%?}
++echo ${var%*}
++echo ${var%%*}
++
++echo end
+diff --git a/shell/match.c b/shell/match.c
+new file mode 100644
+index 0000000..0810fd8
+--- /dev/null
++++ b/shell/match.c
+@@ -0,0 +1,141 @@
++/*
++ * ##/%% variable matching code ripped out of ash shell for code sharing
++ *
++ * Copyright (c) 1989, 1991, 1993, 1994
++ *      The Regents of the University of California.  All rights reserved.
++ *
++ * Copyright (c) 1997-2005 Herbert Xu <herbert@gondor.apana.org.au>
++ * was re-ported from NetBSD and debianized.
++ *
++ * This code is derived from software contributed to Berkeley by
++ * Kenneth Almquist.
++ *
++ * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
++ *
++ * Original BSD copyright notice is retained at the end of this file.
++ */
++
++#ifdef STANDALONE
++# include <stdbool.h>
++# include <stdio.h>
++# include <stdlib.h>
++# include <string.h>
++# include <unistd.h>
++#else
++# include "busybox.h"
++#endif
++#include <fnmatch.h>
++#include "match.h"
++
++#define pmatch(a, b) !fnmatch((a), (b), 0)
++
++char *scanleft(char *string, char *pattern, bool zero)
++{
++	char c;
++	char *loc = string;
++
++	do {
++		int match;
++		const char *s;
++
++		c = *loc;
++		if (zero) {
++			*loc = '\0';
++			s = string;
++		} else
++			s = loc;
++		match = pmatch(pattern, s);
++		*loc = c;
++
++		if (match)
++			return loc;
++
++		loc++;
++	} while (c);
++
++	return NULL;
++}
++
++char *scanright(char *string, char *pattern, bool zero)
++{
++	char c;
++	char *loc = string + strlen(string);
++
++	while (loc >= string) {
++		int match;
++		const char *s;
++
++		c = *loc;
++		if (zero) {
++			*loc = '\0';
++			s = string;
++		} else
++			s = loc;
++		match = pmatch(pattern, s);
++		*loc = c;
++
++		if (match)
++			return loc;
++
++		loc--;
++	}
++
++	return NULL;
++}
++
++#ifdef STANDALONE
++int main(int argc, char *argv[])
++{
++	char *string;
++	char *op;
++	char *pattern;
++	bool zero;
++	char *loc;
++
++	int i;
++
++	if (argc == 1) {
++		puts(
++			"Usage: match <test> [test...]\n\n"
++			"Where a <test> is the form: <string><op><match>\n"
++			"This is to test the shell ${var#val} expression type.\n\n"
++			"e.g. `match 'abc#a*'` -> bc"
++		);
++		return 1;
++	}
++
++	for (i = 1; i < argc; ++i) {
++		size_t off;
++		scan_t scan;
++
++		printf("'%s': ", argv[i]);
++
++		string = strdup(argv[i]);
++		off = strcspn(string, "#%");
++		if (!off) {
++			printf("invalid format\n");
++			free(string);
++			continue;
++		}
++		op = string + off;
++		scan = pick_scan(op[0], op[1], &zero);
++		pattern = op + 1;
++		if (op[0] == op[1])
++			op[1] = '\0', ++pattern;
++		op[0] = '\0';
++
++		loc = scan(string, pattern, zero);
++
++		if (zero) {
++			printf("'%s'\n", loc);
++		} else {
++			*loc = '\0';
++			printf("'%s'\n", string);
++		}
++
++		free(string);
++	}
++
++	return 0;
++}
++#endif
+diff --git a/shell/match.h b/shell/match.h
+new file mode 100644
+index 0000000..863f525
+--- /dev/null
++++ b/shell/match.h
+@@ -0,0 +1,22 @@
++/* match.h - interface to shell ##/%% matching code */
++
++typedef char *(*scan_t)(char *string, char *match, bool zero);
++
++char *scanleft(char *string, char *match, bool zero);
++char *scanright(char *string, char *match, bool zero);
++
++static inline scan_t pick_scan(char op1, char op2, bool *zero)
++{
++	/* #  - scanleft
++	 * ## - scanright
++	 * %  - scanright
++	 * %% - scanleft
++	 */
++	if (op1 == '#') {
++		*zero = true;
++		return op1 == op2 ? scanright : scanleft;
++	} else {
++		*zero = false;
++		return op1 == op2 ? scanleft : scanright;
++	}
++}

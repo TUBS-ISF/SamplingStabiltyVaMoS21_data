@@ -1,0 +1,14 @@
+2009-12-11 14:12:28 +0100
+diff --git a/networking/wget.c b/networking/wget.c
+index 64553d4..ad1770b 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -462,7 +462,7 @@ static void NOINLINE retrieve_file_data(FILE *dfp, int output_fd)
+ 
+ 			rdsz = sizeof(buf);
+ 			if (G.got_clen) {
+-				if (G.content_len < sizeof(buf)) {
++				if (G.content_len < (off_t)sizeof(buf)) {
+ 					if ((int)G.content_len <= 0)
+ 						break;
+ 					rdsz = (unsigned)G.content_len;

@@ -1,0 +1,83 @@
+2009-05-13 02:18:43 +0200
+diff --git a/TODO b/TODO
+index 52b6bd0..beeb475 100644
+--- a/TODO
++++ b/TODO
+@@ -282,3 +282,39 @@ Replace deprecated functions.
+ ---
+ vdprintf() -> similar sized functionality
+ ---
++
++(TODO list after discussion 11.05.2009)
++
++* shrink tc/brctl/ip
++  tc/brctl seem like fairly large things to try and tackle in your timeframe,
++  and i think people have posted attempts in the past. adding additional
++  options to ip though seems reasonable.
++
++* add tests for some applets
++
++* implement POSIX utilities and audit them for POSIX conformance. then
++  audit them for GNU conformance. then document all your findings in a new
++  doc/conformance.txt file while perhaps implementing some of the missing
++  features.
++  you can find the latest POSIX documentation (1003.1-2008) here:
++  http://www.opengroup.org/onlinepubs/9699919799/
++  and the complete list of all utilities that POSIX covers:
++  http://www.opengroup.org/onlinepubs/9699919799/idx/utilities.html
++  The first step would to generate a file/matrix what is already archived
++  (also IPV6)
++
++* ntpdate/ntpd (see ntpclient and openntp for examples)
++
++* implement 'at'
++
++* rpcbind (former portmap) or equivalent
++  so that we don't have to use -o nolock on nfs mounts
++
++* check IPV6 compliance
++
++* generate a mini example using kernel+busybox only (+libc) for example
++
++* more support for advanced linux 2.6.x features, see: iotop
++  most likely there is more
++
++* even more support for statistics: mpstat, iostat, powertop....
+diff --git a/docs/busybox.net/developer.html b/docs/busybox.net/developer.html
+index 18e42cd..ce50555 100644
+--- a/docs/busybox.net/developer.html
++++ b/docs/busybox.net/developer.html
+@@ -31,8 +31,8 @@ committing changes to GIT, and attach a public ssh key to access your account
+ with.</p>
+ 
+ <p>If you don't currently have an ssh version 2 DSA key at least 4096 bits
+-long, you can generate a key using the command 
+-<b>ssh-keygen -b 4096 -t dsa</b> 
++long, you can generate a key using the command
++<b>ssh-keygen -b 4096 -t dsa</b>
+ and hitting enter at the prompts.
+ This will create the files <b>~/.ssh/id_dsa</b> and <b>~/.ssh/id_dsa.pub</b>
+ You must then send the content of 'id_dsa.pub' to me so I can set up your
+@@ -75,8 +75,8 @@ git help
+ <a href="http://www.kernel.org/pub/software/scm/git/">GIT</a>, please visit the
+ <a href="http://git.or.cz/">GIT overview</a> site.
+ You might also want to read online the <a
+-href="http://www.kernel.org/pub/software/scm/git/docs">manpages</a> 
+-or 
++href="http://www.kernel.org/pub/software/scm/git/docs">manpages</a>
++or
+ <a href="http://www.kernel.org/pub/software/scm/git/docs/gittutorial.html">tutorial</a>.
+ </p>
+ 
+diff --git a/shell/hush_test/hush-misc/func4.tests b/shell/hush_test/hush-misc/func4.tests
+index db3f15a..33b1663 100755
+--- a/shell/hush_test/hush-misc/func4.tests
++++ b/shell/hush_test/hush-misc/func4.tests
+@@ -1,5 +1,5 @@
+-func() { 
+-	eval "echo \"\${val_${1}}\"" 
++func() {
++	eval "echo \"\${val_${1}}\""
+ }
+ 
+ val_x=24 

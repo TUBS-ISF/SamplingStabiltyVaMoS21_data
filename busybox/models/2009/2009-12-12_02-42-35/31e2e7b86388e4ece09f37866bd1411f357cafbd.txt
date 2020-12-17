@@ -1,0 +1,124 @@
+2009-12-12 02:42:35 +0100
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index c099570..243626d 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -145,6 +145,8 @@ lib-$(CONFIG_FEATURE_HTTPD_AUTH_MD5) += pw_encrypt.o
+ 
+ lib-$(CONFIG_DF) += find_mount_point.o
+ lib-$(CONFIG_MKFS_MINIX) += find_mount_point.o
++lib-$(CONFIG_MKFS_EXT2) += find_mount_point.o
++lib-$(CONFIG_MKFS_REISER) += find_mount_point.o
+ lib-$(CONFIG_FSCK_MINIX) += find_mount_point.o
+ lib-$(CONFIG_MOUNT) += find_mount_point.o
+ 
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 7bb3f2e..c73e6b7 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -71,7 +71,9 @@
+ # define BB_NUL L'\0'
+ # define CHAR_T wchar_t
+ static bool BB_isspace(CHAR_T c) { return ((unsigned)c < 256 && isspace(c)); }
++# if ENABLE_FEATURE_EDITING_VI
+ static bool BB_isalnum(CHAR_T c) { return ((unsigned)c < 256 && isalnum(c)); }
++# endif
+ static bool BB_ispunct(CHAR_T c) { return ((unsigned)c < 256 && ispunct(c)); }
+ # undef isspace
+ # undef isalnum
+diff --git a/miscutils/beep.c b/miscutils/beep.c
+index f3266dc..c17cbfd 100644
+--- a/miscutils/beep.c
++++ b/miscutils/beep.c
+@@ -32,8 +32,10 @@ int beep_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int beep_main(int argc, char **argv)
+ {
+ 	int speaker = get_console_fd_or_die();
+-	unsigned length, delay, rep;
+-	unsigned tickrate_div_freq;
++	unsigned tickrate_div_freq = tickrate_div_freq; /* for compiler */
++	unsigned length = length;
++	unsigned delay = delay;
++	unsigned rep = rep;
+ 	int c;
+ 
+ 	c = 'n';
+diff --git a/networking/tftp.c b/networking/tftp.c
+index ef4198b..8d60388 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -743,7 +743,7 @@ int tftpd_main(int argc UNUSED_PARAM, char **argv)
+ 	const char *error_msg;
+ 	int opt, result, opcode;
+ 	IF_FEATURE_TFTP_BLOCKSIZE(int blksize = TFTP_BLKSIZE_DEFAULT;)
+-	IF_FEATURE_TFTP_BLOCKSIZE(int want_transfer_size;)
++	IF_FEATURE_TFTP_BLOCKSIZE(int want_transfer_size = 0;)
+ 
+ 	INIT_G();
+ 
+@@ -791,7 +791,6 @@ int tftpd_main(int argc UNUSED_PARAM, char **argv)
+ 		goto err;
+ 	}
+ # if ENABLE_FEATURE_TFTP_BLOCKSIZE
+-	want_transfer_size = 0;
+ 	{
+ 		char *res;
+ 		char *opt_str = mode + sizeof("octet");
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 110bdfa..a30decf 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -703,9 +703,10 @@ packet_ok(int read_len, len_and_sockaddr *from_lsa,
+ }
+ #else /* !ENABLE_TRACEROUTE6 */
+ static ALWAYS_INLINE int
+-packet_ok(int read_len, len_and_sockaddr *from_lsa,
+-			struct sockaddr *to UNUSED_PARAM,
+-			int seq)
++packet_ok(int read_len,
++		len_and_sockaddr *from_lsa IF_NOT_FEATURE_TRACEROUTE_VERBOSE(UNUSED_PARAM),
++		struct sockaddr *to UNUSED_PARAM,
++		int seq)
+ {
+ 	return packet4_ok(read_len, &from_lsa->u.sin, seq);
+ }
+diff --git a/scripts/randomtest b/scripts/randomtest
+index bd5ef4b..a7a2025 100755
+--- a/scripts/randomtest
++++ b/scripts/randomtest
+@@ -35,10 +35,6 @@ cat .config \
+ | grep -v ^CONFIG_SELINUX= \
+ | grep -v ^CONFIG_EFENCE= \
+ | grep -v ^CONFIG_DMALLOC= \
+-| grep -v ^CONFIG_ACPID= \
+-| grep -v ^CONFIG_FLASH_ERASEALL= \
+-| grep -v ^CONFIG_FLASH_LOCK= \
+-| grep -v ^CONFIG_FLASH_UNLOCK= \
+ | cat >.config.new
+ mv .config.new .config
+ }
+@@ -61,15 +57,6 @@ echo 'CONFIG_CROSS_COMPILER_PREFIX="'"$uclibc_cross"'"' >>.config
+ echo 'CONFIG_STATIC=y' >>.config
+ }
+ 
+-# If NOMMU, remove some things
+-grep -q ^CONFIG_NOMMU= .config && {
+-cat .config \
+-| grep -v ^CONFIG_ASH= \
+-| grep -v ^CONFIG_FEATURE_SH_IS_ASH= \
+-| cat >.config.new
+-mv .config.new .config
+-}
+-
+ # If STATIC, remove some things
+ # PAM with static linking is probably pointless
+ # (but I need to try - now I don't have libpam.a on my system, only libpam.so)
+@@ -83,7 +70,7 @@ mv .config.new .config
+ # Regenerate .config with default answers for yanked-off options
+ { yes "" | make oldconfig >/dev/null; } || exit 1
+ 
+-nice -n 10 make 2>&1 | tee -a make.log
++nice -n 10 make $MAKEOPTS 2>&1 | tee -a make.log
+ 
+ test -x busybox && {
+     cd ..

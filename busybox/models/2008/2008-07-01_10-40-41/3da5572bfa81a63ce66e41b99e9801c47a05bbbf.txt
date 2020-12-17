@@ -1,0 +1,210 @@
+2008-07-01 10:40:41 +0000
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index a6bc623..16ca6a5 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -25,9 +25,7 @@ int FAST_FUNC open_transformer(int src_fd,
+ 	if (pid == -1)
+ 		bb_perror_msg_and_die("can't fork");
+ #else
+-	pid = vfork();
+-	if (pid == -1)
+-		bb_perror_msg_and_die("can't vfork");
++	pid = xvfork();
+ #endif
+ 
+ 	if (pid == 0) {
+diff --git a/archival/tar.c b/archival/tar.c
+index 526edb6..17ac6c5 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -536,9 +536,7 @@ static void NOINLINE vfork_compressor(int tar_fd, int gzip)
+ 	(void) &zip_exec;
+ #endif
+ 
+-	gzipPid = vfork();
+-	if (gzipPid < 0)
+-		bb_perror_msg_and_die("can't vfork");
++	gzipPid = xvfork();
+ 
+ 	if (gzipPid == 0) {
+ 		/* child */
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 459fb77..f10572d 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -404,9 +404,7 @@ int start_stop_daemon_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		/* DAEMON_DEVNULL_STDIO is superfluous -
+ 		 * it's always done by bb_daemonize() */
+ #else
+-		pid_t pid = vfork();
+-		if (pid < 0) /* error */
+-			bb_perror_msg_and_die("vfork");
++		pid_t pid = xvfork();
+ 		if (pid != 0) {
+ 			/* parent */
+ 			/* why _exit? the child may have changed the stack,
+diff --git a/include/libbb.h b/include/libbb.h
+index 54601f8..33e465c 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -719,6 +719,8 @@ int bb_execvp(const char *file, char *const argv[]) FAST_FUNC;
+ #define BB_EXECLP(prog,cmd,...) execlp(prog,cmd, __VA_ARGS__)
+ #endif
+ 
++pid_t xvfork(void) FAST_FUNC;
++
+ /* NOMMU friendy fork+exec */
+ pid_t spawn(char **argv) FAST_FUNC;
+ pid_t xspawn(char **argv) FAST_FUNC;
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 5cbecd5..5ace87c 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -109,6 +109,7 @@ lib-y += xfunc_die.o
+ lib-y += xgetcwd.o
+ lib-y += xgethostbyname.o
+ lib-y += xreadlink.o
++lib-y += xvfork.o
+ 
+ # conditionally compiled objects:
+ lib-$(CONFIG_FEATURE_MOUNT_LOOP) += loop.o
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 37d4c27..9baa813 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -226,9 +226,7 @@ void FAST_FUNC forkexit_or_rexec(char **argv)
+ 	if (re_execed)
+ 		return;
+ 
+-	pid = vfork();
+-	if (pid < 0) /* wtf? */
+-		bb_perror_msg_and_die("vfork");
++	pid = xvfork();
+ 	if (pid) /* parent */
+ 		exit(EXIT_SUCCESS);
+ 	/* child - re-exec ourself */
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index dc3179d..4bba9fb 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -38,10 +38,8 @@ static void change_user(const struct passwd *pas)
+ static void edit_file(const struct passwd *pas, const char *file)
+ {
+ 	const char *ptr;
+-	int pid = vfork();
++	int pid = xvfork();
+ 
+-	if (pid < 0) /* failure */
+-		bb_perror_msg_and_die("vfork");
+ 	if (pid) { /* parent */
+ 		wait4pid(pid);
+ 		return;
+@@ -65,9 +63,7 @@ static int open_as_user(const struct passwd *pas, const char *file)
+ 	pid_t pid;
+ 	char c;
+ 
+-	pid = vfork();
+-	if (pid < 0) /* ERROR */
+-		bb_perror_msg_and_die("vfork");
++	pid = xvfork();
+ 	if (pid) { /* PARENT */
+ 		if (wait4pid(pid) == 0) {
+ 			/* exitcode 0: child says it can read */
+diff --git a/miscutils/time.c b/miscutils/time.c
+index a6d158c..104548c 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -372,9 +372,7 @@ static void run_command(char *const *cmd, resource_t *resp)
+ 	void (*quit_signal)(int);
+ 
+ 	resp->elapsed_ms = monotonic_us() / 1000;
+-	pid = vfork();		/* Run CMD as child process.  */
+-	if (pid < 0)
+-		bb_error_msg_and_die("cannot fork");
++	pid = xvfork();		/* Run CMD as child process.  */
+ 	if (pid == 0) {	/* If child.  */
+ 		/* Don't cast execvp arguments; that causes errors on some systems,
+ 		   versus merely warnings if the cast is left off.  */
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index c123918..8caff3f 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -1008,12 +1008,9 @@ static int popen2(FILE **in, FILE **out, char *command, char *param)
+ 	xpiped_pair(outfd);
+ 
+ 	fflush(NULL);
+-	pid = vfork();
++	pid = xvfork();
+ 
+-	switch (pid) {
+-	case -1:  /* failure */
+-		bb_perror_msg_and_die("vfork");
+-	case 0:  /* child */
++	if (pid == 0) { /* child */
+ 		/* NB: close _first_, then move fds! */
+ 		close(infd.wr);
+ 		close(outfd.rd);
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index 1c23ca2..c195cc0 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -120,15 +120,6 @@ static void signal_handler(int signo)
+ #undef err
+ }
+ 
+-/* libbb candidate */
+-static pid_t vfork_or_die(void)
+-{
+-	pid_t pid = vfork();
+-	if (pid < 0)
+-		bb_perror_msg_and_die("vfork");
+-	return pid;
+-}
+-
+ static void launch_helper(const char **argv)
+ {
+ 	// setup vanilla unidirectional pipes interchange
+@@ -137,7 +128,7 @@ static void launch_helper(const char **argv)
+ 
+ 	xpipe(pipes);
+ 	xpipe(pipes+2);
+-	helper_pid = vfork_or_die();
++	helper_pid = xvfork();
+ 	idx = (!helper_pid) * 2;
+ 	xdup2(pipes[idx], STDIN_FILENO);
+ 	xdup2(pipes[3-idx], STDOUT_FILENO);
+diff --git a/shell/hush.c b/shell/hush.c
+index 72186f9..59d8f3f 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3096,9 +3096,11 @@ static FILE *generate_stream_from_list(struct pipe *head)
+  * huge=`cat TESTFILE` # will block here forever
+  * echo OK
+  */
+-	pid = BB_MMU ? fork() : vfork();
++	pid = BB_MMU ? fork() : xvfork();
++#if BB_MMU
+ 	if (pid < 0)
+-		bb_perror_msg_and_die(BB_MMU ? "fork" : "vfork");
++		bb_perror_msg_and_die("fork");
++#endif
+ 	if (pid == 0) { /* child */
+ 		if (ENABLE_HUSH_JOB)
+ 			die_sleep = 0; /* let nofork's xfuncs die */
+diff --git a/util-linux/script.c b/util-linux/script.c
+index e70294e..a6c1ab8 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -87,10 +87,7 @@ int script_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	/* TODO: SIGWINCH? pass window size changes down to slave? */
+ 
+-	child_pid = vfork();
+-	if (child_pid < 0) {
+-		bb_perror_msg_and_die("vfork");
+-	}
++	child_pid = xvfork();
+ 
+ 	if (child_pid) {
+ 		/* parent */

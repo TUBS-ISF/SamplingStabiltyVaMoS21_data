@@ -1,0 +1,3358 @@
+2007-05-26 19:00:18 +0000
+diff --git a/applets/usage.c b/applets/usage.c
+index bb7ca82..f2281d6 100644
+--- a/applets/usage.c
++++ b/applets/usage.c
+@@ -2,7 +2,6 @@
+ #include <unistd.h>
+ 
+ #include "../include/autoconf.h"
+-#include "../include/busybox.h"
+ 
+ static const char usage_messages[] = ""
+ #define MAKE_USAGE
+diff --git a/archival/ar.c b/archival/ar.c
+index 23d9b49..31e96de 100644
+--- a/archival/ar.c
++++ b/archival/ar.c
+@@ -14,7 +14,7 @@
+  * http://www.unix-systems.org/single_unix_specification_v2/xcu/ar.html
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ static void header_verbose_list_ar(const file_header_t *file_header)
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index 00cece4..83b5637 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -5,7 +5,7 @@
+  *  Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ enum {
+diff --git a/archival/cpio.c b/archival/cpio.c
+index 0113867..6d1ee16 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -16,7 +16,7 @@
+ #include <string.h>
+ #include <unistd.h>
+ #include "unarchive.h"
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define CPIO_OPT_EXTRACT			0x01
+ #define CPIO_OPT_TEST				0x02
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 7d31ad1..dcbd0d1 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -24,7 +24,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ /* note: if you vary hash_prime sizes be aware,
+diff --git a/archival/dpkg_deb.c b/archival/dpkg_deb.c
+index fde3c33..138caff 100644
+--- a/archival/dpkg_deb.c
++++ b/archival/dpkg_deb.c
+@@ -4,7 +4,7 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ #define DPKG_DEB_OPT_CONTENTS	1
+diff --git a/archival/gzip.c b/archival/gzip.c
+index 03b6b91..fdf2a79 100644
+--- a/archival/gzip.c
++++ b/archival/gzip.c
+@@ -39,7 +39,7 @@ gzip: bogus: No such file or directory
+ aa:      85.1% -- replaced with aa.gz
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ 
+ /* ===========================================================================
+diff --git a/archival/rpm.c b/archival/rpm.c
+index 654a4a3..71ed32e 100644
+--- a/archival/rpm.c
++++ b/archival/rpm.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ #define RPM_HEADER_MAGIC        "\216\255\350"
+diff --git a/archival/rpm2cpio.c b/archival/rpm2cpio.c
+index 307d1a0..460aeaf 100644
+--- a/archival/rpm2cpio.c
++++ b/archival/rpm2cpio.c
+@@ -6,7 +6,7 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ #define RPM_MAGIC "\355\253\356\333"
+diff --git a/archival/tar.c b/archival/tar.c
+index e634cc6..4323553 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -25,7 +25,7 @@
+ 
+ #include <fnmatch.h>
+ #include <getopt.h>
+-#include "busybox.h"
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ #if ENABLE_FEATURE_TAR_CREATE
+diff --git a/archival/unzip.c b/archival/unzip.c
+index 8a9034f..ef58cd4 100644
+--- a/archival/unzip.c
++++ b/archival/unzip.c
+@@ -24,7 +24,7 @@
+  * - central directory
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ #define ZIP_FILEHEADER_MAGIC		SWAP_LE32(0x04034b50)
+diff --git a/console-tools/chvt.c b/console-tools/chvt.c
+index 5090811..e8761d5 100644
+--- a/console-tools/chvt.c
++++ b/console-tools/chvt.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* From <linux/vt.h> */
+ enum {
+diff --git a/console-tools/clear.c b/console-tools/clear.c
+index 8e34d6d..053293c 100644
+--- a/console-tools/clear.c
++++ b/console-tools/clear.c
+@@ -12,7 +12,7 @@
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ 
+ int clear_main(int argc, char **argv);
+diff --git a/console-tools/deallocvt.c b/console-tools/deallocvt.c
+index 476eefa..db52747 100644
+--- a/console-tools/deallocvt.c
++++ b/console-tools/deallocvt.c
+@@ -10,7 +10,7 @@
+ 
+ /* no options, no getopt */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* From <linux/vt.h> */
+ enum { VT_DISALLOCATE = 0x5608 }; /* free memory associated to vt */
+diff --git a/console-tools/dumpkmap.c b/console-tools/dumpkmap.c
+index 0c19148..f61795c 100644
+--- a/console-tools/dumpkmap.c
++++ b/console-tools/dumpkmap.c
+@@ -8,7 +8,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* From <linux/kd.h> */
+ struct kbentry {
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index f691b11..88d7a04 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -7,7 +7,7 @@
+  * Loads the console font, and possibly the corresponding screen map(s).
+  * (Adapted for busybox by Matej Vela.)
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/kd.h>
+ 
+ enum {
+diff --git a/console-tools/loadkmap.c b/console-tools/loadkmap.c
+index a141435..4a726f9 100644
+--- a/console-tools/loadkmap.c
++++ b/console-tools/loadkmap.c
+@@ -8,7 +8,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define BINARY_KEYMAP_MAGIC "bkeymap"
+ 
+diff --git a/console-tools/openvt.c b/console-tools/openvt.c
+index 882563b..c050ba1 100644
+--- a/console-tools/openvt.c
++++ b/console-tools/openvt.c
+@@ -10,7 +10,7 @@
+ 
+ /* getopt not needed */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int openvt_main(int argc, char **argv);
+ int openvt_main(int argc, char **argv)
+diff --git a/console-tools/reset.c b/console-tools/reset.c
+index 03b078c..c844e15 100644
+--- a/console-tools/reset.c
++++ b/console-tools/reset.c
+@@ -13,7 +13,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <unistd.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int reset_main(int argc, char **argv);
+ int reset_main(int argc, char **argv)
+diff --git a/console-tools/resize.c b/console-tools/resize.c
+index 64f318c..52fdb26 100644
+--- a/console-tools/resize.c
++++ b/console-tools/resize.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ /* no options, no getopt */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define ESC "\033"
+ 
+diff --git a/console-tools/setconsole.c b/console-tools/setconsole.c
+index 31ee1fc..f437415 100644
+--- a/console-tools/setconsole.c
++++ b/console-tools/setconsole.c
+@@ -8,7 +8,7 @@
+  */
+ 
+ #include <getopt.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #if ENABLE_FEATURE_SETCONSOLE_LONG_OPTIONS
+ static const struct option setconsole_long_options[] = {
+diff --git a/console-tools/setkeycodes.c b/console-tools/setkeycodes.c
+index ff137d5..a0d291d 100644
+--- a/console-tools/setkeycodes.c
++++ b/console-tools/setkeycodes.c
+@@ -10,7 +10,7 @@
+  */
+ 
+ #include <sys/ioctl.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ 
+ /* From <linux/kd.h> */
+diff --git a/console-tools/setlogcons.c b/console-tools/setlogcons.c
+index 7b5addc..f95a653 100644
+--- a/console-tools/setlogcons.c
++++ b/console-tools/setlogcons.c
+@@ -9,7 +9,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int setlogcons_main(int argc, char **argv);
+ int setlogcons_main(int argc, char **argv)
+diff --git a/coreutils/basename.c b/coreutils/basename.c
+index f4307d6..f59d7a8 100644
+--- a/coreutils/basename.c
++++ b/coreutils/basename.c
+@@ -20,7 +20,7 @@
+  * 3) Save some space by using strcmp().  Calling strncmp() here was silly.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index 3d61791..ce910bc 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -17,7 +17,7 @@
+  * Major size reduction... over 50% (>1.5k) on i386.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define	THURSDAY		4		/* for reformation */
+ #define	SATURDAY		6		/* 1 Jan 1 was a Saturday */
+diff --git a/coreutils/cat.c b/coreutils/cat.c
+index ed3f336..64e697e 100644
+--- a/coreutils/cat.c
++++ b/coreutils/cat.c
+@@ -10,7 +10,7 @@
+ /* BB_AUDIT SUSv3 compliant */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/cat.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/catv.c b/coreutils/catv.c
+index 826e0e9..2d2229f 100644
+--- a/coreutils/catv.c
++++ b/coreutils/catv.c
+@@ -10,7 +10,7 @@
+ /* See "Cat -v considered harmful" at
+  * http://cm.bell-labs.com/cm/cs/doc/84/kp.ps.gz */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int catv_main(int argc, char **argv);
+ int catv_main(int argc, char **argv)
+diff --git a/coreutils/chgrp.c b/coreutils/chgrp.c
+index 48014ec..90a1cfe 100644
+--- a/coreutils/chgrp.c
++++ b/coreutils/chgrp.c
+@@ -11,7 +11,7 @@
+ /* BB_AUDIT GNU defects - unsupported long options. */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/chgrp.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/coreutils/chmod.c b/coreutils/chmod.c
+index aa36258..52cc40d 100644
+--- a/coreutils/chmod.c
++++ b/coreutils/chmod.c
+@@ -14,7 +14,7 @@
+ /* BB_AUDIT GNU defects - unsupported long options. */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/chmod.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/coreutils/chown.c b/coreutils/chown.c
+index 71ba812..7579e17 100644
+--- a/coreutils/chown.c
++++ b/coreutils/chown.c
+@@ -11,7 +11,7 @@
+ /* BB_AUDIT GNU defects - unsupported long options. */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/chown.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/coreutils/chroot.c b/coreutils/chroot.c
+index 874ee91..192daa8 100644
+--- a/coreutils/chroot.c
++++ b/coreutils/chroot.c
+@@ -9,7 +9,7 @@
+ 
+ /* BB_AUDIT SUSv3 N/A -- Matches GNU behavior. */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int chroot_main(int argc, char **argv);
+ int chroot_main(int argc, char **argv)
+diff --git a/coreutils/cksum.c b/coreutils/cksum.c
+index 70febdf..865bea0 100644
+--- a/coreutils/cksum.c
++++ b/coreutils/cksum.c
+@@ -6,7 +6,7 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details. */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int cksum_main(int argc, char **argv);
+ int cksum_main(int argc, char **argv)
+diff --git a/coreutils/cmp.c b/coreutils/cmp.c
+index 80fab0b..e5dda80 100644
+--- a/coreutils/cmp.c
++++ b/coreutils/cmp.c
+@@ -21,7 +21,7 @@
+  *    in the '-l' case.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static FILE *cmp_xfopen_input(const char *filename)
+ {
+diff --git a/coreutils/comm.c b/coreutils/comm.c
+index 28e3982..3be6760 100644
+--- a/coreutils/comm.c
++++ b/coreutils/comm.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define COMM_OPT_1 (1 << 0)
+ #define COMM_OPT_2 (1 << 1)
+diff --git a/coreutils/cp.c b/coreutils/cp.c
+index 8c09379..f98f281 100644
+--- a/coreutils/cp.c
++++ b/coreutils/cp.c
+@@ -15,7 +15,7 @@
+  * Size reduction.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "libcoreutils/coreutils.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index b9ea312..084f7be 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -9,7 +9,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/coreutils/date.c b/coreutils/date.c
+index d2d77f4..57c826a 100644
+--- a/coreutils/date.c
++++ b/coreutils/date.c
+@@ -10,7 +10,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This 'date' command supports only 2 time setting formats,
+    all the GNU strftime stuff (its in libc, lets use it),
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index 5aee9db..dd311d8 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -9,7 +9,7 @@
+  */
+ 
+ #include <signal.h>  /* For FEATURE_DD_SIGNAL_HANDLING */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/coreutils/df.c b/coreutils/df.c
+index 484cabb..d455d27 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -24,7 +24,7 @@
+ #include <unistd.h>
+ #include <mntent.h>
+ #include <sys/vfs.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #ifndef CONFIG_FEATURE_HUMAN_READABLE
+ static long kscale(long b, long bs)
+diff --git a/coreutils/diff.c b/coreutils/diff.c
+index 09cacbd..f6b045b 100644
+--- a/coreutils/diff.c
++++ b/coreutils/diff.c
+@@ -12,7 +12,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define FSIZE_MAX 32768
+ 
+diff --git a/coreutils/dirname.c b/coreutils/dirname.c
+index 7c5484b..fd2c381 100644
+--- a/coreutils/dirname.c
++++ b/coreutils/dirname.c
+@@ -10,7 +10,7 @@
+ /* BB_AUDIT SUSv3 compliant */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/dirname.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/dos2unix.c b/coreutils/dos2unix.c
+index 04c56ac..b053a0c 100644
+--- a/coreutils/dos2unix.c
++++ b/coreutils/dos2unix.c
+@@ -12,7 +12,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ enum ConvType {
+ 	CT_UNIX2DOS = 1,
+diff --git a/coreutils/du.c b/coreutils/du.c
+index e95f3a2..cb3e715 100644
+--- a/coreutils/du.c
++++ b/coreutils/du.c
+@@ -23,7 +23,7 @@
+  * 4) Fixed busybox bug #1284 involving long overflow with human_readable.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #if ENABLE_FEATURE_HUMAN_READABLE
+ # if ENABLE_FEATURE_DU_DEFAULT_BLOCKSIZE_1K
+diff --git a/coreutils/echo.c b/coreutils/echo.c
+index 2de19c2..9aad2c2 100644
+--- a/coreutils/echo.c
++++ b/coreutils/echo.c
+@@ -23,7 +23,7 @@
+  *    The previous version did not allow 4-digit octals.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int bb_echo(char **argv)
+ {
+diff --git a/coreutils/env.c b/coreutils/env.c
+index 2a271f7..ad30f01 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -29,11 +29,11 @@
+  * - use xfunc_error_retval
+  */
+ 
+-#include "busybox.h"
+-#include <errno.h>
+ #include <getopt.h> /* struct option */
+ extern char **environ;
+ 
++#include "libbb.h"
++
+ #if ENABLE_FEATURE_ENV_LONG_OPTIONS
+ static const struct option env_long_options[] = {
+ 	{ "ignore-environment", 0, NULL, 'i' },
+diff --git a/coreutils/expr.c b/coreutils/expr.c
+index b6bd383..46e18d1 100644
+--- a/coreutils/expr.c
++++ b/coreutils/expr.c
+@@ -25,7 +25,7 @@
+ 
+ /* no getopt needed */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "xregex.h"
+ 
+ /* The kinds of value we can have.  */
+diff --git a/coreutils/false.c b/coreutils/false.c
+index 90d6a01..07cf9e8 100644
+--- a/coreutils/false.c
++++ b/coreutils/false.c
+@@ -10,7 +10,7 @@
+ /* BB_AUDIT SUSv3 compliant */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/false.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/fold.c b/coreutils/fold.c
+index 4ce52cf..d5e3a4d 100644
+--- a/coreutils/fold.c
++++ b/coreutils/fold.c
+@@ -10,7 +10,7 @@
+    Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static unsigned long flags;
+ #define FLAG_COUNT_BYTES	1
+diff --git a/coreutils/head.c b/coreutils/head.c
+index ed1d01d..1700af2 100644
+--- a/coreutils/head.c
++++ b/coreutils/head.c
+@@ -11,7 +11,7 @@
+ /* BB_AUDIT GNU compatible -c, -q, and -v options in 'fancy' configuration. */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/head.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static const char head_opts[] =
+ 	"n:"
+diff --git a/coreutils/hostid.c b/coreutils/hostid.c
+index e14f6ca..7d96651 100644
+--- a/coreutils/hostid.c
++++ b/coreutils/hostid.c
+@@ -9,7 +9,7 @@
+ 
+ /* BB_AUDIT SUSv3 N/A -- Matches GNU behavior. */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 8a60419..064bd29 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -13,7 +13,7 @@
+  * -Z option support: by Yuichi Nakamura <ynakam@hitachisoft.jp>
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <stdio.h>
+ #include <unistd.h>
+ #include <sys/types.h>
+diff --git a/coreutils/install.c b/coreutils/install.c
+index ece5b95..7f168d2 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -9,11 +9,12 @@
+  *           owner/group, will probably modify bb_make_directory(...)
+  */
+ 
+-#include "busybox.h"
+-#include "libcoreutils/coreutils.h"
+ #include <libgen.h>
+ #include <getopt.h> /* struct option */
+ 
++#include "libbb.h"
++#include "libcoreutils/coreutils.h"
++
+ #if ENABLE_FEATURE_INSTALL_LONG_OPTIONS
+ static const struct option install_long_options[] = {
+ 	{ "directory",           0, NULL, 'd' },
+diff --git a/coreutils/length.c b/coreutils/length.c
+index b3a9d49..a310b3b 100644
+--- a/coreutils/length.c
++++ b/coreutils/length.c
+@@ -2,7 +2,7 @@
+ 
+ /* BB_AUDIT SUSv3 N/A -- Apparently a busybox (obsolete?) extension. */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/ln.c b/coreutils/ln.c
+index fd4eace..93a283d 100644
+--- a/coreutils/ln.c
++++ b/coreutils/ln.c
+@@ -11,7 +11,7 @@
+ /* BB_AUDIT GNU options missing: -d, -F, -i, and -v. */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/ln.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/coreutils/logname.c b/coreutils/logname.c
+index aba6ce3..2e628bc 100644
+--- a/coreutils/logname.c
++++ b/coreutils/logname.c
+@@ -20,7 +20,7 @@
+  * a diagnostic message and an error return.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index b9c07ad..e2ed3ee 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -30,7 +30,7 @@
+  */
+ 
+ #include <getopt.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/coreutils/md5_sha1_sum.c b/coreutils/md5_sha1_sum.c
+index a3818d5..4523fa4 100644
+--- a/coreutils/md5_sha1_sum.c
++++ b/coreutils/md5_sha1_sum.c
+@@ -6,7 +6,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ typedef enum { HASH_SHA1, HASH_MD5 } hash_algo_t;
+ 
+diff --git a/coreutils/mkdir.c b/coreutils/mkdir.c
+index 5a6c9d0..60c03a1 100644
+--- a/coreutils/mkdir.c
++++ b/coreutils/mkdir.c
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include <getopt.h> /* struct option */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/mkfifo.c b/coreutils/mkfifo.c
+index 7dcc50f..030c9d2 100644
+--- a/coreutils/mkfifo.c
++++ b/coreutils/mkfifo.c
+@@ -10,7 +10,7 @@
+ /* BB_AUDIT SUSv3 compliant */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/mkfifo.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "libcoreutils/coreutils.h"
+ 
+ int mkfifo_main(int argc, char **argv);
+diff --git a/coreutils/mknod.c b/coreutils/mknod.c
+index 6fa6d83..415ef55 100644
+--- a/coreutils/mknod.c
++++ b/coreutils/mknod.c
+@@ -11,7 +11,7 @@
+ 
+ #include <sys/sysmacros.h>  // For makedev
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "libcoreutils/coreutils.h"
+ 
+ static const char modes_chars[] = { 'p', 'c', 'u', 'b', 0, 1, 1, 2 };
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index c08d232..ad36051 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -20,7 +20,7 @@
+ #include <errno.h>
+ #include <stdlib.h>
+ #include <getopt.h> /* struct option */
+-#include "busybox.h"
++#include "libbb.h"
+ #include "libcoreutils/coreutils.h"
+ 
+ #if ENABLE_FEATURE_MV_LONG_OPTIONS
+diff --git a/coreutils/nice.c b/coreutils/nice.c
+index 3285315..8d77ae4 100644
+--- a/coreutils/nice.c
++++ b/coreutils/nice.c
+@@ -8,7 +8,7 @@
+  */
+ 
+ #include <sys/resource.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int nice_main(int argc, char **argv);
+ int nice_main(int argc, char **argv)
+diff --git a/coreutils/nohup.c b/coreutils/nohup.c
+index 6a6c70e..22419b8 100644
+--- a/coreutils/nohup.c
++++ b/coreutils/nohup.c
+@@ -10,7 +10,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int nohup_main(int argc, char **argv);
+ int nohup_main(int argc, char **argv)
+diff --git a/coreutils/od.c b/coreutils/od.c
+index 0de9def..00de080 100644
+--- a/coreutils/od.c
++++ b/coreutils/od.c
+@@ -12,7 +12,7 @@
+  */
+ 
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #if ENABLE_DESKTOP
+ /* This one provides -t (busybox's own build script needs it) */
+ #include "od_bloaty.c"
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index efdbf35..3250856 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -49,8 +49,7 @@ diff -u -a std bbox >bbox.diff || { echo Different!; sleep 1; }
+ 
+ */
+ 
+-
+-#include "busybox.h"
++#include "libbb.h"
+ #include <getopt.h>
+ 
+ #define assert(a) ((void)0)
+diff --git a/coreutils/printenv.c b/coreutils/printenv.c
+index 935f52d..0e69ff2 100644
+--- a/coreutils/printenv.c
++++ b/coreutils/printenv.c
+@@ -11,7 +11,7 @@
+ #include <stdio.h>
+ #include <string.h>
+ #include <stdlib.h>
+-#include "busybox.h"
++#include "libbb.h"
+ extern char **environ;
+ 
+ int printenv_main(int argc, char **argv);
+diff --git a/coreutils/printf.c b/coreutils/printf.c
+index a2a82d2..d0cf5a6 100644
+--- a/coreutils/printf.c
++++ b/coreutils/printf.c
+@@ -38,7 +38,7 @@
+ 
+ //   19990508 Busy Boxed! Dave Cinege
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ typedef void (*converter)(const char *arg, void *result);
+ 
+diff --git a/coreutils/pwd.c b/coreutils/pwd.c
+index a93b8f1..73a9d5b 100644
+--- a/coreutils/pwd.c
++++ b/coreutils/pwd.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/realpath.c b/coreutils/realpath.c
+index b3f7e49..7c5dc3b 100644
+--- a/coreutils/realpath.c
++++ b/coreutils/realpath.c
+@@ -10,7 +10,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int realpath_main(int argc, char **argv);
+ int realpath_main(int argc, char **argv)
+diff --git a/coreutils/rm.c b/coreutils/rm.c
+index e29073d..cc22647 100644
+--- a/coreutils/rm.c
++++ b/coreutils/rm.c
+@@ -15,7 +15,7 @@
+  * Size reduction.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/rmdir.c b/coreutils/rmdir.c
+index 7f32530..c1b89e4 100644
+--- a/coreutils/rmdir.c
++++ b/coreutils/rmdir.c
+@@ -11,7 +11,7 @@
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/rmdir.html */
+ 
+ #include <libgen.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/seq.c b/coreutils/seq.c
+index ef884d6..050c333 100644
+--- a/coreutils/seq.c
++++ b/coreutils/seq.c
+@@ -7,7 +7,7 @@
+  * Licensed under the GPL v2, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/sleep.c b/coreutils/sleep.c
+index 592005b..e9a30da 100644
+--- a/coreutils/sleep.c
++++ b/coreutils/sleep.c
+@@ -18,7 +18,7 @@
+  * time suffixes for seconds, minutes, hours, and days.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index 06a6cbf..f41bd63 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -12,7 +12,7 @@
+  * http://www.opengroup.org/onlinepubs/007904975/utilities/sort.html
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/coreutils/split.c b/coreutils/split.c
+index 10035e9..27f9cfd 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -9,7 +9,7 @@
+  * SUSv3 requirements:
+  * http://www.opengroup.org/onlinepubs/009695399/utilities/split.html
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static const struct suffix_mult split_suffices[] = {
+ #if ENABLE_FEATURE_SPLIT_FANCY
+diff --git a/coreutils/stat.c b/coreutils/stat.c
+index 16b8d1e..9930d84 100644
+--- a/coreutils/stat.c
++++ b/coreutils/stat.c
+@@ -13,7 +13,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* vars to control behavior */
+ #define OPT_FILESYS		(1<<0)
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index 702cada..488a7f8 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -21,7 +21,7 @@
+ 
+    */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #ifndef _POSIX_VDISABLE
+ # define _POSIX_VDISABLE ((unsigned char) 0)
+diff --git a/coreutils/sum.c b/coreutils/sum.c
+index 9327ca5..5799d14 100644
+--- a/coreutils/sum.c
++++ b/coreutils/sum.c
+@@ -13,7 +13,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ enum { SUM_BSD, PRINT_NAME, SUM_SYSV };
+ 
+diff --git a/coreutils/sync.c b/coreutils/sync.c
+index e52ab76..d562f3f 100644
+--- a/coreutils/sync.c
++++ b/coreutils/sync.c
+@@ -9,7 +9,7 @@
+ 
+ /* BB_AUDIT SUSv3 N/A -- Matches GNU behavior. */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/tail.c b/coreutils/tail.c
+index 32df259..e0d21ed 100644
+--- a/coreutils/tail.c
++++ b/coreutils/tail.c
+@@ -24,7 +24,7 @@
+  * 7) lseek attempted when count==0 even if arg was +0 (from top)
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static const struct suffix_mult tail_suffixes[] = {
+ 	{ "b", 512 },
+diff --git a/coreutils/tee.c b/coreutils/tee.c
+index 338232c..2160141 100644
+--- a/coreutils/tee.c
++++ b/coreutils/tee.c
+@@ -10,7 +10,7 @@
+ /* BB_AUDIT SUSv3 compliant */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/tee.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <signal.h>
+ 
+ int tee_main(int argc, char **argv);
+diff --git a/coreutils/test.c b/coreutils/test.c
+index 70b392f..df8387b 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -20,7 +20,7 @@
+  *     "This program is in the Public Domain."
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <setjmp.h>
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+diff --git a/coreutils/touch.c b/coreutils/touch.c
+index 5f81b23..7b82339 100644
+--- a/coreutils/touch.c
++++ b/coreutils/touch.c
+@@ -17,7 +17,7 @@
+  * Also, exiting on a failure was a bug.  All args should be processed.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/tr.c b/coreutils/tr.c
+index 5d3dd4c..7e89e9a 100644
+--- a/coreutils/tr.c
++++ b/coreutils/tr.c
+@@ -18,7 +18,7 @@
+ /* http://www.opengroup.org/onlinepubs/009695399/utilities/tr.html
+  * TODO: xdigit, graph, print
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define ASCII 0377
+ 
+diff --git a/coreutils/true.c b/coreutils/true.c
+index eee6213..9dcd69a 100644
+--- a/coreutils/true.c
++++ b/coreutils/true.c
+@@ -10,7 +10,7 @@
+ /* BB_AUDIT SUSv3 compliant */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/true.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/tty.c b/coreutils/tty.c
+index d4c179f..2c77c99 100644
+--- a/coreutils/tty.c
++++ b/coreutils/tty.c
+@@ -10,7 +10,7 @@
+ /* BB_AUDIT SUSv3 compliant */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/tty.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int tty_main(int argc, char **argv);
+ int tty_main(int argc, char **argv)
+diff --git a/coreutils/uname.c b/coreutils/uname.c
+index 2faa893..d4188cd 100644
+--- a/coreutils/uname.c
++++ b/coreutils/uname.c
+@@ -37,7 +37,7 @@
+ #include <unistd.h>
+ #include <sys/types.h>
+ #include <sys/utsname.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ typedef struct {
+ 	struct utsname name;
+diff --git a/coreutils/uniq.c b/coreutils/uniq.c
+index 11a731a..adc196b 100644
+--- a/coreutils/uniq.c
++++ b/coreutils/uniq.c
+@@ -10,7 +10,7 @@
+ /* BB_AUDIT SUSv3 compliant */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/uniq.html */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static const char uniq_opts[] = "cdu" "f:s:" "cdu\0\1\2\4";
+ 
+diff --git a/coreutils/usleep.c b/coreutils/usleep.c
+index 2baf2bc..e0cd56e 100644
+--- a/coreutils/usleep.c
++++ b/coreutils/usleep.c
+@@ -9,7 +9,7 @@
+ 
+ /* BB_AUDIT SUSv3 N/A -- Apparently a busybox extension. */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/uudecode.c b/coreutils/uudecode.c
+index c195a3e..779710e 100644
+--- a/coreutils/uudecode.c
++++ b/coreutils/uudecode.c
+@@ -12,7 +12,7 @@
+  */
+ 
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static void read_stduu(FILE *src_stream, FILE *dst_stream)
+ {
+diff --git a/coreutils/uuencode.c b/coreutils/uuencode.c
+index 3207d72..9490474 100644
+--- a/coreutils/uuencode.c
++++ b/coreutils/uuencode.c
+@@ -8,7 +8,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ 
+ #define SRC_BUF_SIZE	45  // This *MUST* be a multiple of 3
+diff --git a/coreutils/watch.c b/coreutils/watch.c
+index 60a4a71..2ad0564 100644
+--- a/coreutils/watch.c
++++ b/coreutils/watch.c
+@@ -11,7 +11,7 @@
+ /* BB_AUDIT SUSv3 N/A */
+ /* BB_AUDIT GNU defects -- only option -n is supported. */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ // procps 2.0.18:
+ // watch [-d] [-n seconds]
+diff --git a/coreutils/wc.c b/coreutils/wc.c
+index 926b3ac..04112c1 100644
+--- a/coreutils/wc.c
++++ b/coreutils/wc.c
+@@ -41,7 +41,7 @@
+  * for which 'wc -c' should output '0'.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #ifdef CONFIG_LOCALE_SUPPORT
+ #define isspace_given_isprint(c) isspace(c)
+diff --git a/coreutils/who.c b/coreutils/who.c
+index a5d3b02..546050a 100644
+--- a/coreutils/who.c
++++ b/coreutils/who.c
+@@ -17,7 +17,7 @@
+  *----------------------------------------------------------------------
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <utmp.h>
+ #include <time.h>
+ 
+diff --git a/coreutils/whoami.c b/coreutils/whoami.c
+index 25757f6..156516f 100644
+--- a/coreutils/whoami.c
++++ b/coreutils/whoami.c
+@@ -9,7 +9,7 @@
+ 
+ /* BB_AUDIT SUSv3 N/A -- Matches GNU behavior. */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/coreutils/yes.c b/coreutils/yes.c
+index 5697641..5529eab 100644
+--- a/coreutils/yes.c
++++ b/coreutils/yes.c
+@@ -14,7 +14,7 @@
+  * Size reductions and removed redundant applet name prefix from error messages.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/debianutils/mktemp.c b/debianutils/mktemp.c
+index ce5bda5..966257a 100644
+--- a/debianutils/mktemp.c
++++ b/debianutils/mktemp.c
+@@ -9,7 +9,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <stdio.h>
+ #include <errno.h>
+ #include <string.h>
+diff --git a/debianutils/pipe_progress.c b/debianutils/pipe_progress.c
+index 51a017c..f950084 100644
+--- a/debianutils/pipe_progress.c
++++ b/debianutils/pipe_progress.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <unistd.h>
+diff --git a/debianutils/readlink.c b/debianutils/readlink.c
+index 1a2c1ef..b6b4965 100644
+--- a/debianutils/readlink.c
++++ b/debianutils/readlink.c
+@@ -7,12 +7,10 @@
+  * Licensed under GPL v2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
+-#include <errno.h>
+-#include <unistd.h>
+-#include <stdlib.h>
+ #include <getopt.h>
+ 
++#include "libbb.h"
++
+ int readlink_main(int argc, char **argv);
+ int readlink_main(int argc, char **argv)
+ {
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index e6dec04..cb4a4e4 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -30,10 +30,10 @@
+  * -u MASK		umask. Set the umask of the program executed to MASK.
+  */
+ 
+-
+-#include "busybox.h"
+ #include <getopt.h>
+ 
++#include "libbb.h"
++
+ #if ENABLE_FEATURE_RUN_PARTS_LONG_OPTIONS
+ static const struct option runparts_long_options[] = {
+ 	{ "arg",        1,      NULL,   'a' },
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 1154794..0681a08 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -8,10 +8,11 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
+ #include <getopt.h>
+ #include <sys/resource.h>
+ 
++#include "libbb.h"
++
+ static int signal_nr = 15;
+ static int user_id = -1;
+ static char *userspec;
+diff --git a/debianutils/which.c b/debianutils/which.c
+index 02992d0..2c71ed3 100644
+--- a/debianutils/which.c
++++ b/debianutils/which.c
+@@ -10,7 +10,7 @@
+  * Based on which from debianutils
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int which_main(int argc, char **argv);
+ int which_main(int argc, char **argv)
+diff --git a/docs/new-applet-HOWTO.txt b/docs/new-applet-HOWTO.txt
+index 5d8fbe7..2bc938f 100644
+--- a/docs/new-applet-HOWTO.txt
++++ b/docs/new-applet-HOWTO.txt
+@@ -19,7 +19,7 @@ such as who you stole the code from and so forth. Also include the mini-GPL
+ boilerplate. Be sure to name the main function <applet>_main instead of main.
+ And be sure to put it in <applet>.c. Usage does not have to be taken care of by
+ your applet.
+-Make sure to #include "busybox.h" as the first include file in your applet so
++Make sure to #include "libbb.h" as the first include file in your applet so
+ the bb_config.h and appropriate platform specific files are included properly.
+ 
+ For a new applet mu, here is the code that would go in mu.c:
+@@ -39,7 +39,7 @@ For a new applet mu, here is the code that would go in mu.c:
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "other.h"
+ 
+ int mu_main(int argc, char **argv);
+diff --git a/e2fsprogs/chattr.c b/e2fsprogs/chattr.c
+index 82dba4a..0ac0373 100644
+--- a/e2fsprogs/chattr.c
++++ b/e2fsprogs/chattr.c
+@@ -19,7 +19,7 @@
+  * 98/12/29	- Display version info only when -V specified (G M Sipe)
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "e2fs_lib.h"
+ 
+ #define OPT_ADD 1
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 446541e..2954cab 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -37,7 +37,7 @@
+  * It doesn't guess filesystem types from on-disk format.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define EXIT_OK          0
+ #define EXIT_NONDESTRUCT 1
+diff --git a/e2fsprogs/lsattr.c b/e2fsprogs/lsattr.c
+index 25d2e3e..fbfbea2 100644
+--- a/e2fsprogs/lsattr.c
++++ b/e2fsprogs/lsattr.c
+@@ -18,7 +18,7 @@
+  * 98/12/29	- Display version info only when -V specified (G M Sipe)
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "e2fs_lib.h"
+ 
+ enum {
+diff --git a/e2fsprogs/old_e2fsprogs/e2fsck.h b/e2fsprogs/old_e2fsprogs/e2fsck.h
+index e520632..73d398f 100644
+--- a/e2fsprogs/old_e2fsprogs/e2fsck.h
++++ b/e2fsprogs/old_e2fsprogs/e2fsck.h
+@@ -39,7 +39,7 @@
+ #include "blkid/blkid.h"
+ #include "ext2fs/ext2_ext_attr.h"
+ #include "uuid/uuid.h"
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #ifdef HAVE_CONIO_H
+ #undef HAVE_TERMIOS_H
+diff --git a/e2fsprogs/old_e2fsprogs/e2p/e2p.h b/e2fsprogs/old_e2fsprogs/e2p/e2p.h
+index 2a2367b..cae28f1 100644
+--- a/e2fsprogs/old_e2fsprogs/e2p/e2p.h
++++ b/e2fsprogs/old_e2fsprogs/e2p/e2p.h
+@@ -1,5 +1,5 @@
+ /* vi: set sw=4 ts=4: */
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/types.h>		/* Needed by dirent.h on netbsd */
+ #include <stdio.h>
+ #include <dirent.h>
+diff --git a/e2fsprogs/old_e2fsprogs/fsck.c b/e2fsprogs/old_e2fsprogs/fsck.c
+index 7b794c3..0ad62ca 100644
+--- a/e2fsprogs/old_e2fsprogs/fsck.c
++++ b/e2fsprogs/old_e2fsprogs/fsck.c
+@@ -46,7 +46,7 @@
+ 
+ #include "e2fsbb.h"
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #ifndef _PATH_MNTTAB
+ #define _PATH_MNTTAB    "/etc/fstab"
+diff --git a/e2fsprogs/old_e2fsprogs/tune2fs.c b/e2fsprogs/old_e2fsprogs/tune2fs.c
+index e5a9337..920a50c 100644
+--- a/e2fsprogs/old_e2fsprogs/tune2fs.c
++++ b/e2fsprogs/old_e2fsprogs/tune2fs.c
+@@ -44,7 +44,7 @@
+ #include "util.h"
+ #include "blkid/blkid.h"
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static char * device_name = NULL;
+ static char * new_label, *new_last_mounted, *new_UUID;
+diff --git a/editors/awk.c b/editors/awk.c
+index 2d6773b..ea326ec 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -7,7 +7,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "xregex.h"
+ #include <math.h>
+ extern char **environ;
+diff --git a/editors/ed.c b/editors/ed.c
+index 1706e42..731aef1 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -7,7 +7,7 @@
+  * The "ed" built-in command (much simplified)
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ enum {
+ 	USERSIZE = sizeof(bb_common_bufsiz1) > 1024 ? 1024
+diff --git a/editors/patch.c b/editors/patch.c
+index 11b2f25..f65bbf4 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -20,10 +20,8 @@
+  */
+ 
+ #include <getopt.h>
+-#include <string.h>
+-#include <stdlib.h>
+-#include <unistd.h>
+-#include "busybox.h"
++
++#include "libbb.h"
+ 
+ static unsigned int copy_lines(FILE *src_stream, FILE *dest_stream, const unsigned int lines_count)
+ {
+diff --git a/editors/sed.c b/editors/sed.c
+index 4dd5331..b3c4430 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -58,7 +58,7 @@
+ 	Reference http://www.opengroup.org/onlinepubs/007904975/utilities/sed.html
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "xregex.h"
+ 
+ /* Each sed command turns into one of these structures. */
+diff --git a/editors/vi.c b/editors/vi.c
+index 66b01e2..97ca802 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -21,7 +21,7 @@
+  *	An "ex" line oriented mode- maybe using "cmdedit"
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define ENABLE_FEATURE_VI_CRASHME 0
+ 
+diff --git a/findutils/find.c b/findutils/find.c
+index aec22a5..2d271d2 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -46,7 +46,7 @@
+  */
+ 
+ #include <fnmatch.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/findutils/grep.c b/findutils/grep.c
+index f434176..5950860 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -19,7 +19,7 @@
+  * (C) 2006 Jac Goudsmit added -o option
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "xregex.h"
+ 
+ /* options */
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index 1a83ee1..4ca9563 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -17,7 +17,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/init/halt.c b/init/halt.c
+index 8faf9d8..ca5c153 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/reboot.h>
+ 
+ int halt_main(int argc, char **argv);
+diff --git a/init/init.c b/init/init.c
+index 342e0a6..3dcd072 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -9,7 +9,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <paths.h>
+ #include <signal.h>
+ #include <sys/ioctl.h>
+diff --git a/init/mesg.c b/init/mesg.c
+index 77bfe0e..e182b41 100644
+--- a/init/mesg.c
++++ b/init/mesg.c
+@@ -7,7 +7,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #ifdef USE_TTY_GROUP
+ #define S_IWGRP_OR_S_IWOTH	S_IWGRP
+diff --git a/ipsvd/ipsvd_perhost.c b/ipsvd/ipsvd_perhost.c
+index 281f708..ed802f0 100644
+--- a/ipsvd/ipsvd_perhost.c
++++ b/ipsvd/ipsvd_perhost.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "ipsvd_perhost.h"
+ 
+ static struct hcc *cc;
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index 553fee8..bc3d3a2 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -32,7 +32,7 @@
+ #include <limits.h>
+ #include <linux/netfilter_ipv4.h> /* wants <limits.h> */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "ipsvd_perhost.h"
+ 
+ #ifdef SSLSVD
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 382d28a..d4465f8 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -7,8 +7,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "libbb.h"
+ #include <getopt.h>
++#include "libbb.h"
+ 
+ /*      Documentation
+ 
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 3cb9c3e..9bbc709 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -29,7 +29,7 @@
+  */
+ 
+ #include <sys/ioctl.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ 
+ /* FIXME: obsolete CONFIG item? */
+diff --git a/libbb/selinux_common.c b/libbb/selinux_common.c
+index 4cb85f0..ff076f6 100644
+--- a/libbb/selinux_common.c
++++ b/libbb/selinux_common.c
+@@ -4,7 +4,7 @@
+  *
+  * Copyright 2007 KaiGai Kohei <kaigai@kaigai.gr.jp>
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ #include <selinux/context.h>
+ 
+ context_t set_security_context_component(security_context_t cur_context,
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 4eb4737..d02ef9c 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -9,7 +9,7 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* All the functions starting with "x" call bb_error_msg_and_die() if they
+  * fail, so callers never need to check for errors.  If it returned, it
+diff --git a/libpwdgrp/uidgid_get.c b/libpwdgrp/uidgid_get.c
+index f10b406..b0085c4 100644
+--- a/libpwdgrp/uidgid_get.c
++++ b/libpwdgrp/uidgid_get.c
+@@ -25,7 +25,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* Always sets uid and gid */
+ int get_uidgid(struct bb_uidgid_t *u, const char *ug, int numeric_ok)
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index 5aefda6..2487aad 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -10,7 +10,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static void xgroup_study(struct group *g)
+ {
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index 124e177..82a4381 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -8,7 +8,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define OPT_DONT_SET_PASS  (1 << 4)
+ #define OPT_DONT_MAKE_HOME (1 << 6)
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index 54babdc..0c298c5 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -5,7 +5,7 @@
+  * Cooked from passwd.c by Thomas Lundquist <thomasez@zelow.no>
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int cryptpw_main(int argc, char **argv);
+ int cryptpw_main(int argc, char **argv)
+diff --git a/loginutils/deluser.c b/loginutils/deluser.c
+index 2781df3..59e69b9 100644
+--- a/loginutils/deluser.c
++++ b/loginutils/deluser.c
+@@ -10,7 +10,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* Status */
+ #define STATUS_OK            0
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 64d2d08..f969124 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -16,7 +16,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <syslog.h>
+ 
+ #if ENABLE_FEATURE_UTMP
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 232c610..d725466 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -3,7 +3,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <utmp.h>
+ #include <sys/resource.h>
+ #include <syslog.h>
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index a323c0a..8f65c3d 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -3,7 +3,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <syslog.h>
+ 
+ 
+diff --git a/loginutils/su.c b/loginutils/su.c
+index 0a786cb..fd17319 100644
+--- a/loginutils/su.c
++++ b/loginutils/su.c
+@@ -5,7 +5,7 @@
+  *  Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <syslog.h>
+ 
+ #define SU_OPT_mp (3)
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index 38503f7..36b10fb 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -7,7 +7,7 @@
+ 
+ #include <syslog.h>
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static const char * const forbid[] = {
+ 	"ENV",
+diff --git a/loginutils/vlock.c b/loginutils/vlock.c
+index 06a7169..7f614fc 100644
+--- a/loginutils/vlock.c
++++ b/loginutils/vlock.c
+@@ -16,7 +16,7 @@
+ /* Fixed by Erik Andersen to do passwords the tinylogin way...
+  * It now works with md5, sha1, etc passwords. */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/vt.h>
+ 
+ static struct passwd *pw;
+diff --git a/miscutils/adjtimex.c b/miscutils/adjtimex.c
+index 22fd39e..9f8227c 100644
+--- a/miscutils/adjtimex.c
++++ b/miscutils/adjtimex.c
+@@ -11,7 +11,7 @@
+  * Licensed under GPLv2 or later, see file License in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/timex.h>
+ 
+ static const struct {int bit; const char *name;} statlist[] = {
+diff --git a/miscutils/bbconfig.c b/miscutils/bbconfig.c
+index 6896506..803d1d9 100644
+--- a/miscutils/bbconfig.c
++++ b/miscutils/bbconfig.c
+@@ -1,7 +1,7 @@
+ /* vi: set sw=4 ts=4: */
+ /* This file was released into the public domain by Paul Fox.
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ #include "bbconfigopts.h"
+ 
+ int bbconfig_main(int argc, char **argv);
+diff --git a/miscutils/chrt.c b/miscutils/chrt.c
+index f52c3cd..8a4b78f 100644
+--- a/miscutils/chrt.c
++++ b/miscutils/chrt.c
+@@ -6,10 +6,10 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
+ #include <unistd.h>
+ #include <sched.h>
+ #include <getopt.h> /* optind */
++#include "libbb.h"
+ #ifndef _POSIX_PRIORITY_SCHEDULING
+ #warning your system may be foobared
+ #endif
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index c7d1a6c..a490d41 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -12,7 +12,7 @@
+ 
+ #define VERSION "2.3.2"
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/syslog.h>
+ 
+ #define arysize(ary)    (sizeof(ary)/sizeof((ary)[0]))
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 02df85b..76c382e 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -10,7 +10,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #ifndef CRONTABS
+ #define CRONTABS        "/var/spool/cron/crontabs"
+diff --git a/miscutils/dc.c b/miscutils/dc.c
+index 1953a94..872b814 100644
+--- a/miscutils/dc.c
++++ b/miscutils/dc.c
+@@ -3,7 +3,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <math.h>
+ 
+ /* Tiny RPN calculator, because "expr" didn't give me bitwise operations. */
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index d1a5163..0b08fb6 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -54,7 +54,7 @@
+       Richard Gooch, c/o ATNF, P. O. Box 76, Epping, N.S.W., 2121, Australia.
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "xregex.h"
+ #include <unistd.h>
+ #include <stdio.h>
+diff --git a/miscutils/eject.c b/miscutils/eject.c
+index 5d7ef1c..631a344 100644
+--- a/miscutils/eject.c
++++ b/miscutils/eject.c
+@@ -13,7 +13,7 @@
+  * Most of the dirty work blatantly ripped off from cat.c =)
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* various defines swiped from linux/cdrom.h */
+ #define CDROMCLOSETRAY            0x5319  /* pendant of CDROMEJECT  */
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 0a689d8..181ac5f 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -12,7 +12,7 @@
+  *          - by Mark Lord (C) 1994-2002 -- freely distributable
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <linux/hdreg.h>
+ 
+ /* device types */
+diff --git a/miscutils/last.c b/miscutils/last.c
+index d354807..f38c4b8 100644
+--- a/miscutils/last.c
++++ b/miscutils/last.c
+@@ -7,7 +7,7 @@
+  * Licensed under the GPL version 2, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <utmp.h>
+ 
+ #ifndef SHUTDOWN_TIME
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 138bd47..3df1f37 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -23,7 +23,7 @@
+ 
+ #include <sched.h>	/* sched_yield() */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #if ENABLE_FEATURE_LESS_REGEXP
+ #include "xregex.h"
+ #endif
+diff --git a/miscutils/makedevs.c b/miscutils/makedevs.c
+index fce7ea4..0ad12d7 100644
+--- a/miscutils/makedevs.c
++++ b/miscutils/makedevs.c
+@@ -7,7 +7,7 @@
+  * known bugs: can't deal with alpha ranges
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #ifdef CONFIG_FEATURE_MAKEDEVS_LEAF
+ int makedevs_main(int argc, char **argv);
+diff --git a/miscutils/mountpoint.c b/miscutils/mountpoint.c
+index e380154..b5ce35c 100644
+--- a/miscutils/mountpoint.c
++++ b/miscutils/mountpoint.c
+@@ -9,7 +9,7 @@
+  * Based on sysvinit's mountpoint
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int mountpoint_main(int argc, char **argv);
+ int mountpoint_main(int argc, char **argv)
+diff --git a/miscutils/mt.c b/miscutils/mt.c
+index bed2969..2971421 100644
+--- a/miscutils/mt.c
++++ b/miscutils/mt.c
+@@ -3,7 +3,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/mtio.h>
+ 
+ struct mt_opcodes {
+diff --git a/miscutils/nmeter.c b/miscutils/nmeter.c
+index c96ce5d..e15cc8c 100644
+--- a/miscutils/nmeter.c
++++ b/miscutils/nmeter.c
+@@ -12,7 +12,7 @@
+ // disk_io: (3,0):(22272,17897,410702,4375,54750)
+ // btime 1059401962
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <time.h>
+ 
+ typedef unsigned long long ullong;
+diff --git a/miscutils/raidautorun.c b/miscutils/raidautorun.c
+index c95b00a..2b65d39 100644
+--- a/miscutils/raidautorun.c
++++ b/miscutils/raidautorun.c
+@@ -8,7 +8,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #include <linux/major.h>
+ #include <linux/raid/md_u.h>
+diff --git a/miscutils/readahead.c b/miscutils/readahead.c
+index 601e845..103ce8e 100644
+--- a/miscutils/readahead.c
++++ b/miscutils/readahead.c
+@@ -10,7 +10,7 @@
+  * Licensed under GPLv2 or later, see file License in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int readahead_main(int argc, char **argv);
+ int readahead_main(int argc, char **argv)
+diff --git a/miscutils/runlevel.c b/miscutils/runlevel.c
+index df2da2b..f7d55de 100644
+--- a/miscutils/runlevel.c
++++ b/miscutils/runlevel.c
+@@ -12,7 +12,7 @@
+  * initially busyboxified by Bernhard Fischer
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <stdio.h>
+ #include <utmp.h>
+ #include <time.h>
+diff --git a/miscutils/rx.c b/miscutils/rx.c
+index 6e79f34..675aad2 100644
+--- a/miscutils/rx.c
++++ b/miscutils/rx.c
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define SOH 0x01
+ #define STX 0x02
+diff --git a/miscutils/setsid.c b/miscutils/setsid.c
+index 1abb545..a976fe9 100644
+--- a/miscutils/setsid.c
++++ b/miscutils/setsid.c
+@@ -14,7 +14,7 @@
+  * - busyboxed
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int setsid_main(int argc, char **argv);
+ int setsid_main(int argc, char **argv)
+diff --git a/miscutils/strings.c b/miscutils/strings.c
+index 49f2cf3..eff1bd9 100644
+--- a/miscutils/strings.c
++++ b/miscutils/strings.c
+@@ -7,11 +7,9 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
+-#include <stdio.h>
+-#include <stdlib.h>
+ #include <getopt.h>
+-#include <ctype.h>
++
++#include "libbb.h"
+ 
+ #define WHOLE_FILE		1
+ #define PRINT_NAME		2
+diff --git a/miscutils/taskset.c b/miscutils/taskset.c
+index b3bf490..cd8ffc8 100644
+--- a/miscutils/taskset.c
++++ b/miscutils/taskset.c
+@@ -6,9 +6,9 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
+ #include <sched.h>
+ #include <getopt.h> /* optind */
++#include "libbb.h"
+ 
+ #if ENABLE_FEATURE_TASKSET_FANCY
+ #define TASKSET_PRINTF_MASK "%s"
+diff --git a/miscutils/time.c b/miscutils/time.c
+index a459195..0a2e0b7 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -9,7 +9,7 @@
+    Heavily modified for busybox by Erik Andersen <andersen@codepoet.org>
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define TV_MSEC tv_usec / 1000
+ 
+diff --git a/miscutils/watchdog.c b/miscutils/watchdog.c
+index 28ae9bd..b64291b 100644
+--- a/miscutils/watchdog.c
++++ b/miscutils/watchdog.c
+@@ -8,7 +8,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define OPT_FOREGROUND 0x01
+ #define OPT_TIMER      0x02
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index adfbd33..f8be9ce 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -58,7 +58,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <libgen.h>
+ #include <sys/utsname.h>
+ 
+diff --git a/modutils/lsmod.c b/modutils/lsmod.c
+index 31549b9..acca230 100644
+--- a/modutils/lsmod.c
++++ b/modutils/lsmod.c
+@@ -11,7 +11,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ 
+ #ifndef CONFIG_FEATURE_CHECK_TAINTED_MODULE
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index 4c5e436..a7c6307 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -11,7 +11,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/utsname.h>
+ #include <fnmatch.h>
+ 
+diff --git a/modutils/rmmod.c b/modutils/rmmod.c
+index 67cf58c..4c792d3 100644
+--- a/modutils/rmmod.c
++++ b/modutils/rmmod.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/syscall.h>
+ 
+ #ifdef CONFIG_FEATURE_2_6_MODULES
+diff --git a/networking/arp.c b/networking/arp.c
+index 7a36f44..6a7c862 100644
+--- a/networking/arp.c
++++ b/networking/arp.c
+@@ -13,7 +13,7 @@
+  * modified for getopt32 by Arne Bernin <arne [at] alamut.de>
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "inet_common.h"
+ 
+ #include <arpa/inet.h>
+diff --git a/networking/arping.c b/networking/arping.c
+index d71ac49..0371df3 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -16,7 +16,7 @@
+ #include <netinet/ether.h>
+ #include <netpacket/packet.h>
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static struct in_addr src;
+ static struct in_addr dst;
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index 8807bbe..32166e5 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -18,7 +18,7 @@
+  */
+ 
+ #include <syslog.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ //#define DEBUG 1
+ #define DEBUG 0
+diff --git a/networking/ether-wake.c b/networking/ether-wake.c
+index ed41590..9de0d48 100644
+--- a/networking/ether-wake.c
++++ b/networking/ether-wake.c
+@@ -70,7 +70,7 @@
+ #include <netinet/ether.h>
+ #include <linux/if.h>
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* Note: PF_INET, SOCK_DGRAM, IPPROTO_UDP would allow SIOCGIFHWADDR to
+  * work as non-root, but we need SOCK_PACKET to specify the Ethernet
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index 9b0510d..54b5f5a 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -13,8 +13,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
+ #include <getopt.h>
++#include "libbb.h"
+ 
+ typedef struct ftp_host_info_s {
+ 	const char *user;
+diff --git a/networking/hostname.c b/networking/hostname.c
+index 3f6a658..50ef7b5 100644
+--- a/networking/hostname.c
++++ b/networking/hostname.c
+@@ -12,7 +12,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static void do_sethostname(char *s, int isfile)
+ {
+diff --git a/networking/httpd.c b/networking/httpd.c
+index d8ea483..f47e2c1 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -91,7 +91,7 @@
+  *
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* amount of buffering in a pipe */
+ #ifndef PIPE_BUF
+diff --git a/networking/ifconfig.c b/networking/ifconfig.c
+index 3dcc902..5742399 100644
+--- a/networking/ifconfig.c
++++ b/networking/ifconfig.c
+@@ -37,7 +37,7 @@
+ #include <netinet/if_ether.h>
+ #endif
+ #include "inet_common.h"
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #if ENABLE_FEATURE_IFCONFIG_SLIP
+ # include <net/if_slip.h>
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 5b22517..8e8341e 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -15,11 +15,12 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
+ #include <sys/utsname.h>
+ #include <fnmatch.h>
+ #include <getopt.h>
+ 
++#include "libbb.h"
++
+ #define MAX_OPT_DEPTH 10
+ #define EUNBALBRACK 10001
+ #define EUNDEFVAR   10002
+diff --git a/networking/inetd.c b/networking/inetd.c
+index dc191a4..211a8dc 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -155,7 +155,7 @@
+  *                      setuid()
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <syslog.h>
+ #include <sys/un.h>
+ 
+diff --git a/networking/interface.c b/networking/interface.c
+index b1b935e..51e3d74 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -34,7 +34,7 @@
+ #include <net/if.h>
+ #include <net/if_arp.h>
+ #include "inet_common.h"
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #if ENABLE_FEATURE_IPV6
+ # define HAVE_AFINET6 1
+diff --git a/networking/ip.c b/networking/ip.c
+index c7816c8..0105bd9 100644
+--- a/networking/ip.c
++++ b/networking/ip.c
+@@ -13,7 +13,7 @@
+  * Bernhard Fischer rewrote to use index_in_substr_array
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #include "libiproute/utils.h"
+ #include "libiproute/ip_common.h"
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index 63ce99f..a39ad1a 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -12,12 +12,12 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
+-#include <ctype.h>
+ #include <getopt.h>
+ #include <sys/socket.h>
+ #include <arpa/inet.h>
+ 
++#include "libbb.h"
++
+ #define CLASS_A_NETMASK	ntohl(0xFF000000)
+ #define CLASS_B_NETMASK	ntohl(0xFFFF0000)
+ #define CLASS_C_NETMASK	ntohl(0xFFFFFF00)
+diff --git a/networking/isrv.c b/networking/isrv.c
+index f0df222..a51618a 100644
+--- a/networking/isrv.c
++++ b/networking/isrv.c
+@@ -8,7 +8,7 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "isrv.h"
+ 
+ #define DEBUG 0
+diff --git a/networking/isrv_identd.c b/networking/isrv_identd.c
+index 59daf99..84cf6da 100644
+--- a/networking/isrv_identd.c
++++ b/networking/isrv_identd.c
+@@ -8,7 +8,7 @@
+  */
+ 
+ #include <syslog.h>
+-#include "busybox.h"
++#include "libbb.h"
+ #include "isrv.h"
+ 
+ enum { TIMEOUT = 20 };
+diff --git a/networking/libiproute/ip_common.h b/networking/libiproute/ip_common.h
+index 96df610..9710107 100644
+--- a/networking/libiproute/ip_common.h
++++ b/networking/libiproute/ip_common.h
+@@ -2,7 +2,7 @@
+ #ifndef _IP_COMMON_H
+ #define _IP_COMMON_H 1
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <asm/types.h>
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+diff --git a/networking/nameif.c b/networking/nameif.c
+index ec77512..a65f308 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -9,7 +9,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <syslog.h>
+ #include <net/if.h>
+ #include <netinet/ether.h>
+diff --git a/networking/nc.c b/networking/nc.c
+index e89eb76..1fb38f8 100644
+--- a/networking/nc.c
++++ b/networking/nc.c
+@@ -7,7 +7,7 @@
+  *  Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #if ENABLE_DESKTOP
+ #include "nc_bloaty.c"
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 57af7eb..3e333b7 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -48,7 +48,7 @@
+  *   are closed, but nc doesn't exit - continues to listen/accept.
+  */
+ 
+-/* done in nc.c: #include "busybox.h" */
++/* done in nc.c: #include "libbb.h" */
+ 
+ enum {
+ 	SLEAZE_PORT = 31337,               /* for UDP-scan RTT trick, change if ya want */
+diff --git a/networking/netstat.c b/networking/netstat.c
+index 5fb5c38..38091ae 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -11,7 +11,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "inet_common.h"
+ 
+ enum {
+diff --git a/networking/nslookup.c b/networking/nslookup.c
+index 424a0e4..608e654 100644
+--- a/networking/nslookup.c
++++ b/networking/nslookup.c
+@@ -12,7 +12,7 @@
+  */
+ 
+ #include <resolv.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /*
+  *  I'm only implementing non-interactive mode;
+diff --git a/networking/ping.c b/networking/ping.c
+index e413bec..2f33191 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -27,7 +27,7 @@
+ 
+ #include <net/if.h>
+ #include <netinet/ip_icmp.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #if ENABLE_PING6
+ #include <netinet/icmp6.h>
+diff --git a/networking/route.c b/networking/route.c
+index da59698..881332b 100644
+--- a/networking/route.c
++++ b/networking/route.c
+@@ -25,12 +25,13 @@
+  * remove ridiculous amounts of bloat.
+  */
+ 
+-#include "busybox.h"
+-#include "inet_common.h"
+ #include <getopt.h>
+ #include <net/route.h>
+ #include <net/if.h>
+ 
++#include "libbb.h"
++#include "inet_common.h"
++
+ 
+ #ifndef RTF_UP
+ /* Keep this in sync with /usr/src/linux/include/linux/route.h */
+diff --git a/networking/telnet.c b/networking/telnet.c
+index 5c75a74..a594505 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -24,7 +24,7 @@
+ #include <termios.h>
+ #include <arpa/telnet.h>
+ #include <netinet/in.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #ifdef DOTRACE
+ #define TRACE(x, y) do { if (x) printf y; } while (0)
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 4ab6f56..21b704a 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -24,7 +24,7 @@
+ /*#define DEBUG 1 */
+ #define DEBUG 0
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #if DEBUG
+ #define TELCMDS
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 3fb76ec..e1e278a 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -19,7 +19,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  * ------------------------------------------------------------------------- */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ 
+ #if ENABLE_FEATURE_TFTP_GET || ENABLE_FEATURE_TFTP_PUT
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index b4cca25..ce8dc83 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -215,7 +215,7 @@
+ #include <netinet/ip.h>
+ #include <netinet/ip_icmp.h>
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "inet_common.h"
+ 
+ 
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 6c0db5b..006d580 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -10,7 +10,7 @@
+ #ifndef _COMMON_H
+ #define _COMMON_H
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define DEFAULT_SCRIPT  "/usr/share/udhcpc/default.script"
+ 
+diff --git a/networking/vconfig.c b/networking/vconfig.c
+index 06c06cb..e063d0a 100644
+--- a/networking/vconfig.c
++++ b/networking/vconfig.c
+@@ -9,7 +9,7 @@
+ 
+ /* BB_AUDIT SUSv3 N/A */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <net/if.h>
+ 
+ /* Stuff from linux/if_vlan.h, kernel version 2.4.23 */
+diff --git a/networking/wget.c b/networking/wget.c
+index 026722a..2c060d7 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -10,8 +10,8 @@
+ /* http://www.unix.org/version2/whatsnew/lfs20mar.html */
+ #define _LARGEFILE64_SOURCE 1
+ 
+-#include "busybox.h"
+ #include <getopt.h>	/* for struct option */
++#include "libbb.h"
+ 
+ struct host_info {
+ 	// May be used if we ever will want to free() all xstrdup()s...
+diff --git a/networking/zcip.c b/networking/zcip.c
+index 195ae50..3b67a03 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -23,7 +23,7 @@
+ // - avoid silent script failures, especially under load...
+ // - link status monitoring (restart on link-up; stop on link-down)
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <syslog.h>
+ #include <poll.h>
+ #include <sys/wait.h>
+diff --git a/procps/free.c b/procps/free.c
+index 2b205d0..42193fd 100644
+--- a/procps/free.c
++++ b/procps/free.c
+@@ -9,7 +9,7 @@
+ 
+ /* getopt not needed */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int free_main(int argc, char **argv);
+ int free_main(int argc, char **argv)
+diff --git a/procps/fuser.c b/procps/fuser.c
+index 40789dd..f65b05d 100644
+--- a/procps/fuser.c
++++ b/procps/fuser.c
+@@ -8,7 +8,7 @@
+  * GNU Library General Public License
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define FUSER_PROC_DIR "/proc"
+ #define FUSER_MAX_LINE 255
+diff --git a/procps/kill.c b/procps/kill.c
+index 3e0e121..892a798 100644
+--- a/procps/kill.c
++++ b/procps/kill.c
+@@ -8,7 +8,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* Note: kill_main is directly called from shell in order to implement
+  * kill built-in. Shell substitutes job ids with process groups first.
+diff --git a/procps/pidof.c b/procps/pidof.c
+index ea2520a..3541aee 100644
+--- a/procps/pidof.c
++++ b/procps/pidof.c
+@@ -7,7 +7,7 @@
+  * Licensed under the GPL version 2, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ enum {
+ 	USE_FEATURE_PIDOF_SINGLE(OPTBIT_SINGLE,)
+diff --git a/procps/ps.c b/procps/ps.c
+index 5545313..968a6fe 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -7,7 +7,7 @@
+  * Licensed under the GPL version 2, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #if ENABLE_DESKTOP
+ 
+diff --git a/procps/renice.c b/procps/renice.c
+index 2964e20..6c5bb0e 100644
+--- a/procps/renice.c
++++ b/procps/renice.c
+@@ -19,7 +19,7 @@
+  *   following IDs (if any).  Multiple switches are allowed.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/resource.h>
+ 
+ void BUG_bad_PRIO_PROCESS(void);
+diff --git a/procps/sysctl.c b/procps/sysctl.c
+index 2c3fda5..a0e9e16 100644
+--- a/procps/sysctl.c
++++ b/procps/sysctl.c
+@@ -14,7 +14,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /*
+  *    Function Prototypes
+diff --git a/procps/top.c b/procps/top.c
+index 580c300..948ab03 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -28,7 +28,7 @@
+  * GNU Library General Public License
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ 
+ typedef struct top_status_t {
+diff --git a/procps/uptime.c b/procps/uptime.c
+index c2b5d39..ee0657e 100644
+--- a/procps/uptime.c
++++ b/procps/uptime.c
+@@ -15,7 +15,7 @@
+ 
+ /* getopt not needed */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #ifndef FSHIFT
+ # define FSHIFT 16              /* nr of bits of precision */
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 7b90784..8eb1e8a 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -28,7 +28,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ /* Busyboxed by Denis Vlasenko <vda.linux@googlemail.com> */
+ /* Dependencies on runit_lib.c removed */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #include <dirent.h>
+ 
+diff --git a/runit/runsv.c b/runit/runsv.c
+index d5bfd4e..20f8495 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -30,7 +30,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ #include <sys/poll.h>
+ #include <sys/file.h>
+-#include "busybox.h"
++#include "libbb.h"
+ #include "runit_lib.h"
+ 
+ static int selfpipe[2];
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 4b94aa2..8db0fc1 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -30,7 +30,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ #include <sys/poll.h>
+ #include <sys/file.h>
+-#include "busybox.h"
++#include "libbb.h"
+ #include "runit_lib.h"
+ 
+ #define MAXSERVICES 1000
+diff --git a/runit/sv.c b/runit/sv.c
+index 01488c0..a918bb7 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -153,7 +153,7 @@ Exit Codes
+ 
+ #include <sys/poll.h>
+ #include <sys/file.h>
+-#include "busybox.h"
++#include "libbb.h"
+ #include "runit_lib.h"
+ 
+ static const char *acts;
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 4e9644f..08e0b64 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -30,7 +30,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ #include <sys/poll.h>
+ #include <sys/file.h>
+-#include "busybox.h"
++#include "libbb.h"
+ #include "runit_lib.h"
+ 
+ static unsigned verbose;
+diff --git a/selinux/chcon.c b/selinux/chcon.c
+index 437502c..a8a816b 100644
+--- a/selinux/chcon.c
++++ b/selinux/chcon.c
+@@ -5,10 +5,11 @@
+  *
+  * Copyright (C) 2006 - 2007 KaiGai Kohei <kaigai@kaigai.gr.jp>
+  */
+-#include "busybox.h"
+ #include <getopt.h>
+ #include <selinux/context.h>
+ 
++#include "libbb.h"
++
+ #define OPT_RECURSIVE		(1<<0)	/* 'R' */
+ #define OPT_CHANHES		(1<<1)	/* 'c' */
+ #define OPT_NODEREFERENCE	(1<<2)	/* 'h' */
+diff --git a/selinux/getenforce.c b/selinux/getenforce.c
+index 865fed9..62b4263 100644
+--- a/selinux/getenforce.c
++++ b/selinux/getenforce.c
+@@ -6,7 +6,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int getenforce_main(int argc, char **argv);
+ int getenforce_main(int argc, char **argv)
+diff --git a/selinux/getsebool.c b/selinux/getsebool.c
+index 0479598..b059003 100644
+--- a/selinux/getsebool.c
++++ b/selinux/getsebool.c
+@@ -6,7 +6,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int getsebool_main(int argc, char **argv);
+ int getsebool_main(int argc, char **argv)
+diff --git a/selinux/load_policy.c b/selinux/load_policy.c
+index 5d5d7d5..5d140bc 100644
+--- a/selinux/load_policy.c
++++ b/selinux/load_policy.c
+@@ -3,7 +3,7 @@
+  * This implementation is based on old load_policy to be small.
+  * Author: Yuichi Nakamura <ynakam@hitachisoft.jp>
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int load_policy_main(int argc, char **argv);
+ int load_policy_main(int argc, char **argv)
+diff --git a/selinux/matchpathcon.c b/selinux/matchpathcon.c
+index 4e33c99..8d681d0 100644
+--- a/selinux/matchpathcon.c
++++ b/selinux/matchpathcon.c
+@@ -4,7 +4,7 @@
+  * Port to busybox: KaiGai Kohei <kaigai@kaigai.gr.jp>
+  *
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ static int print_matchpathcon(char *path, int noprint)
+ {
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index 9f61fdb..741c7bb 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -26,11 +26,12 @@
+  * Port to busybox: KaiGai Kohei <kaigai@kaigai.gr.jp>
+  *                  - based on coreutils-5.97 (in Fedora Core 6)
+  */
+-#include "busybox.h"
+ #include <getopt.h>
+ #include <selinux/context.h>
+ #include <selinux/flask.h>
+ 
++#include "libbb.h"
++
+ static context_t runcon_compute_new_context(char *user, char *role, char *type, char *range,
+ 					    char *command, int compute_trans)
+ {
+diff --git a/selinux/selinuxenabled.c b/selinux/selinuxenabled.c
+index c93ba70..8a9c7cd 100644
+--- a/selinux/selinuxenabled.c
++++ b/selinux/selinuxenabled.c
+@@ -5,7 +5,7 @@
+  * Port to BusyBox  Hiroshi Shinji <shiroshi@my.email.ne.jp>
+  *
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int selinuxenabled_main(int argc, char **argv);
+ int selinuxenabled_main(int argc, char **argv)
+diff --git a/selinux/setenforce.c b/selinux/setenforce.c
+index 9204fcc..59b1b0f 100644
+--- a/selinux/setenforce.c
++++ b/selinux/setenforce.c
+@@ -6,7 +6,7 @@
+  *
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* These strings are arranged so that odd ones
+  * result in security_setenforce(1) being done,
+diff --git a/shell/ash.c b/shell/ash.c
+index ed46e1c..b1d22e5 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -53,7 +53,7 @@
+ #if DEBUG
+ #define _GNU_SOURCE
+ #endif
+-#include "busybox.h"
++#include "busybox.h" /* for struct bb_applet */
+ #include <paths.h>
+ #include <setjmp.h>
+ #include <fnmatch.h>
+diff --git a/shell/bbsh.c b/shell/bbsh.c
+index 8f0fb05..4fd0714 100644
+--- a/shell/bbsh.c
++++ b/shell/bbsh.c
+@@ -36,7 +36,7 @@
+   echo `echo hello#comment " woot` and more
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ // A single executable, its arguments, and other information we know about it.
+ #define BBSH_FLAG_EXIT    1
+diff --git a/shell/hush.c b/shell/hush.c
+index 2e6f286..6844f06 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -76,12 +76,15 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++
+ #include <glob.h>      /* glob, of course */
+ #include <getopt.h>    /* should be pretty obvious */
+ /* #include <dmalloc.h> */
++
+ extern char **environ; /* This is in <unistd.h>, but protected with __USE_GNU */
+ 
++#include "busybox.h" /* for struct bb_applet */
++
+ 
+ /* If you comment out one of these below, it will be #defined later
+  * to perform debug printfs to stderr: */
+diff --git a/shell/lash.c b/shell/lash.c
+index 28449b7..21c95fb 100644
+--- a/shell/lash.c
++++ b/shell/lash.c
+@@ -20,10 +20,11 @@
+ //For debugging/development on the shell only...
+ //#define DEBUG_SHELL
+ 
+-
+-#include "busybox.h"
+ #include <getopt.h>
+ #include <glob.h>
++
++#include "busybox.h" /* for struct bb_applet */
++
+ #define expand_t	glob_t
+ 
+ /* Always enable for the moment... */
+diff --git a/sysklogd/klogd.c b/sysklogd/klogd.c
+index 6242539..5beec14 100644
+--- a/sysklogd/klogd.c
++++ b/sysklogd/klogd.c
+@@ -17,7 +17,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/syslog.h>
+ #include <sys/klog.h>
+ 
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index 71dd531..971a6be 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #if !defined CONFIG_SYSLOGD
+ 
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index b1758a6..ac354b5 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -9,7 +9,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/ipc.h>
+ #include <sys/sem.h>
+ #include <sys/shm.h>
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 76a446b..8897e9c 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -13,7 +13,7 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <paths.h>
+ #include <sys/un.h>
+ 
+diff --git a/util-linux/dmesg.c b/util-linux/dmesg.c
+index 820b837..ed908ed 100644
+--- a/util-linux/dmesg.c
++++ b/util-linux/dmesg.c
+@@ -9,7 +9,7 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <unistd.h>
+ #include <sys/klog.h>
+ 
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index bd584e4..f963040 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -12,7 +12,7 @@
+  *     Geert Uytterhoeven (Geert.Uytterhoeven@cs.kuleuven.ac.be)
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ #define DEFAULTFBDEV  FB_0
+ #define DEFAULTFBMODE "/etc/fb.modes"
+diff --git a/util-linux/fdformat.c b/util-linux/fdformat.c
+index d694bd6..e9fbeee 100644
+--- a/util-linux/fdformat.c
++++ b/util-linux/fdformat.c
+@@ -9,7 +9,7 @@
+  * 5 July 2003 -- modified for Busybox by Erik Andersen
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ 
+ /* Stuff extracted from linux/fd.h */
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index f3c7ca4..a1893c6 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -8,7 +8,7 @@
+  */
+ 
+ #include <assert.h>             /* assert */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* Looks like someone forgot to add this to config system */
+ #ifndef ENABLE_FEATURE_FDISK_BLKSIZE
+diff --git a/util-linux/freeramdisk.c b/util-linux/freeramdisk.c
+index ae341b0..a1f2c56 100644
+--- a/util-linux/freeramdisk.c
++++ b/util-linux/freeramdisk.c
+@@ -9,7 +9,7 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* From <linux/fd.h> */
+ #define FDFLUSH  _IO(2,0x4b)
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index cc73cdd..d35a25a 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -87,7 +87,7 @@
+  * enforced (but it's not much fun on a character device :-).
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <mntent.h>
+ 
+ #include "minix.h"
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 68e69de..b4749c1 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -31,8 +31,8 @@
+  *
+  */
+ 
+-#include "busybox.h"
+ #include <getopt.h>
++#include "libbb.h"
+ 
+ /* NON_OPT is the code that is returned when a non-option is found in '+'
+    mode */
+diff --git a/util-linux/hexdump.c b/util-linux/hexdump.c
+index 85a4490..36ed1e9 100644
+--- a/util-linux/hexdump.c
++++ b/util-linux/hexdump.c
+@@ -10,7 +10,7 @@
+  */
+ 
+ #include <getopt.h>
+-#include "busybox.h"
++#include "libbb.h"
+ #include "dump.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index 4ca8eaf..6864925 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -11,7 +11,7 @@
+ #include <sys/ioctl.h>
+ #include <sys/utsname.h>
+ #include <getopt.h>
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* Copied from linux/rtc.h to eliminate the kernel dependency */
+ struct linux_rtc_time {
+diff --git a/util-linux/ipcrm.c b/util-linux/ipcrm.c
+index 025f527..1e62062 100644
+--- a/util-linux/ipcrm.c
++++ b/util-linux/ipcrm.c
+@@ -8,7 +8,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ /* X/OPEN tells us to use <sys/{types,ipc,sem}.h> for semctl() */
+ /* X/OPEN tells us to use <sys/{types,ipc,msg}.h> for msgctl() */
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index 489480c..393f948 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -8,7 +8,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <errno.h>
+ #include <time.h>
+ #include <pwd.h>
+diff --git a/util-linux/losetup.c b/util-linux/losetup.c
+index b1e4b08..e2d4e4d 100644
+--- a/util-linux/losetup.c
++++ b/util-linux/losetup.c
+@@ -8,9 +8,8 @@
+  */
+ 
+ #include <getopt.h>
+-#include <stdlib.h>
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int losetup_main(int argc, char **argv);
+ int losetup_main(int argc, char **argv)
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 6ff49fc..a4716e2 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -9,7 +9,7 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include "xregex.h"
+ 
+ #define DEV_PATH	"/dev"
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index d70d20f..9707ba3 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -62,7 +62,7 @@
+  *	removed getopt based parser and added a hand rolled one.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <mntent.h>
+ 
+ #include "minix.h"
+diff --git a/util-linux/mkswap.c b/util-linux/mkswap.c
+index a84792c..88f1fbb 100644
+--- a/util-linux/mkswap.c
++++ b/util-linux/mkswap.c
+@@ -6,7 +6,7 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int mkswap_main(int argc, char **argv);
+ int mkswap_main(int argc, char **argv)
+diff --git a/util-linux/more.c b/util-linux/more.c
+index 2a38ef3..30ef896 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -14,7 +14,7 @@
+  * Licensed under GPLv2 or later, see file License in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ 
+ #if ENABLE_FEATURE_USE_TERMIOS
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 030ea66..fe2f1d9 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -18,7 +18,7 @@
+    mount_it_now() does the actual mount.
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <mntent.h>
+ 
+ /* Needed for nfs support only... */
+diff --git a/util-linux/pivot_root.c b/util-linux/pivot_root.c
+index 2706bd2..929ed30 100644
+--- a/util-linux/pivot_root.c
++++ b/util-linux/pivot_root.c
+@@ -8,7 +8,7 @@
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ extern int pivot_root(const char * new_root,const char * put_old);
+ 
+diff --git a/util-linux/rdate.c b/util-linux/rdate.c
+index 33cf64e..9166546 100644
+--- a/util-linux/rdate.c
++++ b/util-linux/rdate.c
+@@ -8,7 +8,7 @@
+  * Licensed under GPL v2 or later, see file License for details.
+ */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ enum { RFC_868_BIAS = 2208988800UL };
+ 
+diff --git a/util-linux/readprofile.c b/util-linux/readprofile.c
+index a17b9c8..f2bd3bb 100644
+--- a/util-linux/readprofile.c
++++ b/util-linux/readprofile.c
+@@ -32,7 +32,7 @@
+  * Paul Mundt <lethal@linux-sh.org>.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/utsname.h>
+ 
+ #define S_LEN 128
+diff --git a/util-linux/setarch.c b/util-linux/setarch.c
+index a7a45ec..f6433d6 100644
+--- a/util-linux/setarch.c
++++ b/util-linux/setarch.c
+@@ -14,7 +14,7 @@
+ #include <stdio.h>
+ #include <sys/personality.h>
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int setarch_main(int ATTRIBUTE_UNUSED argc, char **argv);
+ int setarch_main(int ATTRIBUTE_UNUSED argc, char **argv)
+diff --git a/util-linux/swaponoff.c b/util-linux/swaponoff.c
+index 8930035..cb1bbe9 100644
+--- a/util-linux/swaponoff.c
++++ b/util-linux/swaponoff.c
+@@ -7,7 +7,7 @@
+  * Licensed under the GPL version 2, see the file LICENSE in this tarball.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <mntent.h>
+ #include <sys/swap.h>
+ 
+diff --git a/util-linux/switch_root.c b/util-linux/switch_root.c
+index 88bb9db..72a2f46 100644
+--- a/util-linux/switch_root.c
++++ b/util-linux/switch_root.c
+@@ -6,7 +6,7 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
++#include "libbb.h"
+ #include <sys/vfs.h>
+ 
+ 
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index 19f1345..7063a47 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -8,9 +8,9 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "busybox.h"
+ #include <mntent.h>
+ #include <getopt.h>
++#include "libbb.h"
+ 
+ #define OPTION_STRING		"flDnravdt:"
+ #define OPT_FORCE			1

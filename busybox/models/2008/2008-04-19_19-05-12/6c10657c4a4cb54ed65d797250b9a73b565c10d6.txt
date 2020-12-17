@@ -1,0 +1,45 @@
+2008-04-19 19:05:12 +0000
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 5298ee5..915b74d 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -172,7 +172,7 @@ char *utoa_to_buf(unsigned n, char *buf, unsigned buflen)
+ /* Convert signed integer to ascii, like utoa_to_buf() */
+ char *itoa_to_buf(int n, char *buf, unsigned buflen)
+ {
+-	if (buflen && n<0) {
++	if (buflen && n < 0) {
+ 		n = -n;
+ 		*buf++ = '-';
+ 		buflen--;
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index ad909ff..1190b68 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -191,7 +191,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			if (strchr(*argv, '.'))
+ 				p->i_key = p->o_key = get_addr32(*argv);
+ 			else {
+-				if (get_unsigned(&uval, *argv, 0)<0) {
++				if (get_unsigned(&uval, *argv, 0) < 0) {
+ 					bb_error_msg_and_die("invalid value of \"key\"");
+ 				}
+ 				p->i_key = p->o_key = htonl(uval);
+@@ -203,7 +203,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			if (strchr(*argv, '.'))
+ 				p->o_key = get_addr32(*argv);
+ 			else {
+-				if (get_unsigned(&uval, *argv, 0)<0) {
++				if (get_unsigned(&uval, *argv, 0) < 0) {
+ 					bb_error_msg_and_die("invalid value of \"ikey\"");
+ 				}
+ 				p->i_key = htonl(uval);
+@@ -215,7 +215,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			if (strchr(*argv, '.'))
+ 				p->o_key = get_addr32(*argv);
+ 			else {
+-				if (get_unsigned(&uval, *argv, 0)<0) {
++				if (get_unsigned(&uval, *argv, 0) < 0) {
+ 					bb_error_msg_and_die("invalid value of \"okey\"");
+ 				}
+ 				p->o_key = htonl(uval);

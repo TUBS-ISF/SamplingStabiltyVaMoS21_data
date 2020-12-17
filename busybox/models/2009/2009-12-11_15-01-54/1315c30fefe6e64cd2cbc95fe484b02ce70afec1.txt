@@ -1,0 +1,13 @@
+2009-12-11 15:01:54 +0100
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 130ad25..c099570 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -146,6 +146,7 @@ lib-$(CONFIG_FEATURE_HTTPD_AUTH_MD5) += pw_encrypt.o
+ lib-$(CONFIG_DF) += find_mount_point.o
+ lib-$(CONFIG_MKFS_MINIX) += find_mount_point.o
+ lib-$(CONFIG_FSCK_MINIX) += find_mount_point.o
++lib-$(CONFIG_MOUNT) += find_mount_point.o
+ 
+ lib-$(CONFIG_HWCLOCK) += rtc.o
+ lib-$(CONFIG_RTCWAKE) += rtc.o

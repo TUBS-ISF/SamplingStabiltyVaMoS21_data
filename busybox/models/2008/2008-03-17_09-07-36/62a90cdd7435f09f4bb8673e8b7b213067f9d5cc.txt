@@ -1,0 +1,1121 @@
+2008-03-17 09:07:36 +0000
+diff --git a/coreutils/cat.c b/coreutils/cat.c
+index 181d96a..989147b 100644
+--- a/coreutils/cat.c
++++ b/coreutils/cat.c
+@@ -17,18 +17,14 @@
+ 
+ int bb_cat(char **argv)
+ {
+-	static const char *const argv_dash[] = { "-", NULL };
+-
+ 	int fd;
+ 	int retval = EXIT_SUCCESS;
+ 
+ 	if (!*argv)
+-		argv = (char**) &argv_dash;
++		argv = (char**) &bb_argv_dash;
+ 
+ 	do {
+-		fd = STDIN_FILENO;
+-		if (!LONE_DASH(*argv))
+-			fd = open_or_warn(*argv, O_RDONLY);
++		fd = open_or_warn_stdin(*argv);
+ 		if (fd >= 0) {
+ 			/* This is not a xfunc - never exits */
+ 			off_t r = bb_copyfd_eof(fd, STDOUT_FILENO);
+diff --git a/coreutils/catv.c b/coreutils/catv.c
+index a5ee534..b87740e 100644
+--- a/coreutils/catv.c
++++ b/coreutils/catv.c
+@@ -27,18 +27,14 @@ int catv_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	argv += optind;
+ 
+ 	/* Read from stdin if there's nothing else to do. */
+-	fd = 0;
+-	if (!argv[0]) {
+-		argv--;
+-		goto jump_in;
+-	}
++	if (!argv[0])
++		*--argv = (char*)"-";
+ 	do {
+-		fd = open_or_warn(*argv, O_RDONLY);
++		fd = open_or_warn_stdin(*argv);
+ 		if (fd < 0) {
+ 			retval = EXIT_FAILURE;
+ 			continue;
+ 		}
+- jump_in:
+ 		for (;;) {
+ 			int i, res;
+ 
+diff --git a/coreutils/cksum.c b/coreutils/cksum.c
+index dd274af..6512ccc 100644
+--- a/coreutils/cksum.c
++++ b/coreutils/cksum.c
+@@ -9,46 +9,48 @@
+ #include "libbb.h"
+ 
+ int cksum_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int cksum_main(int argc, char **argv)
++int cksum_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	uint32_t *crc32_table = crc32_filltable(NULL, 1);
+-
+-	FILE *fp;
+ 	uint32_t crc;
+ 	long length, filesize;
+ 	int bytes_read;
+-	char *cp;
++	uint8_t *cp;
+ 
+-	int inp_stdin = (argc == optind) ? 1 : 0;
++#if ENABLE_DESKTOP
++	getopt32(argv, ""); /* coreutils 6.9 compat */
++	argv += optind;
++#else
++	argv++;
++#endif
+ 
+ 	do {
+-		fp = fopen_or_warn_stdin((inp_stdin) ? bb_msg_standard_input : *++argv);
++		int fd = open_or_warn_stdin(*argv ? *argv : bb_msg_standard_input);
+ 
++		if (fd < 0)
++			continue;
+ 		crc = 0;
+ 		length = 0;
+ 
+ #define read_buf bb_common_bufsiz1
+-		while ((bytes_read = fread(read_buf, 1, BUFSIZ, fp)) > 0) {
++		while ((bytes_read = safe_read(fd, read_buf, sizeof(read_buf))) > 0) {
+ 			cp = read_buf;
+ 			length += bytes_read;
+-			while (bytes_read--)
+-				crc = (crc << 8) ^ crc32_table[((crc >> 24) ^ (*cp++)) & 0xffL];
++			do {
++				crc = (crc << 8) ^ crc32_table[(crc >> 24) ^ *cp++];
++			} while (--bytes_read);
+ 		}
++		close(fd);
+ 
+ 		filesize = length;
+ 
+ 		for (; length; length >>= 8)
+-			crc = (crc << 8) ^ crc32_table[((crc >> 24) ^ length) & 0xffL];
++			crc = (crc << 8) ^ crc32_table[((crc >> 24) ^ length) & 0xff];
+ 		crc ^= 0xffffffffL;
+ 
+-		if (inp_stdin) {
+-			printf("%" PRIu32 " %li\n", crc, filesize);
+-			break;
+-		}
+-
+-		printf("%" PRIu32 " %li %s\n", crc, filesize, *argv);
+-		fclose(fp);
+-	} while (*(argv + 1));
++		printf((*argv ? "%" PRIu32 " %li %s\n" : "%" PRIu32 " %li\n"),
++				crc, filesize, *argv);
++	} while (*argv && *++argv);
+ 
+ 	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index ed6f8f6..e617ef2 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -205,7 +205,7 @@ int cut_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		char *ntok;
+ 		int s = 0, e = 0;
+ 
+-		/* take apart the lists, one by one (they are separated with commas */
++		/* take apart the lists, one by one (they are separated with commas) */
+ 		while ((ltok = strsep(&sopt, ",")) != NULL) {
+ 
+ 			/* it's actually legal to pass an empty list */
+@@ -258,25 +258,18 @@ int cut_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	{
+ 		int retval = EXIT_SUCCESS;
+-		FILE *file = stdin;
+ 
+-		if (!*argv) {
+-			argv--;
+-			goto jump_in;
+-		}
++		if (!*argv)
++			*--argv = (char *)"-";
+ 
+ 		do {
+-			file = stdin;
+-			if (NOT_LONE_DASH(*argv))
+-				file = fopen_or_warn(*argv, "r");
++			FILE *file = fopen_or_warn_stdin(*argv);
+ 			if (!file) {
+ 				retval = EXIT_FAILURE;
+ 				continue;
+ 			}
+- jump_in:
+ 			cut_file(file, delim);
+-			if (NOT_LONE_DASH(*argv))
+-				fclose(file);
++			fclose_if_not_stdin(file);
+ 		} while (*++argv);
+ 
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+diff --git a/coreutils/expand.c b/coreutils/expand.c
+index c013395..a7ac8ea 100644
+--- a/coreutils/expand.c
++++ b/coreutils/expand.c
+@@ -154,7 +154,7 @@ int expand_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	if (ENABLE_EXPAND && (!ENABLE_UNEXPAND || applet_name[0] == 'e')) {
+ 		USE_FEATURE_EXPAND_LONG_OPTIONS(applet_long_options = expand_longopts);
+ 		opt = getopt32(argv, "it:", &opt_t);
+-	} else if (ENABLE_UNEXPAND) {
++	} else {
+ 		USE_FEATURE_UNEXPAND_LONG_OPTIONS(applet_long_options = unexpand_longopts);
+ 		/* -t NUM sets also -a */
+ 		opt_complementary = "ta";
+@@ -166,32 +166,23 @@ int expand_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	argv += optind;
+ 
+-	/* If no args are given, read from stdin */
+ 	if (!*argv) {
+ 		*--argv = (char*)bb_msg_standard_input;
+-		goto use_stdin;
+ 	}
+-
+ 	do {
+-		if (NOT_LONE_CHAR(*argv, '-')) {
+-			file = fopen_or_warn(*argv, "r");
+-			if (!file) {
+-				exit_status = EXIT_FAILURE;
+-				continue;
+-			}
+-		} else {
+- use_stdin:
+-			file = stdin;
++		file = fopen_or_warn_stdin(*argv);
++		if (!file) {
++			exit_status = EXIT_FAILURE;
++			continue;
+ 		}
+ 
+ 		if (ENABLE_EXPAND && (!ENABLE_UNEXPAND || applet_name[0] == 'e'))
+ 			USE_EXPAND(expand(file, tab_size, opt));
+-		else if (ENABLE_UNEXPAND)
++		else
+ 			USE_UNEXPAND(unexpand(file, tab_size, opt));
+ 
+ 		/* Check and close the file */
+-		/* We do want all of them to execute, thus | instead of || */
+-		if (ferror(file) | fclose_if_not_stdin(file)) {
++		if (fclose_if_not_stdin(file)) {
+ 			bb_simple_perror_msg(*argv);
+ 			exit_status = EXIT_FAILURE;
+ 		}
+diff --git a/coreutils/fold.c b/coreutils/fold.c
+index ed484ed..e2a30d5 100644
+--- a/coreutils/fold.c
++++ b/coreutils/fold.c
+@@ -12,18 +12,17 @@
+ 
+ #include "libbb.h"
+ 
+-static unsigned long flags;
+-#define FLAG_COUNT_BYTES	1
+-#define FLAG_BREAK_SPACES	2
+-#define FLAG_WIDTH			4
++/* Must match getopt32 call */
++#define FLAG_COUNT_BYTES        1
++#define FLAG_BREAK_SPACES       2
++#define FLAG_WIDTH              4
+ 
+ /* Assuming the current column is COLUMN, return the column that
+    printing C will move the cursor to.
+    The first column is 0. */
+-
+ static int adjust_column(int column, char c)
+ {
+-	if (!(flags & FLAG_COUNT_BYTES)) {
++	if (!(option_mask32 & FLAG_COUNT_BYTES)) {
+ 		if (c == '\b') {
+ 			if (column > 0)
+ 				column--;
+@@ -54,29 +53,27 @@ int fold_main(int argc, char **argv)
+ 			char const *a = argv[i];
+ 
+ 			if (*a++ == '-') {
+-				if (*a == '-' && !a[1])
++				if (*a == '-' && !a[1]) /* "--" */
+ 					break;
+-				if (isdigit(*a)) {
++				if (isdigit(*a))
+ 					argv[i] = xasprintf("-w%s", a);
+-				}
+ 			}
+ 		}
+ 	}
+ 
+-	flags = getopt32(argv, "bsw:", &w_opt);
+-	if (flags & FLAG_WIDTH)
++	getopt32(argv, "bsw:", &w_opt);
++	if (option_mask32 & FLAG_WIDTH)
+ 		width = xatoul_range(w_opt, 1, 10000);
+ 
+ 	argv += optind;
+-	if (!*argv) {
++	if (!*argv)
+ 		*--argv = (char*)"-";
+-	}
+ 
+ 	do {
+ 		FILE *istream = fopen_or_warn_stdin(*argv);
+ 		int c;
+ 		int column = 0;		/* Screen column where next char will go. */
+-		int offset_out = 0;	/* Index in `line_out' for next char. */
++		int offset_out = 0;	/* Index in 'line_out' for next char. */
+ 
+ 		if (istream == NULL) {
+ 			errs |= EXIT_FAILURE;
+@@ -102,7 +99,7 @@ int fold_main(int argc, char **argv)
+ 				/* This character would make the line too long.
+ 				   Print the line plus a newline, and make this character
+ 				   start the next line. */
+-				if (flags & FLAG_BREAK_SPACES) {
++				if (option_mask32 & FLAG_BREAK_SPACES) {
+ 					/* Look for the last blank. */
+ 					int logical_end;
+ 
+@@ -144,7 +141,7 @@ int fold_main(int argc, char **argv)
+ 			fwrite(line_out, sizeof(char), (size_t) offset_out, stdout);
+ 		}
+ 
+-		if (ferror(istream) || fclose_if_not_stdin(istream)) {
++		if (fclose_if_not_stdin(istream)) {
+ 			bb_simple_perror_msg(*argv);	/* Avoid multibyte problems. */
+ 			errs |= EXIT_FAILURE;
+ 		}
+diff --git a/coreutils/head.c b/coreutils/head.c
+index 6293077..570f140 100644
+--- a/coreutils/head.c
++++ b/coreutils/head.c
+@@ -91,19 +91,19 @@ int head_main(int argc, char **argv)
+ 		}
+ 	}
+ 
++	argc -= optind;
+ 	argv += optind;
+-	if (!*argv) {
++	if (!*argv)
+ 		*--argv = (char*)"-";
+-	}
+ 
+ 	fmt = header_fmt_str + 1;
+ #if ENABLE_FEATURE_FANCY_HEAD
+-	if (argc - optind <= header_threshhold) {
++	if (argc <= header_threshhold) {
+ 		header_threshhold = 0;
+ 	}
+ #else
+-	if (argc <= optind + 1) {
+-		fmt += 11;
++	if (argc <= 1) {
++		fmt += 11; /* "" */
+ 	}
+ 	/* Now define some things here to avoid #ifdefs in the code below.
+ 	 * These should optimize out of the if conditions below. */
+diff --git a/coreutils/md5_sha1_sum.c b/coreutils/md5_sha1_sum.c
+index e94f2ce..080eac5 100644
+--- a/coreutils/md5_sha1_sum.c
++++ b/coreutils/md5_sha1_sum.c
+@@ -36,12 +36,9 @@ static uint8_t *hash_file(const char *filename, hash_algo_t hash_algo)
+ 	void (*update)(const void*, size_t, void*);
+ 	void (*final)(void*, void*);
+ 
+-	src_fd = STDIN_FILENO;
+-	if (NOT_LONE_DASH(filename)) {
+-		src_fd = open_or_warn(filename, O_RDONLY);
+-		if (src_fd < 0) {
+-			return NULL;
+-		}
++	src_fd = open_or_warn_stdin(filename);
++	if (src_fd < 0) {
++		return NULL;
+ 	}
+ 
+ 	/* figure specific hash algorithims */
+@@ -78,7 +75,7 @@ static uint8_t *hash_file(const char *filename, hash_algo_t hash_algo)
+ }
+ 
+ int md5_sha1_sum_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int md5_sha1_sum_main(int argc, char **argv)
++int md5_sha1_sum_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int return_value = EXIT_SUCCESS;
+ 	uint8_t *hash_value;
+@@ -90,6 +87,10 @@ int md5_sha1_sum_main(int argc, char **argv)
+ 	if (ENABLE_FEATURE_MD5_SHA1_SUM_CHECK)
+ 		flags = getopt32(argv, "scw");
+ 	else optind = 1;
++	argv += optind;
++	//argc -= optind;
++	if (!*argv)
++		*--argv = (char*)"-";
+ 
+ 	if (ENABLE_FEATURE_MD5_SHA1_SUM_CHECK && !(flags & FLAG_CHECK)) {
+ 		if (flags & FLAG_SILENT) {
+@@ -101,26 +102,18 @@ int md5_sha1_sum_main(int argc, char **argv)
+ 		}
+ 	}
+ 
+-	if (argc == optind) {
+-		argv[argc++] = (char*)"-";
+-	}
+-
+ 	if (ENABLE_FEATURE_MD5_SHA1_SUM_CHECK && (flags & FLAG_CHECK)) {
+ 		FILE *pre_computed_stream;
+ 		int count_total = 0;
+ 		int count_failed = 0;
+-		char *file_ptr = argv[optind];
+ 		char *line;
+ 
+-		if (optind + 1 != argc) {
++		if (argv[1]) {
+ 			bb_error_msg_and_die
+ 				("only one argument may be specified when using -c");
+ 		}
+ 
+-		pre_computed_stream = stdin;
+-		if (NOT_LONE_DASH(file_ptr)) {
+-			pre_computed_stream = xfopen(file_ptr, "r");
+-		}
++		pre_computed_stream = xfopen_stdin(argv[0]);
+ 
+ 		while ((line = xmalloc_getline(pre_computed_stream)) != NULL) {
+ 			char *filename_ptr;
+@@ -168,17 +161,15 @@ int md5_sha1_sum_main(int argc, char **argv)
+ 		}
+ 		*/
+ 	} else {
+-		while (optind < argc) {
+-			char *file_ptr = argv[optind++];
+-
+-			hash_value = hash_file(file_ptr, hash_algo);
++		do {
++			hash_value = hash_file(*argv, hash_algo);
+ 			if (hash_value == NULL) {
+ 				return_value = EXIT_FAILURE;
+ 			} else {
+-				printf("%s  %s\n", hash_value, file_ptr);
++				printf("%s  %s\n", hash_value, *argv);
+ 				free(hash_value);
+ 			}
+-		}
++		} while (*++argv);
+ 	}
+ 	return return_value;
+ }
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index 510f7a2..15566ce 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -351,10 +351,13 @@ int sort_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	if (option_mask32 & FLAG_b) option_mask32 |= FLAG_bb;
+ 
+ 	/* Open input files and read data */
+-	for (i = argv[optind] ? optind : optind-1; argv[i]; i++) {
+-		fp = stdin;
+-		if (i >= optind && NOT_LONE_DASH(argv[i]))
+-			fp = xfopen(argv[i], "r");
++	argv += optind;
++	if (!*argv)
++		*--argv = (char*)"-";
++	do {
++		/* coreutils 6.9 compat: abort on first open error,
++		 * do not continue to next file: */
++		fp = xfopen_stdin(*argv);
+ 		for (;;) {
+ 			line = GET_LINE(fp);
+ 			if (!line) break;
+@@ -362,8 +365,9 @@ int sort_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				lines = xrealloc(lines, sizeof(char *) * (linecount + 64));
+ 			lines[linecount++] = line;
+ 		}
+-		fclose(fp);
+-	}
++		fclose_if_not_stdin(fp);
++	} while (*++argv);
++
+ #if ENABLE_FEATURE_SORT_BIG
+ 	/* if no key, perform alphabetic sort */
+ 	if (!key_list)
+diff --git a/coreutils/sum.c b/coreutils/sum.c
+index 65478b0..e6cfbfd 100644
+--- a/coreutils/sum.c
++++ b/coreutils/sum.c
+@@ -21,20 +21,17 @@ enum { SUM_BSD, PRINT_NAME, SUM_SYSV };
+    The checksum varies depending on sizeof (int). */
+ /* SYSV: calculate and print the checksum and the size in 512-byte blocks */
+ /* Return 1 if successful.  */
+-static unsigned sum_file(const char *file, const unsigned type)
++static unsigned sum_file(const char *file, unsigned type)
+ {
+ #define buf bb_common_bufsiz1
+ 	unsigned long long total_bytes = 0;
+-	int fd = 0, r;
+-
++	int fd, r;
+ 	/* The sum of all the input bytes, modulo (UINT_MAX + 1).  */
+ 	unsigned s = 0;
+ 
+-	if (NOT_LONE_DASH(file)) {
+-		fd = open(file, O_RDONLY);
+-		if (fd == -1)
+-			goto ret_bad;
+-	}
++	fd = open_or_warn_stdin(file);
++	if (fd == -1)
++		return 0;
+ 
+ 	while (1) {
+ 		size_t bytes_read = safe_read(fd, buf, BUFSIZ);
+@@ -44,7 +41,6 @@ static unsigned sum_file(const char *file, const unsigned type)
+ 			if (!bytes_read && !r)
+ 				/* no error */
+ 				break;
+- ret_bad:
+ 			bb_perror_msg(file);
+ 			return 0;
+ 		}
+@@ -75,26 +71,29 @@ static unsigned sum_file(const char *file, const unsigned type)
+ }
+ 
+ int sum_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sum_main(int argc, char **argv)
++int sum_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned n;
+ 	unsigned type = SUM_BSD;
+ 
+ 	n = getopt32(argv, "sr");
++	argv += optind;
+ 	if (n & 1) type = SUM_SYSV;
+ 	/* give the bsd priority over sysv func */
+ 	if (n & 2) type = SUM_BSD;
+ 
+-	if (argc == optind) {
++	if (!argv[0]) {
+ 		/* Do not print the name */
+ 		n = sum_file("-", type);
+ 	} else {
+ 		/* Need to print the name if either
+ 		   - more than one file given
+ 		   - doing sysv */
+-		type += argc - 1 > optind || type == SUM_SYSV;
+-		for (n = 1; optind < argc; optind++)
+-			n &= sum_file(argv[optind], type);
++		type += (argv[1] || type == SUM_SYSV);
++		n = 1;
++		do {
++			n &= sum_file(*argv, type);
++		} while (*++argv);
+ 	}
+ 	return !n;
+ }
+diff --git a/coreutils/tac.c b/coreutils/tac.c
+index ddadcc7..af70f30 100644
+--- a/coreutils/tac.c
++++ b/coreutils/tac.c
+@@ -22,7 +22,7 @@
+ 
+ struct lstring {
+ 	int size;
+-	char buf[];
++	char buf[1];
+ };
+ 
+ int tac_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+@@ -34,7 +34,21 @@ int tac_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	llist_t *list = NULL;
+ 	int retval = EXIT_SUCCESS;
+ 
++#if ENABLE_DESKTOP
++/* tac from coreutils 6.9 supports:
++       -b, --before
++              attach the separator before instead of after
++       -r, --regex
++              interpret the separator as a regular expression
++       -s, --separator=STRING
++              use STRING as the separator instead of newline
++We support none, but at least we will complain or handle "--":
++*/
++	getopt32(argv, "");
++	argv += optind;
++#else
+ 	argv++;
++#endif
+ 	if (!*argv)
+ 		*--argv = (char *)"-";
+ 	/* We will read from last file to first */
+@@ -48,6 +62,7 @@ int tac_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		name--;
+ 		f = fopen_or_warn_stdin(*name);
+ 		if (f == NULL) {
++			/* error message is printed by fopen_or_warn_stdin */
+ 			retval = EXIT_FAILURE;
+ 			continue;
+ 		}
+@@ -61,7 +76,7 @@ int tac_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					line = xrealloc(line, i + 0x7f + sizeof(int) + 1);
+ 				line->buf[i++] = ch;
+ 			}
+-			if ((ch == '\n' || ch == EOF) && i) {
++			if (ch == '\n' || (ch == EOF && i != 0)) {
+ 				line = xrealloc(line, i + sizeof(int));
+ 				line->size = i;
+ 				llist_add_to(&list, line);
+@@ -69,9 +84,8 @@ int tac_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				i = 0;
+ 			}
+ 		} while (ch != EOF);
+-		/* fgetc sets errno to ENOENT on EOF, but     */
+-		/* fopen_or_warn_stdin would catch this error */
+-		/* so we can filter it out here.              */
++		/* fgetc sets errno to ENOENT on EOF, we don't want
++		 * to warn on this non-error! */
+ 		if (errno && errno != ENOENT) {
+ 			bb_simple_perror_msg(*name);
+ 			retval = EXIT_FAILURE;
+diff --git a/coreutils/tail.c b/coreutils/tail.c
+index 340697f..52aa8f6 100644
+--- a/coreutils/tail.c
++++ b/coreutils/tail.c
+@@ -101,16 +101,12 @@ int tail_main(int argc, char **argv)
+ 
+ #if ENABLE_INCLUDE_SUSv2 || ENABLE_FEATURE_FANCY_TAIL
+ 	/* Allow legacy syntax of an initial numeric option without -n. */
+-	if (argc >= 2 && (argv[1][0] == '+' || argv[1][0] == '-')
++	if (argv[1] && (argv[1][0] == '+' || argv[1][0] == '-')
+ 	 && isdigit(argv[1][1])
+ 	) {
+-		/* replacing arg[0] with "-n" can segfault, so... */
+-		argv[1] = xasprintf("-n%s", argv[1]);
+-#if 0 /* If we ever decide to make tail NOFORK */
+-		char *s = alloca(strlen(argv[1]) + 3);
+-		sprintf(s, "-n%s", argv[1]);
+-		argv[1] = s;
+-#endif
++		count = eat_num(&argv[1][1]);
++		argv++;
++		argc--;
+ 	}
+ #endif
+ 
+@@ -133,8 +129,7 @@ int tail_main(int argc, char **argv)
+ 
+ 	/* open all the files */
+ 	fds = xmalloc(sizeof(int) * (argc + 1));
+-	nfiles = i = 0;
+-	if (argc == 0) {
++	if (!argv[0]) {
+ 		struct stat statbuf;
+ 
+ 		if (!fstat(STDIN_FILENO, &statbuf) && S_ISFIFO(statbuf.st_mode)) {
+@@ -142,13 +137,14 @@ int tail_main(int argc, char **argv)
+ 		}
+ 		*argv = (char *) bb_msg_standard_input;
+ 	}
++	nfiles = i = 0;
+ 	do {
+-		FILE* fil = fopen_or_warn_stdin(argv[i]);
+-		if (!fil) {
++		int fd = open_or_warn_stdin(argv[i]);
++		if (fd < 0) {
+ 			G.status = EXIT_FAILURE;
+ 			continue;
+ 		}
+-		fds[nfiles] = fileno(fil);
++		fds[nfiles] = fd;
+ 		argv[nfiles++] = argv[i];
+ 	} while (++i < argc);
+ 
+diff --git a/coreutils/uudecode.c b/coreutils/uudecode.c
+index 34a2239..4c619de 100644
+--- a/coreutils/uudecode.c
++++ b/coreutils/uudecode.c
+@@ -19,48 +19,57 @@ static void read_stduu(FILE *src_stream, FILE *dst_stream)
+ 	char *line;
+ 
+ 	while ((line = xmalloc_getline(src_stream)) != NULL) {
+-		int length;
+-		char *line_ptr = line;
++		int encoded_len, str_len;
++		char *line_ptr, *dst;
+ 
+ 		if (strcmp(line, "end") == 0) {
+-			return;
++			return; /* the only non-error exit */
+ 		}
+-		length = ((*line_ptr - 0x20) & 0x3f)* 4 / 3;
+ 
+-		if (length <= 0) {
++		line_ptr = line;
++		while (*line_ptr) {
++			*line_ptr = (*line_ptr - 0x20) & 0x3f;
++			line_ptr++;
++		}
++		str_len = line_ptr - line;
++
++		encoded_len = line[0] * 4 / 3;
++		/* Check that line is not too short. (we tolerate
++		 * overly _long_ line to accomodate possible extra '`').
++		 * Empty line case is also caught here. */
++		if (str_len <= encoded_len) {
++			break; /* go to bb_error_msg_and_die("short file"); */
++		}
++		if (encoded_len <= 0) {
+ 			/* Ignore the "`\n" line, why is it even in the encode file ? */
++			free(line);
+ 			continue;
+ 		}
+-		if (length > 60) {
++		if (encoded_len > 60) {
+ 			bb_error_msg_and_die("line too long");
+ 		}
+ 
+-		line_ptr++;
+-		/* Tolerate an overly long line to accomodate a possible exta '`' */
+-		if (strlen(line_ptr) < (size_t)length) {
+-			bb_error_msg_and_die("short file");
+-		}
+-
+-		while (length > 0) {
++		dst = line;
++		line_ptr = line + 1;
++		do {
+ 			/* Merge four 6 bit chars to three 8 bit chars */
+-			fputc(((line_ptr[0] - 0x20) & 077) << 2 | ((line_ptr[1] - 0x20) & 077) >> 4, dst_stream);
+-			line_ptr++;
+-			length--;
+-			if (length == 0) {
++			*dst++ = line_ptr[0] << 2 | line_ptr[1] >> 4;
++			encoded_len--;
++			if (encoded_len == 0) {
+ 				break;
+ 			}
+ 
+-			fputc(((line_ptr[0] - 0x20) & 077) << 4 | ((line_ptr[1] - 0x20) & 077) >> 2, dst_stream);
+-			line_ptr++;
+-			length--;
+-			if (length == 0) {
++			*dst++ = line_ptr[1] << 4 | line_ptr[2] >> 2;
++			encoded_len--;
++			if (encoded_len == 0) {
+ 				break;
+ 			}
+ 
+-			fputc(((line_ptr[0] - 0x20) & 077) << 6 | ((line_ptr[1] - 0x20) & 077), dst_stream);
+-			line_ptr += 2;
+-			length -= 2;
+-		}
++			*dst++ = line_ptr[2] << 6 | line_ptr[3];
++			line_ptr += 4;
++			encoded_len -= 2;
++		} while (encoded_len > 0);
++		fwrite(line, 1, dst - line, dst_stream);
+ 		free(line);
+ 	}
+ 	bb_error_msg_and_die("short file");
+@@ -129,7 +138,7 @@ static void read_base64(FILE *src_stream, FILE *dst_stream)
+ int uudecode_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int uudecode_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	FILE *src_stream = stdin;
++	FILE *src_stream;
+ 	char *outname = NULL;
+ 	char *line;
+ 
+@@ -137,8 +146,9 @@ int uudecode_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	getopt32(argv, "o:", &outname);
+ 	argv += optind;
+ 
+-	if (argv[0])
+-		src_stream = xfopen(argv[0], "r");
++	if (!*argv)
++		*--argv = (char*)"-";
++	src_stream = xfopen_stdin(*argv);
+ 
+ 	/* Search for the start of the encoding */
+ 	while ((line = xmalloc_getline(src_stream)) != NULL) {
+@@ -159,7 +169,7 @@ int uudecode_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		}
+ 
+ 		/* begin line found. decode and exit */
+-		mode = strtoul(line_ptr, NULL, 8);
++		mode = bb_strtou(line_ptr, NULL, 8);
+ 		if (outname == NULL) {
+ 			outname = strchr(line_ptr, ' ');
+ 			if ((outname == NULL) || (*outname == '\0')) {
+@@ -170,7 +180,7 @@ int uudecode_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		dst_stream = stdout;
+ 		if (NOT_LONE_DASH(outname)) {
+ 			dst_stream = xfopen(outname, "w");
+-			chmod(outname, mode & (S_IRWXU | S_IRWXG | S_IRWXO));
++			fchmod(fileno(dst_stream), mode & (S_IRWXU | S_IRWXG | S_IRWXO));
+ 		}
+ 		free(line);
+ 		decode_fn_ptr(src_stream, dst_stream);
+diff --git a/coreutils/yes.c b/coreutils/yes.c
+index 269d2a0..9d3f675 100644
+--- a/coreutils/yes.c
++++ b/coreutils/yes.c
+@@ -21,22 +21,21 @@
+ int yes_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int yes_main(int argc, char **argv)
+ {
+-	char **first_arg;
++	char **pp;
+ 
+ 	argv[0] = (char*)"y";
+ 	if (argc != 1) {
+ 		++argv;
+ 	}
+ 
+-	first_arg = argv;
+ 	do {
++		pp = argv;
+ 		while (1) {
+-			fputs(*argv, stdout);
+-			if (!*++argv)
++			fputs(*pp, stdout);
++			if (!*++pp)
+ 				break;
+ 			putchar(' ');
+ 		}
+-		argv = first_arg;
+ 	} while (putchar('\n') != EOF);
+ 
+ 	bb_perror_nomsg_and_die();
+diff --git a/e2fsprogs/lsattr.c b/e2fsprogs/lsattr.c
+index c589486..13eeb35 100644
+--- a/e2fsprogs/lsattr.c
++++ b/e2fsprogs/lsattr.c
+@@ -102,10 +102,8 @@ int lsattr_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	argv += optind;
+ 
+ 	if (!*argv)
+-		lsattr_args(".");
+-	else {
+-		do lsattr_args(*argv++); while (*argv);
+-	}
++		*--argv = (char*)".";
++	do lsattr_args(*argv++); while (*argv);
+ 
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/editors/cmp.c b/editors/cmp.c
+index 9189b31..b211adf 100644
+--- a/editors/cmp.c
++++ b/editors/cmp.c
+@@ -23,16 +23,6 @@
+ 
+ #include "libbb.h"
+ 
+-static FILE *cmp_xfopen_input(const char *filename)
+-{
+-	FILE *fp;
+-
+-	fp = fopen_or_warn_stdin(filename);
+-	if (fp)
+-		return fp;
+-	xfunc_die();	/* We already output an error message. */
+-}
+-
+ static const char fmt_eof[] ALIGN1 = "cmp: EOF on %s\n";
+ static const char fmt_differ[] ALIGN1 = "%s %s differ: char %"OFF_FMT"d, line %d\n";
+ // This fmt_l_opt uses gnu-isms.  SUSv3 would be "%.0s%.0s%"OFF_FMT"d %o %o\n"
+@@ -65,7 +55,7 @@ int cmp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	argv += optind;
+ 
+ 	filename1 = *argv;
+-	fp1 = cmp_xfopen_input(filename1);
++	fp1 = xfopen_stdin(filename1);
+ 
+ 	if (*++argv) {
+ 		filename2 = *argv;
+@@ -79,7 +69,7 @@ int cmp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #endif
+ 	}
+ 
+-	fp2 = cmp_xfopen_input(filename2);
++	fp2 = xfopen_stdin(filename2);
+ 	if (fp1 == fp2) {		/* Paranoia check... stdin == stdin? */
+ 		/* Note that we don't bother reading stdin.  Neither does gnu wc.
+ 		 * But perhaps we should, so that other apps down the chain don't
+diff --git a/editors/sed.c b/editors/sed.c
+index a0994ae..32911f8 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1231,7 +1231,7 @@ static void add_cmd_block(char *cmdstr)
+ }
+ 
+ int sed_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sed_main(int argc, char **argv)
++int sed_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	enum {
+ 		OPT_in_place = 1 << 0,
+@@ -1246,7 +1246,7 @@ int sed_main(int argc, char **argv)
+ 	if (ENABLE_FEATURE_CLEAN_UP) atexit(sed_free_and_close_stuff);
+ 
+ 	/* Lie to autoconf when it starts asking stupid questions. */
+-	if (argc == 2 && !strcmp(argv[1], "--version")) {
++	if (argv[1] && !strcmp(argv[1], "--version")) {
+ 		puts("This is not GNU sed version 4.0");
+ 		return 0;
+ 	}
+@@ -1257,7 +1257,7 @@ int sed_main(int argc, char **argv)
+ 	                    "nn"; /* count -n */
+ 	opt = getopt32(argv, "irne:f:", &opt_e, &opt_f,
+ 			    &G.be_quiet); /* counter for -n */
+-	argc -= optind;
++	//argc -= optind;
+ 	argv += optind;
+ 	if (opt & OPT_in_place) { // -i
+ 		atexit(cleanup_outname);
+@@ -1283,10 +1283,9 @@ int sed_main(int argc, char **argv)
+ 	}
+ 	/* if we didn't get a pattern from -e or -f, use argv[0] */
+ 	if (!(opt & 0x18)) {
+-		if (!argc)
++		if (!*argv)
+ 			bb_show_usage();
+ 		add_cmd_block(*argv++);
+-		argc--;
+ 	}
+ 	/* Flush any unfinished commands. */
+ 	add_cmd("");
+@@ -1306,7 +1305,7 @@ int sed_main(int argc, char **argv)
+ 		int i;
+ 		FILE *file;
+ 
+-		for (i = 0; i < argc; i++) {
++		for (i = 0; argv[i]; i++) {
+ 			struct stat statbuf;
+ 			int nonstdoutfd;
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index c6c2be2..99d681d 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -333,6 +333,7 @@ int xopen(const char *pathname, int flags);
+ int xopen3(const char *pathname, int flags, int mode);
+ int open_or_warn(const char *pathname, int flags);
+ int open3_or_warn(const char *pathname, int flags, int mode);
++int open_or_warn_stdin(const char *pathname);
+ void xrename(const char *oldpath, const char *newpath);
+ int rename_or_warn(const char *oldpath, const char *newpath);
+ off_t xlseek(int fd, off_t offset, int whence);
+@@ -559,6 +560,7 @@ extern FILE *xfopen(const char *filename, const char *mode);
+ /* Prints warning to stderr and returns NULL on failure: */
+ extern FILE *fopen_or_warn(const char *filename, const char *mode);
+ /* "Opens" stdin if filename is special, else just opens file: */
++extern FILE *xfopen_stdin(const char *filename);
+ extern FILE *fopen_or_warn_stdin(const char *filename);
+ 
+ int bb_pstrcmp(const void *a, const void *b);
+@@ -741,6 +743,7 @@ void bb_sanitize_stdio(void);
+ int sanitize_env_if_suid(void);
+ 
+ 
++extern const char *const bb_argv_dash[]; /* "-", NULL */
+ extern const char *opt_complementary;
+ #if ENABLE_GETOPT_LONG
+ #define No_argument "\0"
+diff --git a/libbb/fclose_nonstdin.c b/libbb/fclose_nonstdin.c
+index 88e8474..768ee94 100644
+--- a/libbb/fclose_nonstdin.c
++++ b/libbb/fclose_nonstdin.c
+@@ -16,8 +16,10 @@
+ 
+ int fclose_if_not_stdin(FILE *f)
+ {
+-	if (f != stdin) {
+-		return fclose(f);
+-	}
+-	return 0;
++	/* Some more paranoid applets want ferror() check too */
++	int r = ferror(f); /* NB: does NOT set errno! */
++	if (r) errno = EIO; /* so we'll help it */
++	if (f != stdin)
++		return (r | fclose(f)); /* fclose does set errno on error */
++	return r;
+ }
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index f48ccaa..9e53dfd 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -281,6 +281,8 @@ Special characters:
+ 
+ /* Code here assumes that 'unsigned' is at least 32 bits wide */
+ 
++const char *const bb_argv_dash[] = { "-", NULL };
++
+ const char *opt_complementary;
+ 
+ enum {
+diff --git a/libbb/wfopen_input.c b/libbb/wfopen_input.c
+index 1b4928e..a7c1c32 100644
+--- a/libbb/wfopen_input.c
++++ b/libbb/wfopen_input.c
+@@ -10,8 +10,6 @@
+ /* A number of applets need to open a file for reading, where the filename
+  * is a command line arg.  Since often that arg is '-' (meaning stdin),
+  * we avoid testing everywhere by consolidating things in this routine.
+- *
+- * Note: we also consider "" to mean stdin (for 'cmp' at least).
+  */
+ 
+ #include "libbb.h"
+@@ -21,11 +19,30 @@ FILE *fopen_or_warn_stdin(const char *filename)
+ 	FILE *fp = stdin;
+ 
+ 	if (filename != bb_msg_standard_input
+-	 && filename[0]
+ 	 && NOT_LONE_DASH(filename)
+ 	) {
+ 		fp = fopen_or_warn(filename, "r");
+ 	}
+-
+ 	return fp;
+ }
++
++FILE *xfopen_stdin(const char *filename)
++{
++	FILE *fp = fopen_or_warn_stdin(filename);
++	if (fp)
++		return fp;
++	xfunc_die();	/* We already output an error message. */
++}
++
++int open_or_warn_stdin(const char *filename)
++{
++	int fd = STDIN_FILENO;
++
++	if (filename != bb_msg_standard_input
++	 && NOT_LONE_DASH(filename)
++	) {
++		fd = open_or_warn(filename, O_RDONLY);
++	}
++
++	return fd;
++}
+diff --git a/loginutils/su.c b/loginutils/su.c
+index afb9843..1a35f0e 100644
+--- a/loginutils/su.c
++++ b/loginutils/su.c
+@@ -12,7 +12,7 @@
+ #define SU_OPT_l (4)
+ 
+ int su_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int su_main(int argc, char **argv)
++int su_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned flags;
+ 	char *opt_shell = NULL;
+@@ -24,19 +24,17 @@ int su_main(int argc, char **argv)
+ 	char *old_user;
+ 
+ 	flags = getopt32(argv, "mplc:s:", &opt_command, &opt_shell);
+-	argc -= optind;
++	//argc -= optind;
+ 	argv += optind;
+ 
+-	if (argc && LONE_DASH(argv[0])) {
++	if (argv[0] && LONE_DASH(argv[0])) {
+ 		flags |= SU_OPT_l;
+-		argc--;
+ 		argv++;
+ 	}
+ 
+ 	/* get user if specified */
+-	if (argc) {
++	if (argv[0]) {
+ 		opt_username = argv[0];
+-		//argc--; - not used below anyway
+ 		argv++;
+ 	}
+ 
+diff --git a/miscutils/strings.c b/miscutils/strings.c
+index 57a2c0a..5efbabf 100644
+--- a/miscutils/strings.c
++++ b/miscutils/strings.c
+@@ -23,7 +23,7 @@ int strings_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	unsigned opt;
+ 	unsigned count;
+ 	off_t offset;
+-	FILE *file = stdin;
++	FILE *file;
+ 	char *string;
+ 	const char *fmt = "%s: ";
+ 	const char *n_arg = "4";
+@@ -40,16 +40,14 @@ int strings_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	if (!*argv) {
+ 		fmt = "{%s}: ";
+ 		*--argv = (char *)bb_msg_standard_input;
+-		goto PIPE;
+ 	}
+ 
+ 	do {
+-		file = fopen_or_warn(*argv, "r");
++		file = fopen_or_warn_stdin(*argv);
+ 		if (!file) {
+ 			status = EXIT_FAILURE;
+ 			continue;
+ 		}
+- PIPE:
+ 		offset = 0;
+ 		count = 0;
+ 		do {
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 5bf1a49..ca0c6cb 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -377,7 +377,7 @@ void write_leases(void)
+ 	time_t curr = time(0);
+ 	unsigned long tmp_time;
+ 
+-	fp = open3_or_warn(server_config.lease_file, O_WRONLY|O_CREAT|O_TRUNC, 0666);
++	fp = open_or_warn(server_config.lease_file, O_WRONLY|O_CREAT|O_TRUNC);
+ 	if (fp < 0) {
+ 		return;
+ 	}
+diff --git a/shell/lash_unused.c b/shell/lash_unused.c
+index 10a9120..d57f584 100644
+--- a/shell/lash_unused.c
++++ b/shell/lash_unused.c
+@@ -566,7 +566,7 @@ static int setup_redirects(struct child_prog *prog, int squirrel[])
+ 			break;
+ 		}
+ 
+-		openfd = open3_or_warn(redir->filename, mode, 0666);
++		openfd = open_or_warn(redir->filename, mode);
+ 		if (openfd < 0) {
+ 			/* this could get lost if stderr has been redirected, but
+ 			   bash and ash both lose it as well (though zsh doesn't!) */
+diff --git a/util-linux/hexdump.c b/util-linux/hexdump.c
+index 6708670..cdb17ca 100644
+--- a/util-linux/hexdump.c
++++ b/util-linux/hexdump.c
+@@ -73,7 +73,7 @@ int hexdump_main(int argc, char **argv)
+ 	}
+ 
+ 	/* We cannot use getopt32: in hexdump options are cumulative.
+-	 * E.g. hexdump -C -C file should dump each line twice */
++	 * E.g. "hexdump -C -C file" should dump each line twice */
+ 	while ((ch = getopt(argc, argv, hexdump_opts)) > 0) {
+ 		p = strchr(hexdump_opts, ch);
+ 		if (!p)

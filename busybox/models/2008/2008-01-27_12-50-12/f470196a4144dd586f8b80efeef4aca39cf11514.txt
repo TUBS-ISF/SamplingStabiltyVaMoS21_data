@@ -1,0 +1,314 @@
+2008-01-27 12:50:12 +0000
+diff --git a/init/init.c b/init/init.c
+index f7eb8f3..513ff34 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -10,9 +10,9 @@
+  */
+ 
+ #include "libbb.h"
++#include <syslog.h>
+ #include <paths.h>
+ #include <sys/reboot.h>
+-#include <sys/syslog.h>
+ 
+ #define INIT_BUFFS_SIZE 256
+ #define CONSOLE_NAME_SIZE 32
+diff --git a/libbb/info_msg.c b/libbb/info_msg.c
+index b0ce643..3231bc8 100644
+--- a/libbb/info_msg.c
++++ b/libbb/info_msg.c
+@@ -7,8 +7,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <syslog.h>
+ #include "libbb.h"
++#include <syslog.h>
+ 
+ void bb_info_msg(const char *s, ...)
+ {
+diff --git a/libbb/verror_msg.c b/libbb/verror_msg.c
+index dbd8323..ca44030 100644
+--- a/libbb/verror_msg.c
++++ b/libbb/verror_msg.c
+@@ -7,8 +7,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <syslog.h>
+ #include "libbb.h"
++#include <syslog.h>
+ 
+ smallint logmode = LOGMODE_STDIO;
+ const char *msg_eol = "\n";
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 7e90446..55cbfa7 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -4,9 +4,9 @@
+  */
+ 
+ #include "libbb.h"
++#include <syslog.h>
+ #include <utmp.h>
+ #include <sys/resource.h>
+-#include <syslog.h>
+ 
+ #if ENABLE_SELINUX
+ #include <selinux/selinux.h>  /* for is_selinux_enabled()  */
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index 0842b71..0df084e 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -6,7 +6,6 @@
+ #include "libbb.h"
+ #include <syslog.h>
+ 
+-
+ static void nuke_str(char *str)
+ {
+ 	if (str) memset(str, 0, strlen(str));
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index af457ef..faa93ea 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -5,9 +5,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <syslog.h>
+-
+ #include "libbb.h"
++#include <syslog.h>
+ 
+ //static void catchalarm(int ATTRIBUTE_UNUSED junk)
+ //{
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index fd20e6a..0df143a 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -11,8 +11,8 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include <sys/syslog.h>
+ #include "libbb.h"
++#include <syslog.h>
+ 
+ #ifndef CRONTABS
+ #define CRONTABS        "/var/spool/cron/crontabs"
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 9990142..52a65bc 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -53,17 +53,12 @@
+     The postal address is:
+       Richard Gooch, c/o ATNF, P. O. Box 76, Epping, N.S.W., 2121, Australia.
+ */
+-
+-//#include <sys/wait.h>
+-//#include <sys/ioctl.h>
+-//#include <sys/socket.h>
+-#include <sys/un.h>
+-#include <dirent.h>
+-#include <syslog.h>
+-#include <sys/sysmacros.h>
+ #include "libbb.h"
+ #include "xregex.h"
++#include <syslog.h>
+ 
++#include <sys/un.h>
++#include <sys/sysmacros.h>
+ 
+ /* Various defines taken from linux/major.h */
+ #define IDE0_MAJOR	3
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index 8f01d5c..19720d6 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -17,8 +17,8 @@
+  * the first porting of oao' scdns to busybox also.
+  */
+ 
+-#include <syslog.h>
+ #include "libbb.h"
++#include <syslog.h>
+ 
+ //#define DEBUG 1
+ #define DEBUG 0
+diff --git a/networking/isrv_identd.c b/networking/isrv_identd.c
+index a93de12..dbdecba 100644
+--- a/networking/isrv_identd.c
++++ b/networking/isrv_identd.c
+@@ -7,8 +7,8 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <syslog.h>
+ #include "libbb.h"
++#include <syslog.h>
+ #include "isrv.h"
+ 
+ enum { TIMEOUT = 20 };
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index 6b22061..3f9007e 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -16,7 +16,6 @@
+  * initially integrated into busybox by Bernhard Fischer
+  */
+ 
+-#include <syslog.h>
+ #include <netinet/in.h>
+ #include <netinet/ip.h>
+ #include <arpa/inet.h>
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 0201d26..962e5cc 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -24,14 +24,13 @@
+ #define DEBUG 0
+ 
+ #include "libbb.h"
++#include <syslog.h>
+ 
+ #if DEBUG
+ #define TELCMDS
+ #define TELOPTS
+ #endif
+ #include <arpa/telnet.h>
+-#include <sys/syslog.h>
+-
+ 
+ /* Structure that describes a session */
+ struct tsession {
+diff --git a/networking/zcip.c b/networking/zcip.c
+index ef9aa21..6e1c0d1 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -23,9 +23,6 @@
+ // - avoid silent script failures, especially under load...
+ // - link status monitoring (restart on link-up; stop on link-down)
+ 
+-#include <syslog.h>
+-#include <poll.h>
+-#include <sys/wait.h>
+ #include <netinet/ether.h>
+ #include <net/ethernet.h>
+ #include <net/if.h>
+@@ -34,6 +31,7 @@
+ #include <linux/sockios.h>
+ 
+ #include "libbb.h"
++#include <syslog.h>
+ 
+ /* We don't need more than 32 bits of the counter */
+ #define MONOTONIC_US() ((unsigned)monotonic_us())
+diff --git a/sysklogd/klogd.c b/sysklogd/klogd.c
+index 72f3b55..d65b6f9 100644
+--- a/sysklogd/klogd.c
++++ b/sysklogd/klogd.c
+@@ -18,7 +18,7 @@
+  */
+ 
+ #include "libbb.h"
+-#include <sys/syslog.h>
++#include <syslog.h>
+ #include <sys/klog.h>
+ 
+ static void klogd_signal(int sig ATTRIBUTE_UNUSED)
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index 970b05d..0907501 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -8,28 +8,32 @@
+  */
+ 
+ #include "libbb.h"
+-
+-#if !defined CONFIG_SYSLOGD
+-
+-/* SYSLOG_NAMES defined to pull prioritynames[] and facilitynames[]
+- * from syslog.h. Grrrr - glibc puts those in _rwdata_! :( */
++#ifndef CONFIG_SYSLOGD
+ #define SYSLOG_NAMES
+-#define SYSLOG_NAMES_CONST /* uclibc is saner :) */
+-#include <sys/syslog.h>
+-
++#define SYSLOG_NAMES_CONST
++#include <syslog.h>
+ #else
+-#include <sys/syslog.h>
+-#  ifndef __dietlibc__
+-	/* We have to do this since the header file defines static
+-	 * structures.  Argh.... bad libc, bad, bad...
+-	 */
+-	typedef struct _code {
+-		char *c_name;
+-		int c_val;
+-	} CODE;
+-	extern CODE prioritynames[];
+-	extern CODE facilitynames[];
++/* brokenness alert. Everybody except dietlibc get's this wrong by neither
++ * providing a typedef nor an extern for facilitynames and prioritynames
++ * in syslog.h.
++ */
++# include <syslog.h>
++# ifndef __dietlibc__
++/* We have to do this since the header file does neither provide a sane type
++ * for this structure nor extern definitions.  Argh.... bad libc, bad, bad...
++ */
++typedef struct _code {
++	char *c_name; /* FIXME: this should be const char *const c_name ! */
++	int c_val;
++} CODE;
++#  ifdef __UCLIBC__
++extern const CODE prioritynames[];
++extern const CODE facilitynames[];
++#  else
++extern CODE prioritynames[];
++extern CODE facilitynames[];
+ #  endif
++# endif
+ #endif
+ 
+ /* Decode a symbolic name to a numeric value
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 345bf0e..de8aa04 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -14,14 +14,12 @@
+  */
+ 
+ #include "libbb.h"
++#define SYSLOG_NAMES
++#define SYSLOG_NAMES_CONST
++#include <syslog.h>
++
+ #include <paths.h>
+ #include <sys/un.h>
+-
+-/* SYSLOG_NAMES defined to pull prioritynames[] and facilitynames[]
+- * from syslog.h. Grrrr - glibc puts those in _rwdata_! :( */
+-#define SYSLOG_NAMES
+-#define SYSLOG_NAMES_CONST /* uclibc is saner :) */
+-#include <sys/syslog.h>
+ #include <sys/uio.h>
+ 
+ #if ENABLE_FEATURE_REMOTE_LOG
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index abf5cd0..a10d28d 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -20,9 +20,9 @@
+ 
+ #include <mntent.h>
+ #include "libbb.h"
++#include <syslog.h>
+ 
+ /* Needed for nfs support only... */
+-#include <syslog.h>
+ #include <sys/utsname.h>
+ #undef TRUE
+ #undef FALSE

@@ -1,0 +1,33 @@
+2009-06-10 14:09:48 +0200
+diff --git a/shell/ash.c b/shell/ash.c
+index 7843afa..c726ad4 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -8736,6 +8736,11 @@ static int ulimitcmd(int, char **) FAST_FUNC;
+  * Additional operators:
+  * || and && should work as -o and -a
+  * =~ regexp match
++ * == should do _pattern match_ against right side. bash does this:
++ *      # [[ *a* == bab ]] && echo YES
++ *      # [[ bab == *a* ]] && echo YES
++ *      YES
++ * != does the negated == (i.e., also with pattern matching)
+  * Apart from the above, [[ expr ]] should work as [ expr ]
+  */
+ 
+diff --git a/shell/hush.c b/shell/hush.c
+index 54ab78b..245fb58 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -318,6 +318,11 @@ struct command {
+ // Additional operators:
+ // || and && should work as -o and -a
+ // =~ regexp match
++// == should do _pattern match_ against right side. bash does this:
++//      # [[ *a* == bab ]] && echo YES
++//      # [[ bab == *a* ]] && echo YES
++//      YES
++// != does the negated == (i.e., also with pattern matching)
+ // Apart from the above, [[ expr ]] should work as [ expr ]
+ 
+ /* used for "export noglob=* glob* a=`echo a b`" */

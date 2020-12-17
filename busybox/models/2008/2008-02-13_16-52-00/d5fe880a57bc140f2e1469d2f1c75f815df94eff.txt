@@ -1,0 +1,74 @@
+2008-02-13 16:52:00 +0000
+diff --git a/coreutils/libcoreutils/cp_mv_stat.c b/coreutils/libcoreutils/cp_mv_stat.c
+index 43583d4..ff7c273 100644
+--- a/coreutils/libcoreutils/cp_mv_stat.c
++++ b/coreutils/libcoreutils/cp_mv_stat.c
+@@ -27,6 +27,12 @@ int cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf)
+ {
+ 	if (sf(fn, fn_stat) < 0) {
+ 		if (errno != ENOENT) {
++#if ENABLE_FEATURE_VERBOSE_CP_MESSAGE
++			if (errno == ENOTDIR) {
++				bb_error_msg("cannot stat '%s': Path has non-directory component", fn);
++				return -1;
++			}
++#endif
+ 			bb_perror_msg("cannot stat '%s'", fn);
+ 			return -1;
+ 		}
+diff --git a/libbb/Config.in b/libbb/Config.in
+index 0ad4381..9389fe8 100644
+--- a/libbb/Config.in
++++ b/libbb/Config.in
+@@ -102,6 +102,21 @@ config FEATURE_EDITING_FANCY_PROMPT
+ 	  Setting this option allows for prompts to use things like \w and
+ 	  \$ and escape codes.
+ 
++config FEATURE_VERBOSE_CP_MESSAGE
++	bool "Give more precise messages when copy fails (cp, mv etc)"
++	default n
++	help
++	  Error messages with this feature enabled:
++	    $ cp file /does_not_exist/file
++	    cp: cannot create '/does_not_exist/file': Path does not exist
++	    $ cp file /vmlinuz/file
++	    cp: cannot stat '/vmlinuz/file': Path has non-directory component
++	  If this feature is not enabled, they will be, respectively:
++	    cp: cannot remove '/does_not_exist/file': No such file or directory
++	    cp: cannot stat '/vmlinuz/file': Not a directory
++	  respectively.
++	  This will cost you ~60 bytes.
++
+ config FEATURE_COPYBUF_KB
+ 	int "Copy buffer size, in kilobytes"
+ 	range 1 1024
+diff --git a/libbb/copy_file.c b/libbb/copy_file.c
+index 3da8a35..d37d515 100644
+--- a/libbb/copy_file.c
++++ b/libbb/copy_file.c
+@@ -29,6 +29,7 @@
+ // for POSIX mode to give reasonable error message
+ static int ask_and_unlink(const char *dest, int flags)
+ {
++	int e = errno;
+ #if DO_POSIX_CP
+ 	if (!(flags & (FILEUTILS_FORCE|FILEUTILS_INTERACTIVE))) {
+ 		// Either it exists, or the *path* doesnt exist
+@@ -50,7 +51,16 @@ static int ask_and_unlink(const char *dest, int flags)
+ 			return 0; // not allowed to overwrite
+ 	}
+ 	if (unlink(dest) < 0) {
+-		bb_perror_msg("cannot remove '%s'", dest);
++#if ENABLE_FEATURE_VERBOSE_CP_MESSAGE
++		if (e == errno && e == ENOENT) {
++			/* e == ENOTDIR is similar: path has non-dir component,
++			 * but in this case we don't even reach copy_file() */
++			bb_error_msg("cannot create '%s': Path does not exist", dest);
++			return -1; // error
++		}
++#endif
++		errno = e;
++		bb_perror_msg("cannot create '%s'", dest);
+ 		return -1; // error
+ 	}
+ 	return 1; // ok (to try again)

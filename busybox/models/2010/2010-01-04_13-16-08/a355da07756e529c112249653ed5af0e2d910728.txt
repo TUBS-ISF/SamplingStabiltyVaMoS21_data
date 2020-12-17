@@ -1,0 +1,129 @@
+2010-01-04 13:16:08 +0100
+diff --git a/console-tools/dumpkmap.c b/console-tools/dumpkmap.c
+index c382b5a..061fc47 100644
+--- a/console-tools/dumpkmap.c
++++ b/console-tools/dumpkmap.c
+@@ -28,9 +28,9 @@ int dumpkmap_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ {
+ 	struct kbentry ke;
+ 	int i, j, fd;
+-	RESERVE_CONFIG_BUFFER(flags,MAX_NR_KEYMAPS);
++	RESERVE_CONFIG_BUFFER(flags, MAX_NR_KEYMAPS);
+ 
+-/*	bb_warn_ignoring_args(argc>=2);*/
++/*	bb_warn_ignoring_args(argv[1]);*/
+ 
+ 	fd = get_console_fd_or_die();
+ 
+diff --git a/console-tools/loadkmap.c b/console-tools/loadkmap.c
+index a6b9a86..912291a 100644
+--- a/console-tools/loadkmap.c
++++ b/console-tools/loadkmap.c
+@@ -30,9 +30,9 @@ int loadkmap_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	int i, j, fd;
+ 	uint16_t ibuff[NR_KEYS];
+ /*	const char *tty_name = CURRENT_TTY; */
+-	RESERVE_CONFIG_BUFFER(flags,MAX_NR_KEYMAPS);
++	RESERVE_CONFIG_BUFFER(flags, MAX_NR_KEYMAPS);
+ 
+-/* bb_warn_ignoring_args(argc >= 2); */
++/* bb_warn_ignoring_args(argv[1]); */
+ 	fd = get_console_fd_or_die();
+ /* or maybe:
+ 	opt = getopt32(argv, "C:", &tty_name);
+diff --git a/coreutils/sync.c b/coreutils/sync.c
+index f00a3d0..9016655 100644
+--- a/coreutils/sync.c
++++ b/coreutils/sync.c
+@@ -14,10 +14,10 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int sync_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sync_main(int argc, char **argv UNUSED_PARAM)
++int sync_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	/* coreutils-6.9 compat */
+-	bb_warn_ignoring_args(argc - 1);
++	bb_warn_ignoring_args(argv[1]);
+ 
+ 	sync();
+ 
+diff --git a/coreutils/tty.c b/coreutils/tty.c
+index 975ccdf..69352ec 100644
+--- a/coreutils/tty.c
++++ b/coreutils/tty.c
+@@ -13,7 +13,7 @@
+ #include "libbb.h"
+ 
+ int tty_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int tty_main(int argc, char **argv IF_NOT_INCLUDE_SUSv2(UNUSED_PARAM))
++int tty_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	const char *s;
+ 	IF_INCLUDE_SUSv2(int silent;)	/* Note: No longer relevant in SUSv3. */
+@@ -22,11 +22,11 @@ int tty_main(int argc, char **argv IF_NOT_INCLUDE_SUSv2(UNUSED_PARAM))
+ 	xfunc_error_retval = 2;	/* SUSv3 requires > 1 for error. */
+ 
+ 	IF_INCLUDE_SUSv2(silent = getopt32(argv, "s");)
+-	IF_INCLUDE_SUSv2(argc -= optind;)
+-	IF_NOT_INCLUDE_SUSv2(argc -= 1;)
++	IF_INCLUDE_SUSv2(argv += optind;)
++	IF_NOT_INCLUDE_SUSv2(argv += 1;)
+ 
+ 	/* gnu tty outputs a warning that it is ignoring all args. */
+-	bb_warn_ignoring_args(argc);
++	bb_warn_ignoring_args(argv[0]);
+ 
+ 	retval = EXIT_SUCCESS;
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index 8d3df61..cda59dc 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1022,7 +1022,11 @@ extern struct mntent *find_mount_point(const char *name, int subdir_too) FAST_FU
+ extern void erase_mtab(const char * name) FAST_FUNC;
+ extern unsigned int tty_baud_to_value(speed_t speed) FAST_FUNC;
+ extern speed_t tty_value_to_baud(unsigned int value) FAST_FUNC;
+-extern void bb_warn_ignoring_args(int n) FAST_FUNC;
++#if ENABLE_DESKTOP
++extern void bb_warn_ignoring_args(char *arg) FAST_FUNC;
++#else
++# define bb_warn_ignoring_args(arg) ((void)0)
++#endif
+ 
+ extern int get_linux_version_code(void) FAST_FUNC;
+ 
+diff --git a/libbb/warn_ignoring_args.c b/libbb/warn_ignoring_args.c
+index 65dea32..fa33c25 100644
+--- a/libbb/warn_ignoring_args.c
++++ b/libbb/warn_ignoring_args.c
+@@ -6,12 +6,13 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+ #include "libbb.h"
+ 
+-void FAST_FUNC bb_warn_ignoring_args(int n)
++#if ENABLE_DESKTOP
++void FAST_FUNC bb_warn_ignoring_args(char *arg)
+ {
+-	if (n) {
++	if (arg) {
+ 		bb_error_msg("ignoring all arguments");
+ 	}
+ }
++#endif
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index 659f3a9..e767453 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -166,7 +166,7 @@ static int iprule_list(char **argv)
+ 
+ 	if (*argv) {
+ 		//bb_error_msg("\"rule show\" needs no arguments");
+-		bb_warn_ignoring_args(1);
++		bb_warn_ignoring_args(*argv);
+ 		return -1;
+ 	}
+ 

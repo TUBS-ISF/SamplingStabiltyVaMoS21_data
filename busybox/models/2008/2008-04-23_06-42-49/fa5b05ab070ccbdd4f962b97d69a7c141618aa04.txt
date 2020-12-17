@@ -1,0 +1,9 @@
+2008-04-23 06:42:49 +0000
+diff --git a/testsuite/date/date-u-works b/testsuite/date/date-u-works
+index 7d9902a..665e4ea 100644
+--- a/testsuite/date/date-u-works
++++ b/testsuite/date/date-u-works
+@@ -1,2 +1,2 @@
+-test x"`date -u`" = x"`busybox date -u`"
++test x"Wed Apr 23 11:22:33 UTC 2008" = x"`busybox date -u -d 11:22:33`"
+ 

@@ -1,0 +1,286 @@
+2008-01-06 03:26:53 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 33e73b2..a076062 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -503,7 +503,9 @@ char *itoa(int n);
+ /* Returns a pointer past the formatted number, does NOT null-terminate */
+ char *utoa_to_buf(unsigned n, char *buf, unsigned buflen);
+ char *itoa_to_buf(int n, char *buf, unsigned buflen);
+-void smart_ulltoa5(unsigned long long ul, char buf[5]);
++/* Intelligent formatters of bignums */
++void smart_ulltoa4(unsigned long long ul, char buf[5], const char *scale);
++void smart_ulltoa5(unsigned long long ul, char buf[5], const char *scale);
+ //TODO: provide pointer to buf (avoid statics)?
+ const char *make_human_readable_str(unsigned long long size,
+ 		unsigned long block_size, unsigned long display_unit);
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 6d8eac4..6d50bf9 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -282,10 +282,10 @@ void xsetenv(const char *key, const char *value)
+ 		bb_error_msg_and_die(bb_msg_memory_exhausted);
+ }
+ 
+-// Converts unsigned long long value into compact 4-char
+-// representation. Examples: "1234", "1.2k", " 27M", "123T"
+-// Fifth char is always '\0'
+-void smart_ulltoa5(unsigned long long ul, char buf[5])
++/* Converts unsigned long long value into compact 4-char
++ * representation. Examples: "1234", "1.2k", " 27M", "123T"
++ * String is not terminated (buf[4] is untouched) */
++void smart_ulltoa4(unsigned long long ul, char buf[5], const char *scale)
+ {
+ 	const char *fmt;
+ 	char c;
+@@ -327,13 +327,66 @@ void smart_ulltoa5(unsigned long long ul, char buf[5])
+ 			buf[1] = '.';
+ 		}
+ 		buf[2] = "0123456789"[v];
+-		// see http://en.wikipedia.org/wiki/Tera
+-		// (small letters stand out better versus numbers)
+-		buf[3] = " kmgtpezy"[idx];
++		buf[3] = scale[idx]; /* typically scale = " kmgt..." */
+ 	}
+-	buf[4] = '\0';
+ }
+ 
++/* Converts unsigned long long value into compact 5-char representation.
++ * String is not terminated (buf[5] is untouched) */
++void smart_ulltoa5(unsigned long long ul, char buf[6], const char *scale)
++{
++	const char *fmt;
++	char c;
++	unsigned v, u, idx = 0;
++
++	if (ul > 99999) { // do not scale if 99999 or less
++		ul *= 10;
++		do {
++			ul /= 1024;
++			idx++;
++		} while (ul >= 100000);
++	}
++	v = ul; // ullong divisions are expensive, avoid them
++
++	fmt = " 123456789";
++	u = v / 10;
++	v = v % 10;
++	if (!idx) {
++		// 99999 or less: use "12345" format
++		// u is value/10, v is last digit
++		c = buf[0] = " 123456789"[u/1000];
++		if (c != ' ') fmt = "0123456789";
++		c = buf[1] = fmt[u/100%10];
++		if (c != ' ') fmt = "0123456789";
++		c = buf[2] = fmt[u/10%10];
++		if (c != ' ') fmt = "0123456789";
++		buf[3] = fmt[u%10];
++		buf[4] = "0123456789"[v];
++	} else {
++		// value has been scaled into 0..9999.9 range
++		// u is value, v is 1/10ths (allows for 92.1M format)
++		if (u >= 100) {
++			// value is >= 100: use "1234M', " 123M" formats
++			c = buf[0] = " 123456789"[u/1000];
++			if (c != ' ') fmt = "0123456789";
++			c = buf[1] = fmt[u/100%10];
++			if (c != ' ') fmt = "0123456789";
++			v = u % 10;
++			u = u / 10;
++			buf[2] = fmt[u%10];
++		} else {
++			// value is < 100: use "92.1M" format
++			c = buf[0] = " 123456789"[u/10];
++			if (c != ' ') fmt = "0123456789";
++			buf[1] = fmt[u%10];
++			buf[2] = '.';
++		}
++		buf[3] = "0123456789"[v];
++		buf[4] = scale[idx]; /* typically scale = " kmgt..." */
++	}
++}
++
++
+ // Convert unsigned integer to ascii, writing into supplied buffer.
+ // A truncated result contains the first few digits of the result ala strncpy.
+ // Returns a pointer past last generated digit, does _not_ store NUL.
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index b846ee5..b8ba3fa 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -257,7 +257,10 @@ static int rdval_diskstats(const char* p, ullong *vec)
+ static void scale(ullong ul)
+ {
+ 	char buf[5];
+-	smart_ulltoa5(ul, buf);
++
++	/* see http://en.wikipedia.org/wiki/Tera */
++	smart_ulltoa4(ul, buf, " kmgtpezy");
++	buf[4] = '\0';
+ 	put(buf);
+ }
+ 
+diff --git a/procps/ps.c b/procps/ps.c
+index a6c35f1..6a6a9e6 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -25,9 +25,9 @@ enum { MAX_WIDTH = 2*1024 };
+ 
+ #if ENABLE_SELINUX
+ #define SELINIX_O_PREFIX "label,"
+-#define DEFAULT_O_STR    (SELINIX_O_PREFIX "pid,user" USE_FEATURE_PS_TIME(",time"))
++#define DEFAULT_O_STR    (SELINIX_O_PREFIX "pid,user" USE_FEATURE_PS_TIME(",time") ",args")
+ #else
+-#define DEFAULT_O_STR    ("pid,user" USE_FEATURE_PS_TIME(",time"))
++#define DEFAULT_O_STR    ("pid,user" USE_FEATURE_PS_TIME(",time") ",args")
+ #endif
+ 
+ typedef struct {
+@@ -188,7 +188,10 @@ static void func_pgid(char *buf, int size, const procps_status_t *ps)
+ static void put_lu(char *buf, int size, unsigned long u)
+ {
+ 	char buf5[5];
+-	smart_ulltoa5( ((unsigned long long)u) << 10, buf5);
++
++	/* see http://en.wikipedia.org/wiki/Tera */
++	smart_ulltoa4( (u, buf5, " mgtpezy");
++	buf5[5] = '\0';
+ 	sprintf(buf, "%.*s", size, buf5);
+ }
+ 
+@@ -505,9 +508,9 @@ int ps_main(int argc, char **argv)
+ #endif /* ENABLE_FEATURE_PS_WIDE || ENABLE_SELINUX */
+ 
+ 	if (use_selinux)
+-		puts("  PID Context                          Stat Command");
++		puts("  PID CONTEXT                          STAT COMMAND");
+ 	else
+-		puts("  PID  Uid        VSZ Stat Command");
++		puts("  PID USER       VSZ STAT COMMAND");
+ 
+ 	while ((p = procps_scan(p, 0
+ 			| PSSCAN_PID
+@@ -519,7 +522,7 @@ int ps_main(int argc, char **argv)
+ 	))) {
+ #if ENABLE_SELINUX
+ 		if (use_selinux) {
+-			len = printf("%5u %-32s %s ",
++			len = printf("%5u %-32.32s %s ",
+ 					p->pid,
+ 					p->context ? p->context : "unknown",
+ 					p->state);
+@@ -527,12 +530,17 @@ int ps_main(int argc, char **argv)
+ #endif
+ 		{
+ 			const char *user = get_cached_username(p->uid);
+-			if (p->vsz == 0)
+-				len = printf("%5u %-8s        %s ",
+-					p->pid, user, p->state);
+-			else
+-				len = printf("%5u %-8s %6lu %s ",
+-					p->pid, user, p->vsz, p->state);
++			//if (p->vsz == 0)
++			//	len = printf("%5u %-8.8s        %s ",
++			//		p->pid, user, p->state);
++			//else
++			{
++				char buf6[6];
++				smart_ulltoa5(p->vsz, buf6, " mgtpezy");
++				buf6[5] = '\0';
++				len = printf("%5u %-8.8s %s %s ",
++					p->pid, user, buf6, p->state);
++			}
+ 		}
+ 
+ 		{
+diff --git a/procps/top.c b/procps/top.c
+index 2005191..fc393d4 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -669,60 +669,10 @@ static void display_topmem_header(int scr_width)
+ #undef str
+ }
+ 
+-// Converts unsigned long long value into compact 5-char
+-// representation. Sixth char is always ' '
+-static void smart_ulltoa6(unsigned long long ul, char buf[6])
++static void ulltoa6_and_space(unsigned long long ul, char buf[6])
+ {
+-	const char *fmt;
+-	char c;
+-	unsigned v, u, idx = 0;
+-
+-	if (ul > 99999) { // do not scale if 99999 or less
+-		ul *= 10;
+-		do {
+-			ul /= 1024;
+-			idx++;
+-		} while (ul >= 100000);
+-	}
+-	v = ul; // ullong divisions are expensive, avoid them
+-
+-	fmt = " 123456789";
+-	u = v / 10;
+-	v = v % 10;
+-	if (!idx) {
+-		// 99999 or less: use "12345" format
+-		// u is value/10, v is last digit
+-		c = buf[0] = " 123456789"[u/1000];
+-		if (c != ' ') fmt = "0123456789";
+-		c = buf[1] = fmt[u/100%10];
+-		if (c != ' ') fmt = "0123456789";
+-		c = buf[2] = fmt[u/10%10];
+-		if (c != ' ') fmt = "0123456789";
+-		buf[3] = fmt[u%10];
+-		buf[4] = "0123456789"[v];
+-	} else {
+-		// value has been scaled into 0..9999.9 range
+-		// u is value, v is 1/10ths (allows for 92.1M format)
+-		if (u >= 100) {
+-			// value is >= 100: use "1234M', " 123M" formats
+-			c = buf[0] = " 123456789"[u/1000];
+-			if (c != ' ') fmt = "0123456789";
+-			c = buf[1] = fmt[u/100%10];
+-			if (c != ' ') fmt = "0123456789";
+-			v = u % 10;
+-			u = u / 10;
+-			buf[2] = fmt[u%10];
+-		} else {
+-			// value is < 100: use "92.1M" format
+-			c = buf[0] = " 123456789"[u/10];
+-			if (c != ' ') fmt = "0123456789";
+-			buf[1] = fmt[u%10];
+-			buf[2] = '.';
+-		}
+-		buf[3] = "0123456789"[v];
+-		// see http://en.wikipedia.org/wiki/Tera
+-		buf[4] = " mgtpezy"[idx];
+-	}
++	/* see http://en.wikipedia.org/wiki/Tera */
++	smart_ulltoa5(ul, buf, " mgtpezy");
+ 	buf[5] = ' ';
+ }
+ 
+@@ -739,14 +689,14 @@ static NOINLINE void display_topmem_process_list(int count, int scr_width)
+ 
+ 	while (--count >= 0) {
+ 		// PID VSZ VSZRW RSS (SHR) DIRTY (SHR) COMMAND
+-		smart_ulltoa6(s->pid     , &line_buf[0*6]);
+-		smart_ulltoa6(s->vsz     , &line_buf[1*6]);
+-		smart_ulltoa6(s->vszrw   , &line_buf[2*6]);
+-		smart_ulltoa6(s->rss     , &line_buf[3*6]);
+-		smart_ulltoa6(s->rss_sh  , &line_buf[4*6]);
+-		smart_ulltoa6(s->dirty   , &line_buf[5*6]);
+-		smart_ulltoa6(s->dirty_sh, &line_buf[6*6]);
+-		smart_ulltoa6(s->stack   , &line_buf[7*6]);
++		ulltoa6_and_space(s->pid     , &line_buf[0*6]);
++		ulltoa6_and_space(s->vsz     , &line_buf[1*6]);
++		ulltoa6_and_space(s->vszrw   , &line_buf[2*6]);
++		ulltoa6_and_space(s->rss     , &line_buf[3*6]);
++		ulltoa6_and_space(s->rss_sh  , &line_buf[4*6]);
++		ulltoa6_and_space(s->dirty   , &line_buf[5*6]);
++		ulltoa6_and_space(s->dirty_sh, &line_buf[6*6]);
++		ulltoa6_and_space(s->stack   , &line_buf[7*6]);
+ 		line_buf[8*6] = '\0';
+ 		if (scr_width > MIN_WIDTH) {
+ 			read_cmdline(&line_buf[8*6], scr_width - MIN_WIDTH, s->pid, s->comm);

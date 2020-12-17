@@ -1,0 +1,15 @@
+2008-10-02 13:30:31 +0000
+diff --git a/networking/Config.in b/networking/Config.in
+index 9aa1422..bceacdd 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -699,7 +699,8 @@ config FEATURE_SENDMAIL_MAILXX
+ 	default n
+ 	depends on FEATURE_SENDMAIL_MAILX
+ 	help
+-	  Allow to specify Cc: addresses and some additional headers: Errors-To:.
++	  Allow to specify Cc: addresses and some additional headers:
++	  Errors-To:
+ 
+ config FEATURE_SENDMAIL_SSL
+ 	bool "Allow to communicate via SSL/TLS"

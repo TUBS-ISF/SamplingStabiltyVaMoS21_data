@@ -1,0 +1,323 @@
+2008-09-26 10:35:55 +0000
+diff --git a/include/grp_.h b/include/grp_.h
+index 23c4dcc..697a786 100644
+--- a/include/grp_.h
++++ b/include/grp_.h
+@@ -21,21 +21,17 @@
+  *	POSIX Standard: 9.2.1 Group Database Access	<grp.h>
+  */
+ 
+-#ifndef	_GRP_H
+-#define	_GRP_H 1
++#ifndef	BB_GRP_H
++#define	BB_GRP_H 1
+ 
+ #if __GNUC_PREREQ(4,1)
+ # pragma GCC visibility push(hidden)
+ #endif
+ 
+-/* The group structure.	 */
+-struct group {
+-	char *gr_name;          /* Group name.  */
+-	char *gr_passwd;        /* Password.    */
+-	gid_t gr_gid;           /* Group ID.    */
+-	char **gr_mem;          /* Member list. */
+-};
+-
++/* This file is #included after #include <grp.h>
++ * We will use libc-defined structures, but will #define finction names
++ * so that function calls are directed to bb_internal_XXX replacements
++ */
+ 
+ #define setgrent     bb_internal_setgrent
+ #define endgrent     bb_internal_endgrent
+@@ -53,9 +49,7 @@ struct group {
+ 
+ 
+ /* All function names below should be remapped by #defines above
+- * in order to not collide with libc names.
+- * In theory it isn't necessary, but I saw weird interactions at link time.
+- * Let's play safe */
++ * in order to not collide with libc names. */
+ 
+ 
+ /* Rewind the group-file stream.  */
+@@ -71,14 +65,14 @@ extern struct group *getgrent(void);
+ extern struct group *fgetgrent(FILE *__stream);
+ 
+ /* Write the given entry onto the given stream.  */
+-extern int putgrent(__const struct group *__restrict __p,
++extern int putgrent(const struct group *__restrict __p,
+ 		     FILE *__restrict __f);
+ 
+ /* Search for an entry with a matching group ID.  */
+ extern struct group *getgrgid(gid_t __gid);
+ 
+ /* Search for an entry with a matching group name.  */
+-extern struct group *getgrnam(__const char *__name);
++extern struct group *getgrnam(const char *__name);
+ 
+ /* Reentrant versions of some of the functions above.
+ 
+@@ -98,7 +92,7 @@ extern int getgrgid_r(gid_t __gid, struct group *__restrict __resultbuf,
+ 		       struct group **__restrict __result);
+ 
+ /* Search for an entry with a matching group name.  */
+-extern int getgrnam_r(__const char *__restrict __name,
++extern int getgrnam_r(const char *__restrict __name,
+ 		       struct group *__restrict __resultbuf,
+ 		       char *__restrict __buffer, size_t __buflen,
+ 		       struct group **__restrict __result);
+@@ -113,13 +107,13 @@ extern int fgetgrent_r(FILE *__restrict __stream,
+ /* Store at most *NGROUPS members of the group set for USER into
+    *GROUPS.  Also include GROUP.  The actual number of groups found is
+    returned in *NGROUPS.  Return -1 if the if *NGROUPS is too small.  */
+-extern int getgrouplist(__const char *__user, gid_t __group,
++extern int getgrouplist(const char *__user, gid_t __group,
+ 			 gid_t *__groups, int *__ngroups);
+ 
+ /* Initialize the group set for the current user
+    by reading the group database and using all groups
+    of which USER is a member.  Also include GROUP.  */
+-extern int initgroups(__const char *__user, gid_t __group);
++extern int initgroups(const char *__user, gid_t __group);
+ 
+ #if __GNUC_PREREQ(4,1)
+ # pragma GCC visibility pop
+diff --git a/include/libbb.h b/include/libbb.h
+index 951ff2f..5b92574 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -69,21 +69,15 @@
+ #include <dmalloc.h>
+ #endif
+ 
+-#if !ENABLE_USE_BB_PWD_GRP
+-# include <pwd.h>
+-# include <grp.h>
+-#endif
++#include <pwd.h>
++#include <grp.h>
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+-# if !ENABLE_USE_BB_SHADOW
+-#  include <shadow.h>
+-# endif
++# include <shadow.h>
+ #endif
+ 
+ /* Some libc's forget to declare these, do it ourself */
+ 
+ extern char **environ;
+-/* Set the group set for the current user to GROUPS (N of them).  */
+-int setgroups(size_t n, const gid_t *groups);
+ #if defined(__GLIBC__) && __GLIBC__ < 2
+ int vdprintf(int d, const char *format, va_list ap);
+ #endif
+diff --git a/include/pwd_.h b/include/pwd_.h
+index 6199034..c36e468 100644
+--- a/include/pwd_.h
++++ b/include/pwd_.h
+@@ -21,24 +21,17 @@
+  *	POSIX Standard: 9.2.2 User Database Access	<pwd.h>
+  */
+ 
+-#ifndef	_PWD_H
+-#define	_PWD_H 1
++#ifndef	BB_PWD_H
++#define	BB_PWD_H 1
+ 
+ #if __GNUC_PREREQ(4,1)
+ # pragma GCC visibility push(hidden)
+ #endif
+ 
+-/* The passwd structure.  */
+-struct passwd {
+-	char *pw_name;          /* Username.  */
+-	char *pw_passwd;        /* Password.  */
+-	uid_t pw_uid;           /* User ID.  */
+-	gid_t pw_gid;           /* Group ID.  */
+-	char *pw_gecos;         /* Real name.  */
+-	char *pw_dir;           /* Home directory.  */
+-	char *pw_shell;         /* Shell program.  */
+-};
+-
++/* This file is #included after #include <pwd.h>
++ * We will use libc-defined structures, but will #define finction names
++ * so that function calls are directed to bb_internal_XXX replacements
++ */
+ 
+ #define setpwent    bb_internal_setpwent
+ #define endpwent    bb_internal_endpwent
+@@ -51,13 +44,11 @@ struct passwd {
+ #define getpwuid_r  bb_internal_getpwuid_r
+ #define getpwnam_r  bb_internal_getpwnam_r
+ #define fgetpwent_r bb_internal_fgetpwent_r
+-#define getpw       bb_internal_getpw
++//#define getpw       bb_internal_getpw
+ 
+ 
+ /* All function names below should be remapped by #defines above
+- * in order to not collide with libc names.
+- * In theory it isn't necessary, but I saw weird interactions at link time.
+- * Let's play safe */
++ * in order to not collide with libc names. */
+ 
+ 
+ /* Rewind the password-file stream.  */
+@@ -73,14 +64,14 @@ extern struct passwd *getpwent(void);
+ extern struct passwd *fgetpwent(FILE *__stream);
+ 
+ /* Write the given entry onto the given stream.  */
+-extern int putpwent(__const struct passwd *__restrict __p,
++extern int putpwent(const struct passwd *__restrict __p,
+ 		     FILE *__restrict __f);
+ 
+ /* Search for an entry with a matching user ID.  */
+ extern struct passwd *getpwuid(uid_t __uid);
+ 
+ /* Search for an entry with a matching username.  */
+-extern struct passwd *getpwnam(__const char *__name);
++extern struct passwd *getpwnam(const char *__name);
+ 
+ /* Reentrant versions of some of the functions above.
+ 
+@@ -99,7 +90,7 @@ extern int getpwuid_r(uid_t __uid,
+ 		       char *__restrict __buffer, size_t __buflen,
+ 		       struct passwd **__restrict __result);
+ 
+-extern int getpwnam_r(__const char *__restrict __name,
++extern int getpwnam_r(const char *__restrict __name,
+ 		       struct passwd *__restrict __resultbuf,
+ 		       char *__restrict __buffer, size_t __buflen,
+ 		       struct passwd **__restrict __result);
+@@ -114,7 +105,7 @@ extern int fgetpwent_r(FILE *__restrict __stream,
+ /* Re-construct the password-file line for the given uid
+    in the given buffer.  This knows the format that the caller
+    will expect, but this need not be the format of the password file.  */
+-extern int getpw(uid_t __uid, char *__buffer);
++/* UNUSED extern int getpw(uid_t __uid, char *__buffer); */
+ 
+ #if __GNUC_PREREQ(4,1)
+ # pragma GCC visibility pop
+diff --git a/include/rtc_.h b/include/rtc_.h
+index 2e99058..867edb3 100644
+--- a/include/rtc_.h
++++ b/include/rtc_.h
+@@ -4,8 +4,8 @@
+  * Licensed under the GPL-2 or later.
+  */
+ 
+-#ifndef _BB_RTC_H_
+-#define _BB_RTC_H_
++#ifndef BB_RTC_H
++#define BB_RTC_H
+ 
+ #include "libbb.h"
+ 
+diff --git a/include/shadow_.h b/include/shadow_.h
+index 5a8b71a..73bed84 100644
+--- a/include/shadow_.h
++++ b/include/shadow_.h
+@@ -19,32 +19,23 @@
+ 
+ /* Declaration of types and functions for shadow password suite */
+ 
+-#ifndef _SHADOW_H
+-#define _SHADOW_H 1
++#ifndef BB_SHADOW_H
++#define BB_SHADOW_H 1
+ 
+ #if __GNUC_PREREQ(4,1)
+ # pragma GCC visibility push(hidden)
+ #endif
+ 
++/* This file is #included after #include <shadow.h>
++ * We will use libc-defined structures, but will #define finction names
++ * so that function calls are directed to bb_internal_XXX replacements
++ */
++
+ /* Paths to the user database files */
+ #ifndef _PATH_SHADOW
+ #define _PATH_SHADOW "/etc/shadow"
+ #endif
+ 
+-/* Structure of the password file */
+-struct spwd {
+-	char *sp_namp;          /* Login name */
+-	char *sp_pwdp;          /* Encrypted password */
+-	long sp_lstchg;         /* Date of last change */
+-	long sp_min;            /* Minimum number of days between changes */
+-	long sp_max;            /* Maximum number of days between changes */
+-	long sp_warn;           /* Number of days to warn user to change the password */
+-	long sp_inact;          /* Number of days the account may be inactive */
+-	long sp_expire;         /* Number of days since 1970-01-01 until account expires */
+-	unsigned long sp_flag;  /* Reserved */
+-};
+-
+-
+ #define setspent    bb_internal_setspent
+ #define endspent    bb_internal_endspent
+ #define getspent    bb_internal_getspent
+@@ -61,9 +52,7 @@ struct spwd {
+ 
+ 
+ /* All function names below should be remapped by #defines above
+- * in order to not collide with libc names.
+- * In theory it isn't necessary, but I saw weird interactions at link time.
+- * Let's play safe */
++ * in order to not collide with libc names. */
+ 
+ 
+ /* Open database for reading */
+@@ -76,26 +65,26 @@ extern void endspent(void);
+ extern struct spwd *getspent(void);
+ 
+ /* Get shadow entry matching NAME */
+-extern struct spwd *getspnam(__const char *__name);
++extern struct spwd *getspnam(const char *__name);
+ 
+ /* Read shadow entry from STRING */
+-extern struct spwd *sgetspent(__const char *__string);
++extern struct spwd *sgetspent(const char *__string);
+ 
+ /* Read next shadow entry from STREAM */
+ extern struct spwd *fgetspent(FILE *__stream);
+ 
+ /* Write line containing shadow password entry to stream */
+-extern int putspent(__const struct spwd *__p, FILE *__stream);
++extern int putspent(const struct spwd *__p, FILE *__stream);
+ 
+ /* Reentrant versions of some of the functions above */
+ extern int getspent_r(struct spwd *__result_buf, char *__buffer,
+ 		       size_t __buflen, struct spwd **__result);
+ 
+-extern int getspnam_r(__const char *__name, struct spwd *__result_buf,
++extern int getspnam_r(const char *__name, struct spwd *__result_buf,
+ 		       char *__buffer, size_t __buflen,
+ 		       struct spwd **__result);
+ 
+-extern int sgetspent_r(__const char *__string, struct spwd *__result_buf,
++extern int sgetspent_r(const char *__string, struct spwd *__result_buf,
+ 			char *__buffer, size_t __buflen,
+ 			struct spwd **__result);
+ 
+diff --git a/libpwdgrp/pwd_grp.c b/libpwdgrp/pwd_grp.c
+index 98b8367..223cbde 100644
+--- a/libpwdgrp/pwd_grp.c
++++ b/libpwdgrp/pwd_grp.c
+@@ -396,6 +396,7 @@ struct spwd *getspnam(const char *name)
+ }
+ #endif
+ 
++#ifdef THIS_ONE_IS_UNUSED
+ /* This one doesn't use static buffers */
+ int getpw(uid_t uid, char *buf)
+ {
+@@ -419,6 +420,7 @@ int getpw(uid_t uid, char *buf)
+ 
+ 	return -1;
+ }
++#endif
+ 
+ /**********************************************************************/
+ 

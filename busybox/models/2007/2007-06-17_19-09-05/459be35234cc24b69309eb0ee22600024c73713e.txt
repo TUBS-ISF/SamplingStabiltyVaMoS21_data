@@ -1,0 +1,1041 @@
+2007-06-17 19:09:05 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index c0c417c..2a50bce 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -200,6 +200,7 @@ struct sysinfo {
+ };
+ int sysinfo(struct sysinfo* info);
+ 
++unsigned long long monotonic_us(void);
+ 
+ extern void chomp(char *s);
+ extern void trim(char *s);
+diff --git a/libbb/Config.in b/libbb/Config.in
+index a1ff7c0..0a3769d 100644
+--- a/libbb/Config.in
++++ b/libbb/Config.in
+@@ -95,4 +95,14 @@ config FEATURE_EDITING_FANCY_PROMPT
+ 	  Setting this option allows for prompts to use things like \w and
+ 	  \$ and escape codes.
+ 
++config MONOTONIC_SYSCALL
++	bool "Use clock_gettime(CLOCK_MONOTONIC) syscall"
++	default y
++	help
++	  Use clock_gettime(CLOCK_MONOTONIC) syscall for measuring
++	  time intervals (time, ping, traceroute etc need this).
++	  Probably requires Linux 2.6+. If not selected, gettimeofday
++	  will be used instead (which gives wrong results if date/time
++	  is reset).
++
+ endmenu
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index e562f32..693f609 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -78,6 +78,7 @@ lib-y += simplify_path.o
+ lib-y += skip_whitespace.o
+ lib-y += speed_table.o
+ lib-y += str_tolower.o
++lib-y += time.o
+ lib-y += trim.o
+ lib-y += u_signal_names.o
+ lib-y += udp_io.o
+diff --git a/libbb/time.c b/libbb/time.c
+new file mode 100644
+index 0000000..f2a7415
+--- /dev/null
++++ b/libbb/time.c
+@@ -0,0 +1,32 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Utility routines.
++ *
++ * Copyright (C) 2007 Denis Vlasenko
++ *
++ * Licensed under GPL version 2, see file LICENSE in this tarball for details.
++ */
++
++#include "libbb.h"
++
++#if ENABLE_MONOTONIC_SYSCALL
++#include <sys/syscall.h>
++
++/* libc has incredibly messy way of doing this,
++ * typically requiring -lrt. We just skip all this mess */
++unsigned long long monotonic_us(void)
++{
++	struct timespec ts;
++	if (syscall(__NR_clock_gettime, CLOCK_MONOTONIC, &ts))
++		bb_error_msg_and_die("clock_gettime(MONOTONIC) failed");
++	return ts.tv_sec * 1000000ULL + ts.tv_nsec/1000;
++}
++#else
++unsigned long long monotonic_us(void)
++{
++	struct timeval tv;
++	if (gettimeofday(&tv, NULL))
++		bb_error_msg_and_die("gettimeofday failed");
++	return tv.tv_sec * 1000000ULL + tv_usec;
++}
++#endif
+diff --git a/miscutils/time.c b/miscutils/time.c
+index 705123c..578cb35 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -11,28 +11,16 @@
+ 
+ #include "libbb.h"
+ 
+-#define TV_MSEC tv_usec / 1000
+-
+ /* Information on the resources used by a child process.  */
+ typedef struct {
+ 	int waitstatus;
+ 	struct rusage ru;
+-	struct timeval start, elapsed;	/* Wallclock time of process.  */
++	unsigned elapsed_ms;	/* Wallclock time of process.  */
+ } resource_t;
+ 
+ /* msec = milliseconds = 1/1,000 (1*10e-3) second.
+    usec = microseconds = 1/1,000,000 (1*10e-6) second.  */
+ 
+-#ifndef TICKS_PER_SEC
+-#define TICKS_PER_SEC 100
+-#endif
+-
+-/* The number of milliseconds in one `tick' used by the `rusage' structure.  */
+-#define MSEC_PER_TICK (1000 / TICKS_PER_SEC)
+-
+-/* Return the number of clock ticks that occur in M milliseconds.  */
+-#define MSEC_TO_TICKS(m) ((m) / MSEC_PER_TICK)
+-
+ #define UL unsigned long
+ 
+ static const char default_format[] = "real\t%E\nuser\t%u\nsys\t%T";
+@@ -76,7 +64,6 @@ static const char long_format[] =
+ static int resuse_end(pid_t pid, resource_t * resp)
+ {
+ 	int status;
+-
+ 	pid_t caught;
+ 
+ 	/* Ignore signals, but don't ignore the children.  When wait3
+@@ -85,18 +72,8 @@ static int resuse_end(pid_t pid, resource_t * resp)
+ 		if (caught == -1)
+ 			return 0;
+ 	}
+-
+-	gettimeofday(&resp->elapsed, (struct timezone *) 0);
+-	resp->elapsed.tv_sec -= resp->start.tv_sec;
+-	if (resp->elapsed.tv_usec < resp->start.tv_usec) {
+-		/* Manually carry a one from the seconds field.  */
+-		resp->elapsed.tv_usec += 1000000;
+-		--resp->elapsed.tv_sec;
+-	}
+-	resp->elapsed.tv_usec -= resp->start.tv_usec;
+-
++	resp->elapsed_ms = (monotonic_us() / 1000) - resp->elapsed_ms;
+ 	resp->waitstatus = status;
+-
+ 	return 1;
+ }
+ 
+@@ -181,30 +158,30 @@ static unsigned long ptok(unsigned long pages)
+    COMMAND is the command and args that are being summarized.
+    RESP is resource information on the command.  */
+ 
++#ifndef TICKS_PER_SEC
++#define TICKS_PER_SEC 100
++#endif
++
+ static void summarize(const char *fmt, char **command, resource_t * resp)
+ {
+-	unsigned long r;	/* Elapsed real milliseconds.  */
+-	unsigned long v;	/* Elapsed virtual (CPU) milliseconds.  */
++	unsigned vv_ms;     /* Elapsed virtual (CPU) milliseconds */
++	unsigned cpu_ticks; /* Same, in "CPU ticks" */
+ 
+ 	if (WIFSTOPPED(resp->waitstatus))
+-		printf("Command stopped by signal %d\n",
++		printf("Command stopped by signal %u\n",
+ 				WSTOPSIG(resp->waitstatus));
+ 	else if (WIFSIGNALED(resp->waitstatus))
+-		printf("Command terminated by signal %d\n",
++		printf("Command terminated by signal %u\n",
+ 				WTERMSIG(resp->waitstatus));
+ 	else if (WIFEXITED(resp->waitstatus) && WEXITSTATUS(resp->waitstatus))
+-		printf("Command exited with non-zero status %d\n",
++		printf("Command exited with non-zero status %u\n",
+ 				WEXITSTATUS(resp->waitstatus));
+ 
+-	/* Convert all times to milliseconds.  Occasionally, one of these values
+-	   comes out as zero.  Dividing by zero causes problems, so we first
+-	   check the time value.  If it is zero, then we take `evasive action'
+-	   instead of calculating a value.  */
++	vv_ms = (resp->ru.ru_utime.tv_sec + resp->ru.ru_stime.tv_sec) * 1000
++	      + (resp->ru.ru_utime.tv_usec + resp->ru.ru_stime.tv_usec) / 1000;
+ 
+-	r = resp->elapsed.tv_sec * 1000 + resp->elapsed.tv_usec / 1000;
+-
+-	v = resp->ru.ru_utime.tv_sec * 1000 + resp->ru.ru_utime.TV_MSEC +
+-		resp->ru.ru_stime.tv_sec * 1000 + resp->ru.ru_stime.TV_MSEC;
++	cpu_ticks = vv_ms * TICKS_PER_SEC / 1000;
++	if (!cpu_ticks) cpu_ticks = 1; /* we divide by it, must be nonzero */
+ 
+ 	/* putchar() != putc(stdout) in glibc! */
+ 
+@@ -245,127 +222,122 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 				break;
+ 			case 'D':	/* Average unshared data size.  */
+ 				printf("%lu",
+-						MSEC_TO_TICKS(v) == 0 ? 0 :
+-						ptok((UL) resp->ru.ru_idrss) / MSEC_TO_TICKS(v) +
+-						ptok((UL) resp->ru.ru_isrss) / MSEC_TO_TICKS(v));
+-				break;
+-			case 'E':	/* Elapsed real (wall clock) time.  */
+-				if (resp->elapsed.tv_sec >= 3600)	/* One hour -> h:m:s.  */
+-					printf("%ldh %ldm %02lds",
+-							resp->elapsed.tv_sec / 3600,
+-							(resp->elapsed.tv_sec % 3600) / 60,
+-							resp->elapsed.tv_sec % 60);
++						ptok((UL) resp->ru.ru_idrss) / cpu_ticks +
++						ptok((UL) resp->ru.ru_isrss) / cpu_ticks);
++				break;
++			case 'E': {	/* Elapsed real (wall clock) time.  */
++				unsigned seconds = resp->elapsed_ms / 1000;
++				if (seconds >= 3600)	/* One hour -> h:m:s.  */
++					printf("%uh %um %02us",
++							seconds / 3600,
++							(seconds % 3600) / 60,
++							seconds % 60);
+ 				else
+-					printf("%ldm %ld.%02lds",	/* -> m:s.  */
+-							resp->elapsed.tv_sec / 60,
+-							resp->elapsed.tv_sec % 60,
+-							resp->elapsed.tv_usec / 10000);
++					printf("%um %u.%02us",	/* -> m:s.  */
++							seconds / 60,
++							seconds % 60,
++							(unsigned)(resp->elapsed_ms / 10) % 100);
+ 				break;
++			}
+ 			case 'F':	/* Major page faults.  */
+-				printf("%ld", resp->ru.ru_majflt);
++				printf("%lu", resp->ru.ru_majflt);
+ 				break;
+ 			case 'I':	/* Inputs.  */
+-				printf("%ld", resp->ru.ru_inblock);
++				printf("%lu", resp->ru.ru_inblock);
+ 				break;
+ 			case 'K':	/* Average mem usage == data+stack+text.  */
+ 				printf("%lu",
+-						MSEC_TO_TICKS(v) == 0 ? 0 :
+-						ptok((UL) resp->ru.ru_idrss) / MSEC_TO_TICKS(v) +
+-						ptok((UL) resp->ru.ru_isrss) / MSEC_TO_TICKS(v) +
+-						ptok((UL) resp->ru.ru_ixrss) / MSEC_TO_TICKS(v));
++						ptok((UL) resp->ru.ru_idrss) / cpu_ticks +
++						ptok((UL) resp->ru.ru_isrss) / cpu_ticks +
++						ptok((UL) resp->ru.ru_ixrss) / cpu_ticks);
+ 				break;
+ 			case 'M':	/* Maximum resident set size.  */
+ 				printf("%lu", ptok((UL) resp->ru.ru_maxrss));
+ 				break;
+ 			case 'O':	/* Outputs.  */
+-				printf("%ld", resp->ru.ru_oublock);
++				printf("%lu", resp->ru.ru_oublock);
+ 				break;
+ 			case 'P':	/* Percent of CPU this job got.  */
+ 				/* % cpu is (total cpu time)/(elapsed time).  */
+-				if (r > 0)
+-					printf("%lu%%", (v * 100 / r));
++				if (resp->elapsed_ms > 0)
++					printf("%u%%", (unsigned)(vv_ms * 100 / resp->elapsed_ms));
+ 				else
+ 					printf("?%%");
+ 				break;
+ 			case 'R':	/* Minor page faults (reclaims).  */
+-				printf("%ld", resp->ru.ru_minflt);
++				printf("%lu", resp->ru.ru_minflt);
+ 				break;
+ 			case 'S':	/* System time.  */
+-				printf("%ld.%02ld",
+-						resp->ru.ru_stime.tv_sec,
+-						resp->ru.ru_stime.TV_MSEC / 10);
++				printf("%u.%02u",
++						(unsigned)resp->ru.ru_stime.tv_sec,
++						(unsigned)(resp->ru.ru_stime.tv_usec / 10000));
+ 				break;
+ 			case 'T':	/* System time.  */
+ 				if (resp->ru.ru_stime.tv_sec >= 3600) /* One hour -> h:m:s.  */
+-					printf("%ldh %ldm %02lds",
+-							resp->ru.ru_stime.tv_sec / 3600,
+-							(resp->ru.ru_stime.tv_sec % 3600) / 60,
+-							resp->ru.ru_stime.tv_sec % 60);
++					printf("%uh %um %02us",
++							(unsigned)(resp->ru.ru_stime.tv_sec / 3600),
++							(unsigned)(resp->ru.ru_stime.tv_sec % 3600) / 60,
++							(unsigned)(resp->ru.ru_stime.tv_sec % 60));
+ 				else
+-					printf("%ldm %ld.%02lds",	/* -> m:s.  */
+-							resp->ru.ru_stime.tv_sec / 60,
+-							resp->ru.ru_stime.tv_sec % 60,
+-							resp->ru.ru_stime.tv_usec / 10000);
++					printf("%um %u.%02us",	/* -> m:s.  */
++							(unsigned)(resp->ru.ru_stime.tv_sec / 60),
++							(unsigned)(resp->ru.ru_stime.tv_sec % 60),
++							(unsigned)(resp->ru.ru_stime.tv_usec / 10000));
+ 				break;
+ 			case 'U':	/* User time.  */
+-				printf("%ld.%02ld",
+-						resp->ru.ru_utime.tv_sec,
+-						resp->ru.ru_utime.TV_MSEC / 10);
++				printf("%u.%02u",
++						(unsigned)resp->ru.ru_utime.tv_sec,
++						(unsigned)(resp->ru.ru_utime.tv_usec / 10000));
+ 				break;
+ 			case 'u':	/* User time.  */
+ 				if (resp->ru.ru_utime.tv_sec >= 3600) /* One hour -> h:m:s.  */
+-					printf("%ldh %ldm %02lds",
+-							resp->ru.ru_utime.tv_sec / 3600,
+-							(resp->ru.ru_utime.tv_sec % 3600) / 60,
+-							resp->ru.ru_utime.tv_sec % 60);
++					printf("%uh %um %02us",
++							(unsigned)(resp->ru.ru_utime.tv_sec / 3600),
++							(unsigned)(resp->ru.ru_utime.tv_sec % 3600) / 60,
++							(unsigned)(resp->ru.ru_utime.tv_sec % 60));
+ 				else
+-					printf("%ldm %ld.%02lds",	/* -> m:s.  */
+-							resp->ru.ru_utime.tv_sec / 60,
+-							resp->ru.ru_utime.tv_sec % 60,
+-							resp->ru.ru_utime.tv_usec / 10000);
++					printf("%um %u.%02us",	/* -> m:s.  */
++							(unsigned)(resp->ru.ru_utime.tv_sec / 60),
++							(unsigned)(resp->ru.ru_utime.tv_sec % 60),
++							(unsigned)(resp->ru.ru_utime.tv_usec / 10000));
+ 				break;
+ 			case 'W':	/* Times swapped out.  */
+-				printf("%ld", resp->ru.ru_nswap);
++				printf("%lu", resp->ru.ru_nswap);
+ 				break;
+ 			case 'X':	/* Average shared text size.  */
+-				printf("%lu",
+-						MSEC_TO_TICKS(v) == 0 ? 0 :
+-						ptok((UL) resp->ru.ru_ixrss) / MSEC_TO_TICKS(v));
++				printf("%lu", ptok((UL) resp->ru.ru_ixrss) / cpu_ticks);
+ 				break;
+ 			case 'Z':	/* Page size.  */
+-				printf("%d", getpagesize());
++				printf("%u", getpagesize());
+ 				break;
+ 			case 'c':	/* Involuntary context switches.  */
+-				printf("%ld", resp->ru.ru_nivcsw);
++				printf("%lu", resp->ru.ru_nivcsw);
+ 				break;
+ 			case 'e':	/* Elapsed real time in seconds.  */
+-				printf("%ld.%02ld",
+-						resp->elapsed.tv_sec, resp->elapsed.tv_usec / 10000);
++				printf("%u.%02u",
++						(unsigned)resp->elapsed_ms / 1000,
++						(unsigned)(resp->elapsed_ms / 10) % 100);
+ 				break;
+ 			case 'k':	/* Signals delivered.  */
+-				printf("%ld", resp->ru.ru_nsignals);
++				printf("%lu", resp->ru.ru_nsignals);
+ 				break;
+ 			case 'p':	/* Average stack segment.  */
+-				printf("%lu",
+-						MSEC_TO_TICKS(v) == 0 ? 0 :
+-						ptok((UL) resp->ru.ru_isrss) / MSEC_TO_TICKS(v));
++				printf("%lu", ptok((UL) resp->ru.ru_isrss) / cpu_ticks);
+ 				break;
+ 			case 'r':	/* Incoming socket messages received.  */
+-				printf("%ld", resp->ru.ru_msgrcv);
++				printf("%lu", resp->ru.ru_msgrcv);
+ 				break;
+ 			case 's':	/* Outgoing socket messages sent.  */
+-				printf("%ld", resp->ru.ru_msgsnd);
++				printf("%lu", resp->ru.ru_msgsnd);
+ 				break;
+ 			case 't':	/* Average resident set size.  */
+-				printf("%lu",
+-						MSEC_TO_TICKS(v) == 0 ? 0 :
+-						ptok((UL) resp->ru.ru_idrss) / MSEC_TO_TICKS(v));
++				printf("%lu", ptok((UL) resp->ru.ru_idrss) / cpu_ticks);
+ 				break;
+ 			case 'w':	/* Voluntary context switches.  */
+-				printf("%ld", resp->ru.ru_nvcsw);
++				printf("%lu", resp->ru.ru_nvcsw);
+ 				break;
+ 			case 'x':	/* Exit status.  */
+-				printf("%d", WEXITSTATUS(resp->waitstatus));
++				printf("%u", WEXITSTATUS(resp->waitstatus));
+ 				break;
+ 			}
+ 			break;
+@@ -403,7 +375,7 @@ static void run_command(char *const *cmd, resource_t * resp)
+ 	pid_t pid;			/* Pid of child.  */
+ 	__sighandler_t interrupt_signal, quit_signal;
+ 
+-	gettimeofday(&resp->start, (struct timezone *) 0);
++	resp->elapsed_ms = monotonic_us() / 1000;
+ 	pid = vfork();		/* Run CMD as child process.  */
+ 	if (pid < 0)
+ 		bb_error_msg_and_die("cannot fork");
+diff --git a/networking/arping.c b/networking/arping.c
+index 1b26049..a022e70 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -8,9 +8,6 @@
+  * Busybox port: Nick Fedchik <nick@fedchik.org.ua>
+  */
+ 
+-//#include <sys/ioctl.h>
+-//#include <signal.h>
+-
+ #include <arpa/inet.h>
+ #include <net/if.h>
+ #include <netinet/ether.h>
+@@ -18,42 +15,42 @@
+ 
+ #include "libbb.h"
+ 
++/* We don't expect to see 1000+ seconds delay, unsigned is enough */
++#define MONOTONIC_US() ((unsigned)monotonic_us())
++
+ static struct in_addr src;
+ static struct in_addr dst;
+ static struct sockaddr_ll me;
+ static struct sockaddr_ll he;
+-static struct timeval last;
+-
+-enum cfg_e {
+-	dad = 1,
+-	unsolicited = 2,
+-	advert = 4,
+-	quiet = 8,
+-	quit_on_reply = 16,
+-	broadcast_only = 32,
+-	unicasting = 64
++static unsigned last;
++
++enum {
++	DAD = 1,
++	UNSOLICITED = 2,
++	ADVERT = 4,
++	QUIET = 8,
++	QUIT_ON_REPLY = 16,
++	BCAST_ONLY = 32,
++	UNICASTING = 64
+ };
+ static int cfg;
+ 
+ static int s;
+ static unsigned count = UINT_MAX;
+-static unsigned timeout;
++static unsigned timeout_us;
+ static int sent;
+ static int brd_sent;
+ static int received;
+ static int brd_recv;
+ static int req_recv;
+ 
+-#define MS_TDIFF(tv1,tv2) ( ((tv1).tv_sec-(tv2).tv_sec)*1000 + \
+-			((tv1).tv_usec-(tv2).tv_usec)/1000 )
+-
+ static int send_pack(int sock, struct in_addr *src_addr,
+ 			struct in_addr *dst_addr, struct sockaddr_ll *ME,
+ 			struct sockaddr_ll *HE)
+ {
+ 	int err;
+-	struct timeval now;
+-	RESERVE_CONFIG_UBUFFER(buf, 256);
++	unsigned now;
++	unsigned char buf[256];
+ 	struct arphdr *ah = (struct arphdr *) buf;
+ 	unsigned char *p = (unsigned char *) (ah + 1);
+ 
+@@ -62,7 +59,7 @@ static int send_pack(int sock, struct in_addr *src_addr,
+ 	ah->ar_pro = htons(ETH_P_IP);
+ 	ah->ar_hln = ME->sll_halen;
+ 	ah->ar_pln = 4;
+-	ah->ar_op = cfg & advert ? htons(ARPOP_REPLY) : htons(ARPOP_REQUEST);
++	ah->ar_op = cfg & ADVERT ? htons(ARPOP_REPLY) : htons(ARPOP_REQUEST);
+ 
+ 	memcpy(p, &ME->sll_addr, ah->ar_hln);
+ 	p += ME->sll_halen;
+@@ -70,7 +67,7 @@ static int send_pack(int sock, struct in_addr *src_addr,
+ 	memcpy(p, src_addr, 4);
+ 	p += 4;
+ 
+-	if (cfg & advert)
++	if (cfg & ADVERT)
+ 		memcpy(p, &ME->sll_addr, ah->ar_hln);
+ 	else
+ 		memcpy(p, &HE->sll_addr, ah->ar_hln);
+@@ -79,21 +76,21 @@ static int send_pack(int sock, struct in_addr *src_addr,
+ 	memcpy(p, dst_addr, 4);
+ 	p += 4;
+ 
+-	gettimeofday(&now, NULL);
++	now = MONOTONIC_US();
+ 	err = sendto(sock, buf, p - buf, 0, (struct sockaddr *) HE, sizeof(*HE));
+ 	if (err == p - buf) {
+ 		last = now;
+ 		sent++;
+-		if (!(cfg & unicasting))
++		if (!(cfg & UNICASTING))
+ 			brd_sent++;
+ 	}
+-	RELEASE_CONFIG_BUFFER(buf);
+ 	return err;
+ }
+ 
++static void finish(void) ATTRIBUTE_NORETURN;
+ static void finish(void)
+ {
+-	if (!(cfg & quiet)) {
++	if (!(cfg & QUIET)) {
+ 		printf("Sent %d probe(s) (%d broadcast(s))\n"
+ 			"Received %d repl%s"
+ 			" (%d request(s), %d broadcast(s))\n",
+@@ -101,30 +98,31 @@ static void finish(void)
+ 			received, (received == 1) ? "ies" : "y",
+ 			req_recv, brd_recv);
+ 	}
+-	if (cfg & dad)
++	if (cfg & DAD)
+ 		exit(!!received);
+-	if (cfg & unsolicited)
++	if (cfg & UNSOLICITED)
+ 		exit(0);
+ 	exit(!received);
+ }
+ 
+ static void catcher(void)
+ {
+-	struct timeval tv;
+-	static struct timeval start;
++	static unsigned start;
+ 
+-	gettimeofday(&tv, NULL);
++	unsigned now;
+ 
+-	if (start.tv_sec == 0)
+-		start = tv;
++	now = MONOTONIC_US();
++	if (start == 0)
++		start = now;
+ 
+-	if (count-- == 0
+-	 || (timeout && MS_TDIFF(tv, start) > timeout * 1000 + 500))
++	if (count == 0 || (timeout_us && (now - start) > (timeout_us + 500000)))
+ 		finish();
+ 
+-	if (last.tv_sec == 0 || MS_TDIFF(tv, last) > 500) {
++	count--;
++
++	if (last == 0 || (now - last) > 500000) {
+ 		send_pack(s, &src, &dst, &me, &he);
+-		if (count == 0 && (cfg & unsolicited))
++		if (count == 0 && (cfg & UNSOLICITED))
+ 			finish();
+ 	}
+ 	alarm(1);
+@@ -162,7 +160,7 @@ static int recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 		return 0;
+ 	memcpy(&src_ip, p + ah->ar_hln, 4);
+ 	memcpy(&dst_ip, p + ah->ar_hln + 4 + ah->ar_hln, 4);
+-	if (!(cfg & dad)) {
++	if (!(cfg & DAD)) {
+ 		if (src_ip.s_addr != dst.s_addr)
+ 			return 0;
+ 		if (src.s_addr != dst_ip.s_addr)
+@@ -190,11 +188,8 @@ static int recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 		if (src.s_addr && src.s_addr != dst_ip.s_addr)
+ 			return 0;
+ 	}
+-	if (!(cfg & quiet)) {
++	if (!(cfg & QUIET)) {
+ 		int s_printed = 0;
+-		struct timeval tv;
+-
+-		gettimeofday(&tv, NULL);
+ 
+ 		printf("%scast re%s from %s [%s]",
+ 			FROM->sll_pkttype == PACKET_HOST ? "Uni" : "Broad",
+@@ -212,13 +207,8 @@ static int recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 				ether_ntoa((struct ether_addr *) p + ah->ar_hln + 4));
+ 		}
+ 
+-		if (last.tv_sec) {
+-			long usecs = (tv.tv_sec - last.tv_sec) * 1000000 +
+-				tv.tv_usec - last.tv_usec;
+-			long msecs = (usecs + 500) / 1000;
+-
+-			usecs -= msecs * 1000 - 500;
+-			printf(" %ld.%03ldms\n", msecs, usecs);
++		if (last) {
++			printf(" %u.%03ums\n", last / 1000, last % 1000);
+ 		} else {
+ 			printf(" UNSOLICITED?\n");
+ 		}
+@@ -229,11 +219,11 @@ static int recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 		brd_recv++;
+ 	if (ah->ar_op == htons(ARPOP_REQUEST))
+ 		req_recv++;
+-	if (cfg & quit_on_reply)
++	if (cfg & QUIT_ON_REPLY)
+ 		finish();
+-	if (!(cfg & broadcast_only)) {
++	if (!(cfg & BCAST_ONLY)) {
+ 		memcpy(he.sll_addr, p, me.sll_halen);
+-		cfg |= unicasting;
++		cfg |= UNICASTING;
+ 	}
+ 	return 1;
+ }
+@@ -245,6 +235,7 @@ int arping_main(int argc, char **argv)
+ 	int ifindex;
+ 	char *source = NULL;
+ 	char *target;
++	unsigned char *packet;
+ 
+ 	s = xsocket(PF_PACKET, SOCK_DGRAM, 0);
+ 
+@@ -258,28 +249,23 @@ int arping_main(int argc, char **argv)
+ 		/* Dad also sets quit_on_reply.
+ 		 * Advert also sets unsolicited.
+ 		 */
+-		opt_complementary = "Df:AU";
++		opt_complementary = "=1:Df:AU";
+ 		opt = getopt32(argc, argv, "DUAqfbc:w:I:s:",
+ 					&_count, &_timeout, &device, &source);
+ 		cfg |= opt & 0x3f; /* set respective flags */
+ 		if (opt & 0x40) /* -c: count */
+ 			count = xatou(_count);
+ 		if (opt & 0x80) /* -w: timeout */
+-			timeout = xatoul_range(_timeout, 0, INT_MAX/2000);
+-		//if (opt & 0x100) /* -i: interface */
+-		if (strlen(device) > IF_NAMESIZE) {
++			timeout_us = xatou_range(_timeout, 0, INT_MAX/2000000) * 1000000;
++		//if (opt & 0x100) /* -I: interface */
++		if (strlen(device) >= IF_NAMESIZE) {
+ 			bb_error_msg_and_die("interface name '%s' is too long",
+ 							device);
+ 		}
+ 		//if (opt & 0x200) /* -s: source */
+ 	}
+-	argc -= optind;
+-	argv += optind;
+-
+-	if (argc != 1)
+-		bb_show_usage();
+ 
+-	target = *argv;
++	target = argv[optind];
+ 
+ 	xfunc_error_retval = 2;
+ 
+@@ -301,7 +287,7 @@ int arping_main(int argc, char **argv)
+ 		}
+ 		if (ifr.ifr_flags & (IFF_NOARP | IFF_LOOPBACK)) {
+ 			bb_error_msg("interface %s is not ARPable", device);
+-			return (cfg & dad ? 0 : 2);
++			return (cfg & DAD ? 0 : 2);
+ 		}
+ 	}
+ 
+@@ -317,10 +303,10 @@ int arping_main(int argc, char **argv)
+ 		bb_error_msg_and_die("invalid source address %s", source);
+ 	}
+ 
+-	if (!(cfg & dad) && (cfg & unsolicited) && src.s_addr == 0)
++	if (!(cfg & DAD) && (cfg & UNSOLICITED) && src.s_addr == 0)
+ 		src = dst;
+ 
+-	if (!(cfg & dad) || src.s_addr) {
++	if (!(cfg & DAD) || src.s_addr) {
+ 		struct sockaddr_in saddr;
+ 		int probe_fd = xsocket(AF_INET, SOCK_DGRAM, 0);
+ 
+@@ -333,7 +319,7 @@ int arping_main(int argc, char **argv)
+ 		if (src.s_addr) {
+ 			saddr.sin_addr = src;
+ 			xbind(probe_fd, (struct sockaddr *) &saddr, sizeof(saddr));
+-		} else if (!(cfg & dad)) {
++		} else if (!(cfg & DAD)) {
+ 			socklen_t alen = sizeof(saddr);
+ 
+ 			saddr.sin_port = htons(1025);
+@@ -364,18 +350,18 @@ int arping_main(int argc, char **argv)
+ 	}
+ 	if (me.sll_halen == 0) {
+ 		bb_error_msg("interface \"%s\" is not ARPable (no ll address)", device);
+-		return (cfg & dad ? 0 : 2);
++		return (cfg & DAD ? 0 : 2);
+ 	}
+ 	he = me;
+ 	memset(he.sll_addr, -1, he.sll_halen);
+ 
+-	if (!(cfg & quiet)) {
++	if (!(cfg & QUIET)) {
+ 		printf("ARPING to %s from %s via %s\n",
+ 			inet_ntoa(dst), inet_ntoa(src),
+ 			device ? device : "unknown");
+ 	}
+ 
+-	if (!src.s_addr && !(cfg & dad)) {
++	if (!src.s_addr && !(cfg & DAD)) {
+ 		bb_error_msg_and_die("no src address in the non-DAD mode");
+ 	}
+ 
+@@ -394,9 +380,9 @@ int arping_main(int argc, char **argv)
+ 
+ 	catcher();
+ 
++	packet = xmalloc(4096);
+ 	while (1) {
+ 		sigset_t sset, osset;
+-		RESERVE_CONFIG_UBUFFER(packet, 4096);
+ 		struct sockaddr_ll from;
+ 		socklen_t alen = sizeof(from);
+ 		int cc;
+@@ -412,6 +398,5 @@ int arping_main(int argc, char **argv)
+ 		sigprocmask(SIG_BLOCK, &sset, &osset);
+ 		recv_pack(packet, cc, &from);
+ 		sigprocmask(SIG_SETMASK, &osset, NULL);
+-		RELEASE_CONFIG_BUFFER(packet);
+ 	}
+ }
+diff --git a/networking/pscan.c b/networking/pscan.c
+index 10bf3b6..9fa6993 100644
+--- a/networking/pscan.c
++++ b/networking/pscan.c
+@@ -17,19 +17,6 @@
+ #define DERR(...) ((void)0)
+ #endif
+ 
+-/* return time in usec */
+-// TODO: move to libbb and use in traceroute, zcip, arping etc
+-// (maybe also use absolute monotonic clock - no time warps
+-// due to admin resetting date/time?)
+-static unsigned gettimeofday_us(void)
+-{
+-	struct timeval now;
+-	
+-	if (gettimeofday(&now, NULL))
+-		return 0;
+-	return (now.tv_sec * 1000000 + now.tv_usec);
+-}
+-
+ static const char *port_name(unsigned port)
+ {
+ 	struct servent *server;
+@@ -40,6 +27,9 @@ static const char *port_name(unsigned port)
+ 	return "unknown";
+ }
+ 
++/* We don't expect to see 1000+ seconds delay, unsigned is enough */
++#define MONOTONIC_US() ((unsigned)monotonic_us())
++
+ int pscan_main(int argc, char **argv);
+ int pscan_main(int argc, char **argv)
+ {
+@@ -91,7 +81,7 @@ int pscan_main(int argc, char **argv)
+ 		/* Nonblocking connect typically "fails" with errno == EINPROGRESS */
+ 		ndelay_on(s);
+ 		DMSG("connect to port %u", port);
+-		start = gettimeofday_us();
++		start = MONOTONIC_US();
+ 		if (connect(s, &lsap->sa, lsap->len) == 0) {
+ 			/* Unlikely, for me even localhost fails :) */
+ 			DMSG("connect succeeded");
+@@ -110,15 +100,15 @@ int pscan_main(int argc, char **argv)
+ 				closed_ports++;
+ 				break;
+ 			}
+-			DERR("port %u errno %d @%u", port, errno, gettimeofday_us() - start);
+-			if ((gettimeofday_us() - start) > rtt_4)
++			DERR("port %u errno %d @%u", port, errno, MONOTONIC_US() - start);
++			if ((MONOTONIC_US() - start) > rtt_4)
+ 				break;
+ 			/* Can sleep (much) longer than specified delay.
+ 			 * We check rtt BEFORE we usleep, otherwise
+ 			 * on localhost we'll do zero writes done (!)
+ 			 * before we exceed (rather small) rtt */
+ 			usleep(rtt_4/8);
+-			DMSG("write to port %u @%u", port, gettimeofday_us() - start);
++			DMSG("write to port %u @%u", port, MONOTONIC_US() - start);
+ 			if (write(s, " ", 1) >= 0) { /* We were able to write to the socket */
+  open:
+ 				open_ports++;
+@@ -126,13 +116,13 @@ int pscan_main(int argc, char **argv)
+ 				break;
+ 			}
+ 		}
+-		DMSG("out of loop @%u", gettimeofday_us() - start);
++		DMSG("out of loop @%u", MONOTONIC_US() - start);
+ 
+ 		/* Estimate new rtt - we don't want to wait entire timeout
+ 		 * for each port. *4 allows for rise in net delay.
+ 		 * We increase rtt quickly (*4), decrease slowly (4/8 == 1/2)
+ 		 * because we don't want to accidentally miss ports. */
+-		rtt_4 = (gettimeofday_us() - start) * 4;
++		rtt_4 = (MONOTONIC_US() - start) * 4;
+ 		if (rtt_4 < min_rtt)
+ 			rtt_4 = min_rtt;
+ 		if (rtt_4 > timeout)
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 40533a8..9fc15d3 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -275,7 +275,8 @@ struct hostinfo {
+ struct outdata {
+ 	unsigned char seq;             /* sequence number of this packet */
+ 	unsigned char ttl;             /* ttl packet left with */
+-	struct timeval tv ATTRIBUTE_PACKED; /* time packet left */
++// UNUSED. Retaining to have the same packet size.
++	struct timeval tv_UNUSED ATTRIBUTE_PACKED; /* time packet left */
+ };
+ 
+ struct IFADDRLIST {
+@@ -533,37 +534,19 @@ findsaddr(const struct sockaddr_in *to, struct sockaddr_in *from)
+ 
+ */
+ 
+-/*
+- * Subtract 2 timeval structs:  out = out - in.
+- * Out is assumed to be >= in.
+- */
+-static inline void
+-tvsub(struct timeval *out, struct timeval *in)
+-{
+-
+-	if ((out->tv_usec -= in->tv_usec) < 0)   {
+-		--out->tv_sec;
+-		out->tv_usec += 1000000;
+-	}
+-	out->tv_sec -= in->tv_sec;
+-}
+-
+ static int
+-wait_for_reply(int sock, struct sockaddr_in *fromp, const struct timeval *tp)
++wait_for_reply(int sock, struct sockaddr_in *fromp)
+ {
+ 	fd_set fds;
+-	struct timeval now, tvwait;
+-	struct timezone tz;
++	struct timeval tvwait;
+ 	int cc = 0;
+ 	socklen_t fromlen = sizeof(*fromp);
+ 
+ 	FD_ZERO(&fds);
+ 	FD_SET(sock, &fds);
+ 
+-	tvwait.tv_sec = tp->tv_sec + waittime;
+-	tvwait.tv_usec = tp->tv_usec;
+-	(void)gettimeofday(&now, &tz);
+-	tvsub(&tvwait, &now);
++	tvwait.tv_sec = waittime;
++	tvwait.tv_usec = 0;
+ 
+ 	if (select(sock + 1, &fds, NULL, NULL, &tvwait) > 0)
+ 		cc = recvfrom(sock, (char *)packet, sizeof(packet), 0,
+@@ -609,7 +592,7 @@ in_cksum(uint16_t *addr, int len)
+ 
+ 
+ static void
+-send_probe(int seq, int ttl, struct timeval *tp)
++send_probe(int seq, int ttl)
+ {
+ 	int cc;
+ 	struct udpiphdr *ui, *oui;
+@@ -633,7 +616,8 @@ send_probe(int seq, int ttl, struct timeval *tp)
+ 	/* Payload */
+ 	outdata->seq = seq;
+ 	outdata->ttl = ttl;
+-	memcpy(&outdata->tv, tp, sizeof(outdata->tv));
++// UNUSED: was storing gettimeofday's result there, but never ever checked it
++	/*memcpy(&outdata->tv, tp, sizeof(outdata->tv));*/
+ 
+ #if ENABLE_FEATURE_TRACEROUTE_USE_ICMP
+ 	if (useicmp)
+@@ -706,7 +690,6 @@ send_probe(int seq, int ttl, struct timeval *tp)
+ 	    packlen, (struct sockaddr *)&whereto, sizeof(whereto));
+ 	if (cc != packlen)  {
+ 		bb_info_msg("wrote %s %d chars, ret=%d", hostname, packlen, cc);
+-//		(void)fflush(stdout);
+ 	}
+ }
+ 
+@@ -908,9 +891,9 @@ getaddr(uint32_t *ap, const char *host)
+ #endif
+ 
+ static void
+-print_delta_ms(struct timeval *t1p, struct timeval *t2p)
++print_delta_ms(unsigned t1p, unsigned t2p)
+ {
+-	unsigned tt = (t2p->tv_sec - t1p->tv_sec) * 1000000 + (t2p->tv_usec - t1p->tv_usec);
++	unsigned tt = t2p - t1p;
+ 	printf("  %u.%03u ms", tt/1000, tt%1000);
+ }
+ 
+@@ -1230,17 +1213,17 @@ int traceroute_main(int argc, char **argv)
+ 		printf("%2d ", ttl);
+ 		for (probe = 0; probe < nprobes; ++probe) {
+ 			int cc;
+-			struct timeval t1, t2;
+-			struct timezone tz;
++			unsigned t1;
++			unsigned t2;
+ 			struct ip *ip;
+ 
+ 			if (sentfirst && pausemsecs > 0)
+ 				usleep(pausemsecs * 1000);
+-			(void)gettimeofday(&t1, &tz);
+-			send_probe(++seq, ttl, &t1);
++			t1 = monotonic_us();
++			send_probe(++seq, ttl);
+ 			++sentfirst;
+-			while ((cc = wait_for_reply(s, from, &t1)) != 0) {
+-				(void)gettimeofday(&t2, &tz);
++			while ((cc = wait_for_reply(s, from)) != 0) {
++				t2 = monotonic_us();
+ 				i = packet_ok(packet, cc, from, seq);
+ 				/* Skip short packet */
+ 				if (i == 0)
+@@ -1251,7 +1234,7 @@ int traceroute_main(int argc, char **argv)
+ 					lastaddr = from->sin_addr.s_addr;
+ 					++gotlastaddr;
+ 				}
+-				print_delta_ms(&t1, &t2);
++				print_delta_ms(t1, t2);
+ 				ip = (struct ip *)packet;
+ 				if (op & OPT_TTL_FLAG)
+ 					printf(" (%d)", ip->ip_ttl);
+diff --git a/networking/wget.c b/networking/wget.c
+index fe669bb..fc7f7c3 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -705,7 +705,7 @@ progressmeter(int flag)
+ 	ratio = 100;
+ 	if (totalsize != 0 && !chunked) {
+ 		/* long long helps to have working ETA even if !LFS */
+-		ratio = (int) (100 * (unsigned long long)(transferred+beg_range) / totalsize);
++		ratio = (int) (100ULL * (transferred+beg_range) / totalsize);
+ 		ratio = MIN(ratio, 100);
+ 	}
+ 
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index c4b793e..204a103 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -7,7 +7,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ */
+ 
+-//#include <sys/ioctl.h>
+ #include <sys/utsname.h>
+ #include <getopt.h>
+ #include "libbb.h"
+@@ -98,49 +97,42 @@ static void write_rtc(time_t t, int utc)
+ 	close(rtc);
+ }
+ 
+-static int show_clock(int utc)
++static void show_clock(int utc)
+ {
+-	struct tm *ptm;
++	//struct tm *ptm;
+ 	time_t t;
+-	RESERVE_CONFIG_BUFFER(buffer, 64);
++	char *cp;
+ 
+ 	t = read_rtc(utc);
+-	ptm = localtime(&t);  /* Sets 'tzname[]' */
++	//ptm = localtime(&t);  /* Sets 'tzname[]' */
+ 
+-	safe_strncpy(buffer, ctime(&t), 64);
+-	if (buffer[0])
+-		buffer[strlen(buffer) - 1] = 0;
++	cp = ctime(&t);
++	if (cp[0])
++		cp[strlen(cp) - 1] = '\0';
+ 
+-	//printf("%s  %.6f seconds %s\n", buffer, 0.0, utc ? "" : (ptm->tm_isdst ? tzname[1] : tzname[0]));
+-	printf( "%s  %.6f seconds\n", buffer, 0.0);
+-	RELEASE_CONFIG_BUFFER(buffer);
+-
+-	return 0;
++	//printf("%s  %.6f seconds %s\n", cp, 0.0, utc ? "" : (ptm->tm_isdst ? tzname[1] : tzname[0]));
++	printf("%s  0.000000 seconds\n", cp);
+ }
+ 
+-static int to_sys_clock(int utc)
++static void to_sys_clock(int utc)
+ {
+-	struct timeval tv = { 0, 0 };
++	struct timeval tv;
+ 	const struct timezone tz = { timezone/60 - 60*daylight, 0 };
+ 
+ 	tv.tv_sec = read_rtc(utc);
+-
++	tv.tv_usec = 0;
+ 	if (settimeofday(&tv, &tz))
+ 		bb_perror_msg_and_die("settimeofday() failed");
+-
+-	return 0;
+ }
+ 
+-static int from_sys_clock(int utc)
++static void from_sys_clock(int utc)
+ {
+-	struct timeval tv = { 0, 0 };
+-	struct timezone tz = { 0, 0 };
+-
+-	if (gettimeofday(&tv, &tz))
+-		bb_perror_msg_and_die("gettimeofday() failed");
++	struct timeval tv;
+ 
++	gettimeofday(&tv, NULL);
++	//if (gettimeofday(&tv, NULL))
++	//	bb_perror_msg_and_die("gettimeofday() failed");
+ 	write_rtc(tv.tv_sec, utc);
+-	return 0;
+ }
+ 
+ #ifdef CONFIG_FEATURE_HWCLOCK_ADJTIME_FHS
+@@ -182,8 +174,8 @@ static int check_utc(void)
+ #define HWCLOCK_OPT_SYSTOHC     0x10
+ #define HWCLOCK_OPT_RTCFILE     0x20
+ 
+-int hwclock_main(int argc, char **argv );
+-int hwclock_main(int argc, char **argv )
++int hwclock_main(int argc, char **argv);
++int hwclock_main(int argc, char **argv)
+ {
+ 	unsigned opt;
+ 	int utc;
+@@ -210,12 +202,14 @@ int hwclock_main(int argc, char **argv )
+ 		utc = check_utc();
+ 
+ 	if (opt & HWCLOCK_OPT_HCTOSYS) {
+-		return to_sys_clock(utc);
++		to_sys_clock(utc);
++		return 0;
+ 	}
+-	else if (opt & HWCLOCK_OPT_SYSTOHC) {
+-		return from_sys_clock(utc);
+-	} else {
+-		/* default HWCLOCK_OPT_SHOW */
+-		return show_clock(utc);
++	if (opt & HWCLOCK_OPT_SYSTOHC) {
++		from_sys_clock(utc);
++		return 0;
+ 	}
++	/* default HWCLOCK_OPT_SHOW */
++	show_clock(utc);
++	return 0;
+ }

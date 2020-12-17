@@ -1,0 +1,855 @@
+2008-03-17 09:13:22 +0000
+diff --git a/Config.in b/Config.in
+index 73736e3..a3354eb 100644
+--- a/Config.in
++++ b/Config.in
+@@ -111,7 +111,7 @@ config LOCALE_SUPPORT
+ 	  busybox to support locale settings.
+ 
+ config GETOPT_LONG
+-	bool "Enable support for --long-options"
++	bool "Support for --long-options"
+ 	default y
+ 	help
+ 	  Enable this if you want busybox applets to use the gnu --long-option
+@@ -567,4 +567,3 @@ source sysklogd/Config.in
+ source runit/Config.in
+ source selinux/Config.in
+ source printutils/Config.in
+-source ipsvd/Config.in
+diff --git a/Makefile b/Makefile
+index ab9698e..f77e851 100644
+--- a/Makefile
++++ b/Makefile
+@@ -437,7 +437,6 @@ libs-y		:= \
+ 		editors/ \
+ 		findutils/ \
+ 		init/ \
+-		ipsvd/ \
+ 		libbb/ \
+ 		libpwdgrp/ \
+ 		loginutils/ \
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index 042f622..03111c1 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -1,7 +1,7 @@
+ #
+ # Automatically generated make config: don't edit
+ # Busybox version: 1.10.0.svn
+-# Sat Mar  8 01:11:42 2008
++# Sat Mar 15 20:36:24 2008
+ #
+ CONFIG_HAVE_DOT_CONFIG=y
+ 
+@@ -698,6 +698,7 @@ CONFIG_FEATURE_TELNET_AUTOLOGIN=y
+ CONFIG_TELNETD=y
+ CONFIG_FEATURE_TELNETD_STANDALONE=y
+ CONFIG_TFTP=y
++CONFIG_TFTPD=y
+ CONFIG_FEATURE_TFTP_GET=y
+ CONFIG_FEATURE_TFTP_PUT=y
+ CONFIG_FEATURE_TFTP_BLOCKSIZE=y
+@@ -724,6 +725,8 @@ CONFIG_FEATURE_WGET_STATUSBAR=y
+ CONFIG_FEATURE_WGET_AUTHENTICATION=y
+ CONFIG_FEATURE_WGET_LONG_OPTIONS=y
+ CONFIG_ZCIP=y
++CONFIG_TCPSVD=y
++CONFIG_UDPSVD=y
+ 
+ #
+ # Process Utilities
+@@ -812,7 +815,7 @@ CONFIG_LOGGER=y
+ # CONFIG_RUNSV is not set
+ CONFIG_RUNSVDIR=y
+ CONFIG_SV=y
+-# CONFIG_SVLOGD is not set
++CONFIG_SVLOGD=y
+ CONFIG_CHPST=y
+ CONFIG_SETUIDGID=y
+ CONFIG_ENVUIDGID=y
+@@ -840,9 +843,3 @@ CONFIG_SOFTLIMIT=y
+ CONFIG_LPD=y
+ CONFIG_LPR=y
+ CONFIG_LPQ=y
+-
+-#
+-# ipsvd Utilities
+-#
+-CONFIG_TCPSVD=y
+-CONFIG_UDPSVD=y
+diff --git a/archival/Config.in b/archival/Config.in
+index 619cd1b..60c3ed2 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -29,7 +29,7 @@ config AR
+ 	  probably say N here.
+ 
+ config FEATURE_AR_LONG_FILENAMES
+-	bool "Enable support for long filenames (not need for debs)"
++	bool "Support for long filenames (not need for debs)"
+ 	default n
+ 	depends on AR
+ 	help
+@@ -99,7 +99,7 @@ config DPKG_DEB
+ 	  probably say N here.
+ 
+ config FEATURE_DPKG_DEB_EXTRACT_ONLY
+-	bool "extract only (-x)"
++	bool "Extract only (-x)"
+ 	default n
+ 	depends on DPKG_DEB
+ 	help
+@@ -215,7 +215,7 @@ config FEATURE_TAR_FROM
+ 	  a list of files to include or exclude from an archive.
+ 
+ config FEATURE_TAR_OLDGNU_COMPATIBILITY
+-	bool "Enable support for old tar header format"
++	bool "Support for old tar header format"
+ 	default N
+ 	depends on TAR
+ 	help
+@@ -233,7 +233,7 @@ config FEATURE_TAR_OLDSUN_COMPATIBILITY
+ 	  It is said to be fixed in newer Sun tar, but "old" tarballs still exist.
+ 
+ config FEATURE_TAR_GNU_EXTENSIONS
+-	bool "Enable support for some GNU tar extensions"
++	bool "Support for GNU tar extensions (long filenames)"
+ 	default y
+ 	depends on TAR
+ 	help
+diff --git a/console-tools/Config.in b/console-tools/Config.in
+index bd9dfb3..4b7f02d 100644
+--- a/console-tools/Config.in
++++ b/console-tools/Config.in
+@@ -72,7 +72,7 @@ config RESIZE
+ 	  terminal.
+ 
+ config FEATURE_RESIZE_PRINT
+-	bool "print environment variables"
++	bool "Print environment variables"
+ 	default n
+ 	depends on RESIZE
+ 	help
+diff --git a/coreutils/Config.in b/coreutils/Config.in
+index e2072c8..8d61925 100644
+--- a/coreutils/Config.in
++++ b/coreutils/Config.in
+@@ -528,7 +528,7 @@ config SORT
+ 	  sort is used to sort lines of text in specified files.
+ 
+ config FEATURE_SORT_BIG
+-	bool "full SuSv3 compliant sort (Support -ktcsbdfiozgM)"
++	bool "Full SuSv3 compliant sort (support -ktcsbdfiozgM)"
+ 	default y
+ 	depends on SORT
+ 	help
+@@ -546,7 +546,7 @@ config SPLIT
+ 	  split a file into pieces.
+ 
+ config FEATURE_SPLIT_FANCY
+-	bool "fancy extensions"
++	bool "Fancy extensions"
+ 	default n
+ 	depends on SPLIT
+ 	help
+@@ -616,7 +616,7 @@ config TEE
+ 	  to standard output and files.
+ 
+ config FEATURE_TEE_USE_BLOCK_IO
+-	bool "Enable block i/o (larger/faster) instead of byte i/o."
++	bool "Enable block I/O (larger/faster) instead of byte I/O"
+ 	default n
+ 	depends on TEE
+ 	help
+diff --git a/init/Config.in b/init/Config.in
+index f525abc..25f4390 100644
+--- a/init/Config.in
++++ b/init/Config.in
+@@ -13,7 +13,7 @@ config INIT
+ 	  init is the first program run when the system boots.
+ 
+ config DEBUG_INIT
+-	bool "debugging aid"
++	bool "Debugging aid"
+ 	default n
+ 	depends on INIT
+ 	help
+diff --git a/libbb/Config.in b/libbb/Config.in
+index 9389fe8..842dd1f 100644
+--- a/libbb/Config.in
++++ b/libbb/Config.in
+@@ -13,7 +13,7 @@ config PASSWORD_MINLEN
+ 	  Minimum allowable password length.
+ 
+ config MD5_SIZE_VS_SPEED
+-	int " MD5: Trade Bytes for Speed"
++	int "MD5: Trade Bytes for Speed"
+ 	default 2
+ 	range 0 3
+ 	help
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index 6ee154c..81d05ef 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -14,7 +14,7 @@ config FEATURE_SHADOWPASSWDS
+ 	  publicly readable.
+ 
+ config USE_BB_SHADOW
+-	bool "  Use busybox shadow password functions"
++	bool "Use busybox shadow password functions"
+ 	default y
+ 	depends on USE_BB_PWD_GRP && FEATURE_SHADOWPASSWDS
+ 	help
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 2cc6d9e..e149e41 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -178,7 +178,7 @@ config DEVFSD_VERBOSE
+ 	  Increases logging to stderr or syslog.
+ 
+ config FEATURE_DEVFS
+-	bool "  Use devfs names for all devices (obsolete)"
++	bool "Use devfs names for all devices (obsolete)"
+ 	default n
+ 	help
+ 	  This is obsolete and will be going away at the end of 2008..
+@@ -194,7 +194,7 @@ config EJECT
+ 	  Used to eject cdroms.  (defaults to /dev/cdrom)
+ 
+ config FEATURE_EJECT_SCSI
+-  bool "eject scsi support"
++  bool "SCSI support"
+   default n
+   depends on EJECT
+   help
+@@ -437,7 +437,7 @@ config TASKSET
+ 	  This requires sched_{g,s}etaffinity support in your libc.
+ 
+ config FEATURE_TASKSET_FANCY
+-	bool "fancy output"
++	bool "Fancy output"
+ 	default y
+ 	depends on TASKSET
+ 	help
+diff --git a/modutils/Config.in b/modutils/Config.in
+index 6a69567..364ec24 100644
+--- a/modutils/Config.in
++++ b/modutils/Config.in
+@@ -73,7 +73,7 @@ config LSMOD
+ 	  lsmod is used to display a list of loaded modules.
+ 
+ config FEATURE_LSMOD_PRETTY_2_6_OUTPUT
+-	bool "lsmod pretty output for 2.6.x Linux kernels "
++	bool "Pretty output for 2.6.x Linux kernels"
+ 	default n
+ 	depends on LSMOD
+ 	help
+diff --git a/networking/Config.in b/networking/Config.in
+index 729cca1..f0a9307 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -55,7 +55,7 @@ config BRCTL
+ 	  Supports addbr/delbr and addif/delif.
+ 
+ #config FEATURE_BRCTL_SHOW
+-#	bool "support show, showmac and showstp"
++#	bool "Support show, showmac and showstp"
+ #	default n
+ #	depends on BRCTL
+ #	help
+@@ -63,7 +63,7 @@ config BRCTL
+ #	    showmacs, showstp, show
+ 
+ config FEATURE_BRCTL_FANCY
+-	bool "fancy options"
++	bool "Fancy options"
+ 	default n
+ 	depends on BRCTL
+ 	help
+@@ -142,7 +142,7 @@ config FEATURE_HTTPD_USE_SENDFILE
+ 	  instead of read/write loop.
+ 
+ config FEATURE_HTTPD_RELOAD_CONFIG_SIGHUP
+-	bool "Support reloading the global config file using hup signal"
++	bool "Support reloading of global config file on HUP signal"
+ 	default n
+ 	depends on HTTPD
+ 	help
+@@ -192,7 +192,7 @@ config FEATURE_HTTPD_CGI
+ 	  when specific URLs are requested.
+ 
+ config FEATURE_HTTPD_CONFIG_WITH_SCRIPT_INTERPR
+-	bool "Enable support for running scripts through an interpreter"
++	bool "Support for running scripts through an interpreter"
+ 	default n
+ 	depends on FEATURE_HTTPD_CGI
+ 	help
+@@ -203,7 +203,7 @@ config FEATURE_HTTPD_CONFIG_WITH_SCRIPT_INTERPR
+ 	  *.php:/path/to/your/php
+ 
+ config FEATURE_HTTPD_SET_REMOTE_PORT_TO_ENV
+-	bool "Support the REMOTE_PORT environment variable for CGI"
++	bool "Set REMOTE_PORT environment variable for CGI"
+ 	default n
+ 	depends on FEATURE_HTTPD_CGI
+ 	help
+@@ -211,17 +211,17 @@ config FEATURE_HTTPD_SET_REMOTE_PORT_TO_ENV
+ 	  references that contain a unique port number.
+ 
+ config FEATURE_HTTPD_ENCODE_URL_STR
+-	bool "Enable the -e option for shell script CGI simplification."
++	bool "Enable -e option (useful for CGIs written as shell scripts)"
+ 	default y
+ 	depends on HTTPD
+ 	help
+-	  This option allows html encoding arbitrary
+-	  strings for display of the browser.  Output goes to stdout.
+-	  For example, httpd -e "<Hello World>" as
++	  This option allows html encoding of arbitrary strings for display
++	  by the browser.  Output goes to stdout.
++	  For example, httpd -e "<Hello World>" produces
+ 	  "&#60Hello&#32World&#62".
+ 
+ config FEATURE_HTTPD_ERROR_PAGES
+-	bool "Enable support for custom error pages"
++	bool "Support for custom error pages"
+ 	default n
+ 	depends on HTTPD
+ 	help
+@@ -234,7 +234,7 @@ config FEATURE_HTTPD_ERROR_PAGES
+ 	  message.
+ 
+ config FEATURE_HTTPD_PROXY
+-	bool "Enable support for reverse proxy"
++	bool "Support for reverse proxy"
+ 	default n
+ 	depends on HTTPD
+ 	help
+@@ -363,14 +363,14 @@ config FEATURE_IFUPDOWN_IFCONFIG_BUILTIN
+ 	  work.
+ 
+ config FEATURE_IFUPDOWN_IPV4
+-	bool "Enable support for IPv4"
++	bool "Support for IPv4"
+ 	default y
+ 	depends on IFUPDOWN
+ 	help
+ 	  If you want ifup/ifdown to talk IPv4, leave this on.
+ 
+ config FEATURE_IFUPDOWN_IPV6
+-	bool "Enable support for IPv6"
++	bool "Support for IPv6"
+ 	default n
+ 	depends on IFUPDOWN && FEATURE_IPV6
+ 	help
+@@ -378,7 +378,7 @@ config FEATURE_IFUPDOWN_IPV6
+ 
+ ### UNUSED
+ ###config FEATURE_IFUPDOWN_IPX
+-###	bool "Enable support for IPX"
++###	bool "Support for IPX"
+ ###	default n
+ ###	depends on IFUPDOWN
+ ###	help
+@@ -394,7 +394,7 @@ config FEATURE_IFUPDOWN_MAPPING
+ 	  a weird network setup you don't need it.
+ 
+ config FEATURE_IFUPDOWN_EXTERNAL_DHCP
+-	bool "Enable support for external dhcp clients"
++	bool "Support for external dhcp clients"
+ 	default n
+ 	depends on IFUPDOWN
+ 	help
+@@ -497,7 +497,7 @@ config FEATURE_IP_RULE
+ 	  Add support for rule commands to "ip".
+ 
+ config FEATURE_IP_SHORT_FORMS
+-	bool "Support short forms of ip commands."
++	bool "Support short forms of ip commands"
+ 	default n
+ 	depends on IP
+ 	help
+@@ -625,7 +625,7 @@ config NETSTAT
+ 	  netstat prints information about the Linux networking subsystem.
+ 
+ config FEATURE_NETSTAT_WIDE
+-	bool "  Enable wide netstat output"
++	bool "Enable wide netstat output"
+ 	default n
+ 	depends on NETSTAT
+ 	help
+@@ -896,4 +896,16 @@ config ZCIP
+ 	  See http://www.zeroconf.org for further details, and "zcip.script"
+ 	  in the busybox examples.
+ 
++config TCPSVD
++	bool "tcpsvd"
++	default n
++	help
++	  tcpsvd listens on a TCP port and runs a program for each new connection
++
++config UDPSVD
++	bool "udpsvd"
++	default n
++	help
++	  udpsvd listens on an UDP port and runs a program for each new connection
++
+ endmenu
+diff --git a/networking/Kbuild b/networking/Kbuild
+index bf9ba99..be2ef94 100644
+--- a/networking/Kbuild
++++ b/networking/Kbuild
+@@ -40,3 +40,6 @@ lib-$(CONFIG_TRACEROUTE)   += traceroute.o
+ lib-$(CONFIG_VCONFIG)      += vconfig.o
+ lib-$(CONFIG_WGET)         += wget.o
+ lib-$(CONFIG_ZCIP)         += zcip.o
++
++lib-$(CONFIG_TCPSVD)       += tcpudp.o tcpudp_perhost.o
++lib-$(CONFIG_UDPSVD)       += tcpudp.o tcpudp_perhost.o
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 4458bd7..db3d4c5 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -206,17 +206,22 @@ static void fmt_time_bernstein_25(char *s)
+ 	bin2hex(s, (char*)pack, 12);
+ }
+ 
+-static unsigned processorstart(struct logdir *ld)
++static void processorstart(struct logdir *ld)
+ {
++	char sv_ch;
+ 	int pid;
+ 
+-	if (!ld->processor) return 0;
++	if (!ld->processor) return;
+ 	if (ld->ppid) {
+ 		warnx("processor already running", ld->name);
+-		return 0;
++		return;
+ 	}
+-	while ((pid = fork()) == -1)
+-		pause2cannot("fork for processor", ld->name);
++
++	/* vfork'ed child trashes this byte, save... */
++	sv_ch = ld->fnsave[26];
++
++	while ((pid = vfork()) == -1)
++		pause2cannot("vfork for processor", ld->name);
+ 	if (!pid) {
+ 		char *prog[4];
+ 		int fd;
+@@ -235,7 +240,7 @@ static unsigned processorstart(struct logdir *ld)
+ 			bb_error_msg(INFO"processing: %s/%s", ld->name, ld->fnsave);
+ 		fd = xopen(ld->fnsave, O_RDONLY|O_NDELAY);
+ 		xmove_fd(fd, 0);
+-		ld->fnsave[26] = 't';
++		ld->fnsave[26] = 't'; /* <- that's why we need sv_ch! */
+ 		fd = xopen(ld->fnsave, O_WRONLY|O_NDELAY|O_TRUNC|O_CREAT);
+ 		xmove_fd(fd, 1);
+ 		fd = open_read("state");
+@@ -257,8 +262,8 @@ static unsigned processorstart(struct logdir *ld)
+ 		execv("/bin/sh", prog);
+ 		bb_perror_msg_and_die(FATAL"cannot %s processor %s", "run", ld->name);
+ 	}
++	ld->fnsave[26] = sv_ch; /* ...restore */
+ 	ld->ppid = pid;
+-	return 1;
+ }
+ 
+ static unsigned processorstop(struct logdir *ld)
+diff --git a/scripts/Makefile.IMA b/scripts/Makefile.IMA
+index f5bc6ff..1d7bc2c 100644
+--- a/scripts/Makefile.IMA
++++ b/scripts/Makefile.IMA
+@@ -63,9 +63,6 @@ lib-y:=
+ include runit/Kbuild
+ lib-all-y += $(patsubst %,runit/%,$(sort $(lib-y)))
+ lib-y:=
+-include ipsvd/Kbuild
+-lib-all-y += $(patsubst %,ipsvd/%,$(sort $(lib-y)))
+-lib-y:=
+ include modutils/Kbuild
+ lib-all-y += $(patsubst %,modutils/%,$(sort $(lib-y)))
+ lib-y:=
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 87bc6bd..a42f6e4 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -1,4 +1,7 @@
+ #
++# Automatically generated make config: don't edit
++# Busybox version: 1.10.0.svn
++# Sat Mar 15 20:35:39 2008
+ #
+ CONFIG_HAVE_DOT_CONFIG=y
+ 
+@@ -36,6 +39,7 @@ CONFIG_FEATURE_HAVE_RPC=y
+ # Build Options
+ #
+ # CONFIG_STATIC is not set
++# CONFIG_NOMMU is not set
+ # CONFIG_BUILD_LIBBUSYBOX is not set
+ # CONFIG_FEATURE_INDIVIDUAL is not set
+ # CONFIG_FEATURE_SHARED_BUSYBOX is not set
+@@ -79,6 +83,7 @@ CONFIG_FEATURE_EDITING_HISTORY=15
+ CONFIG_FEATURE_TAB_COMPLETION=y
+ # CONFIG_FEATURE_USERNAME_COMPLETION is not set
+ # CONFIG_FEATURE_EDITING_FANCY_PROMPT is not set
++# CONFIG_FEATURE_VERBOSE_CP_MESSAGE is not set
+ CONFIG_FEATURE_COPYBUF_KB=4
+ # CONFIG_MONOTONIC_SYSCALL is not set
+ CONFIG_IOCTL_HEX2STR_ERROR=y
+@@ -106,15 +111,17 @@ CONFIG_RPM=y
+ CONFIG_FEATURE_RPM_BZ2=y
+ CONFIG_TAR=y
+ CONFIG_FEATURE_TAR_CREATE=y
++CONFIG_FEATURE_TAR_GZIP=y
+ CONFIG_FEATURE_TAR_BZIP2=y
+ CONFIG_FEATURE_TAR_LZMA=y
+-CONFIG_FEATURE_TAR_FROM=y
+-CONFIG_FEATURE_TAR_GZIP=y
+ CONFIG_FEATURE_TAR_COMPRESS=y
++CONFIG_FEATURE_TAR_AUTODETECT=y
++CONFIG_FEATURE_TAR_FROM=y
+ CONFIG_FEATURE_TAR_OLDGNU_COMPATIBILITY=y
+ CONFIG_FEATURE_TAR_OLDSUN_COMPATIBILITY=y
+ CONFIG_FEATURE_TAR_GNU_EXTENSIONS=y
+ CONFIG_FEATURE_TAR_LONG_OPTIONS=y
++CONFIG_FEATURE_TAR_UNAME_GNAME=y
+ CONFIG_UNCOMPRESS=y
+ CONFIG_UNLZMA=y
+ CONFIG_FEATURE_LZMA_FAST=y
+@@ -201,6 +208,7 @@ CONFIG_FEATURE_READLINK_FOLLOW=y
+ CONFIG_REALPATH=y
+ CONFIG_RM=y
+ CONFIG_RMDIR=y
++# CONFIG_FEATURE_RMDIR_LONG_OPTIONS is not set
+ CONFIG_SEQ=y
+ CONFIG_SHA1SUM=y
+ CONFIG_SLEEP=y
+@@ -361,6 +369,8 @@ CONFIG_FEATURE_XARGS_SUPPORT_ZERO_TERM=y
+ CONFIG_INIT=y
+ # CONFIG_DEBUG_INIT is not set
+ CONFIG_FEATURE_USE_INITTAB=y
++# CONFIG_FEATURE_KILL_REMOVED is not set
++CONFIG_FEATURE_KILL_DELAY=0
+ CONFIG_FEATURE_INIT_SCTTY=y
+ # CONFIG_FEATURE_INIT_SYSLOG is not set
+ CONFIG_FEATURE_EXTRA_QUIET=y
+@@ -380,6 +390,7 @@ CONFIG_FEATURE_ADDUSER_TO_GROUP=y
+ CONFIG_DELGROUP=y
+ CONFIG_FEATURE_DEL_USER_FROM_GROUP=y
+ CONFIG_ADDUSER=y
++# CONFIG_FEATURE_ADDUSER_LONG_OPTIONS is not set
+ CONFIG_DELUSER=y
+ CONFIG_GETTY=y
+ CONFIG_FEATURE_UTMP=y
+@@ -448,6 +459,7 @@ CONFIG_FEATURE_FDISK_WRITABLE=y
+ # CONFIG_FEATURE_SUN_LABEL is not set
+ # CONFIG_FEATURE_OSF_LABEL is not set
+ CONFIG_FEATURE_FDISK_ADVANCED=y
++# CONFIG_FINDFS is not set
+ CONFIG_FREERAMDISK=y
+ CONFIG_FSCK_MINIX=y
+ CONFIG_MKFS_MINIX=y
+@@ -468,22 +480,56 @@ CONFIG_IPCS=y
+ CONFIG_LOSETUP=y
+ CONFIG_MDEV=y
+ CONFIG_FEATURE_MDEV_CONF=y
++CONFIG_FEATURE_MDEV_RENAME=y
+ CONFIG_FEATURE_MDEV_EXEC=y
+ CONFIG_FEATURE_MDEV_LOAD_FIRMWARE=y
+ CONFIG_MKSWAP=y
+ CONFIG_FEATURE_MKSWAP_V0=y
+ CONFIG_MORE=y
+ CONFIG_FEATURE_USE_TERMIOS=y
++# CONFIG_VOLUMEID is not set
++# CONFIG_FEATURE_VOLUMEID_EXT is not set
++# CONFIG_FEATURE_VOLUMEID_REISERFS is not set
++# CONFIG_FEATURE_VOLUMEID_FAT is not set
++# CONFIG_FEATURE_VOLUMEID_HFS is not set
++# CONFIG_FEATURE_VOLUMEID_JFS is not set
++# CONFIG_FEATURE_VOLUMEID_UFS is not set
++# CONFIG_FEATURE_VOLUMEID_XFS is not set
++# CONFIG_FEATURE_VOLUMEID_NTFS is not set
++# CONFIG_FEATURE_VOLUMEID_ISO9660 is not set
++# CONFIG_FEATURE_VOLUMEID_UDF is not set
++# CONFIG_FEATURE_VOLUMEID_LUKS is not set
++# CONFIG_FEATURE_VOLUMEID_LINUXSWAP is not set
++# CONFIG_FEATURE_VOLUMEID_LVM is not set
++# CONFIG_FEATURE_VOLUMEID_CRAMFS is not set
++# CONFIG_FEATURE_VOLUMEID_HPFS is not set
++# CONFIG_FEATURE_VOLUMEID_ROMFS is not set
++# CONFIG_FEATURE_VOLUMEID_SYSV is not set
++# CONFIG_FEATURE_VOLUMEID_MINIX is not set
++# CONFIG_FEATURE_VOLUMEID_MAC is not set
++# CONFIG_FEATURE_VOLUMEID_MSDOS is not set
++# CONFIG_FEATURE_VOLUMEID_OCFS2 is not set
++# CONFIG_FEATURE_VOLUMEID_HIGHPOINTRAID is not set
++# CONFIG_FEATURE_VOLUMEID_ISWRAID is not set
++# CONFIG_FEATURE_VOLUMEID_LSIRAID is not set
++# CONFIG_FEATURE_VOLUMEID_VIARAID is not set
++# CONFIG_FEATURE_VOLUMEID_SILICONRAID is not set
++# CONFIG_FEATURE_VOLUMEID_NVIDIARAID is not set
++# CONFIG_FEATURE_VOLUMEID_PROMISERAID is not set
++# CONFIG_FEATURE_VOLUMEID_LINUXRAID is not set
+ CONFIG_MOUNT=y
++CONFIG_FEATURE_MOUNT_FAKE=y
++CONFIG_FEATURE_MOUNT_VERBOSE=y
+ # CONFIG_FEATURE_MOUNT_HELPERS is not set
++# CONFIG_FEATURE_MOUNT_LABEL is not set
+ CONFIG_FEATURE_MOUNT_NFS=y
+ CONFIG_FEATURE_MOUNT_CIFS=y
+-CONFIG_FEATURE_MOUNT_FAKE=y
+ CONFIG_FEATURE_MOUNT_FLAGS=y
+ CONFIG_FEATURE_MOUNT_FSTAB=y
+ CONFIG_PIVOT_ROOT=y
+ CONFIG_RDATE=y
+ CONFIG_READPROFILE=y
++# CONFIG_RTCWAKE is not set
+ CONFIG_SETARCH=y
+ CONFIG_SWAPONOFF=y
+ CONFIG_SWITCH_ROOT=y
+@@ -501,6 +547,14 @@ CONFIG_FEATURE_MOUNT_LOOP=y
+ #
+ CONFIG_ADJTIMEX=y
+ # CONFIG_BBCONFIG is not set
++# CONFIG_CHAT is not set
++# CONFIG_FEATURE_CHAT_NOFAIL is not set
++# CONFIG_FEATURE_CHAT_TTY_HIFI is not set
++# CONFIG_FEATURE_CHAT_IMPLICIT_CR is not set
++# CONFIG_FEATURE_CHAT_SWALLOW_OPTS is not set
++# CONFIG_FEATURE_CHAT_SEND_ESCAPES is not set
++# CONFIG_FEATURE_CHAT_VAR_ABORT_LEN is not set
++# CONFIG_FEATURE_CHAT_CLR_ABORT is not set
+ CONFIG_CHRT=y
+ CONFIG_CROND=y
+ # CONFIG_DEBUG_CROND_OPTION is not set
+@@ -539,6 +593,7 @@ CONFIG_RAIDAUTORUN=y
+ CONFIG_READAHEAD=y
+ CONFIG_RUNLEVEL=y
+ CONFIG_RX=y
++CONFIG_SCRIPT=y
+ CONFIG_STRINGS=y
+ CONFIG_SETSID=y
+ CONFIG_TASKSET=y
+@@ -556,6 +611,7 @@ CONFIG_FEATURE_PREFER_IPV4_ADDRESS=y
+ CONFIG_ARP=y
+ CONFIG_ARPING=y
+ CONFIG_BRCTL=y
++CONFIG_FEATURE_BRCTL_FANCY=y
+ CONFIG_DNSD=y
+ CONFIG_ETHER_WAKE=y
+ CONFIG_FAKEIDENTD=y
+@@ -583,6 +639,7 @@ CONFIG_FEATURE_IFCONFIG_SLIP=y
+ CONFIG_FEATURE_IFCONFIG_MEMSTART_IOADDR_IRQ=y
+ CONFIG_FEATURE_IFCONFIG_HW=y
+ CONFIG_FEATURE_IFCONFIG_BROADCAST_PLUS=y
++CONFIG_IFENSLAVE=y
+ CONFIG_IFUPDOWN=y
+ CONFIG_IFUPDOWN_IFSTATE_PATH="/var/run/ifstate"
+ CONFIG_FEATURE_IFUPDOWN_IP=y
+@@ -616,6 +673,7 @@ CONFIG_IPCALC=y
+ CONFIG_FEATURE_IPCALC_FANCY=y
+ CONFIG_FEATURE_IPCALC_LONG_OPTIONS=y
+ CONFIG_NAMEIF=y
++# CONFIG_FEATURE_NAMEIF_EXTENDED is not set
+ CONFIG_NC=y
+ CONFIG_NC_SERVER=y
+ CONFIG_NC_EXTRA=y
+@@ -624,11 +682,11 @@ CONFIG_FEATURE_NETSTAT_WIDE=y
+ CONFIG_NSLOOKUP=y
+ CONFIG_PING=y
+ CONFIG_PING6=y
+-CONFIG_PSCAN=y
+ CONFIG_FEATURE_FANCY_PING=y
++CONFIG_PSCAN=y
+ CONFIG_ROUTE=y
+ CONFIG_SENDMAIL=y
+-CONFIG_FEATURE_SENDMAIL_NETWORK=y
++CONFIG_FETCHMAIL=y
+ CONFIG_SLATTACH=y
+ CONFIG_TELNET=y
+ CONFIG_FEATURE_TELNET_TTYPE=y
+@@ -636,6 +694,7 @@ CONFIG_FEATURE_TELNET_AUTOLOGIN=y
+ CONFIG_TELNETD=y
+ CONFIG_FEATURE_TELNETD_STANDALONE=y
+ CONFIG_TFTP=y
++CONFIG_TFTPD=y
+ CONFIG_FEATURE_TFTP_GET=y
+ CONFIG_FEATURE_TFTP_PUT=y
+ CONFIG_FEATURE_TFTP_BLOCKSIZE=y
+@@ -648,10 +707,13 @@ CONFIG_APP_UDHCPD=y
+ CONFIG_APP_DHCPRELAY=y
+ CONFIG_APP_DUMPLEASES=y
+ CONFIG_FEATURE_UDHCPD_WRITE_LEASES_EARLY=y
++CONFIG_DHCPD_LEASES_FILE="/var/lib/misc/udhcpd.leases"
+ CONFIG_APP_UDHCPC=y
+ CONFIG_FEATURE_UDHCPC_ARPING=y
++# CONFIG_FEATURE_UDHCP_PORT is not set
+ # CONFIG_FEATURE_UDHCP_DEBUG is not set
+ CONFIG_FEATURE_RFC3397=y
++CONFIG_DHCPC_DEFAULT_SCRIPT="/usr/share/udhcpc/default.script"
+ CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS=80
+ CONFIG_VCONFIG=y
+ CONFIG_WGET=y
+@@ -659,6 +721,8 @@ CONFIG_FEATURE_WGET_STATUSBAR=y
+ CONFIG_FEATURE_WGET_AUTHENTICATION=y
+ CONFIG_FEATURE_WGET_LONG_OPTIONS=y
+ CONFIG_ZCIP=y
++CONFIG_TCPSVD=y
++CONFIG_UDPSVD=y
+ 
+ #
+ # Process Utilities
+@@ -676,6 +740,8 @@ CONFIG_FEATURE_PIDOF_OMIT=y
+ CONFIG_PKILL=y
+ CONFIG_PS=y
+ CONFIG_FEATURE_PS_WIDE=y
++# CONFIG_FEATURE_PS_TIME is not set
++# CONFIG_FEATURE_PS_UNUSUAL_SYSTEMS is not set
+ CONFIG_RENICE=y
+ CONFIG_BB_SYSCTL=y
+ CONFIG_TOP=y
+@@ -735,6 +801,7 @@ CONFIG_FEATURE_SH_EXTRA_QUIET=y
+ CONFIG_SYSLOGD=y
+ CONFIG_FEATURE_ROTATE_LOGFILE=y
+ CONFIG_FEATURE_REMOTE_LOG=y
++# CONFIG_FEATURE_SYSLOGD_DUP is not set
+ CONFIG_FEATURE_IPC_SYSLOG=y
+ CONFIG_FEATURE_IPC_SYSLOG_BUFFER_SIZE=16
+ CONFIG_LOGREAD=y
+@@ -771,7 +838,8 @@ CONFIG_SOFTLIMIT=y
+ # CONFIG_SESTATUS is not set
+ 
+ #
+-# ipsvd utilities
++# Print Utilities
+ #
+-CONFIG_TCPSVD=y
+-CONFIG_UDPSVD=y
++CONFIG_LPD=y
++CONFIG_LPR=y
++CONFIG_LPQ=y
+diff --git a/sysklogd/Config.in b/sysklogd/Config.in
+index 45f86ed..4312a05 100644
+--- a/sysklogd/Config.in
++++ b/sysklogd/Config.in
+@@ -65,7 +65,7 @@ config FEATURE_IPC_SYSLOG
+ 	  break badly.
+ 
+ config FEATURE_IPC_SYSLOG_BUFFER_SIZE
+-	int "    Circular buffer size in Kbytes (minimum 4KB)"
++	int "Circular buffer size in Kbytes (minimum 4KB)"
+ 	default 16
+ 	range 4 2147483647
+ 	depends on FEATURE_IPC_SYSLOG
+@@ -84,7 +84,7 @@ config LOGREAD
+ 	  stored in the syslogd circular buffer.
+ 
+ config FEATURE_LOGREAD_REDUCED_LOCKING
+-	bool "logread double buffering"
++	bool "Double buffering"
+ 	default n
+ 	depends on LOGREAD
+ 	help
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 552ca0f..25c7a1e 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -18,7 +18,7 @@ config DMESG
+ 	  wish to enable the 'dmesg' utility.
+ 
+ config FEATURE_DMESG_PRETTY
+-	bool "pretty dmesg output"
++	bool "Pretty dmesg output"
+ 	default y
+ 	depends on DMESG
+ 	help
+@@ -93,7 +93,7 @@ config FDISK
+ 	  'disk slices' that are defined on a hard drive.
+ 
+ config FDISK_SUPPORT_LARGE_DISKS
+-	bool "support over 4GB disks"
++	bool "Support over 4GB disks"
+ 	default y
+ 	depends on FDISK
+ 	help
+@@ -221,13 +221,6 @@ config HEXDUMP
+ 	  The hexdump utility is used to display binary data in a readable
+ 	  way that is comparable to the output from most hex editors.
+ 
+-config HD
+-	bool "hd"
+-	default n
+-	select HEXDUMP
+-	help
+-	  hd is an alias to hexdump -C.
+-
+ config FEATURE_HEXDUMP_REVERSE
+ 	bool "Support -R, reverse of 'hexdump -Cv'"
+ 	default n
+@@ -238,6 +231,13 @@ config FEATURE_HEXDUMP_REVERSE
+ 	  NB: this option is non-standard. It's unwise to use it in scripts
+ 	  aimed to be portable.
+ 
++config HD
++	bool "hd"
++	default n
++	select HEXDUMP
++	help
++	  hd is an alias to hexdump -C.
++
+ config HWCLOCK
+ 	bool "hwclock"
+ 	default n
+@@ -356,7 +356,7 @@ config MKSWAP
+ 	  the swap space using the 'swapon' utility.
+ 
+ config FEATURE_MKSWAP_V0
+-	bool "version 0 support"
++	bool "Version 0 support"
+ 	default n
+ 	depends on MKSWAP
+ #	depends on MKSWAP && DEPRECATED
+@@ -607,14 +607,14 @@ config MOUNT
+ 	  the 'mount' utility.
+ 
+ config FEATURE_MOUNT_FAKE
+-	bool "mount -f option"
++	bool "Support option -f"
+ 	default n
+ 	depends on MOUNT
+ 	help
+ 	  Enable support for faking a file system mount.
+ 
+ config FEATURE_MOUNT_VERBOSE
+-	bool "mount -v option"
++	bool "Support option -v"
+ 	default n
+ 	depends on MOUNT
+ 	help
+@@ -635,7 +635,7 @@ config FEATURE_MOUNT_HELPERS
+ 	  The idea is to use such virtual filesystems in /etc/fstab.
+ 
+ config FEATURE_MOUNT_LABEL
+-	bool "  Support specifiying devices by label or UUID"
++	bool "Support specifiying devices by label or UUID"
+ 	default n
+ 	depends on MOUNT
+ 	select FINDFS
+@@ -758,7 +758,7 @@ config UMOUNT
+ 	  also want to enable 'umount'.
+ 
+ config FEATURE_UMOUNT_ALL
+-	bool "umount -a option"
++	bool "Support option -a"
+ 	default n
+ 	depends on UMOUNT
+ 	help
+@@ -808,4 +808,3 @@ config FEATURE_MTAB_SUPPORT
+ 	  your kernel.
+ 
+ endmenu
+-

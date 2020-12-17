@@ -1,0 +1,14 @@
+2009-03-29 17:25:14 +0000
+diff --git a/modutils/modutils.c b/modutils/modutils.c
+index 405785f..ef4f619 100644
+--- a/modutils/modutils.c
++++ b/modutils/modutils.c
+@@ -127,7 +127,7 @@ int FAST_FUNC bb_init_module(const char *filename, const char *options)
+ 	image = xmalloc_open_zipped_read_close(filename, &len);
+ 	if (image) {
+ 		rc = 0;
+-		if (init_module(image, len, options) != 0)
++		if (init_module(image, len, options ? options : "") != 0)
+ 			rc = errno;
+ 		free(image);
+ 	}

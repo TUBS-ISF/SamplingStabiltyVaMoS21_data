@@ -1,0 +1,64 @@
+2007-11-14 10:18:33 +0000
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index cb5ac2c..91c12f4 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -125,6 +125,7 @@ USE_FEATURE_IPV6(sa_family_t af,)
+ 	int rc;
+ 	len_and_sockaddr *r = NULL;
+ 	struct addrinfo *result = NULL;
++	struct addrinfo *used_res;
+ 	const char *org_host = host; /* only for error msg */
+ 	const char *cp;
+ 	struct addrinfo hint;
+@@ -169,9 +170,21 @@ USE_FEATURE_IPV6(sa_family_t af,)
+ 			xfunc_die();
+ 		goto ret;
+ 	}
+-	r = xmalloc(offsetof(len_and_sockaddr, sa) + result->ai_addrlen);
+-	r->len = result->ai_addrlen;
+-	memcpy(&r->sa, result->ai_addr, result->ai_addrlen);
++	used_res = result;
++#if ENABLE_FEATURE_PREFER_IPV4_ADDRESS
++	while (1) {
++		if (used_res->ai_family == AF_INET)
++			break;
++		used_res = used_res->ai_next;
++		if (!used_res) {
++			used_res = result;
++			break;
++		}
++	}
++#endif
++	r = xmalloc(offsetof(len_and_sockaddr, sa) + used_res->ai_addrlen);
++	r->len = used_res->ai_addrlen;
++	memcpy(&r->sa, used_res->ai_addr, used_res->ai_addrlen);
+ 	set_nport(r, htons(port));
+  ret:
+ 	freeaddrinfo(result);
+diff --git a/networking/Config.in b/networking/Config.in
+index b5b4597..b50aacf 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -12,6 +12,21 @@ config FEATURE_IPV6
+ 	  Enable IPv6 support in busybox.
+ 	  This adds IPv6 support in the networking applets.
+ 
++config FEATURE_PREFER_IPV4_ADDRESS
++	bool "Preferentially use IPv4 addresses from DNS queries"
++	default y
++	depends on FEATURE_IPV6
++	help
++	  Use IPv4 address of network host if it has one.
++
++	  If this option is off, the first returned address will be used.
++	  This may cause problems when your DNS server is IPv6-capable and
++	  is returning IPv6 host addresses too. If IPv6 address
++	  precedes IPv4 one in DNS reply, busybox network applets
++	  (e.g. wget) will use IPv6 address. On an IPv6-incapable host
++	  or network applets will fail to connect to the host
++	  using IPv6 address.
++
+ config VERBOSE_RESOLUTION_ERRORS
+ 	bool "Verbose resolution errors"
+ 	default n

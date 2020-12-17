@@ -1,0 +1,122 @@
+2008-02-08 15:41:01 +0000
+diff --git a/README b/README
+index 96ca0bb..24a26ed 100644
+--- a/README
++++ b/README
+@@ -82,6 +82,9 @@ Downloading the current source code:
+   is generally a faster way of getting it fixed, and the complete archive of
+   what happened is the subversion changelog.
+ 
++  Note: if you want to compile busybox in a busybox environment you must
++  select ENABLE_DESKTOP.
++
+ ----------------
+ 
+ getting help:
+diff --git a/coreutils/cat.c b/coreutils/cat.c
+index a1db4cd..18a74b8 100644
+--- a/coreutils/cat.c
++++ b/coreutils/cat.c
+@@ -30,7 +30,7 @@ int bb_cat(char **argv)
+ 		if (!LONE_DASH(*argv))
+ 			fd = open_or_warn(*argv, O_RDONLY);
+ 		if (fd >= 0) {
+-			/* This is not an xfunc - never exits */
++			/* This is not a xfunc - never exits */
+ 			off_t r = bb_copyfd_eof(fd, STDOUT_FILENO);
+ 			if (fd != STDIN_FILENO)
+ 				close(fd);
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 4fb825e..6948bf1 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -723,7 +723,7 @@ decode_one_format(const char *s_orig, const char *s, const char **next,
+ 
+ /* Decode the modern od format string S.  Append the decoded
+    representation to the global array SPEC, reallocating SPEC if
+-   necessary.  Return zero if S is valid, nonzero otherwise.  */
++   necessary.  */
+ 
+ static void
+ decode_format_string(const char *s)
+@@ -776,18 +776,18 @@ skip(off_t n_skip)
+ 			   as large as the size of the current file, we can
+ 			   decrement n_skip and go on to the next file.  */
+ 		if (fstat(fileno(in_stream), &file_stats) == 0
+-		 && S_ISREG(file_stats.st_mode) && file_stats.st_size >= 0
++		 && S_ISREG(file_stats.st_mode) && file_stats.st_size > 0
+ 		) {
+ 			if (file_stats.st_size < n_skip) {
+ 				n_skip -= file_stats.st_size;
+-				/* take check&close / open_next route */
++				/* take "check & close / open_next" route */
+ 			} else {
+ 				if (fseeko(in_stream, n_skip, SEEK_CUR) != 0)
+ 					ioerror = 1;
+ 				return;
+ 			}
+ 		} else {
+-			/* If it's not a regular file with nonnegative size,
++			/* If it's not a regular file with positive size,
+ 			   position the file pointer by reading.  */
+ 			char buf[1024];
+ 			size_t n_bytes_to_read = 1024;
+@@ -1000,9 +1000,7 @@ parse_old_offset(const char *s, off_t *offset)
+    spec, extend the input block with zero bytes until its length is a
+    multiple of all format spec sizes.  Write the final block.  Finally,
+    write on a line by itself the offset of the byte after the last byte
+-   read.  Accumulate return values from calls to read_block and
+-   check_and_close, and if any was nonzero, return nonzero.
+-   Otherwise, return zero.  */
++   read.  */
+ 
+ static void
+ dump(off_t current_offset, off_t end_offset)
+@@ -1078,8 +1076,7 @@ dump(off_t current_offset, off_t end_offset)
+    and INPUT_FILENAME so they correspond to the next file in the list.
+    Then try to read a byte from the newly opened file.  Repeat if
+    necessary until EOF is reached for the last file in FILE_LIST, then
+-   set *C to EOF and return.  Subsequent calls do likewise.  The return
+-   value is nonzero if any errors occured, zero otherwise.  */
++   set *C to EOF and return.  Subsequent calls do likewise.  */
+ 
+ static void
+ read_char(int *c)
+@@ -1112,8 +1109,7 @@ read_char(int *c)
+    A string constant is a run of at least 'string_min' ASCII
+    graphic (or formatting) characters terminated by a null.
+    Based on a function written by Richard Stallman for a
+-   traditional version of od.  Return nonzero if an error
+-   occurs.  Otherwise, return zero.  */
++   traditional version of od.  */
+ 
+ static void
+ dump_strings(off_t address, off_t end_offset)
+@@ -1412,8 +1408,8 @@ int od_main(int argc, char **argv)
+ 		if (str_w)
+ 			bytes_per_block = xatou(str_w);
+ 		if (!bytes_per_block || bytes_per_block % l_c_m != 0) {
+-			bb_error_msg("warning: invalid width %zu; using %d instead",
+-					bytes_per_block, l_c_m);
++			bb_error_msg("warning: invalid width %u; using %d instead",
++					(unsigned)bytes_per_block, l_c_m);
+ 			bytes_per_block = l_c_m;
+ 		}
+ 	} else {
+diff --git a/include/usage.h b/include/usage.h
+index 9ae7d98..dfa7515 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2654,10 +2654,10 @@ USE_FEATURE_BRCTL_FANCY("\n" \
+        "Address:    127.0.0.1\n"
+ 
+ #define od_trivial_usage \
+-       "[-aBbcDdeFfHhIiLlOovXx] [FILE]"
++       "[-aBbcDdeFfHhIiLlOovXx] " USE_DESKTOP("[-t TYPE] ") "[FILE]"
+ #define od_full_usage \
+        "Write an unambiguous representation, octal bytes by default, of FILE\n" \
+-       "to standard output. With no FILE, or when FILE is -, read standard input."
++       "to standard output. With no FILE or when FILE is -, read standard input."
+ 
+ #define openvt_trivial_usage \
+        "VTNUM COMMAND [ARGS...]"

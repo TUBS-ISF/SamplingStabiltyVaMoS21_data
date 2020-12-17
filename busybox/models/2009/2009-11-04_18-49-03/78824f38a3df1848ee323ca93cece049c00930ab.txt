@@ -1,0 +1,15 @@
+2009-11-04 18:49:03 -0500
+diff --git a/include/applets.h b/include/applets.h
+index 7d25f1b..e1b8e76 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -80,8 +80,8 @@ IF_ASH(APPLET(ash, _BB_DIR_BIN, _BB_SUID_DROP))
+ IF_AWK(APPLET_NOEXEC(awk, awk, _BB_DIR_USR_BIN, _BB_SUID_DROP, awk))
+ IF_BASENAME(APPLET_NOFORK(basename, basename, _BB_DIR_USR_BIN, _BB_SUID_DROP, basename))
+ IF_BBCONFIG(APPLET(bbconfig, _BB_DIR_BIN, _BB_SUID_DROP))
++IF_BBSH(APPLET(bbsh, _BB_DIR_BIN, _BB_SUID_DROP))
+ IF_BEEP(APPLET(beep, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+-//IF_BBSH(APPLET(bbsh, _BB_DIR_BIN, _BB_SUID_DROP))
+ IF_BLKID(APPLET(blkid, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_BRCTL(APPLET(brctl, _BB_DIR_USR_SBIN, _BB_SUID_DROP))
+ IF_BUNZIP2(APPLET(bunzip2, _BB_DIR_USR_BIN, _BB_SUID_DROP))

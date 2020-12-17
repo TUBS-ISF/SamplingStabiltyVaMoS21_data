@@ -1,0 +1,20 @@
+2007-11-16 11:52:42 +0000
+diff --git a/coreutils/who.c b/coreutils/who.c
+index f336c95..e6bd0af 100644
+--- a/coreutils/who.c
++++ b/coreutils/who.c
+@@ -16,6 +16,7 @@
+  *
+  *----------------------------------------------------------------------
+  */
++/* BB_AUDIT SUSv3 _NOT_ compliant -- missing options -b, -d, -H, -l, -m, -p, -q, -r, -s, -t, -T, -u; Missing argument 'file'.  */
+ 
+ #include "libbb.h"
+ #include <utmp.h>
+@@ -71,5 +72,5 @@ int who_main(int argc, char **argv)
+ 	}
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		endutent();
+-	return 0;
++	return EXIT_SUCCESS;
+ }

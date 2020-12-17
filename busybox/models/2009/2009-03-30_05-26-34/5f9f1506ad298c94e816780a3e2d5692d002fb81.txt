@@ -1,0 +1,18 @@
+2009-03-30 05:26:34 +0000
+diff --git a/Makefile.custom b/Makefile.custom
+index 140ff45..d9a2367 100644
+--- a/Makefile.custom
++++ b/Makefile.custom
+@@ -106,8 +106,10 @@ bigdata: busybox_unstripped
+ doc: docs/busybox.pod docs/BusyBox.txt docs/BusyBox.1 docs/BusyBox.html
+ 
+ # FIXME: Doesn't belong here
+-disp_doc = \
+-  @$(if $(quiet),echo "  DOC     $(@F)")
++       cmd_doc =
++ quiet_cmd_doc = $(Q)echo "  DOC     $(@F)"
++silent_cmd_doc =
++disp_doc       = $($(quiet)cmd_doc)
+ 
+ docs/busybox.pod: $(srctree)/docs/busybox_header.pod \
+ 		$(srctree)/include/usage.h \

@@ -1,0 +1,426 @@
+2009-10-13 17:58:24 +0200
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index 39af883..86d2754 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -162,7 +162,7 @@ static NOINLINE int print_linkinfo(const struct nlmsghdr *n)
+ 
+ 	if (!filter.family || filter.family == AF_PACKET) {
+ 		SPRINT_BUF(b1);
+-		printf("%c    link/%s ", _SL_, ll_type_n2a(ifi->ifi_type, b1, sizeof(b1)));
++		printf("%c    link/%s ", _SL_, ll_type_n2a(ifi->ifi_type, b1));
+ 
+ 		if (tb[IFLA_ADDRESS]) {
+ 			fputs(ll_addr_n2a(RTA_DATA(tb[IFLA_ADDRESS]),
+@@ -308,7 +308,7 @@ static int FAST_FUNC print_addrinfo(const struct sockaddr_nl *who UNUSED_PARAM,
+ 				    RTA_DATA(rta_tb[IFA_ANYCAST]),
+ 				    abuf, sizeof(abuf)));
+ 	}
+-	printf("scope %s ", rtnl_rtscope_n2a(ifa->ifa_scope, b1, sizeof(b1)));
++	printf("scope %s ", rtnl_rtscope_n2a(ifa->ifa_scope, b1));
+ 	if (ifa->ifa_flags & IFA_F_SECONDARY) {
+ 		ifa->ifa_flags &= ~IFA_F_SECONDARY;
+ 		printf("secondary ");
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index ac7eec5..7031bed 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -196,7 +196,7 @@ static int FAST_FUNC print_route(const struct sockaddr_nl *who UNUSED_PARAM,
+ 		printf("Deleted ");
+ 	}
+ 	if (r->rtm_type != RTN_UNICAST && !filter.type) {
+-		printf("%s ", rtnl_rtntype_n2a(r->rtm_type, b1, sizeof(b1)));
++		printf("%s ", rtnl_rtntype_n2a(r->rtm_type, b1));
+ 	}
+ 
+ 	if (tb[RTA_DST]) {
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index bec530d..e524731 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -113,7 +113,7 @@ static int FAST_FUNC print_rule(const struct sockaddr_nl *who UNUSED_PARAM,
+ 	}
+ 
+ 	if (r->rtm_tos) {
+-		printf("tos %s ", rtnl_dsfield_n2a(r->rtm_tos, b1, sizeof(b1)));
++		printf("tos %s ", rtnl_dsfield_n2a(r->rtm_tos, b1));
+ 	}
+ 	if (tb[RTA_PROTOINFO]) {
+ 		printf("fwmark %#x ", *(uint32_t*)RTA_DATA(tb[RTA_PROTOINFO]));
+@@ -124,7 +124,7 @@ static int FAST_FUNC print_rule(const struct sockaddr_nl *who UNUSED_PARAM,
+ 	}
+ 
+ 	if (r->rtm_table)
+-		printf("lookup %s ", rtnl_rttable_n2a(r->rtm_table, b1, sizeof(b1)));
++		printf("lookup %s ", rtnl_rttable_n2a(r->rtm_table, b1));
+ 
+ 	if (tb[RTA_FLOW]) {
+ 		uint32_t to = *(uint32_t*)RTA_DATA(tb[RTA_FLOW]);
+@@ -132,10 +132,10 @@ static int FAST_FUNC print_rule(const struct sockaddr_nl *who UNUSED_PARAM,
+ 		to &= 0xFFFF;
+ 		if (from) {
+ 			printf("realms %s/",
+-				rtnl_rtrealm_n2a(from, b1, sizeof(b1)));
++				rtnl_rtrealm_n2a(from, b1));
+ 		}
+ 		printf("%s ",
+-			rtnl_rtrealm_n2a(to, b1, sizeof(b1)));
++			rtnl_rtrealm_n2a(to, b1));
+ 	}
+ 
+ 	if (r->rtm_type == RTN_NAT) {
+@@ -148,7 +148,7 @@ static int FAST_FUNC print_rule(const struct sockaddr_nl *who UNUSED_PARAM,
+ 		} else
+ 			printf("masquerade");
+ 	} else if (r->rtm_type != RTN_UNICAST)
+-		fputs(rtnl_rtntype_n2a(r->rtm_type, b1, sizeof(b1)), stdout);
++		fputs(rtnl_rtntype_n2a(r->rtm_type, b1), stdout);
+ 
+ 	bb_putchar('\n');
+ 	/*fflush(stdout);*/
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index 6a841aa..836709c 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -436,7 +436,7 @@ static void print_tunnel(struct ip_tunnel_parm *p)
+ 			printf(" inherit");
+ 		if (p->iph.tos & ~1)
+ 			printf("%c%s ", p->iph.tos & 1 ? '/' : ' ',
+-			       rtnl_dsfield_n2a(p->iph.tos & ~1, b1, sizeof(b1)));
++			       rtnl_dsfield_n2a(p->iph.tos & ~1, b1));
+ 	}
+ 	if (!(p->iph.frag_off & htons(IP_DF)))
+ 		printf(" nopmtudisc");
+diff --git a/networking/libiproute/ll_addr.c b/networking/libiproute/ll_addr.c
+index f50e371..f59831c 100644
+--- a/networking/libiproute/ll_addr.c
++++ b/networking/libiproute/ll_addr.c
+@@ -17,7 +17,7 @@
+ #include "utils.h"
+ 
+ 
+-const char *ll_addr_n2a(unsigned char *addr, int alen, int type, char *buf, int blen)
++const char* FAST_FUNC ll_addr_n2a(unsigned char *addr, int alen, int type, char *buf, int blen)
+ {
+ 	int i;
+ 	int l;
+@@ -27,13 +27,13 @@ const char *ll_addr_n2a(unsigned char *addr, int alen, int type, char *buf, int
+ 		return inet_ntop(AF_INET, addr, buf, blen);
+ 	}
+ 	l = 0;
+-	for (i=0; i<alen; i++) {
+-		if (i==0) {
+-			snprintf(buf+l, blen, ":%02x"+1, addr[i]);
++	for (i = 0; i < alen; i++) {
++		if (i == 0) {
++			snprintf(buf + l, blen, ":%02x"+1, addr[i]);
+ 			blen -= 2;
+ 			l += 2;
+ 		} else {
+-			snprintf(buf+l, blen, ":%02x", addr[i]);
++			snprintf(buf + l, blen, ":%02x", addr[i]);
+ 			blen -= 3;
+ 			l += 3;
+ 		}
+@@ -41,7 +41,7 @@ const char *ll_addr_n2a(unsigned char *addr, int alen, int type, char *buf, int
+ 	return buf;
+ }
+ 
+-int ll_addr_a2n(unsigned char *lladdr, int len, char *arg)
++int FAST_FUNC ll_addr_a2n(unsigned char *lladdr, int len, char *arg)
+ {
+ 	int i;
+ 
+diff --git a/networking/libiproute/ll_proto.c b/networking/libiproute/ll_proto.c
+index a934935..145902b 100644
+--- a/networking/libiproute/ll_proto.c
++++ b/networking/libiproute/ll_proto.c
+@@ -98,7 +98,7 @@ __PF(ECONET,econet)
+ #undef __PF
+ 
+ 
+-const char *ll_proto_n2a(unsigned short id, char *buf, int len)
++const char* FAST_FUNC ll_proto_n2a(unsigned short id, char *buf, int len)
+ {
+ 	unsigned i;
+ 	id = ntohs(id);
+@@ -110,7 +110,7 @@ const char *ll_proto_n2a(unsigned short id, char *buf, int len)
+ 	return buf;
+ }
+ 
+-int ll_proto_a2n(unsigned short *id, char *buf)
++int FAST_FUNC ll_proto_a2n(unsigned short *id, char *buf)
+ {
+ 	unsigned i;
+ 	for (i = 0; i < ARRAY_SIZE(llproto_names); i++) {
+diff --git a/networking/libiproute/ll_types.c b/networking/libiproute/ll_types.c
+index d5d2a1f..3861c28 100644
+--- a/networking/libiproute/ll_types.c
++++ b/networking/libiproute/ll_types.c
+@@ -15,7 +15,7 @@
+ #include "libbb.h"
+ #include "rt_names.h"
+ 
+-const char *ll_type_n2a(int type, char *buf, int len)
++const char* FAST_FUNC ll_type_n2a(int type, char *buf)
+ {
+ 	static const char arphrd_name[] =
+ 	/* 0,                  */ "generic" "\0"
+@@ -200,6 +200,6 @@ const char *ll_type_n2a(int type, char *buf, int len)
+ 			return aname;
+ 		aname += strlen(aname) + 1;
+ 	}
+-	snprintf(buf, len, "[%d]", type);
++	sprintf(buf, "[%d]", type);
+ 	return buf;
+ }
+diff --git a/networking/libiproute/rt_names.c b/networking/libiproute/rt_names.c
+index 2699dba..8dd16e3 100644
+--- a/networking/libiproute/rt_names.c
++++ b/networking/libiproute/rt_names.c
+@@ -90,10 +90,10 @@ static void rtnl_rtprot_initialize(void)
+ 	rtnl_tab_initialize("/etc/iproute2/rt_protos", rtnl_rtprot_tab->tab);
+ }
+ 
+-const char* rtnl_rtprot_n2a(int id, char *buf, int len)
++const char* FAST_FUNC rtnl_rtprot_n2a(int id, char *buf)
+ {
+ 	if (id < 0 || id >= 256) {
+-		snprintf(buf, len, "%d", id);
++		sprintf(buf, "%d", id);
+ 		return buf;
+ 	}
+ 
+@@ -101,11 +101,12 @@ const char* rtnl_rtprot_n2a(int id, char *buf, int len)
+ 
+ 	if (rtnl_rtprot_tab->tab[id])
+ 		return rtnl_rtprot_tab->tab[id];
+-	snprintf(buf, len, "%d", id);
++	/* buf is SPRINT_BSIZE big */
++	sprintf(buf, "%d", id);
+ 	return buf;
+ }
+ 
+-int rtnl_rtprot_a2n(uint32_t *id, char *arg)
++int FAST_FUNC rtnl_rtprot_a2n(uint32_t *id, char *arg)
+ {
+ 	rtnl_rtprot_initialize();
+ 	return rtnl_a2n(rtnl_rtprot_tab, id, arg, 0);
+@@ -127,10 +128,10 @@ static void rtnl_rtscope_initialize(void)
+ 	rtnl_tab_initialize("/etc/iproute2/rt_scopes", rtnl_rtscope_tab->tab);
+ }
+ 
+-const char* rtnl_rtscope_n2a(int id, char *buf, int len)
++const char* FAST_FUNC rtnl_rtscope_n2a(int id, char *buf)
+ {
+ 	if (id < 0 || id >= 256) {
+-		snprintf(buf, len, "%d", id);
++		sprintf(buf, "%d", id);
+ 		return buf;
+ 	}
+ 
+@@ -138,11 +139,12 @@ const char* rtnl_rtscope_n2a(int id, char *buf, int len)
+ 
+ 	if (rtnl_rtscope_tab->tab[id])
+ 		return rtnl_rtscope_tab->tab[id];
+-	snprintf(buf, len, "%d", id);
++	/* buf is SPRINT_BSIZE big */
++	sprintf(buf, "%d", id);
+ 	return buf;
+ }
+ 
+-int rtnl_rtscope_a2n(uint32_t *id, char *arg)
++int FAST_FUNC rtnl_rtscope_a2n(uint32_t *id, char *arg)
+ {
+ 	rtnl_rtscope_initialize();
+ 	return rtnl_a2n(rtnl_rtscope_tab, id, arg, 0);
+@@ -159,17 +161,17 @@ static void rtnl_rtrealm_initialize(void)
+ 	rtnl_tab_initialize("/etc/iproute2/rt_realms", rtnl_rtrealm_tab->tab);
+ }
+ 
+-int rtnl_rtrealm_a2n(uint32_t *id, char *arg)
++int FAST_FUNC rtnl_rtrealm_a2n(uint32_t *id, char *arg)
+ {
+ 	rtnl_rtrealm_initialize();
+ 	return rtnl_a2n(rtnl_rtrealm_tab, id, arg, 0);
+ }
+ 
+ #if ENABLE_FEATURE_IP_RULE
+-const char* rtnl_rtrealm_n2a(int id, char *buf, int len)
++const char* FAST_FUNC rtnl_rtrealm_n2a(int id, char *buf)
+ {
+ 	if (id < 0 || id >= 256) {
+-		snprintf(buf, len, "%d", id);
++		sprintf(buf, "%d", id);
+ 		return buf;
+ 	}
+ 
+@@ -177,7 +179,8 @@ const char* rtnl_rtrealm_n2a(int id, char *buf, int len)
+ 
+ 	if (rtnl_rtrealm_tab->tab[id])
+ 		return rtnl_rtrealm_tab->tab[id];
+-	snprintf(buf, len, "%d", id);
++	/* buf is SPRINT_BSIZE big */
++	sprintf(buf, "%d", id);
+ 	return buf;
+ }
+ #endif
+@@ -193,10 +196,10 @@ static void rtnl_rtdsfield_initialize(void)
+ 	rtnl_tab_initialize("/etc/iproute2/rt_dsfield", rtnl_rtdsfield_tab->tab);
+ }
+ 
+-const char * rtnl_dsfield_n2a(int id, char *buf, int len)
++const char* FAST_FUNC rtnl_dsfield_n2a(int id, char *buf)
+ {
+ 	if (id < 0 || id >= 256) {
+-		snprintf(buf, len, "%d", id);
++		sprintf(buf, "%d", id);
+ 		return buf;
+ 	}
+ 
+@@ -204,11 +207,12 @@ const char * rtnl_dsfield_n2a(int id, char *buf, int len)
+ 
+ 	if (rtnl_rtdsfield_tab->tab[id])
+ 		return rtnl_rtdsfield_tab->tab[id];
+-	snprintf(buf, len, "0x%02x", id);
++	/* buf is SPRINT_BSIZE big */
++	sprintf(buf, "0x%02x", id);
+ 	return buf;
+ }
+ 
+-int rtnl_dsfield_a2n(uint32_t *id, char *arg)
++int FAST_FUNC rtnl_dsfield_a2n(uint32_t *id, char *arg)
+ {
+ 	rtnl_rtdsfield_initialize();
+ 	return rtnl_a2n(rtnl_rtdsfield_tab, id, arg, 16);
+@@ -229,10 +233,10 @@ static void rtnl_rttable_initialize(void)
+ 	rtnl_tab_initialize("/etc/iproute2/rt_tables", rtnl_rttable_tab->tab);
+ }
+ 
+-const char *rtnl_rttable_n2a(int id, char *buf, int len)
++const char* FAST_FUNC rtnl_rttable_n2a(int id, char *buf)
+ {
+ 	if (id < 0 || id >= 256) {
+-		snprintf(buf, len, "%d", id);
++		sprintf(buf, "%d", id);
+ 		return buf;
+ 	}
+ 
+@@ -240,11 +244,12 @@ const char *rtnl_rttable_n2a(int id, char *buf, int len)
+ 
+ 	if (rtnl_rttable_tab->tab[id])
+ 		return rtnl_rttable_tab->tab[id];
+-	snprintf(buf, len, "%d", id);
++	/* buf is SPRINT_BSIZE big */
++	sprintf(buf, "%d", id);
+ 	return buf;
+ }
+ 
+-int rtnl_rttable_a2n(uint32_t *id, char *arg)
++int FAST_FUNC rtnl_rttable_a2n(uint32_t *id, char *arg)
+ {
+ 	rtnl_rttable_initialize();
+ 	return rtnl_a2n(rtnl_rttable_tab, id, arg, 0);
+diff --git a/networking/libiproute/rt_names.h b/networking/libiproute/rt_names.h
+index a2d4fd1..e73aa85 100644
+--- a/networking/libiproute/rt_names.h
++++ b/networking/libiproute/rt_names.h
+@@ -4,25 +4,26 @@
+ 
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+-extern const char* rtnl_rtprot_n2a(int id, char *buf, int len);
+-extern const char* rtnl_rtscope_n2a(int id, char *buf, int len);
+-extern const char* rtnl_rtrealm_n2a(int id, char *buf, int len);
+-extern const char* rtnl_dsfield_n2a(int id, char *buf, int len);
+-extern const char* rtnl_rttable_n2a(int id, char *buf, int len);
+-extern int rtnl_rtprot_a2n(uint32_t *id, char *arg);
+-extern int rtnl_rtscope_a2n(uint32_t *id, char *arg);
+-extern int rtnl_rtrealm_a2n(uint32_t *id, char *arg);
+-extern int rtnl_dsfield_a2n(uint32_t *id, char *arg);
+-extern int rtnl_rttable_a2n(uint32_t *id, char *arg);
++/* buf is SPRINT_BSIZE big */
++extern const char* rtnl_rtprot_n2a(int id, char *buf) FAST_FUNC;
++extern const char* rtnl_rtscope_n2a(int id, char *buf) FAST_FUNC;
++extern const char* rtnl_rtrealm_n2a(int id, char *buf) FAST_FUNC;
++extern const char* rtnl_dsfield_n2a(int id, char *buf) FAST_FUNC;
++extern const char* rtnl_rttable_n2a(int id, char *buf) FAST_FUNC;
++extern int rtnl_rtprot_a2n(uint32_t *id, char *arg) FAST_FUNC;
++extern int rtnl_rtscope_a2n(uint32_t *id, char *arg) FAST_FUNC;
++extern int rtnl_rtrealm_a2n(uint32_t *id, char *arg) FAST_FUNC;
++extern int rtnl_dsfield_a2n(uint32_t *id, char *arg) FAST_FUNC;
++extern int rtnl_rttable_a2n(uint32_t *id, char *arg) FAST_FUNC;
+ 
+-extern const char* ll_type_n2a(int type, char *buf, int len);
++extern const char* ll_type_n2a(int type, char *buf) FAST_FUNC;
+ 
+ extern const char* ll_addr_n2a(unsigned char *addr, int alen, int type,
+-				char *buf, int blen);
+-extern int ll_addr_a2n(unsigned char *lladdr, int len, char *arg);
++				char *buf, int blen) FAST_FUNC;
++extern int ll_addr_a2n(unsigned char *lladdr, int len, char *arg) FAST_FUNC;
+ 
+-extern const char* ll_proto_n2a(unsigned short id, char *buf, int len);
+-extern int ll_proto_a2n(unsigned short *id, char *buf);
++extern const char* ll_proto_n2a(unsigned short id, char *buf, int len) FAST_FUNC;
++extern int ll_proto_a2n(unsigned short *id, char *buf) FAST_FUNC;
+ 
+ POP_SAVED_FUNCTION_VISIBILITY
+ 
+diff --git a/networking/libiproute/rtm_map.c b/networking/libiproute/rtm_map.c
+index 6fe5c4b..5e358e1 100644
+--- a/networking/libiproute/rtm_map.c
++++ b/networking/libiproute/rtm_map.c
+@@ -15,7 +15,7 @@
+ #include "rt_names.h"
+ #include "utils.h"
+ 
+-const char *rtnl_rtntype_n2a(int id, char *buf, int len)
++const char* FAST_FUNC rtnl_rtntype_n2a(int id, char *buf)
+ {
+ 	switch (id) {
+ 	case RTN_UNSPEC:
+@@ -43,13 +43,14 @@ const char *rtnl_rtntype_n2a(int id, char *buf, int len)
+ 	case RTN_XRESOLVE:
+ 		return "xresolve";
+ 	default:
+-		snprintf(buf, len, "%d", id);
++		/* buf is SPRINT_BSIZE big */
++		sprintf(buf, "%d", id);
+ 		return buf;
+ 	}
+ }
+ 
+ 
+-int rtnl_rtntype_a2n(int *id, char *arg)
++int FAST_FUNC rtnl_rtntype_a2n(int *id, char *arg)
+ {
+ 	static const char keywords[] ALIGN1 =
+ 		"local\0""nat\0""broadcast\0""brd\0""anycast\0"
+@@ -95,7 +96,7 @@ int rtnl_rtntype_a2n(int *id, char *arg)
+ 	return 0;
+ }
+ 
+-int get_rt_realms(uint32_t *realms, char *arg)
++int FAST_FUNC get_rt_realms(uint32_t *realms, char *arg)
+ {
+ 	uint32_t realm = 0;
+ 	char *p = strchr(arg, '/');
+diff --git a/networking/libiproute/rtm_map.h b/networking/libiproute/rtm_map.h
+index ab1b70e..4377bd5 100644
+--- a/networking/libiproute/rtm_map.h
++++ b/networking/libiproute/rtm_map.h
+@@ -4,10 +4,10 @@
+ 
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+-const char *rtnl_rtntype_n2a(int id, char *buf, int len);
+-int rtnl_rtntype_a2n(int *id, char *arg);
++const char *rtnl_rtntype_n2a(int id, char *buf) FAST_FUNC;
++int rtnl_rtntype_a2n(int *id, char *arg) FAST_FUNC;
+ 
+-int get_rt_realms(uint32_t *realms, char *arg);
++int get_rt_realms(uint32_t *realms, char *arg) FAST_FUNC;
+ 
+ POP_SAVED_FUNCTION_VISIBILITY
+ 

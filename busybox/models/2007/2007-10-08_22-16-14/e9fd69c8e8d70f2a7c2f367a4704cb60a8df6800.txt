@@ -1,0 +1,42 @@
+2007-10-08 22:16:14 +0000
+diff --git a/Makefile b/Makefile
+index 5cc4ab2..6808e7d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -970,7 +970,7 @@ distclean: mrproper
+ 	@find $(srctree) $(RCS_FIND_IGNORE) \
+ 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
+ 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
+-	 	-o -name '.*.rej' -o -size 0 \
++	 	-o -name '.*.rej' -o -name '*.tmp' -o -size 0 \
+ 		-o -name '*%' -o -name '.*.cmd' -o -name 'core' \) \
+ 		-type f -print | xargs rm -f
+ 
+diff --git a/scripts/trylink b/scripts/trylink
+index d6538f1..6905f86 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -151,10 +151,11 @@ if test "$CONFIG_FEATURE_SHARED_BUSYBOX" = y; then
+ fi
+ 
+ if test "$CONFIG_FEATURE_INDIVIDUAL" = y; then
++    echo "Linking individual applets against libbusybox (see $sharedlib_dir/*)"
+     gcc -DNAME_MAIN_CNAME -E -include include/autoconf.h include/applets.h \
+     | grep -v "^#" \
+     | grep -v "^$" \
+-    > applet.lst
++    > applet_lst.tmp
+     while read name main junk; do
+ 
+ 	echo "\
+@@ -183,9 +184,8 @@ int main(int argc, char **argv)
+ 	}
+ 	rm -- "$sharedlib_dir/applet.c" $EXE.out
+ 	strip -s --remove-section=.note --remove-section=.comment $EXE
+-	echo "applet linked against libbusybox: $EXE"
+ 
+-    done <applet.lst
++    done <applet_lst.tmp
+ fi
+ 
+ # libbusybox.so is needed only for -lbusybox at link time,

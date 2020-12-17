@@ -1,0 +1,104 @@
+2009-03-31 19:18:17 +0000
+diff --git a/shell/ash.c b/shell/ash.c
+index 13b4329..1de989e 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -12574,7 +12574,7 @@ readcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ #endif
+ 
+ 	status = 0;
+-	startword = 1;
++	startword = 2;
+ 	backslash = 0;
+ #if ENABLE_ASH_READ_TIMEOUT
+ 	if (timeout) /* NB: ensuring end_ms is nonzero */
+@@ -12582,6 +12582,8 @@ readcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ #endif
+ 	STARTSTACKSTR(p);
+ 	do {
++		const char *is_ifs;
++
+ #if ENABLE_ASH_READ_TIMEOUT
+ 		if (end_ms) {
+ 			struct pollfd pfd[1];
+@@ -12611,25 +12613,34 @@ readcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 			continue;
+ 		}
+ 		if (!rflag && c == '\\') {
+-			backslash++;
++			backslash = 1;
+ 			continue;
+ 		}
+ 		if (c == '\n')
+ 			break;
+-		if (startword && *ifs == ' ' && strchr(ifs, c)) {
+-			continue;
++		is_ifs = strchr(ifs, c);
++		if (startword && is_ifs) {
++			if (isspace(c))
++				continue;
++			/* non-space ifs char */
++			startword--;
++			if (startword == 1) /* first one? */
++				continue;
+ 		}
+ 		startword = 0;
+-		if (ap[1] != NULL && strchr(ifs, c) != NULL) {
++		if (ap[1] != NULL && is_ifs) {
++			const char *beg;
+ 			STACKSTRNUL(p);
+-			setvar(*ap, stackblock(), 0);
++			beg = stackblock();
++			setvar(*ap, beg, 0);
+ 			ap++;
+-			startword = 1;
++			/* can we skip one non-space ifs? (2: yes) */
++			startword = isspace(c) ? 2 : 1;
+ 			STARTSTACKSTR(p);
+-		} else {
+- put:
+-			STPUTC(c, p);
++			continue;
+ 		}
++ put:
++		STPUTC(c, p);
+ 	}
+ /* end of do {} while: */
+ #if ENABLE_ASH_READ_NCHARS
+@@ -12643,8 +12654,8 @@ readcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ #endif
+ 
+ 	STACKSTRNUL(p);
+-	/* Remove trailing blanks */
+-	while ((char *)stackblock() <= --p && strchr(ifs, *p) != NULL)
++	/* Remove trailing space ifs chars */
++	while ((char *)stackblock() <= --p && isspace(*p) && strchr(ifs, *p) != NULL)
+ 		*p = '\0';
+ 	setvar(*ap, stackblock(), 0);
+ 	while (*++ap != NULL)
+diff --git a/shell/ash_test/ash-read/read_ifs.right b/shell/ash_test/ash-read/read_ifs.right
+new file mode 100644
+index 0000000..027ecd1
+--- /dev/null
++++ b/shell/ash_test/ash-read/read_ifs.right
+@@ -0,0 +1,7 @@
++.a. .b. .c.
++.a. .b. .c.
++.a. .. .b,c.
++.a. .. .b,c.
++.a. .. .c.
++.a. .. .c. .d.
++.a. .. .b,c,d  ,  ,.
+diff --git a/shell/ash_test/ash-read/read_ifs.tests b/shell/ash_test/ash-read/read_ifs.tests
+new file mode 100755
+index 0000000..cf7cd93
+--- /dev/null
++++ b/shell/ash_test/ash-read/read_ifs.tests
+@@ -0,0 +1,7 @@
++printf 'a\t\tb\tc\n' | ( IFS=$(printf "\t") read a b c; echo ".$a. .$b. .$c." )
++printf 'a\t\tb\tc\n' | ( IFS=$(printf " \t") read a b c; echo ".$a. .$b. .$c." )
++printf 'a,,b,c\n'    | ( IFS="," read a b c; echo ".$a. .$b. .$c." )
++printf 'a,,b,c\n'    | ( IFS=" ," read a b c; echo ".$a. .$b. .$c." )
++printf 'a ,, c\n'    | ( IFS=" ," read a b c; echo ".$a. .$b. .$c." )
++printf 'a ,, c d\n'  | ( IFS=" ," read a b c d; echo ".$a. .$b. .$c. .$d." )
++printf ' a,,b,c,d  ,  ,\n' | ( IFS=" ," read a b c; echo ".$a. .$b. .$c." )

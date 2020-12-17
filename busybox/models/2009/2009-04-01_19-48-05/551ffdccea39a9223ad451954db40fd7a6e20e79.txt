@@ -1,0 +1,165 @@
+2009-04-01 19:48:05 +0000
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/probe.h b/e2fsprogs/old_e2fsprogs/blkid/probe.h
+index 0fd16a7..ef289f5 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/probe.h
++++ b/e2fsprogs/old_e2fsprogs/blkid/probe.h
+@@ -308,9 +308,9 @@ _INLINE_ __u32 blkid_swab32(__u32 val)
+ #ifdef EXT2FS_REQUIRE_486
+ 	__asm__("bswap %0" : "=r" (val) : "0" (val));
+ #else
+-	__asm__("xchgb %b0,%h0\n\t"	/* swap lower bytes	*/
+-		"rorl $16,%0\n\t"	/* swap words		*/
+-		"xchgb %b0,%h0"		/* swap higher bytes	*/
++	__asm__("xchgb %b0,%h0\n\t"	/* swap lower bytes  */
++		"rorl $16,%0\n\t"	/* swap words        */
++		"xchgb %b0,%h0"		/* swap higher bytes */
+ 		:"=q" (val)
+ 		: "0" (val));
+ #endif
+@@ -319,9 +319,9 @@ _INLINE_ __u32 blkid_swab32(__u32 val)
+ 
+ _INLINE_ __u16 blkid_swab16(__u16 val)
+ {
+-	__asm__("xchgb %b0,%h0"		/* swap bytes		*/ \
+-		: "=q" (val) \
+-		:  "0" (val)); \
++	__asm__("xchgb %b0,%h0"		/* swap bytes */
++		: "=q" (val)
++		:  "0" (val));
+ 		return val;
+ }
+ 
+diff --git a/include/platform.h b/include/platform.h
+index 5d6a181..13dfcbd 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -371,4 +371,4 @@ static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+ #endif
+ #endif
+ 
+-#endif	/* platform.h	*/
++#endif	/* platform.h */
+diff --git a/include/rtc_.h b/include/rtc_.h
+index 867edb3..ae17ee7 100644
+--- a/include/rtc_.h
++++ b/include/rtc_.h
+@@ -44,27 +44,26 @@ struct linux_rtc_wkalrm {
+  * ioctl calls that are permitted to the /dev/rtc interface, if
+  * any of the RTC drivers are enabled.
+  */
++#define RTC_AIE_ON      _IO('p', 0x01)  /* Alarm int. enable on         */
++#define RTC_AIE_OFF     _IO('p', 0x02)  /* ... off                      */
++#define RTC_UIE_ON      _IO('p', 0x03)  /* Update int. enable on        */
++#define RTC_UIE_OFF     _IO('p', 0x04)  /* ... off                      */
++#define RTC_PIE_ON      _IO('p', 0x05)  /* Periodic int. enable on      */
++#define RTC_PIE_OFF     _IO('p', 0x06)  /* ... off                      */
++#define RTC_WIE_ON      _IO('p', 0x0f)  /* Watchdog int. enable on      */
++#define RTC_WIE_OFF     _IO('p', 0x10)  /* ... off                      */
+ 
+-#define RTC_AIE_ON	_IO('p', 0x01)	/* Alarm int. enable on		*/
+-#define RTC_AIE_OFF	_IO('p', 0x02)	/* ... off			*/
+-#define RTC_UIE_ON	_IO('p', 0x03)	/* Update int. enable on	*/
+-#define RTC_UIE_OFF	_IO('p', 0x04)	/* ... off			*/
+-#define RTC_PIE_ON	_IO('p', 0x05)	/* Periodic int. enable on	*/
+-#define RTC_PIE_OFF	_IO('p', 0x06)	/* ... off			*/
+-#define RTC_WIE_ON	_IO('p', 0x0f)  /* Watchdog int. enable on	*/
+-#define RTC_WIE_OFF	_IO('p', 0x10)  /* ... off			*/
++#define RTC_ALM_SET     _IOW('p', 0x07, struct linux_rtc_time) /* Set alarm time  */
++#define RTC_ALM_READ    _IOR('p', 0x08, struct linux_rtc_time) /* Read alarm time */
++#define RTC_RD_TIME     _IOR('p', 0x09, struct linux_rtc_time) /* Read RTC time   */
++#define RTC_SET_TIME    _IOW('p', 0x0a, struct linux_rtc_time) /* Set RTC time    */
++#define RTC_IRQP_READ   _IOR('p', 0x0b, unsigned long)   /* Read IRQ rate   */
++#define RTC_IRQP_SET    _IOW('p', 0x0c, unsigned long)   /* Set IRQ rate    */
++#define RTC_EPOCH_READ  _IOR('p', 0x0d, unsigned long)   /* Read epoch      */
++#define RTC_EPOCH_SET   _IOW('p', 0x0e, unsigned long)   /* Set epoch       */
+ 
+-#define RTC_ALM_SET	_IOW('p', 0x07, struct linux_rtc_time) /* Set alarm time  */
+-#define RTC_ALM_READ	_IOR('p', 0x08, struct linux_rtc_time) /* Read alarm time */
+-#define RTC_RD_TIME	_IOR('p', 0x09, struct linux_rtc_time) /* Read RTC time   */
+-#define RTC_SET_TIME	_IOW('p', 0x0a, struct linux_rtc_time) /* Set RTC time    */
+-#define RTC_IRQP_READ	_IOR('p', 0x0b, unsigned long)	 /* Read IRQ rate   */
+-#define RTC_IRQP_SET	_IOW('p', 0x0c, unsigned long)	 /* Set IRQ rate    */
+-#define RTC_EPOCH_READ	_IOR('p', 0x0d, unsigned long)	 /* Read epoch      */
+-#define RTC_EPOCH_SET	_IOW('p', 0x0e, unsigned long)	 /* Set epoch       */
+-
+-#define RTC_WKALM_SET	_IOW('p', 0x0f, struct linux_rtc_wkalrm)/* Set wakeup alarm*/
+-#define RTC_WKALM_RD	_IOR('p', 0x10, struct linux_rtc_wkalrm)/* Get wakeup alarm*/
++#define RTC_WKALM_SET   _IOW('p', 0x0f, struct linux_rtc_wkalrm)/* Set wakeup alarm*/
++#define RTC_WKALM_RD    _IOR('p', 0x10, struct linux_rtc_wkalrm)/* Get wakeup alarm*/
+ 
+ /* interrupt flags */
+ #define RTC_IRQF 0x80 /* any of the following is active */
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 2e158bc..804fe0b 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -55,7 +55,7 @@ typedef struct CronLine {
+ #if ENABLE_FEATURE_CROND_CALL_SENDMAIL
+ 	int cl_MailPos;         /* 'empty file' size                    */
+ 	smallint cl_MailFlag;   /* running pid is for mail              */
+-	char *cl_MailTo;	/* whom to mail results			*/
++	char *cl_MailTo;	/* whom to mail results                 */
+ #endif
+ 	/* ordered by size, not in natural order. makes code smaller: */
+ 	char cl_Dow[7];         /* 0-6, beginning sunday                */
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 5c1f6d5..de5d68a 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -59,7 +59,7 @@
+ #define ADV_PIO_MODES		64  /* advanced PIO modes supported */
+ 				    /* multiword DMA xfer cycle time: */
+ #define DMA_TIME_MIN		65  /*   - minimum */
+-#define DMA_TIME_NORM		66  /*   - manufacturer's recommended	*/
++#define DMA_TIME_NORM		66  /*   - manufacturer's recommended */
+ 				    /* minimum PIO xfer cycle time: */
+ #define PIO_NO_FLOW		67  /*   - without flow control */
+ #define PIO_FLOW		68  /*   - with IORDY flow control */
+@@ -82,7 +82,7 @@
+ #define ENH_ERASE_TIME		90  /*   - enhanced */
+ #define ADV_PWR			91  /* current advanced power management level
+ 				       in low byte, 0x40 in high byte. */
+-#define PSWD_CODE		92  /* master password revision code	*/
++#define PSWD_CODE		92  /* master password revision code */
+ #define HWRST_RSLT		93  /* hardware reset result */
+ #define ACOUSTIC		94  /* acoustic mgmt values ( >= ATA-6) */
+ #define LBA_LSB			100 /* LBA: maximum.  Currently only 48 */
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index d62f324..6e1398d 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -67,7 +67,7 @@ struct dhcpOfferedAddr* FAST_FUNC add_lease(
+ 			if (hostname_length > sizeof(oldest->hostname))
+ 				hostname_length = sizeof(oldest->hostname);
+             		hostname = (uint8_t*) safe_strncpy((char*)oldest->hostname, (char*)hostname, hostname_length);
+-			/* sanitization (s/non-ACSII/^/g) */
++			/* sanitization (s/non-ASCII/^/g) */
+ 			while (*hostname) {
+ 				if (*hostname < ' ' || *hostname > 126)
+ 					*hostname = '^';
+diff --git a/shell/ash.c b/shell/ash.c
+index b63a243..4f7f38f 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -12619,7 +12619,7 @@ readcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 		if (c == '\n')
+ 			break;
+ 		/* $IFS splitting */
+-/* http://www.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_06_05	*/
++/* http://www.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_06_05 */
+ 		is_ifs = strchr(ifs, c);
+ 		if (startword && is_ifs) {
+ 			if (isspace(c))
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index e008166..affeab0 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -91,7 +91,7 @@ struct fb_var_screeninfo {
+ 	uint32_t height;                /* height of picture in mm */
+ 	uint32_t width;                 /* width of picture in mm */
+ 
+-	uint32_t accel_flags;		/* acceleration flags (hints)	*/
++	uint32_t accel_flags;		/* acceleration flags (hints) */
+ 
+ 	/* Timing: All values in pixclocks, except pixclock (of course) */
+ 	uint32_t pixclock;              /* pixel clock in ps (pico seconds) */

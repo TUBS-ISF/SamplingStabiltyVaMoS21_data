@@ -1,0 +1,79 @@
+2010-01-31 00:10:18 +0100
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index 207fa96..79fe074 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -113,7 +113,10 @@ int cal_main(int argc UNUSED_PARAM, char **argv)
+ 			if (argv[2]) {
+ 				bb_show_usage();
+ 			}
+-			month = xatou_range(*argv++, 1, 12);
++			if (!(flags & 2)) { /* no -y */
++				month = xatou_range(*argv, 1, 12);
++			}
++			argv++;
+ 		}
+ 		year = xatou_range(*argv, 1, 9999);
+ 	}
+diff --git a/testsuite/cal.tests b/testsuite/cal.tests
+new file mode 100755
+index 0000000..36be2b4
+--- /dev/null
++++ b/testsuite/cal.tests
+@@ -0,0 +1,39 @@
++#!/bin/sh
++# Copyright 2010 by Denys Vlasenko
++# Licensed under GPL v2, see file LICENSE for details.
++
++. ./testing.sh
++
++test -f "$bindir/.config" && . "$bindir/.config"
++
++# testing "test name" "command" "expected result" "file input" "stdin"
++
++testing "cal 2000" "cal 1 2000" "\
++    January 2000
++Su Mo Tu We Th Fr Sa
++                   1
++ 2  3  4  5  6  7  8
++ 9 10 11 12 13 14 15
++16 17 18 19 20 21 22
++23 24 25 26 27 28 29
++30 31
++" "" ""
++
++test x"$CONFIG_LOCALE_SUPPORT" = x"y" \
++&& test x"$CONFIG_FEATURE_ASSUME_UNICODE" = x"y" \
++&& test x"$CONFIG_LAST_SUPPORTED_WCHAR" = x"0" \
++&& test x"$CONFIG_UNICODE_WIDE_WCHARS" = x"y" \
++&& test x"$CONFIG_STATIC" != x"y" \
++&& test x"$CONFIG_CROSS_COMPILER_PREFIX" = x"" \
++&& testing "unicode cal 2000" "LANG=zh_TW.utf8 cal 1 2000" "\
++    一月 2000
++日 一 二 三 四 五 六
++                   1
++ 2  3  4  5  6  7  8
++ 9 10 11 12 13 14 15
++16 17 18 19 20 21 22
++23 24 25 26 27 28 29
++30 31
++" "" ""
++
++exit $FAILCOUNT
+diff --git a/testsuite/runtest b/testsuite/runtest
+index 10563d7..5c185c5 100755
+--- a/testsuite/runtest
++++ b/testsuite/runtest
+@@ -78,9 +78,10 @@ run_oldstyle_applet_tests()
+ 
+ 
+ lcwd=$(pwd)
+-[ x"$tsdir" != x ] || tsdir="$lcwd"
+-[ x"$bindir" != x ] || bindir="${lcwd%/*}" # one directory up from $lcwd
++[ x"$tsdir" != x"" ] || tsdir="$lcwd"
++[ x"$bindir" != x"" ] || bindir="${lcwd%/*}" # one directory up from $lcwd
+ PATH="$bindir:$PATH"
++export bindir   # some tests need to look at $bindir/.config
+ 
+ if [ x"$VERBOSE" = x ]; then
+ 	export VERBOSE=

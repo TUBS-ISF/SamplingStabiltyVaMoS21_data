@@ -1,0 +1,14 @@
+2009-04-06 12:28:34 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index e86f0d2..7e6d356 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1799,7 +1799,7 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 				//bb_error_msg("'%s' -> '%s'", arg, dest.data);
+ 				exp_str = expand_string_to_string(dest.data);
+ 				//bb_error_msg("'%s' -> '%s'", dest.data, exp_str);
+-				o_free(&dest);
++				o_free_unsafe(&dest);
+ 			}
+ 			hooks.lookupvar = get_local_var_value;
+ 			hooks.setvar = arith_set_local_var;

@@ -1,0 +1,40 @@
+2009-03-11 15:59:49 +0000
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 85bb737..b7b9ee1 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -342,7 +342,7 @@ int login_main(int argc UNUSED_PARAM, char **argv)
+ 	/* Was breaking "login <username>" from shell command line: */
+ 	/*bb_setpgrp();*/
+ 
+-	openlog(applet_name, LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_AUTH);
++	openlog(applet_name, LOG_PID | LOG_CONS, LOG_AUTH);
+ 
+ 	while (1) {
+ 		/* flush away any type-ahead (as getty does) */
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index aa89b87..9ed78c1 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -100,7 +100,7 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
+ #endif
+ 
+ 	logmode = LOGMODE_BOTH;
+-	openlog(applet_name, LOG_NOWAIT, LOG_AUTH);
++	openlog(applet_name, 0, LOG_AUTH);
+ 	opt = getopt32(argv, "a:lud", &opt_a);
+ 	//argc -= optind;
+ 	argv += optind;
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 72d5101..590bf23 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1119,7 +1119,7 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
+ 	else
+ 		bb_sanitize_stdio();
+ 	if (!(opt & 4)) {
+-		openlog(applet_name, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
++		openlog(applet_name, LOG_PID, LOG_DAEMON);
+ 		logmode = LOGMODE_SYSLOG;
+ 	}
+ 

@@ -1,0 +1,75 @@
+2007-06-19 14:43:17 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 999caae..9ca5653 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -847,10 +847,9 @@ typedef struct {
+ 	unsigned sid;
+ 	unsigned uid;
+ 	unsigned gid;
++	unsigned tty_major,tty_minor;
+ 	char state[4];
+-	char tty_str[8]; /* "maj,min" or "?" */
+-	/* basename of executable in exec(2), read from /proc/N/stat, */
+-	/* size from sizeof(task_struct.comm) in /usr/include/linux/sched.h */
++	/* basename of executable in exec(2), read from /proc/N/stat */
+ 	char comm[COMM_LEN];
+ 	/* user/group? - use passwd/group parsing functions */
+ } procps_status_t;
+diff --git a/libbb/procps.c b/libbb/procps.c
+index e04ff34..10ddabf 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -225,30 +225,18 @@ procps_status_t* procps_scan(procps_status_t* sp, int flags)
+ 				break;
+ 			sp->vsz = vsz >> 10; /* vsize is in bytes and we want kb */
+ 			sp->rss = rss >> 10;
+-
+-			sp->tty_str[0] = '?';
+-			/* sp->tty_str[1] = '\0'; - done by memset */
+-			if (tty) /* tty field of "0" means "no tty" */
+-				snprintf(sp->tty_str, sizeof(sp->tty_str), "%u,%u",
+-					(tty >> 8) & 0xfff, /* major */
+-					(tty & 0xff) | ((tty >> 12) & 0xfff00));
++			sp->tty_major = (tty >> 8) & 0xfff;
++			sp->tty_minor = (tty & 0xff) | ((tty >> 12) & 0xfff00));
+ #else
+ /* This costs ~100 bytes more but makes top faster by 20%
+  * If you run 10000 processes, this may be important for you */
+-			cp += 2;
+-			sp->state[0] = *cp++; cp++;
+-			sp->ppid = fast_strtoul_10(cp, &cp);
++			sp->state[0] = cp[2];
++			sp->ppid = fast_strtoul_10(cp + 4, &cp);
+ 			sp->pgid = fast_strtoul_10(cp, &cp);
+ 			sp->sid = fast_strtoul_10(cp, &cp);
+-			sp->tty_str[0] = '?';
+-			/* sp->tty_str[1] = '\0'; - done by memset */
+ 			tty = fast_strtoul_10(cp, &cp);
+-			if (tty && (flags & PSSCAN_TTY)) {
+-				/* tty field of "0" means "no tty" */
+-				snprintf(sp->tty_str, sizeof(sp->tty_str), "%u,%u",
+-					(tty >> 8) & 0xfff, /* major */
+-					(tty & 0xff) | ((tty >> 12) & 0xfff00));
+-			}
++			sp->tty_major = (tty >> 8) & 0xfff;
++			sp->tty_minor = (tty & 0xff) | ((tty >> 12) & 0xfff00);
+ 			cp = skip_fields(cp, 6); /* tpgid, flags, min_flt, cmin_flt, maj_flt, cmaj_flt */
+ 			sp->utime = fast_strtoul_10(cp, &cp);
+ 			sp->stime = fast_strtoul_10(cp, &cp);
+diff --git a/procps/ps.c b/procps/ps.c
+index c3023cf..fd53eca 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -68,7 +68,10 @@ static void func_rss(char *buf, int size, const procps_status_t *ps)
+ 
+ static void func_tty(char *buf, int size, const procps_status_t *ps)
+ {
+-	safe_strncpy(buf, ps->tty_str, size+1);
++	buf[0] = '?';
++	buf[1] = '\0';
++	if (ps->tty_major) /* tty field of "0" means "no tty" */
++		snprintf(buf, size+1, "%u,%u", ps->tty_major, ps->tty_minor);
+ }
+ 
+ #if ENABLE_SELINUX

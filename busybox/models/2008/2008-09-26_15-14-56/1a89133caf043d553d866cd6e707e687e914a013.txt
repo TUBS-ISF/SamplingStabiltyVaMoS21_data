@@ -1,0 +1,43 @@
+2008-09-26 15:14:56 +0000
+diff --git a/debianutils/Config.in b/debianutils/Config.in
+index 4ed00dd..8deb38f 100644
+--- a/debianutils/Config.in
++++ b/debianutils/Config.in
+@@ -64,6 +64,7 @@ config FEATURE_START_STOP_DAEMON_FANCY
+ 	  Support additional arguments.
+ 	  -o|--oknodo ignored since we exit with 0 anyway
+ 	  -v|--verbose
++	  -N|--nicelevel N
+ 
+ config FEATURE_START_STOP_DAEMON_LONG_OPTIONS
+ 	bool "Enable long options"
+diff --git a/include/usage.h b/include/usage.h
+index 24008de..d60ffef 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3729,10 +3729,10 @@
+      "\nOther:" \
+ 	USE_FEATURE_START_STOP_DAEMON_FANCY( \
+      "\n	-o,--oknodo		Exit with status 0 if nothing is done" \
+-     "\n	-q,--quiet		Quiet" \
+-	) \
+      "\n	-v,--verbose		Verbose" \
+ 	) \
++     "\n	-q,--quiet		Quiet" \
++	) \
+ 	SKIP_FEATURE_START_STOP_DAEMON_LONG_OPTIONS( \
+      "\nProcess matching:" \
+      "\n	-u USERNAME|UID	Match only this user's processes" \
+@@ -3757,10 +3757,10 @@
+      "\nOther:" \
+ 	USE_FEATURE_START_STOP_DAEMON_FANCY( \
+      "\n	-o		Exit with status 0 if nothing is done" \
+-     "\n	-q		Quiet" \
+-	) \
+      "\n	-v		Verbose" \
+ 	) \
++     "\n	-q		Quiet" \
++	) \
+ 
+ #define stat_trivial_usage \
+        "[OPTION] FILE..."

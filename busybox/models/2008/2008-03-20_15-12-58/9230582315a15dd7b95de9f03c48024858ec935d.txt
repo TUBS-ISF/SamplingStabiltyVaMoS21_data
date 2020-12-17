@@ -1,0 +1,145 @@
+2008-03-20 15:12:58 +0000
+diff --git a/libbb/change_identity.c b/libbb/change_identity.c
+index f19aa8a..da840bf 100644
+--- a/libbb/change_identity.c
++++ b/libbb/change_identity.c
+@@ -35,7 +35,7 @@ void change_identity(const struct passwd *pw)
+ {
+ 	if (initgroups(pw->pw_name, pw->pw_gid) == -1)
+ 		bb_perror_msg_and_die("can't set groups");
+-	endgrent(); /* ?? */
++	endgrent(); /* helps to close a fd used internally by libc */
+ 	xsetgid(pw->pw_gid);
+ 	xsetuid(pw->pw_uid);
+ }
+diff --git a/libpwdgrp/pwd_grp.c b/libpwdgrp/pwd_grp.c
+index 7e7ff48..3fe70f4 100644
+--- a/libpwdgrp/pwd_grp.c
++++ b/libpwdgrp/pwd_grp.c
+@@ -630,12 +630,11 @@ int initgroups(const char *user, gid_t gid)
+ 	char buff[PWD_BUFFER_SIZE];
+ 
+ 	rv = -1;
++	grfile = fopen(_PATH_GROUP, "r");
++	if (grfile != NULL) {
+ 
+-	/* We alloc space for 8 gids at a time. */
+-	group_list = (gid_t *) malloc(8*sizeof(gid_t *));
+-	if (group_list
+-	 && ((grfile = fopen(_PATH_GROUP, "r")) != NULL)
+-	) {
++		/* We alloc space for 8 gids at a time. */
++		group_list = xmalloc(8 * sizeof(gid_t *));
+ 		*group_list = gid;
+ 		num_groups = 1;
+ 
+@@ -645,13 +644,8 @@ int initgroups(const char *user, gid_t gid)
+ 				for (m = group.gr_mem; *m; m++) {
+ 					if (!strcmp(*m, user)) {
+ 						if (!(num_groups & 7)) {
+-							gid_t *tmp = (gid_t *)
+-								realloc(group_list,
+-										(num_groups+8) * sizeof(gid_t *));
+-							if (!tmp) {
+-								rv = -1;
+-								goto DO_CLOSE;
+-							}
++							gid_t *tmp = xrealloc(group_list,
++									(num_groups+8) * sizeof(gid_t *));
+ 							group_list = tmp;
+ 						}
+ 						group_list[num_groups++] = group.gr_gid;
+@@ -662,13 +656,10 @@ int initgroups(const char *user, gid_t gid)
+ 		}
+ 
+ 		rv = setgroups(num_groups, group_list);
+-	DO_CLOSE:
++		free(group_list);
+ 		fclose(grfile);
+ 	}
+ 
+-	/* group_list will be NULL if initial malloc failed, which may trigger
+-	 * warnings from various malloc debuggers. */
+-	free(group_list);
+ 	return rv;
+ }
+ 
+@@ -677,7 +668,7 @@ int putpwent(const struct passwd *__restrict p, FILE *__restrict f)
+ 	int rv = -1;
+ 
+ 	if (!p || !f) {
+-		errno=EINVAL;
++		errno = EINVAL;
+ 	} else {
+ 		/* No extra thread locking is needed above what fprintf does. */
+ 		if (fprintf(f, "%s:%s:%lu:%lu:%s:%s:%s\n",
+@@ -702,7 +693,7 @@ int putgrent(const struct group *__restrict p, FILE *__restrict f)
+ 	int rv = -1;
+ 
+ 	if (!p || !f) {				/* Sigh... glibc checks. */
+-		errno=EINVAL;
++		errno = EINVAL;
+ 	} else {
+ 		if (fprintf(f, "%s:%s:%lu:",
+ 					p->gr_name, p->gr_passwd,
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 620e680..5e6037c 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -2340,7 +2340,7 @@ int httpd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #if ENABLE_FEATURE_HTTPD_SETUID
+ 	if (opt & OPT_SETUID) {
+ 		if (!get_uidgid(&ugid, s_ugid, 1))
+-			bb_error_msg_and_die("unrecognized user[:group] "
++			bb_error_msg_and_die("unknown user[:group] "
+ 						"name '%s'", s_ugid);
+ 	}
+ #endif
+@@ -2389,10 +2389,8 @@ int httpd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #if ENABLE_FEATURE_HTTPD_RELOAD_CONFIG_SIGHUP
+ 	if (!(opt & OPT_INETD))
+ 		sighup_handler(0);
+-	else /* do not install HUP handler in inetd mode */
+ #endif
+-		index_page = "index.html";
+-		parse_conf(default_path_httpd_conf, FIRST_PARSE);
++	parse_conf(default_path_httpd_conf, FIRST_PARSE);
+ 
+ 	xfunc_error_retval = 0;
+ 	if (opt & OPT_INETD)
+diff --git a/networking/inetd.c b/networking/inetd.c
+index b931aa1..5cdfe0a 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -142,15 +142,15 @@
+ /* Here's the scoop concerning the user[:group] feature:
+  * 1) group is not specified:
+  *      a) user = root: NO setuid() or setgid() is done
+- *      b) other:       setgid(primary group as found in passwd)
+- *                      initgroups(name, primary group)
++ *      b) other:       initgroups(name, primary group)
++ *                      setgid(primary group as found in passwd)
+  *                      setuid()
+  * 2) group is specified:
+  *      a) user = root: setgid(specified group)
+  *                      NO initgroups()
+  *                      NO setuid()
+- *      b) other:       setgid(specified group)
+- *                      initgroups(name, specified group)
++ *      b) other:       initgroups(name, specified group)
++ *                      setgid(specified group)
+  *                      setuid()
+  */
+ 
+@@ -1383,9 +1383,8 @@ int inetd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			if (pwd->pw_uid) {
+ 				if (sep->se_group)
+ 					pwd->pw_gid = grp->gr_gid;
+-				xsetgid(pwd->pw_gid);
+-				initgroups(pwd->pw_name, pwd->pw_gid);
+-				xsetuid(pwd->pw_uid);
++				/* initgroups, setgid, setuid: */
++				change_identity(pwd);
+ 			} else if (sep->se_group) {
+ 				xsetgid(grp->gr_gid);
+ 				setgroups(1, &grp->gr_gid);

@@ -1,0 +1,1462 @@
+2009-11-13 09:08:27 +0100
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index a9334df..451c6fa 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -912,7 +912,7 @@ static void write_status_file(deb_file_t **deb_file)
+ 	/* Create a separate backfile to dpkg */
+ 	if (rename("/var/lib/dpkg/status", "/var/lib/dpkg/status.udeb.bak") == -1) {
+ 		if (errno != ENOENT)
+-			bb_error_msg_and_die("cannot create backup status file");
++			bb_error_msg_and_die("can't create backup status file");
+ 		/* Its ok if renaming the status file fails because status
+ 		 * file doesnt exist, maybe we are starting from scratch */
+ 		bb_error_msg("no status file found, creating new one");
+@@ -1646,7 +1646,7 @@ int dpkg_main(int argc UNUSED_PARAM, char **argv)
+ 			init_archive_deb_control(archive_handle);
+ 			deb_file[deb_count]->control_file = deb_extract_control_file_to_buffer(archive_handle, control_list);
+ 			if (deb_file[deb_count]->control_file == NULL) {
+-				bb_error_msg_and_die("cannot extract control file");
++				bb_error_msg_and_die("can't extract control file");
+ 			}
+ 			deb_file[deb_count]->filename = xstrdup(argv[0]);
+ 			package_num = fill_package_struct(deb_file[deb_count]->control_file);
+diff --git a/archival/tar.c b/archival/tar.c
+index 450402d..9598237 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -331,7 +331,7 @@ static int writeTarHeader(struct TarBallInfo *tbInfo,
+ 		if (sizeof(statbuf->st_size) > 4
+ 		 && statbuf->st_size > (off_t)0777777777777LL
+ 		) {
+-			bb_error_msg_and_die("cannot store file '%s' "
++			bb_error_msg_and_die("can't store file '%s' "
+ 				"of size %"OFF_FMT"d, aborting",
+ 				fileName, statbuf->st_size);
+ 		}
+@@ -598,7 +598,7 @@ static NOINLINE int writeTarFile(int tar_fd, int verboseFlag,
+ 	/* Store the stat info for the tarball's file, so
+ 	 * can avoid including the tarball into itself....  */
+ 	if (fstat(tbInfo.tarFd, &tbInfo.statBuf) < 0)
+-		bb_perror_msg_and_die("cannot stat tar file");
++		bb_perror_msg_and_die("can't stat tar file");
+ 
+ #if ENABLE_FEATURE_SEAMLESS_GZ || ENABLE_FEATURE_SEAMLESS_BZ2
+ 	if (gzip)
+diff --git a/coreutils/date.c b/coreutils/date.c
+index a230fe2..51200e6 100644
+--- a/coreutils/date.c
++++ b/coreutils/date.c
+@@ -164,7 +164,7 @@ int date_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 		/* if setting time, set it */
+ 		if ((opt & OPT_SET) && stime(&tm) < 0) {
+-			bb_perror_msg("cannot set date");
++			bb_perror_msg("can't set date");
+ 		}
+ 	}
+ 
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 6022c9f..ec9227d0 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -175,7 +175,7 @@ int id_main(int argc UNUSED_PARAM, char **argv)
+ 			}
+ 		} else if (n < 0) { /* error in get_groups() */
+ 			if (!ENABLE_DESKTOP)
+-				bb_error_msg_and_die("cannot get groups");
++				bb_error_msg_and_die("can't get groups");
+ 			else
+ 				return EXIT_FAILURE;
+ 		}
+diff --git a/coreutils/libcoreutils/cp_mv_stat.c b/coreutils/libcoreutils/cp_mv_stat.c
+index 0fd467c..5ba07ec 100644
+--- a/coreutils/libcoreutils/cp_mv_stat.c
++++ b/coreutils/libcoreutils/cp_mv_stat.c
+@@ -29,11 +29,11 @@ int FAST_FUNC cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf)
+ 		if (errno != ENOENT) {
+ #if ENABLE_FEATURE_VERBOSE_CP_MESSAGE
+ 			if (errno == ENOTDIR) {
+-				bb_error_msg("cannot stat '%s': Path has non-directory component", fn);
++				bb_error_msg("can't stat '%s': Path has non-directory component", fn);
+ 				return -1;
+ 			}
+ #endif
+-			bb_perror_msg("cannot stat '%s'", fn);
++			bb_perror_msg("can't stat '%s'", fn);
+ 			return -1;
+ 		}
+ 		return 0;
+diff --git a/coreutils/md5_sha1_sum.c b/coreutils/md5_sha1_sum.c
+index a988b9c..a64026d 100644
+--- a/coreutils/md5_sha1_sum.c
++++ b/coreutils/md5_sha1_sum.c
+@@ -174,7 +174,7 @@ int md5_sha1_sum_main(int argc UNUSED_PARAM, char **argv)
+ 		}
+ 		/*
+ 		if (fclose_if_not_stdin(pre_computed_stream) == EOF) {
+-			bb_perror_msg_and_die("cannot close file %s", file_ptr);
++			bb_perror_msg_and_die("can't close file %s", file_ptr);
+ 		}
+ 		*/
+ 	} else {
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index be10b03..1c5a467 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -87,10 +87,10 @@ int mv_main(int argc, char **argv)
+ 			if (errno != EXDEV
+ 			 || (source_exists = cp_mv_stat2(*argv, &source_stat, lstat)) < 1
+ 			) {
+-				bb_perror_msg("cannot rename '%s'", *argv);
++				bb_perror_msg("can't rename '%s'", *argv);
+ 			} else {
+ 				static const char fmt[] ALIGN1 =
+-					"cannot overwrite %sdirectory with %sdirectory";
++					"can't overwrite %sdirectory with %sdirectory";
+ 
+ 				if (dest_exists) {
+ 					if (dest_exists == 3) {
+@@ -105,7 +105,7 @@ int mv_main(int argc, char **argv)
+ 						}
+ 					}
+ 					if (unlink(dest) < 0) {
+-						bb_perror_msg("cannot remove '%s'", dest);
++						bb_perror_msg("can't remove '%s'", dest);
+ 						goto RET_1;
+ 					}
+ 				}
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 1d5769b..0c4740b 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -807,7 +807,7 @@ skip(off_t n_skip)
+ 	}
+ 
+ 	if (n_skip)
+-		bb_error_msg_and_die("cannot skip past end of combined input");
++		bb_error_msg_and_die("can't skip past end of combined input");
+ }
+ 
+ 
+diff --git a/coreutils/rm.c b/coreutils/rm.c
+index 6b3fbcf..3090cc3 100644
+--- a/coreutils/rm.c
++++ b/coreutils/rm.c
+@@ -42,7 +42,7 @@ int rm_main(int argc UNUSED_PARAM, char **argv)
+ 			const char *base = bb_get_last_path_component_strip(*argv);
+ 
+ 			if (DOT_OR_DOTDOT(base)) {
+-				bb_error_msg("cannot remove '.' or '..'");
++				bb_error_msg("can't remove '.' or '..'");
+ 			} else if (remove_file(*argv, flags) >= 0) {
+ 				continue;
+ 			}
+diff --git a/coreutils/stat.c b/coreutils/stat.c
+index 44a03e5..2bc9a08 100644
+--- a/coreutils/stat.c
++++ b/coreutils/stat.c
+@@ -383,7 +383,7 @@ static bool do_statfs(const char *filename, const char *format)
+ 	}
+ #endif
+ 	if (statfs(filename, &statfsbuf) != 0) {
+-		bb_perror_msg("cannot read file system information for '%s'", filename);
++		bb_perror_msg("can't read file system information for '%s'", filename);
+ 		return 0;
+ 	}
+ 
+@@ -495,7 +495,7 @@ static bool do_stat(const char *filename, const char *format)
+ 	}
+ #endif
+ 	if ((option_mask32 & OPT_DEREFERENCE ? stat : lstat) (filename, &statbuf) != 0) {
+-		bb_perror_msg("cannot stat '%s'", filename);
++		bb_perror_msg("can't stat '%s'", filename);
+ 		return 0;
+ 	}
+ 
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 6726fc7..10da8dc 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -443,5 +443,5 @@ int start_stop_daemon_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ #endif
+ 	execvp(startas, argv);
+-	bb_perror_msg_and_die("cannot start %s", startas);
++	bb_perror_msg_and_die("can't start %s", startas);
+ }
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 21b2fdc..fd0401b 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -298,7 +298,7 @@ static void load_fs_info(const char *filename)
+ 
+ 	fstab = setmntent(filename, "r");
+ 	if (!fstab) {
+-		bb_perror_msg("cannot read %s", filename);
++		bb_perror_msg("can't read %s", filename);
+ 		return;
+ 	}
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/resolve.c b/e2fsprogs/old_e2fsprogs/blkid/resolve.c
+index 7942de2..0f92158 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/resolve.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/resolve.c
+@@ -121,7 +121,7 @@ int main(int argc, char **argv)
+ 		exit(1);
+ 	}
+ 	if (blkid_get_cache(&cache, bb_dev_null) < 0) {
+-		fprintf(stderr, "cannot get blkid cache\n");
++		fprintf(stderr, "Can't get blkid cache\n");
+ 		exit(1);
+ 	}
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/e2fsck.c b/e2fsprogs/old_e2fsprogs/e2fsck.c
+index 6531f5d..c715d3e 100644
+--- a/e2fsprogs/old_e2fsprogs/e2fsck.c
++++ b/e2fsprogs/old_e2fsprogs/e2fsck.c
+@@ -9400,7 +9400,7 @@ static const struct e2fsck_problem problem_table[] = {
+ 
+ 	/* Cannot proceed without a root inode. */
+ 	{ PR_3_NO_ROOT_INODE_ABORT,
+-	  N_("Cannot proceed without a @r.\n"),
++	  N_("can't proceed without a @r.\n"),
+ 	  PROMPT_NONE, PR_FATAL },
+ 
+ 	/* Internal error: couldn't find dir_info */
+@@ -12653,7 +12653,7 @@ static void check_mount(e2fsck_t ctx)
+ 
+ 	printf(_("%s is mounted.  "), ctx->filesystem_name);
+ 	if (!ctx->interactive)
+-		bb_error_msg_and_die(_("cannot continue, aborting"));
++		bb_error_msg_and_die(_("can't continue, aborting"));
+ 	printf(_("\n\n\007\007\007\007WARNING!!!  "
+ 	       "Running e2fsck on a mounted filesystem may cause\n"
+ 	       "SEVERE filesystem damage.\007\007\007\n\n"));
+@@ -13373,7 +13373,7 @@ restart:
+ 				 * happen, unless the hardware or
+ 				 * device driver is being bogus.
+ 				 */
+-				bb_error_msg(_("cannot set superblock flags on %s"), ctx->device_name);
++				bb_error_msg(_("can't set superblock flags on %s"), ctx->device_name);
+ 				bb_error_msg_and_die(0);
+ 			}
+ 			retval = e2fsck_run_ext3_journal(ctx);
+diff --git a/e2fsprogs/old_e2fsprogs/fsck.c b/e2fsprogs/old_e2fsprogs/fsck.c
+index 98e4e38..687938c 100644
+--- a/e2fsprogs/old_e2fsprogs/fsck.c
++++ b/e2fsprogs/old_e2fsprogs/fsck.c
+@@ -1001,7 +1001,7 @@ static int ignore(struct fs_info *fs)
+ 	s = find_fsck(fs->type);
+ 	if (s == NULL) {
+ 		if (wanted)
+-			bb_error_msg("cannot check %s: fsck.%s not found",
++			bb_error_msg("can't check %s: fsck.%s not found",
+ 				fs->device, fs->type);
+ 		return 1;
+ 	}
+@@ -1203,7 +1203,7 @@ static void PRS(int argc, char **argv)
+ 				 * /proc/partitions isn't found.
+ 				 */
+ 				if (access("/proc/partitions", R_OK) < 0) {
+-					bb_perror_msg_and_die("cannot open /proc/partitions "
++					bb_perror_msg_and_die("can't open /proc/partitions "
+ 							"(is /proc mounted?)");
+ 				}
+ 				/*
+@@ -1215,7 +1215,7 @@ static void PRS(int argc, char **argv)
+ 		"must be root to scan for matching filesystems: %s\n", arg);
+ 				else
+ 					bb_error_msg_and_die(
+-		"cannot find matching filesystem: %s", arg);
++		"can't find matching filesystem: %s", arg);
+ 			}
+ 			devices[num_devices++] = dev ? dev : string_copy(arg);
+ 			continue;
+diff --git a/e2fsprogs/old_e2fsprogs/mke2fs.c b/e2fsprogs/old_e2fsprogs/mke2fs.c
+index a132743..32f0329 100644
+--- a/e2fsprogs/old_e2fsprogs/mke2fs.c
++++ b/e2fsprogs/old_e2fsprogs/mke2fs.c
+@@ -245,7 +245,7 @@ static void test_disk(ext2_filsys fs, badblocks_list *bb_list)
+ 	mke2fs_verbose("Running command: %s\n", buf);
+ 	f = popen(buf, "r");
+ 	if (!f) {
+-		bb_perror_msg_and_die("cannot run '%s'", buf);
++		bb_perror_msg_and_die("can't run '%s'", buf);
+ 	}
+ 	retval = ext2fs_read_bb_FILE(fs, f, bb_list, invalid_block);
+ 	pclose(f);
+@@ -1305,7 +1305,7 @@ int mke2fs_main (int argc, char **argv)
+ 			retval = zero_blocks(fs, start, blocks - start,
+ 					     NULL, &ret_blk, NULL);
+ 
+-		mke2fs_warning_msg(retval, "cannot zero block %u at end of filesystem", ret_blk);
++		mke2fs_warning_msg(retval, "can't zero block %u at end of filesystem", ret_blk);
+ 		write_inode_tables(fs);
+ 		create_root_dir(fs);
+ 		create_lost_and_found(fs);
+diff --git a/e2fsprogs/old_e2fsprogs/tune2fs.c b/e2fsprogs/old_e2fsprogs/tune2fs.c
+index 1d39ed1..00f8682 100644
+--- a/e2fsprogs/old_e2fsprogs/tune2fs.c
++++ b/e2fsprogs/old_e2fsprogs/tune2fs.c
+@@ -392,7 +392,7 @@ static time_t parse_time(char *str)
+ 		ts.tm_mday = 0;
+ #endif
+ 	if (ts.tm_mday == 0) {
+-		bb_error_msg_and_die("Cannot parse date/time specifier: %s", str);
++		bb_error_msg_and_die("can't parse date/time specifier: %s", str);
+ 	}
+ 	return mktime(&ts);
+ }
+@@ -590,7 +590,7 @@ int tune2fs_main(int argc, char **argv)
+ 	}
+ 	retval = ext2fs_check_if_mounted(device_name, &mount_flags);
+ 	if (retval)
+-		bb_error_msg_and_die("cannot determine if %s is mounted", device_name);
++		bb_error_msg_and_die("can't determine if %s is mounted", device_name);
+ 	/* Normally we only need to write out the superblock */
+ 	fs->flags |= EXT2_FLAG_SUPER_ONLY;
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/util.c b/e2fsprogs/old_e2fsprogs/util.c
+index 7ab6591..326492d 100644
+--- a/e2fsprogs/old_e2fsprogs/util.c
++++ b/e2fsprogs/old_e2fsprogs/util.c
+@@ -35,7 +35,7 @@ void check_plausibility(const char *device, int force)
+ 	if (force)
+ 		return;
+ 	if (val == -1)
+-		bb_perror_msg_and_die("cannot stat %s", device);
++		bb_perror_msg_and_die("can't stat %s", device);
+ 	if (!S_ISBLK(s.st_mode)) {
+ 		printf("%s is not a block special device.\n", device);
+ 		proceed_question();
+@@ -79,7 +79,7 @@ void check_mount(const char *device, int force, const char *type)
+ 
+ 	retval = ext2fs_check_if_mounted(device, &mount_flags);
+ 	if (retval) {
+-		bb_error_msg("cannot determine if %s is mounted", device);
++		bb_error_msg("can't determine if %s is mounted", device);
+ 		return;
+ 	}
+ 	if (mount_flags & EXT2_MF_MOUNTED) {
+@@ -216,7 +216,7 @@ void make_journal_device(char *journal_device, ext2_filsys fs, int quiet, int fo
+ 					EXT2_FLAG_JOURNAL_DEV_OK, 0,
+ 					fs->blocksize, io_ptr, &jfs);
+ 	if (retval)
+-		bb_error_msg_and_die("cannot journal device %s", journal_device);
++		bb_error_msg_and_die("can't journal device %s", journal_device);
+ 	if (!quiet)
+ 		printf("Adding journal to device %s: ", journal_device);
+ 	fflush(stdout);
+@@ -245,7 +245,7 @@ void make_journal_blocks(ext2_filsys fs, int journal_size, int journal_flags, in
+ 	retval = ext2fs_add_journal_inode(fs, journal_blocks,
+ 						  journal_flags);
+ 	if (retval)
+-		bb_error_msg_and_die("cannot create journal");
++		bb_error_msg_and_die("can't create journal");
+ 	if (!quiet)
+ 		puts("done");
+ }
+diff --git a/editors/ed.c b/editors/ed.c
+index 8ed4cd4..9ce8bea 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -456,7 +456,7 @@ static void subCommand(const char *cmd, int num1, int num2)
+ 		 */
+ 		nlp = malloc(sizeof(LINE) + lp->len + deltaLen);
+ 		if (nlp == NULL) {
+-			bb_error_msg("cannot get memory for line");
++			bb_error_msg("can't get memory for line");
+ 			return;
+ 		}
+ 
+@@ -983,7 +983,7 @@ static NOINLINE int searchLines(const char *str, int num1, int num2)
+ 		lp = lp->next;
+ 	}
+ 
+-	bb_error_msg("cannot find string \"%s\"", str);
++	bb_error_msg("can't find string \"%s\"", str);
+ 	return 0;
+ }
+ 
+diff --git a/editors/sed.c b/editors/sed.c
+index 27c3459..cc609c3 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1337,7 +1337,7 @@ int sed_main(int argc UNUSED_PARAM, char **argv)
+ 			G.outname = xasprintf("%sXXXXXX", argv[i]);
+ 			nonstdoutfd = mkstemp(G.outname);
+ 			if (-1 == nonstdoutfd)
+-				bb_perror_msg_and_die("cannot create temp file %s", G.outname);
++				bb_perror_msg_and_die("can't create temp file %s", G.outname);
+ 			G.nonstdout = fdopen(nonstdoutfd, "w");
+ 
+ 			/* Set permissions of output file */
+diff --git a/editors/vi.c b/editors/vi.c
+index 1a3997a..6a67228 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -2335,7 +2335,7 @@ static int file_insert(const char *fn, char *p, int update_ro_status)
+ 	} else if (cnt < size) {
+ 		// There was a partial read, shrink unused space text[]
+ 		p = text_hole_delete(p + cnt, p + (size - cnt) - 1);	// un-do buffer insert
+-		status_line_bold("cannot read all of file \"%s\"", fn);
++		status_line_bold("can't read all of file \"%s\"", fn);
+ 	}
+ 	if (cnt >= size)
+ 		file_modified++;
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index ab1a6d0..c711777 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -426,7 +426,7 @@ int xargs_main(int argc, char **argv)
+ 			n_chars += strlen(*argv) + 1;
+ 		}
+ 		if (n_max_chars < n_chars) {
+-			bb_error_msg_and_die("cannot fit single argument within argument list size limit");
++			bb_error_msg_and_die("can't fit single argument within argument list size limit");
+ 		}
+ 		n_max_chars -= n_chars;
+ 	} else {
+diff --git a/init/init.c b/init/init.c
+index 6bee8f3..5240e47 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -305,7 +305,7 @@ static void init_exec(const char *command)
+ 			ioctl(STDIN_FILENO, TIOCSCTTY, 0 /*only try, don't steal*/);
+ 	}
+ 	BB_EXECVP(cmd[0] + dash, cmd);
+-	message(L_LOG | L_CONSOLE, "cannot run '%s': %s", cmd[0], strerror(errno));
++	message(L_LOG | L_CONSOLE, "can't run '%s': %s", cmd[0], strerror(errno));
+ 	/* returns if execvp fails */
+ }
+ 
+@@ -899,7 +899,7 @@ int init_main(int argc UNUSED_PARAM, char **argv)
+ 			BB_EXECVP(argv[0], argv);
+ 		} else if (enforce > 0) {
+ 			/* SELinux in enforcing mode but load_policy failed */
+-			message(L_CONSOLE, "cannot load SELinux Policy. "
++			message(L_CONSOLE, "can't load SELinux Policy. "
+ 				"Machine is in enforcing mode. Halting now.");
+ 			exit(EXIT_FAILURE);
+ 		}
+diff --git a/libbb/copy_file.c b/libbb/copy_file.c
+index ae70cbc..ff29885 100644
+--- a/libbb/copy_file.c
++++ b/libbb/copy_file.c
+@@ -30,12 +30,12 @@ static int ask_and_unlink(const char *dest, int flags)
+ #if !ENABLE_FEATURE_NON_POSIX_CP
+ 	if (!(flags & (FILEUTILS_FORCE|FILEUTILS_INTERACTIVE))) {
+ 		/* Either it exists, or the *path* doesnt exist */
+-		bb_perror_msg("cannot create '%s'", dest);
++		bb_perror_msg("can't create '%s'", dest);
+ 		return -1;
+ 	}
+ #endif
+ 	// else: act as if -f is always in effect.
+-	// We don't want "cannot create" msg, we want unlink to be done
++	// We don't want "can't create" msg, we want unlink to be done
+ 	// (silently unless -i). Why? POSIX cp usually succeeds with
+ 	// O_TRUNC open of existing file, and user is left ignorantly happy.
+ 	// With above block unconditionally enabled, non-POSIX cp
+@@ -56,12 +56,12 @@ static int ask_and_unlink(const char *dest, int flags)
+ 		if (e == errno && e == ENOENT) {
+ 			/* e == ENOTDIR is similar: path has non-dir component,
+ 			 * but in this case we don't even reach copy_file() */
+-			bb_error_msg("cannot create '%s': Path does not exist", dest);
++			bb_error_msg("can't create '%s': Path does not exist", dest);
+ 			return -1; /* error */
+ 		}
+ #endif
+ 		errno = e; /* do not use errno from unlink */
+-		bb_perror_msg("cannot create '%s'", dest);
++		bb_perror_msg("can't create '%s'", dest);
+ 		return -1; /* error */
+ 	}
+ 	return 1; /* ok (to try again) */
+@@ -90,13 +90,13 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 		 * Making [sym]links to dangling symlinks works, so... */
+ 		if (flags & (FILEUTILS_MAKE_SOFTLINK|FILEUTILS_MAKE_HARDLINK))
+ 			goto make_links;
+-		bb_perror_msg("cannot stat '%s'", source);
++		bb_perror_msg("can't stat '%s'", source);
+ 		return -1;
+ 	}
+ 
+ 	if (lstat(dest, &dest_stat) < 0) {
+ 		if (errno != ENOENT) {
+-			bb_perror_msg("cannot stat '%s'", dest);
++			bb_perror_msg("can't stat '%s'", dest);
+ 			return -1;
+ 		}
+ 	} else {
+@@ -114,14 +114,14 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 		security_context_t con;
+ 		if (lgetfilecon(source, &con) >= 0) {
+ 			if (setfscreatecon(con) < 0) {
+-				bb_perror_msg("cannot set setfscreatecon %s", con);
++				bb_perror_msg("can't set setfscreatecon %s", con);
+ 				freecon(con);
+ 				return -1;
+ 			}
+ 		} else if (errno == ENOTSUP || errno == ENODATA) {
+ 			setfscreatecon_or_die(NULL);
+ 		} else {
+-			bb_perror_msg("cannot lgetfilecon %s", source);
++			bb_perror_msg("can't lgetfilecon %s", source);
+ 			return -1;
+ 		}
+ 	}
+@@ -166,13 +166,13 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 			mode |= S_IRWXU;
+ 			if (mkdir(dest, mode) < 0) {
+ 				umask(saved_umask);
+-				bb_perror_msg("cannot create directory '%s'", dest);
++				bb_perror_msg("can't create directory '%s'", dest);
+ 				return -1;
+ 			}
+ 			umask(saved_umask);
+ 			/* need stat info for add_to_ino_dev_hashtable */
+ 			if (lstat(dest, &dest_stat) < 0) {
+-				bb_perror_msg("cannot stat '%s'", dest);
++				bb_perror_msg("can't stat '%s'", dest);
+ 				return -1;
+ 			}
+ 		}
+@@ -204,7 +204,7 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 		if (!dest_exists
+ 		 && chmod(dest, source_stat.st_mode & ~saved_umask) < 0
+ 		) {
+-			bb_perror_msg("cannot preserve %s of '%s'", "permissions", dest);
++			bb_perror_msg("can't preserve %s of '%s'", "permissions", dest);
+ 			/* retval = -1; - WRONG! copy *WAS* made */
+ 		}
+ 		goto preserve_mode_ugid_time;
+@@ -222,7 +222,7 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 			if (ovr <= 0)
+ 				return ovr;
+ 			if (lf(source, dest) < 0) {
+-				bb_perror_msg("cannot create link '%s'", dest);
++				bb_perror_msg("can't create link '%s'", dest);
+ 				return -1;
+ 			}
+ 		}
+@@ -257,7 +257,7 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 					if (ovr <= 0)
+ 						return ovr;
+ 					if (link(link_target, dest) < 0) {
+-						bb_perror_msg("cannot create link '%s'", dest);
++						bb_perror_msg("can't create link '%s'", dest);
+ 						return -1;
+ 					}
+ 				}
+@@ -318,7 +318,7 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 			retval = -1;
+ 		/* Ok, writing side I can understand... */
+ 		if (close(dst_fd) < 0) {
+-			bb_perror_msg("cannot close '%s'", dest);
++			bb_perror_msg("can't close '%s'", dest);
+ 			retval = -1;
+ 		}
+ 		/* ...but read size is already checked by bb_copyfd_eof */
+@@ -345,12 +345,12 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 			int r = symlink(lpath, dest);
+ 			free(lpath);
+ 			if (r < 0) {
+-				bb_perror_msg("cannot create symlink '%s'", dest);
++				bb_perror_msg("can't create symlink '%s'", dest);
+ 				return -1;
+ 			}
+ 			if (flags & FILEUTILS_PRESERVE_STATUS)
+ 				if (lchown(dest, source_stat.st_uid, source_stat.st_gid) < 0)
+-					bb_perror_msg("cannot preserve %s of '%s'", "ownership", dest);
++					bb_perror_msg("can't preserve %s of '%s'", "ownership", dest);
+ 		}
+ 		/* _Not_ jumping to preserve_mode_ugid_time:
+ 		 * symlinks don't have those */
+@@ -360,7 +360,7 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 	 || S_ISSOCK(source_stat.st_mode) || S_ISFIFO(source_stat.st_mode)
+ 	) {
+ 		if (mknod(dest, source_stat.st_mode, source_stat.st_rdev) < 0) {
+-			bb_perror_msg("cannot create '%s'", dest);
++			bb_perror_msg("can't create '%s'", dest);
+ 			return -1;
+ 		}
+ 	} else {
+@@ -380,13 +380,13 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 		times.modtime = source_stat.st_mtime;
+ 		/* BTW, utimes sets usec-precision time - just FYI */
+ 		if (utime(dest, &times) < 0)
+-			bb_perror_msg("cannot preserve %s of '%s'", "times", dest);
++			bb_perror_msg("can't preserve %s of '%s'", "times", dest);
+ 		if (chown(dest, source_stat.st_uid, source_stat.st_gid) < 0) {
+ 			source_stat.st_mode &= ~(S_ISUID | S_ISGID);
+-			bb_perror_msg("cannot preserve %s of '%s'", "ownership", dest);
++			bb_perror_msg("can't preserve %s of '%s'", "ownership", dest);
+ 		}
+ 		if (chmod(dest, source_stat.st_mode) < 0)
+-			bb_perror_msg("cannot preserve %s of '%s'", "permissions", dest);
++			bb_perror_msg("can't preserve %s of '%s'", "permissions", dest);
+ 	}
+ 
+ 	return retval;
+diff --git a/libbb/kernel_version.c b/libbb/kernel_version.c
+index 937d2db..cc23712 100644
+--- a/libbb/kernel_version.c
++++ b/libbb/kernel_version.c
+@@ -24,7 +24,7 @@ int FAST_FUNC get_linux_version_code(void)
+ 	int i, r;
+ 
+ 	if (uname(&name) == -1) {
+-		bb_perror_msg("cannot get system information");
++		bb_perror_msg("can't get system information");
+ 		return 0;
+ 	}
+ 
+diff --git a/libbb/make_directory.c b/libbb/make_directory.c
+index 391493c..a4ad599 100644
+--- a/libbb/make_directory.c
++++ b/libbb/make_directory.c
+@@ -93,6 +93,6 @@ int FAST_FUNC bb_make_directory(char *path, long mode, int flags)
+ 		*s = c;
+ 	} /* while (1) */
+ 
+-	bb_perror_msg("cannot %s directory '%s'", fail_msg, path);
++	bb_perror_msg("can't %s directory '%s'", fail_msg, path);
+ 	return -1;
+ }
+diff --git a/libbb/remove_file.c b/libbb/remove_file.c
+index 8b14f07..da14885 100644
+--- a/libbb/remove_file.c
++++ b/libbb/remove_file.c
+@@ -17,11 +17,11 @@ int FAST_FUNC remove_file(const char *path, int flags)
+ 
+ 	if (lstat(path, &path_stat) < 0) {
+ 		if (errno != ENOENT) {
+-			bb_perror_msg("cannot stat '%s'", path);
++			bb_perror_msg("can't stat '%s'", path);
+ 			return -1;
+ 		}
+ 		if (!(flags & FILEUTILS_FORCE)) {
+-			bb_perror_msg("cannot remove '%s'", path);
++			bb_perror_msg("can't remove '%s'", path);
+ 			return -1;
+ 		}
+ 		return 0;
+@@ -63,7 +63,7 @@ int FAST_FUNC remove_file(const char *path, int flags)
+ 		}
+ 
+ 		if (closedir(dp) < 0) {
+-			bb_perror_msg("cannot close '%s'", path);
++			bb_perror_msg("can't close '%s'", path);
+ 			return -1;
+ 		}
+ 
+@@ -74,7 +74,7 @@ int FAST_FUNC remove_file(const char *path, int flags)
+ 		}
+ 
+ 		if (rmdir(path) < 0) {
+-			bb_perror_msg("cannot remove '%s'", path);
++			bb_perror_msg("can't remove '%s'", path);
+ 			return -1;
+ 		}
+ 
+@@ -94,7 +94,7 @@ int FAST_FUNC remove_file(const char *path, int flags)
+ 	}
+ 
+ 	if (unlink(path) < 0) {
+-		bb_perror_msg("cannot remove '%s'", path);
++		bb_perror_msg("can't remove '%s'", path);
+ 		return -1;
+ 	}
+ 
+diff --git a/libbb/run_shell.c b/libbb/run_shell.c
+index 2ccb3a1..de7b92a 100644
+--- a/libbb/run_shell.c
++++ b/libbb/run_shell.c
+@@ -86,5 +86,5 @@ void FAST_FUNC run_shell(const char *shell, int loginshell, const char *command,
+ 		freecon(current_sid);
+ #endif
+ 	execv(shell, (char **) args);
+-	bb_perror_msg_and_die("cannot run %s", shell);
++	bb_perror_msg_and_die("can't run %s", shell);
+ }
+diff --git a/libbb/selinux_common.c b/libbb/selinux_common.c
+index 275a761..7b56967 100644
+--- a/libbb/selinux_common.c
++++ b/libbb/selinux_common.c
+@@ -36,7 +36,7 @@ void FAST_FUNC setfscreatecon_or_die(security_context_t scontext)
+ 	if (setfscreatecon(scontext) < 0) {
+ 		/* Can be NULL. All known printf implementations
+ 		 * display "(null)", "<null>" etc */
+-		bb_perror_msg_and_die("cannot set default "
++		bb_perror_msg_and_die("can't set default "
+ 				"file creation context to %s", scontext);
+ 	}
+ }
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index a184669..f018ca9 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -63,9 +63,9 @@ void FAST_FUNC xconnect(int s, const struct sockaddr *s_addr, socklen_t addrlen)
+ 			close(s);
+ 		if (s_addr->sa_family == AF_INET)
+ 			bb_perror_msg_and_die("%s (%s)",
+-				"cannot connect to remote host",
++				"can't connect to remote host",
+ 				inet_ntoa(((struct sockaddr_in *)s_addr)->sin_addr));
+-		bb_perror_msg_and_die("cannot connect to remote host");
++		bb_perror_msg_and_die("can't connect to remote host");
+ 	}
+ }
+ 
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 1ffa965..7a6f246 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -175,7 +175,7 @@ static void initselinux(char *username, char *full_tty,
+ 		return;
+ 
+ 	if (get_default_context(username, NULL, user_sid)) {
+-		bb_error_msg_and_die("cannot get SID for %s", username);
++		bb_error_msg_and_die("can't get SID for %s", username);
+ 	}
+ 	if (getfilecon(full_tty, &old_tty_sid) < 0) {
+ 		bb_perror_msg_and_die("getfilecon(%s) failed", full_tty);
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index 1164ff4..c1481c6 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -146,7 +146,7 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
+ 	if (!(opt & OPT_lud)) {
+ 		if (myuid && !c) { /* passwd starts with '!' */
+ 			/* LOGMODE_BOTH */
+-			bb_error_msg_and_die("cannot change "
++			bb_error_msg_and_die("can't change "
+ 					"locked password for %s", name);
+ 		}
+ 		printf("Changing password for %s\n", name);
+@@ -189,7 +189,7 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 	/* LOGMODE_BOTH */
+ 	if (rc < 0)
+-		bb_error_msg_and_die("cannot update password file %s",
++		bb_error_msg_and_die("can't update password file %s",
+ 				filename);
+ 	bb_info_msg("Password for %s changed by %s", name, myname);
+ 
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 74bf916..8e4f0bf 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -834,7 +834,7 @@ static void RunJob(const char *user, CronLine *line)
+ 				line->cl_Shell);
+ 			line->cl_MailPos = lseek(mailFd, 0, SEEK_CUR);
+ 		} else {
+-			crondlog(ERR20 "cannot create mail file %s for user %s, "
++			crondlog(ERR20 "can't create mail file %s for user %s, "
+ 					"discarding output", mailFile, user);
+ 		}
+ 	}
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 34b80ea..67b10f6 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -193,7 +193,7 @@ int crontab_main(int argc UNUSED_PARAM, char **argv)
+ 			close(fd);
+ 			xrename(new_fname, pas->pw_name);
+ 		} else {
+-			bb_error_msg("cannot create %s/%s",
++			bb_error_msg("can't create %s/%s",
+ 					crontab_dir, new_fname);
+ 		}
+ 		if (tmp_fname)
+@@ -220,7 +220,7 @@ int crontab_main(int argc UNUSED_PARAM, char **argv)
+ 		/* loop */
+ 	}
+ 	if (fd < 0) {
+-		bb_error_msg("cannot append to %s/%s",
++		bb_error_msg("can't append to %s/%s",
+ 				crontab_dir, CRONUPDATE);
+ 	}
+ 	return 0;
+diff --git a/miscutils/time.c b/miscutils/time.c
+index 30298fe..42c812a 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -380,7 +380,7 @@ static void run_command(char *const *cmd, resource_t *resp)
+ 		   versus merely warnings if the cast is left off.  */
+ 		BB_EXECVP(cmd[0], cmd);
+ 		xfunc_error_retval = (errno == ENOENT ? 127 : 126);
+-		bb_error_msg_and_die("cannot run %s", cmd[0]);
++		bb_error_msg_and_die("can't run %s", cmd[0]);
+ 	}
+ 
+ 	/* Have signals kill the child but not self (if possible).  */
+diff --git a/networking/ether-wake.c b/networking/ether-wake.c
+index 59f4053..e05db7a 100644
+--- a/networking/ether-wake.c
++++ b/networking/ether-wake.c
+@@ -167,7 +167,7 @@ static int get_wol_pw(const char *ethoptarg, unsigned char *wol_passwd)
+ 		byte_cnt = sscanf(ethoptarg, "%u.%u.%u.%u",
+ 		                  &passwd[0], &passwd[1], &passwd[2], &passwd[3]);
+ 	if (byte_cnt < 4) {
+-		bb_error_msg("cannot read Wake-On-LAN pass");
++		bb_error_msg("can't read Wake-On-LAN pass");
+ 		return 0;
+ 	}
+ // TODO: check invalid numbers >255??
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index b5cc3de..18abc12 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -178,7 +178,7 @@ int ipcalc_main(int argc, char **argv)
+ 
+ 			hostinfo = gethostbyaddr((char *) &ipaddr, sizeof(ipaddr), AF_INET);
+ 			if (!hostinfo) {
+-				bb_herror_msg_and_die("cannot find hostname for %s", argv[0]);
++				bb_herror_msg_and_die("can't find hostname for %s", argv[0]);
+ 			}
+ 			str_tolower(hostinfo->h_name);
+ 
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index fcf9623..c450c6a 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -426,7 +426,7 @@ int ipaddr_list_or_flush(char **argv, int flush)
+ 			bb_error_msg_and_die(bb_msg_requires_arg, "flush");
+ 		}
+ 		if (filter.family == AF_PACKET) {
+-			bb_error_msg_and_die("cannot flush link addresses");
++			bb_error_msg_and_die("can't flush link addresses");
+ 		}
+ 	}
+ 
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index 7031bed..67eb90b 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -499,7 +499,7 @@ static void iproute_flush_cache(void)
+ 	}
+ 
+ 	if (write(flush_fd, "-1", 2) < 2) {
+-		bb_perror_msg("cannot flush routing cache");
++		bb_perror_msg("can't flush routing cache");
+ 		return;
+ 	}
+ 	close(flush_fd);
+@@ -681,7 +681,7 @@ static int iproute_list_or_flush(char **argv, int flush)
+ 	if (filter.tb != -1) {
+ 		xrtnl_wilddump_request(&rth, do_ipv6, RTM_GETROUTE);
+ 	} else if (rtnl_rtcache_request(&rth, do_ipv6) < 0) {
+-		bb_perror_msg_and_die("cannot send dump request");
++		bb_perror_msg_and_die("can't send dump request");
+ 	}
+ 	xrtnl_dump_filter(&rth, print_route, NULL);
+ 
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index 836709c..67afd1b 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -222,7 +222,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 				}
+ 				p->iph.protocol = IPPROTO_IPV6;
+ 			} else {
+-				bb_error_msg_and_die("%s tunnel mode", "cannot guess");
++				bb_error_msg_and_die("%s tunnel mode", "can't guess");
+ 			}
+ 		} else if (key == ARG_key) {
+ 			unsigned uval;
+@@ -377,7 +377,7 @@ static int do_add(int cmd, char **argv)
+ 	case IPPROTO_IPV6:
+ 		return do_add_ioctl(cmd, "sit0", &p);
+ 	default:
+-		bb_error_msg_and_die("cannot determine tunnel mode (ipip, gre or sit)");
++		bb_error_msg_and_die("can't determine tunnel mode (ipip, gre or sit)");
+ 	}
+ }
+ 
+@@ -499,7 +499,7 @@ static void do_tunnels_list(struct ip_tunnel_parm *p)
+ 			continue;
+ 		type = do_ioctl_get_iftype(name);
+ 		if (type == -1) {
+-			bb_error_msg("cannot get type of [%s]", name);
++			bb_error_msg("can't get type of [%s]", name);
+ 			continue;
+ 		}
+ 		if (type != ARPHRD_TUNNEL && type != ARPHRD_IPGRE && type != ARPHRD_SIT)
+diff --git a/networking/libiproute/libnetlink.c b/networking/libiproute/libnetlink.c
+index b4cc8df..9e6467d 100644
+--- a/networking/libiproute/libnetlink.c
++++ b/networking/libiproute/libnetlink.c
+@@ -242,7 +242,7 @@ int FAST_FUNC rtnl_talk(struct rtnl_handle *rtnl, struct nlmsghdr *n,
+ 	status = sendmsg(rtnl->fd, &msg, 0);
+ 
+ 	if (status < 0) {
+-		bb_perror_msg("cannot talk to rtnetlink");
++		bb_perror_msg("can't talk to rtnetlink");
+ 		goto ret;
+ 	}
+ 
+diff --git a/networking/libiproute/ll_map.c b/networking/libiproute/ll_map.c
+index 3c4ef2c..246b9e3 100644
+--- a/networking/libiproute/ll_map.c
++++ b/networking/libiproute/ll_map.c
+@@ -193,7 +193,7 @@ int FAST_FUNC xll_name_to_index(const char *name)
+ 	}
+ /* out:*/
+ 	if (ret <= 0)
+-		bb_error_msg_and_die("cannot find device \"%s\"", name);
++		bb_error_msg_and_die("can't find device '%s'", name);
+ 	return ret;
+ }
+ 
+diff --git a/networking/nameif.c b/networking/nameif.c
+index fb31fbf..36fbb95 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -92,7 +92,7 @@ static void nameif_parse_selector(ethtable_t *ch, char *selector)
+ 			lmac = xmalloc(ETH_ALEN);
+ 			ch->mac = ether_aton_r(selector + (strncmp(selector, "mac=", 4) ? 0 : 4), lmac);
+ 			if (ch->mac == NULL)
+-				bb_error_msg_and_die("cannot parse %s", selector);
++				bb_error_msg_and_die("can't parse %s", selector);
+ #if  ENABLE_FEATURE_NAMEIF_EXTENDED
+ 			found_selector++;
+ 		};
+@@ -211,7 +211,7 @@ int nameif_main(int argc, char **argv)
+ 		if (strcmp(ifr.ifr_name, ch->ifname) != 0) {
+ 			strcpy(ifr.ifr_newname, ch->ifname);
+ 			ioctl_or_perror_and_die(ctl_sk, SIOCSIFNAME, &ifr,
+-					"cannot change ifname %s to %s",
++					"can't change ifname %s to %s",
+ 					ifr.ifr_name, ch->ifname);
+ 		}
+ 		/* Remove list entry of renamed interface */
+diff --git a/networking/tc.c b/networking/tc.c
+index d963694..3115a52 100644
+--- a/networking/tc.c
++++ b/networking/tc.c
+@@ -531,7 +531,7 @@ int tc_main(int argc UNUSED_PARAM, char **argv)
+ 		if (rtnl_dump_request(&rth, obj == OBJ_qdisc ? RTM_GETQDISC :
+ 						obj == OBJ_class ? RTM_GETTCLASS : RTM_GETTFILTER,
+ 						&msg, sizeof(msg)) < 0)
+-			bb_simple_perror_msg_and_die("cannot send dump request");
++			bb_simple_perror_msg_and_die("can't send dump request");
+ 
+ 		xrtnl_dump_filter(&rth, obj == OBJ_qdisc ? print_qdisc :
+ 						obj == OBJ_class ? print_class : print_filter,
+diff --git a/networking/tcpudp.c b/networking/tcpudp.c
+index 98a2aa8..25b3319 100644
+--- a/networking/tcpudp.c
++++ b/networking/tcpudp.c
+@@ -251,14 +251,14 @@ int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
+ 	if (!cert) cert = "./cert.pem";
+ 	if (!key) key = cert;
+ 	if (matrixSslOpen() < 0)
+-		fatal("cannot initialize ssl");
++		fatal("can't initialize ssl");
+ 	if (matrixSslReadKeys(&keys, cert, key, 0, ca) < 0) {
+ 		if (client)
+-			fatal("cannot read cert, key, or ca file");
+-		fatal("cannot read cert or key file");
++			fatal("can't read cert, key, or ca file");
++		fatal("can't read cert or key file");
+ 	}
+ 	if (matrixSslNewSession(&ssl, keys, 0, SSL_FLAGS_SERVER) < 0)
+-		fatal("cannot create ssl session");
++		fatal("can't create ssl session");
+ #endif
+ 
+ 	sig_block(SIGCHLD);
+@@ -425,7 +425,7 @@ int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
+ 			if (opts & OPT_h) {
+ 				free_me1 = remote_hostname = xmalloc_sockaddr2host_noport(&remote.u.sa);
+ 				if (!remote_hostname) {
+-					bb_error_msg("cannot look up hostname for %s", remote_addr);
++					bb_error_msg("can't look up hostname for %s", remote_addr);
+ 					remote_hostname = remote_addr;
+ 				}
+ 			}
+@@ -441,7 +441,7 @@ int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
+ 				if (!local_hostname) {
+ 					free_me2 = local_hostname = xmalloc_sockaddr2host_noport(&local.u.sa);
+ 					if (!local_hostname)
+-						bb_error_msg_and_die("cannot look up hostname for %s", local_addr);
++						bb_error_msg_and_die("can't look up hostname for %s", local_addr);
+ 				}
+ 				/* else: local_hostname is not NULL, but is NOT malloced! */
+ 			}
+diff --git a/networking/udhcp/arpping.c b/networking/udhcp/arpping.c
+index 48158fc..3df0f39 100644
+--- a/networking/udhcp/arpping.c
++++ b/networking/udhcp/arpping.c
+@@ -57,7 +57,7 @@ int FAST_FUNC arpping(uint32_t test_nip,
+ 	}
+ 
+ 	if (setsockopt_broadcast(s) == -1) {
+-		bb_perror_msg("cannot enable bcast on raw socket");
++		bb_perror_msg("can't enable bcast on raw socket");
+ 		goto ret;
+ 	}
+ 
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 23292a5..dc5d9ff 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -77,7 +77,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* Create pidfile */
+ 	write_pidfile(server_config.pidfile);
+-	/* if (!..) bb_perror_msg("cannot create pidfile %s", pidfile); */
++	/* if (!..) bb_perror_msg("can't create pidfile %s", pidfile); */
+ 
+ 	bb_info_msg("%s (v"BB_VER") started", applet_name);
+ 
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index 38f9919..10ec459 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -255,6 +255,6 @@ int FAST_FUNC add_simple_option(uint8_t *optionptr, uint8_t code, uint32_t data)
+ 		}
+ 	}
+ 
+-	bb_error_msg("cannot add option 0x%02x", code);
++	bb_error_msg("can't add option 0x%02x", code);
+ 	return 0;
+ }
+diff --git a/networking/udhcp/signalpipe.c b/networking/udhcp/signalpipe.c
+index a025bd8..c181e0e 100644
+--- a/networking/udhcp/signalpipe.c
++++ b/networking/udhcp/signalpipe.c
+@@ -29,7 +29,7 @@ static void signal_handler(int sig)
+ {
+ 	unsigned char ch = sig; /* use char, avoid dealing with partial writes */
+ 	if (write(signal_pipe.wr, &ch, 1) != 1)
+-		bb_perror_msg("cannot send signal");
++		bb_perror_msg("can't send signal");
+ }
+ 
+ 
+diff --git a/networking/wget.c b/networking/wget.c
+index 11d39cb..8ca6def 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -626,7 +626,7 @@ int wget_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* Impossible?
+ 	if ((opt & WGET_OPT_CONTINUE) && !fname_out)
+-		bb_error_msg_and_die("cannot specify continue (-c) without a filename (-O)");
++		bb_error_msg_and_die("can't specify continue (-c) without a filename (-O)");
+ 	*/
+ 
+ 	/* Determine where to start transfer */
+diff --git a/procps/kill.c b/procps/kill.c
+index 1f82069..e418046 100644
+--- a/procps/kill.c
++++ b/procps/kill.c
+@@ -195,7 +195,7 @@ int kill_main(int argc, char **argv)
+ 						continue;
+ 					errors++;
+ 					if (!quiet)
+-						bb_perror_msg("cannot kill pid %u", (unsigned)*pl);
++						bb_perror_msg("can't kill pid %u", (unsigned)*pl);
+ 				}
+ 			}
+ 			free(pidList);
+@@ -214,7 +214,7 @@ int kill_main(int argc, char **argv)
+ 			bb_error_msg("bad pid '%s'", arg);
+ 			errors++;
+ 		} else if (kill(pid, signo) != 0) {
+-			bb_perror_msg("cannot kill pid %d", (int)pid);
++			bb_perror_msg("can't kill pid %d", (int)pid);
+ 			errors++;
+ 		}
+ 		arg = *++argv;
+diff --git a/procps/ps.c b/procps/ps.c
+index e940045..be11a1b 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -143,7 +143,7 @@ static unsigned get_kernel_HZ(void)
+ 		kernel_HZ = get_HZ_by_waiting();
+ 
+ 	//if (open_read_close("/proc/uptime", buf, sizeof(buf) <= 0)
+-	//	bb_perror_msg_and_die("cannot read %s", "/proc/uptime");
++	//	bb_perror_msg_and_die("can't read %s", "/proc/uptime");
+ 	//buf[sizeof(buf)-1] = '\0';
+ 	///sscanf(buf, "%llu", &seconds_since_boot);
+ 	sysinfo(&info);
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 492c2a5..f6aaeb7 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -73,7 +73,7 @@ struct globals {
+ 
+ static void fatal2_cannot(const char *m1, const char *m2)
+ {
+-	bb_perror_msg_and_die("%s: fatal: cannot %s%s", svdir, m1, m2);
++	bb_perror_msg_and_die("%s: fatal: can't %s%s", svdir, m1, m2);
+ 	/* was exiting 100 */
+ }
+ static void warn3x(const char *m1, const char *m2, const char *m3)
+@@ -82,7 +82,7 @@ static void warn3x(const char *m1, const char *m2, const char *m3)
+ }
+ static void warn2_cannot(const char *m1, const char *m2)
+ {
+-	warn3x("cannot ", m1, m2);
++	warn3x("can't ", m1, m2);
+ }
+ #if ENABLE_FEATURE_RUNSVDIR_LOG
+ static void warnx(const char *m1)
+@@ -256,14 +256,14 @@ int runsvdir_main(int argc UNUSED_PARAM, char **argv)
+ 		if (rploglen < 7) {
+ 			warnx("log must have at least seven characters");
+ 		} else if (piped_pair(logpipe)) {
+-			warnx("cannot create pipe for log");
++			warnx("can't create pipe for log");
+ 		} else {
+ 			close_on_exec_on(logpipe.rd);
+ 			close_on_exec_on(logpipe.wr);
+ 			ndelay_on(logpipe.rd);
+ 			ndelay_on(logpipe.wr);
+ 			if (dup2(logpipe.wr, 2) == -1) {
+-				warnx("cannot set filedescriptor for log");
++				warnx("can't set filedescriptor for log");
+ 			} else {
+ 				pfd[0].fd = logpipe.rd;
+ 				pfd[0].events = POLLIN;
+diff --git a/runit/sv.c b/runit/sv.c
+index 732c33c..96ebb74 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -228,13 +228,13 @@ static int svstatus_get(void)
+ 			             : failx("runsv not running");
+ 			return 0;
+ 		}
+-		warn("cannot open supervise/ok");
++		warn("can't open supervise/ok");
+ 		return -1;
+ 	}
+ 	close(fd);
+ 	fd = open_read("supervise/status");
+ 	if (fd == -1) {
+-		warn("cannot open supervise/status");
++		warn("can't open supervise/status");
+ 		return -1;
+ 	}
+ 	r = read(fd, &svstatus, 20);
+@@ -243,11 +243,11 @@ static int svstatus_get(void)
+ 	case 20:
+ 		break;
+ 	case -1:
+-		warn("cannot read supervise/status");
++		warn("can't read supervise/status");
+ 		return -1;
+ 	default:
+ 		errno = 0;
+-		warn("cannot read supervise/status: bad format");
++		warn("can't read supervise/status: bad format");
+ 		return -1;
+ 	}
+ 	return 1;
+@@ -263,7 +263,7 @@ static unsigned svstatus_print(const char *m)
+ 
+ 	if (stat("down", &s) == -1) {
+ 		if (errno != ENOENT) {
+-			bb_perror_msg(WARN"cannot stat %s/down", *service);
++			bb_perror_msg(WARN"can't stat %s/down", *service);
+ 			return 0;
+ 		}
+ 		normallyup = 1;
+@@ -303,7 +303,7 @@ static int status(const char *unused UNUSED_PARAM)
+ 	r = svstatus_print(*service);
+ 	if (chdir("log") == -1) {
+ 		if (errno != ENOENT) {
+-			printf("; log: "WARN"cannot change to log service directory: %s",
++			printf("; log: "WARN"can't change to log service directory: %s",
+ 					strerror(errno));
+ 		}
+ 	} else if (svstatus_get()) {
+@@ -322,7 +322,7 @@ static int checkscript(void)
+ 
+ 	if (stat("check", &s) == -1) {
+ 		if (errno == ENOENT) return 1;
+-		bb_perror_msg(WARN"cannot stat %s/check", *service);
++		bb_perror_msg(WARN"can't stat %s/check", *service);
+ 		return 0;
+ 	}
+ 	/* if (!(s.st_mode & S_IXUSR)) return 1; */
+@@ -330,11 +330,11 @@ static int checkscript(void)
+ 	prog[1] = NULL;
+ 	pid = spawn(prog);
+ 	if (pid <= 0) {
+-		bb_perror_msg(WARN"cannot %s child %s/check", "run", *service);
++		bb_perror_msg(WARN"can't %s child %s/check", "run", *service);
+ 		return 0;
+ 	}
+ 	while (safe_waitpid(pid, &w, 0) == -1) {
+-		bb_perror_msg(WARN"cannot %s child %s/check", "wait for", *service);
++		bb_perror_msg(WARN"can't %s child %s/check", "wait for", *service);
+ 		return 0;
+ 	}
+ 	return WEXITSTATUS(w) == 0;
+@@ -400,7 +400,7 @@ static int control(const char *a)
+ 	fd = open_write("supervise/control");
+ 	if (fd == -1) {
+ 		if (errno != ENODEV)
+-			warn("cannot open supervise/control");
++			warn("can't open supervise/control");
+ 		else
+ 			*a == 'x' ? ok("runsv not running") : failx("runsv not running");
+ 		return -1;
+@@ -409,7 +409,7 @@ static int control(const char *a)
+ 	r = write(fd, a, l);
+ 	close(fd);
+ 	if (r != l) {
+-		warn("cannot write to supervise/control");
++		warn("can't write to supervise/control");
+ 		return -1;
+ 	}
+ 	return 1;
+@@ -541,7 +541,7 @@ int sv_main(int argc UNUSED_PARAM, char **argv)
+ 		}
+ 		if (chdir(x) == -1) {
+  chdir_failed_0:
+-			fail("cannot change to service directory");
++			fail("can't change to service directory");
+ 			goto nullify_service_0;
+ 		}
+ 		if (act && (act(acts) == -1)) {
+@@ -569,7 +569,7 @@ int sv_main(int argc UNUSED_PARAM, char **argv)
+ 			}
+ 			if (chdir(x) == -1) {
+  chdir_failed:
+-				fail("cannot change to service directory");
++				fail("can't change to service directory");
+ 				goto nullify_service;
+ 			}
+ 			if (cbk(acts) != 0)
+diff --git a/selinux/chcon.c b/selinux/chcon.c
+index 55c2522..4395a7e 100644
+--- a/selinux/chcon.c
++++ b/selinux/chcon.c
+@@ -49,12 +49,12 @@ static int FAST_FUNC change_filedir_context(
+ 	}
+ 	if (status < 0 && errno != ENODATA) {
+ 		if ((option_mask32 & OPT_QUIET) == 0)
+-			bb_error_msg("cannot obtain security context: %s", fname);
++			bb_error_msg("can't obtain security context: %s", fname);
+ 		goto skip;
+ 	}
+ 
+ 	if (file_context == NULL && specified_context == NULL) {
+-		bb_error_msg("cannot apply partial context to unlabeled file %s", fname);
++		bb_error_msg("can't apply partial context to unlabeled file %s", fname);
+ 		goto skip;
+ 	}
+ 
+@@ -62,7 +62,7 @@ static int FAST_FUNC change_filedir_context(
+ 		context = set_security_context_component(file_context,
+ 							 user, role, type, range);
+ 		if (!context) {
+-			bb_error_msg("cannot compute security context from %s", file_context);
++			bb_error_msg("can't compute security context from %s", file_context);
+ 			goto skip;
+ 		}
+ 	} else {
+@@ -75,7 +75,7 @@ static int FAST_FUNC change_filedir_context(
+ 
+ 	context_string = context_str(context);
+ 	if (!context_string) {
+-		bb_error_msg("cannot obtain security context in text expression");
++		bb_error_msg("can't obtain security context in text expression");
+ 		goto skip;
+ 	}
+ 
+diff --git a/selinux/getsebool.c b/selinux/getsebool.c
+index b761b72..7478b79 100644
+--- a/selinux/getsebool.c
++++ b/selinux/getsebool.c
+@@ -25,7 +25,7 @@ int getsebool_main(int argc, char **argv)
+ 
+ 		rc = security_get_boolean_names(&names, &len);
+ 		if (rc)
+-			bb_perror_msg_and_die("cannot get boolean names");
++			bb_perror_msg_and_die("can't get boolean names");
+ 
+ 		if (!len) {
+ 			puts("No booleans");
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index 6ecd789..8472b70 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -41,13 +41,13 @@ static context_t runcon_compute_new_context(char *user, char *role, char *type,
+ 	security_context_t cur_context;
+ 
+ 	if (getcon(&cur_context))
+-		bb_error_msg_and_die("cannot get current context");
++		bb_error_msg_and_die("can't get current context");
+ 
+ 	if (compute_trans) {
+ 		security_context_t file_context, new_context;
+ 
+ 		if (getfilecon(command, &file_context) < 0)
+-			bb_error_msg_and_die("cannot retrieve attributes of '%s'",
++			bb_error_msg_and_die("can't retrieve attributes of '%s'",
+ 					     command);
+ 		if (security_compute_create(cur_context, file_context,
+ 					    SECCLASS_PROCESS, &new_context))
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index cc9eec2..18ea05f 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -565,7 +565,7 @@ static void write_superblock(void)
+ 
+ 	xlseek(dev_fd, BLOCK_SIZE, SEEK_SET);
+ 	if (BLOCK_SIZE != full_write(dev_fd, superblock_buffer, BLOCK_SIZE))
+-		die("cannot write superblock");
++		die("can't write superblock");
+ }
+ 
+ static void write_tables(void)
+@@ -573,11 +573,11 @@ static void write_tables(void)
+ 	write_superblock();
+ 
+ 	if (IMAPS * BLOCK_SIZE != write(dev_fd, inode_map, IMAPS * BLOCK_SIZE))
+-		die("cannot write inode map");
++		die("can't write inode map");
+ 	if (ZMAPS * BLOCK_SIZE != write(dev_fd, zone_map, ZMAPS * BLOCK_SIZE))
+-		die("cannot write zone map");
++		die("can't write zone map");
+ 	if (INODE_BUFFER_SIZE != write(dev_fd, inode_buffer, INODE_BUFFER_SIZE))
+-		die("cannot write inodes");
++		die("can't write inodes");
+ }
+ 
+ static void get_dirsize(void)
+@@ -607,7 +607,7 @@ static void read_superblock(void)
+ {
+ 	xlseek(dev_fd, BLOCK_SIZE, SEEK_SET);
+ 	if (BLOCK_SIZE != full_read(dev_fd, superblock_buffer, BLOCK_SIZE))
+-		die("cannot read superblock");
++		die("can't read superblock");
+ 	/* already initialized to:
+ 	namelen = 14;
+ 	dirsize = 16;
+@@ -643,11 +643,11 @@ static void read_tables(void)
+ 	inode_count = xmalloc(INODES + 1);
+ 	zone_count = xmalloc(ZONES);
+ 	if (IMAPS * BLOCK_SIZE != read(dev_fd, inode_map, IMAPS * BLOCK_SIZE))
+-		die("cannot read inode map");
++		die("can't read inode map");
+ 	if (ZMAPS * BLOCK_SIZE != read(dev_fd, zone_map, ZMAPS * BLOCK_SIZE))
+-		die("cannot read zone map");
++		die("can't read zone map");
+ 	if (INODE_BUFFER_SIZE != read(dev_fd, inode_buffer, INODE_BUFFER_SIZE))
+-		die("cannot read inodes");
++		die("can't read inodes");
+ 	if (NORM_FIRSTZONE != FIRSTZONE) {
+ 		printf("warning: firstzone!=norm_firstzone\n");
+ 		errors_uncorrected = 1;
+diff --git a/util-linux/ipcrm.c b/util-linux/ipcrm.c
+index 5e18c28..8b0b226 100644
+--- a/util-linux/ipcrm.c
++++ b/util-linux/ipcrm.c
+@@ -63,7 +63,7 @@ static int remove_ids(type_id type, int argc, char **argv)
+ 				ret = shmctl(id, IPC_RMID, NULL);
+ 
+ 			if (ret) {
+-				bb_perror_msg("cannot remove id %s", argv[0]);
++				bb_perror_msg("can't remove id %s", argv[0]);
+ 				nb_errors++;
+ 			}
+ 		}
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 8819cee..c6c2036 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -243,22 +243,22 @@ static void write_tables(void)
+ 	msg_eol = "seek to 0 failed";
+ 	xlseek(dev_fd, 0, SEEK_SET);
+ 
+-	msg_eol = "cannot clear boot sector";
++	msg_eol = "can't clear boot sector";
+ 	xwrite(dev_fd, G.boot_block_buffer, 512);
+ 
+ 	msg_eol = "seek to BLOCK_SIZE failed";
+ 	xlseek(dev_fd, BLOCK_SIZE, SEEK_SET);
+ 
+-	msg_eol = "cannot write superblock";
++	msg_eol = "can't write superblock";
+ 	xwrite(dev_fd, G.superblock_buffer, BLOCK_SIZE);
+ 
+-	msg_eol = "cannot write inode map";
++	msg_eol = "can't write inode map";
+ 	xwrite(dev_fd, G.inode_map, SB_IMAPS * BLOCK_SIZE);
+ 
+-	msg_eol = "cannot write zone map";
++	msg_eol = "can't write zone map";
+ 	xwrite(dev_fd, G.zone_map, SB_ZMAPS * BLOCK_SIZE);
+ 
+-	msg_eol = "cannot write inodes";
++	msg_eol = "can't write inodes";
+ 	xwrite(dev_fd, G.inode_buffer, INODE_BUFFER_SIZE);
+ 
+ 	msg_eol = "\n";
+@@ -687,7 +687,7 @@ int mkfs_minix_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	xmove_fd(xopen(G.device_name, O_RDWR), dev_fd);
+ 	if (fstat(dev_fd, &statbuf) < 0)
+-		bb_error_msg_and_die("cannot stat %s", G.device_name);
++		bb_error_msg_and_die("can't stat %s", G.device_name);
+ 	if (!S_ISBLK(statbuf.st_mode))
+ 		opt &= ~1; // clear -c (check)
+ 
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 1c51373..30037f9 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -1710,7 +1710,7 @@ static int singlemount(struct mntent *mp, int ignore_busy)
+ 				if (errno == EPERM || errno == EACCES)
+ 					bb_error_msg(bb_msg_perm_denied_are_you_root);
+ 				else
+-					bb_perror_msg("cannot setup loop device");
++					bb_perror_msg("can't setup loop device");
+ 				return errno;
+ 			}
+ 
+@@ -1915,7 +1915,7 @@ int mount_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 	fstab = setmntent(fstabname, "r");
+ 	if (!fstab)
+-		bb_perror_msg_and_die("cannot read %s", fstabname);
++		bb_perror_msg_and_die("can't read %s", fstabname);
+ 
+ 	// Loop through entries until we find what we're looking for
+ 	memset(mtpair, 0, sizeof(mtpair));
+diff --git a/util-linux/rdate.c b/util-linux/rdate.c
+index 0880edf..f257d54 100644
+--- a/util-linux/rdate.c
++++ b/util-linux/rdate.c
+@@ -61,7 +61,7 @@ int rdate_main(int argc UNUSED_PARAM, char **argv)
+ 			bb_error_msg("current time matches remote time");
+ 		else
+ 			if (stime(&remote_time) < 0)
+-				bb_perror_msg_and_die("cannot set time of day");
++				bb_perror_msg_and_die("can't set time of day");
+ 	}
+ 
+ 	if ((flags & 1) == 0)
+diff --git a/util-linux/volume_id/volume_id.c b/util-linux/volume_id/volume_id.c
+index 4826c2e..c8cf946 100644
+--- a/util-linux/volume_id/volume_id.c
++++ b/util-linux/volume_id/volume_id.c
+@@ -223,7 +223,7 @@ struct volume_id* FAST_FUNC volume_id_open_dev_t(dev_t devt)
+ 	/* create temporary node to open block device */
+ 	unlink(tmp_node);
+ 	if (mknod(tmp_node, (S_IFBLK | 0600), devt) != 0)
+-		bb_perror_msg_and_die("cannot mknod(%s)", tmp_node);
++		bb_perror_msg_and_die("can't mknod(%s)", tmp_node);
+ 
+ 	id = volume_id_open_node(tmp_node);
+ 	unlink(tmp_node);

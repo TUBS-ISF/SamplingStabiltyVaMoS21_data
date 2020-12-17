@@ -1,0 +1,95 @@
+2008-07-22 20:16:55 +0000
+diff --git a/coreutils/printf.c b/coreutils/printf.c
+index 7f6235a..72acbc7 100644
+--- a/coreutils/printf.c
++++ b/coreutils/printf.c
+@@ -289,7 +289,7 @@ static char **print_formatted(char *f, char **argv)
+ 			/* Remove size modifiers - "%Ld" would try to printf
+ 			 * long long, we pass long, and it spews garbage */
+ 			if ((*f | 0x20) == 'l' || *f == 'h' || *f == 'z') {
+-				strcpy(f, f + 1);
++				overlapping_strcpy(f, f + 1);
+ 			}
+ //FIXME: actually, the same happens with bare "%d":
+ //it printfs an int, but we pass long!
+diff --git a/editors/sed.c b/editors/sed.c
+index 496d3d2..eb31f7d 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1219,7 +1219,7 @@ static void add_cmd_block(char *cmdstr)
+ 				slashes++;
+ 			/* Odd number of preceding slashes - newline is escaped */
+ 			if (slashes & 1) {
+-				strcpy(eol-1, eol);
++				overlapping_strcpy(eol - 1, eol);
+ 				eol = strchr(eol, '\n');
+ 				goto next;
+ 			}
+diff --git a/include/libbb.h b/include/libbb.h
+index 684e130..c0b731b 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -540,6 +540,7 @@ ssize_t recv_from_to(int fd, void *buf, size_t len, int flags,
+ 
+ char *xstrdup(const char *s) FAST_FUNC;
+ char *xstrndup(const char *s, int n) FAST_FUNC;
++void overlapping_strcpy(char *dst, const char *src) FAST_FUNC;
+ char *safe_strncpy(char *dst, const char *src, size_t size) FAST_FUNC;
+ /* Guaranteed to NOT be a macro (smallest code). Saves nearly 2k on uclibc.
+  * But potentially slow, don't use in one-billion-times loops */
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 2e16e6a..032da24 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1552,7 +1552,7 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ 		vi_case(CTRL('U')|vbit:)
+ 			/* Control-U -- Clear line before cursor */
+ 			if (cursor) {
+-				strcpy(command, command + cursor);
++				overlapping_strcpy(command, command + cursor);
+ 				command_len -= cursor;
+ 				redraw(cmdedit_y, command_len);
+ 			}
+diff --git a/libbb/parse_config.c b/libbb/parse_config.c
+index 5109066..d1b2921 100644
+--- a/libbb/parse_config.c
++++ b/libbb/parse_config.c
+@@ -161,7 +161,7 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 			int n = strspn(line, delims);
+ 			if (n) {
+ 				ii -= n;
+-				strcpy(line, line + n);
++				overlapping_strcpy(line, line + n);
+ 			}
+ 			// cut trailing
+ 			if (ii) {
+diff --git a/libbb/safe_strncpy.c b/libbb/safe_strncpy.c
+index 649fa10..4acd976 100644
+--- a/libbb/safe_strncpy.c
++++ b/libbb/safe_strncpy.c
+@@ -16,3 +16,12 @@ char* FAST_FUNC safe_strncpy(char *dst, const char *src, size_t size)
+ 	dst[--size] = '\0';
+ 	return strncpy(dst, src, size);
+ }
++
++/* Like strcpy but can copy overlapping strings. */
++void FAST_FUNC overlapping_strcpy(char *dst, const char *src)
++{
++	while ((*dst = *src) != '\0') {
++		dst++;
++		src++;
++	}
++}
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index 8cff0b9..be03932 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -800,7 +800,7 @@ int nmeter_main(int argc, char **argv)
+ 		if (!cur)
+ 			break;
+ 		if (cur[1] == '%') {	// %%
+-			strcpy(cur, cur+1);
++			overlapping_strcpy(cur, cur + 1);
+ 			cur++;
+ 			goto again;
+ 		}

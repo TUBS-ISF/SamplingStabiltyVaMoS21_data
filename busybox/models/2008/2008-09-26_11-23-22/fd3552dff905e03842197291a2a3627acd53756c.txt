@@ -1,0 +1,40 @@
+2008-09-26 11:23:22 +0000
+diff --git a/include/grp_.h b/include/grp_.h
+index 697a786..3d00b4a 100644
+--- a/include/grp_.h
++++ b/include/grp_.h
+@@ -29,7 +29,7 @@
+ #endif
+ 
+ /* This file is #included after #include <grp.h>
+- * We will use libc-defined structures, but will #define finction names
++ * We will use libc-defined structures, but will #define function names
+  * so that function calls are directed to bb_internal_XXX replacements
+  */
+ 
+diff --git a/include/pwd_.h b/include/pwd_.h
+index c36e468..a0cf7c9 100644
+--- a/include/pwd_.h
++++ b/include/pwd_.h
+@@ -29,7 +29,7 @@
+ #endif
+ 
+ /* This file is #included after #include <pwd.h>
+- * We will use libc-defined structures, but will #define finction names
++ * We will use libc-defined structures, but will #define function names
+  * so that function calls are directed to bb_internal_XXX replacements
+  */
+ 
+diff --git a/include/shadow_.h b/include/shadow_.h
+index 73bed84..60f3e6b 100644
+--- a/include/shadow_.h
++++ b/include/shadow_.h
+@@ -27,7 +27,7 @@
+ #endif
+ 
+ /* This file is #included after #include <shadow.h>
+- * We will use libc-defined structures, but will #define finction names
++ * We will use libc-defined structures, but will #define function names
+  * so that function calls are directed to bb_internal_XXX replacements
+  */
+ 

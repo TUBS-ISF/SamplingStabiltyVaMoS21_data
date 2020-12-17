@@ -1,0 +1,15 @@
+2010-01-26 08:34:49 +0100
+diff --git a/Makefile b/Makefile
+index 2065558..1481f01 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ VERSION = 1
+-PATCHLEVEL = 16
++PATCHLEVEL = 17
+ SUBLEVEL = 0
+-EXTRAVERSION =
++EXTRAVERSION = .git
+ NAME = Unnamed
+ 
+ # *DOCUMENTATION*

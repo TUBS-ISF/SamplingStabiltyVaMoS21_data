@@ -1,0 +1,64 @@
+2007-09-30 16:32:01 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 34b9784..e3f9c49 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -787,7 +787,7 @@ int bb_make_directory(char *path, long mode, int flags);
+ 
+ int get_signum(const char *name);
+ const char *get_signame(int number);
+-void print_signames_and_exit(void) ATTRIBUTE_NORETURN;
++void print_signames(void);
+ 
+ char *bb_simplify_path(const char *path);
+ 
+diff --git a/libbb/u_signal_names.c b/libbb/u_signal_names.c
+index 5a6f592..ed3bb5c 100644
+--- a/libbb/u_signal_names.c
++++ b/libbb/u_signal_names.c
+@@ -163,7 +163,7 @@ const char *get_signame(int number)
+ 
+ // Print the whole signal list
+ 
+-void print_signames_and_exit(void)
++void print_signames(void)
+ {
+ 	int signo;
+ 
+@@ -172,5 +172,4 @@ void print_signames_and_exit(void)
+ 		if (name[0])
+ 			puts(name);
+ 	}
+-	exit(EXIT_SUCCESS);
+ }
+diff --git a/procps/kill.c b/procps/kill.c
+index 961f8cb..323ee7b 100644
+--- a/procps/kill.c
++++ b/procps/kill.c
+@@ -58,7 +58,8 @@ int kill_main(int argc, char **argv)
+ 	if (arg[1] == 'l' && arg[2] == '\0') {
+ 		if (argc == 1) {
+ 			/* Print the whole signal list */
+-			print_signames_and_exit();
++			print_signames();
++			return 0;
+ 		}
+ 		/* -l <sig list> */
+ 		while ((arg = *++argv)) {
+diff --git a/procps/pgrep.c b/procps/pgrep.c
+index 3bf087f..2bedabf 100644
+--- a/procps/pgrep.c
++++ b/procps/pgrep.c
+@@ -87,8 +87,10 @@ int pgrep_main(int argc, char **argv)
+ 		scan_mask |= PSSCAN_ARGVN;
+ 
+ 	if (pkill) {
+-		if (OPT_LIST) /* -l: print the whole signal list */
+-			print_signames_and_exit();
++		if (OPT_LIST) { /* -l: print the whole signal list */
++			print_signames();
++			return 0;
++		}
+ 		if (first_arg && first_arg[0] == '-') {
+ 			signo = get_signum(&first_arg[1]);
+ 			if (signo < 0) /* || signo > MAX_SIGNUM ? */

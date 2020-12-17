@@ -1,0 +1,212 @@
+2007-12-26 20:44:45 +0000
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 27512eb..1db53f4 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -602,7 +602,7 @@ static unsigned fill_package_struct(char *control_buffer)
+ 				&field_name, &field_value);
+ 
+ 		if (field_name == NULL) {
+-			goto fill_package_struct_cleanup; /* Oh no, the dreaded goto statement! */
++			goto fill_package_struct_cleanup;
+ 		}
+ 
+ 		field_num = index_in_strings(field_names, field_name);
+@@ -745,7 +745,7 @@ static void index_status_file(const char *filename)
+ 	unsigned status_num;
+ 
+ 	status_file = xfopen(filename, "r");
+-	while ((control_buffer = xmalloc_fgets_str(status_file, "\n\n")) != NULL) {
++	while ((control_buffer = xmalloc_fgetline_str(status_file, "\n\n")) != NULL) {
+ 		const unsigned package_num = fill_package_struct(control_buffer);
+ 		if (package_num != -1) {
+ 			status_node = xmalloc(sizeof(status_node_t));
+@@ -798,7 +798,7 @@ static void write_status_file(deb_file_t **deb_file)
+ 	int i = 0;
+ 
+ 	/* Update previously known packages */
+-	while ((control_buffer = xmalloc_fgets_str(old_status_file, "\n\n")) != NULL) {
++	while ((control_buffer = xmalloc_fgetline_str(old_status_file, "\n\n")) != NULL) {
+ 		tmp_string = strstr(control_buffer, "Package:");
+ 		if (tmp_string == NULL) {
+ 			continue;
+diff --git a/include/libbb.h b/include/libbb.h
+index 2b92821..1da37ed 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -464,9 +464,12 @@ extern void xwrite(int fd, const void *buf, size_t count);
+ 
+ /* Reads and prints to stdout till eof, then closes FILE. Exits on error: */
+ extern void xprint_and_close_file(FILE *file);
+-extern char *xmalloc_fgets(FILE *file);
+-/* Read up to (and including) TERMINATING_STRING: */
++/* Reads up to (and including) TERMINATING_STRING: */
+ extern char *xmalloc_fgets_str(FILE *file, const char *terminating_string);
++/* Chops off TERMINATING_STRING: from the end: */
++extern char *xmalloc_fgetline_str(FILE *file, const char *terminating_string);
++/* Reads up to (and including) "\n" or NUL byte */
++extern char *xmalloc_fgets(FILE *file);
+ /* Chops off '\n' from the end, unlike fgets: */
+ extern char *xmalloc_getline(FILE *file);
+ extern char *bb_get_chunk_from_file(FILE *file, int *end);
+diff --git a/libbb/fgets_str.c b/libbb/fgets_str.c
+index 1bc6c3b..d6fada1 100644
+--- a/libbb/fgets_str.c
++++ b/libbb/fgets_str.c
+@@ -10,10 +10,7 @@
+ 
+ #include "libbb.h"
+ 
+-/* Read up to (and including) TERMINATING_STRING from FILE and return it.
+- * Return NULL on EOF.  */
+-
+-char *xmalloc_fgets_str(FILE *file, const char *terminating_string)
++static char *xmalloc_fgets_internal(FILE *file, const char *terminating_string, int chop_off)
+ {
+ 	char *linebuf = NULL;
+ 	const int term_length = strlen(terminating_string);
+@@ -25,12 +22,12 @@ char *xmalloc_fgets_str(FILE *file, const char *terminating_string)
+ 	while (1) {
+ 		ch = fgetc(file);
+ 		if (ch == EOF) {
+-			free(linebuf);
+-			return NULL;
++			if (idx == 0)
++				return linebuf; /* NULL */
++			break;
+ 		}
+ 
+-		/* grow the line buffer as necessary */
+-		while (idx > linebufsz - 2) {
++		if (idx >= linebufsz) {
+ 			linebufsz += 200;
+ 			linebuf = xrealloc(linebuf, linebufsz);
+ 		}
+@@ -40,14 +37,30 @@ char *xmalloc_fgets_str(FILE *file, const char *terminating_string)
+ 
+ 		/* Check for terminating string */
+ 		end_string_offset = idx - term_length;
+-		if (end_string_offset > 0
++		if (end_string_offset >= 0
+ 		 && memcmp(&linebuf[end_string_offset], terminating_string, term_length) == 0
+ 		) {
+-			idx -= term_length;
++			if (chop_off)
++				idx -= term_length;
+ 			break;
+ 		}
+ 	}
++	/* Grow/shrink *first*, then store NUL */
+ 	linebuf = xrealloc(linebuf, idx + 1);
+ 	linebuf[idx] = '\0';
+ 	return linebuf;
+ }
++
++/* Read up to TERMINATING_STRING from FILE and return it,
++ * including terminating string.
++ * Non-terminated string can be returned if EOF is reached.
++ * Return NULL if EOF is reached immediately.  */
++char *xmalloc_fgets_str(FILE *file, const char *terminating_string)
++{
++	return xmalloc_fgets_internal(file, terminating_string, 0);
++}
++
++char *xmalloc_fgetline_str(FILE *file, const char *terminating_string)
++{
++	return xmalloc_fgets_internal(file, terminating_string, 1);
++}
+diff --git a/libbb/get_line_from_file.c b/libbb/get_line_from_file.c
+index 1eb4af1..ac4d14b 100644
+--- a/libbb/get_line_from_file.c
++++ b/libbb/get_line_from_file.c
+@@ -12,11 +12,10 @@
+ #include "libbb.h"
+ 
+ /* This function reads an entire line from a text file, up to a newline
+- * or NUL byte, inclusive.  It returns a malloc'ed char * which must be
+- * stored and free'ed by the caller.  If end is NULL '\n' isn't considered
++ * or NUL byte, inclusive.  It returns a malloc'ed char * which
++ * must be free'ed by the caller.  If end is NULL '\n' isn't considered
+  * end of line.  If end isn't NULL, length of the chunk read is stored in it.
+  * Return NULL if EOF/error */
+-
+ char *bb_get_chunk_from_file(FILE *file, int *end)
+ {
+ 	int ch;
+diff --git a/networking/netstat.c b/networking/netstat.c
+index d86c2ff..1c78f9d 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -170,6 +170,11 @@ static void tcp_do_one(int lnr, char *line)
+ 			rem_addr, &rem_port, &state,
+ 			&txq, &rxq, &timer_run, &time_len, &retr, &uid, &timeout, &inode, more);
+ 
++	if (num < 10) {
++		bb_error_msg("warning, got bogus tcp line");
++		return;
++	}
++
+ 	if (strlen(local_addr) > 8) {
+ #if ENABLE_FEATURE_IPV6
+ 		build_ipv6_addr(local_addr, &localaddr);
+@@ -180,11 +185,6 @@ static void tcp_do_one(int lnr, char *line)
+ 		build_ipv4_addr(rem_addr, &remaddr);
+ 	}
+ 
+-	if (num < 10) {
+-		bb_error_msg("warning, got bogus tcp line");
+-		return;
+-	}
+-
+ 	if ((rem_port && (flags & NETSTAT_CONNECTED))
+ 	 || (!rem_port && (flags & NETSTAT_LISTENING))
+ 	) {
+@@ -349,17 +349,16 @@ static void unix_do_one(int nr, char *line)
+ 	const char *ss_proto, *ss_state, *ss_type;
+ 	char ss_flags[32];
+ 
++	/* TODO: currently we stop at first NUL byte. Is it a problem? */
++
+ 	if (nr == 0)
+ 		return; /* skip header */
+ 
+-	{
+-		char *last = last_char_is(line, '\n');
+-		if (last)
+-			*last = '\0';
+-	}
++	*strchrnul(line, '\n') = '\0';
+ 
+ 	/* 2.6.15 may report lines like "... @/tmp/fam-user-^@^@^@^@^@^@^@..."
+-	 * (those ^@ are NUL bytes). fgets sees them as tons of empty lines. */
++	 * Other users report long lines filled by NUL bytes. 
++	 * (those ^@ are NUL bytes too). We see them as empty lines. */
+ 	if (!line[0])
+ 		return;
+ 
+@@ -474,20 +473,14 @@ static void do_info(const char *file, const char *name, void (*proc)(int, char *
+ 		return;
+ 	}
+ 	lnr = 0;
+-	do {
+-		buffer = xmalloc_fgets(procinfo);
+-		if (buffer) {
+-			(proc)(lnr++, buffer);
+-			free(buffer);
+-		}
+-	} while (buffer);
++	/* Why? because xmalloc_fgets_str doesn't stop on NULs */
++	while ((buffer = xmalloc_fgets_str(procinfo, "\n")) != NULL) {
++		(proc)(lnr++, buffer);
++		free(buffer);
++	}
+ 	fclose(procinfo);
+ }
+ 
+-/*
+- * Our main function.
+- */
+-
+ int netstat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int netstat_main(int argc, char **argv)
+ {

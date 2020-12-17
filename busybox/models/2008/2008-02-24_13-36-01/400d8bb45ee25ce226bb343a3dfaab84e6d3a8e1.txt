@@ -1,0 +1,316 @@
+2008-02-24 13:36:01 +0000
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index 7552c85..961b1ff 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -141,7 +141,7 @@ int dd_main(int argc, char **argv)
+ #if ENABLE_FEATURE_DD_SIGNAL_HANDLING
+ 	sigact.sa_handler = dd_output_status;
+ 	sigact.sa_flags = SA_RESTART;
+-	sigemptyset(&sigact.sa_mask);
++	/*sigemptyset(&sigact.sa_mask); - memset did it */
+ 	sigaction(SIGUSR1, &sigact, NULL);
+ #endif
+ 
+@@ -164,40 +164,40 @@ int dd_main(int argc, char **argv)
+ 		if (what == 0)
+ 			bb_show_usage();
+ 		arg += key_len;
+-		/* Must fit into positive ssize_t */
+ #if ENABLE_FEATURE_DD_IBS_OBS
+-			if (what == OP_ibs) {
+-				ibs = xatoul_range_sfx(arg, 1, ((size_t)-1L)/2, dd_suffixes);
+-				continue;
+-			}
+-			if (what == OP_obs) {
+-				obs = xatoul_range_sfx(arg, 1, ((size_t)-1L)/2, dd_suffixes);
+-				continue;
+-			}
+-			if (what == OP_conv) {
+-				while (1) {
+-					/* find ',', replace them with nil so we can use arg for
+-					 * index_in_strings() without copying.
+-					 * We rely on arg being non-null, else strchr would fault.
+-					 */
+-					key = strchr(arg, ',');
+-					if (key)
+-						*key = '\0';
+-					what = index_in_strings(keywords, arg) + 1;
+-					if (what < OP_conv_notrunc)
+-						bb_error_msg_and_die(bb_msg_invalid_arg, arg, "conv");
+-					if (what == OP_conv_notrunc)
+-						flags |= FLAG_NOTRUNC;
+-					if (what == OP_conv_sync)
+-						flags |= FLAG_SYNC;
+-					if (what == OP_conv_noerror)
+-						flags |= FLAG_NOERROR;
+-					if (!key) /* no ',' left, so this was the last specifier */
+-						break;
+-					arg = key + 1; /* skip this keyword and ',' */
+-				}
+-				continue;
++		if (what == OP_ibs) {
++			/* Must fit into positive ssize_t */
++			ibs = xatoul_range_sfx(arg, 1, ((size_t)-1L)/2, dd_suffixes);
++			continue;
++		}
++		if (what == OP_obs) {
++			obs = xatoul_range_sfx(arg, 1, ((size_t)-1L)/2, dd_suffixes);
++			continue;
++		}
++		if (what == OP_conv) {
++			while (1) {
++				/* find ',', replace them with NUL so we can use arg for
++				 * index_in_strings() without copying.
++				 * We rely on arg being non-null, else strchr would fault.
++				 */
++				key = strchr(arg, ',');
++				if (key)
++					*key = '\0';
++				what = index_in_strings(keywords, arg) + 1;
++				if (what < OP_conv_notrunc)
++					bb_error_msg_and_die(bb_msg_invalid_arg, arg, "conv");
++				if (what == OP_conv_notrunc)
++					flags |= FLAG_NOTRUNC;
++				if (what == OP_conv_sync)
++					flags |= FLAG_SYNC;
++				if (what == OP_conv_noerror)
++					flags |= FLAG_NOERROR;
++				if (!key) /* no ',' left, so this was the last specifier */
++					break;
++				arg = key + 1; /* skip this keyword and ',' */
+ 			}
++			continue;
++		}
+ #endif
+ 		if (what == OP_bs) {
+ 			ibs = obs = xatoul_range_sfx(arg, 1, ((size_t)-1L)/2, dd_suffixes);
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 0122851..de2d61e 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -1168,8 +1168,8 @@ int fsck_main(int argc, char **argv)
+ 
+ 	memset(&sa, 0, sizeof(sa));
+ 	sa.sa_handler = signal_cancel;
+-	sigaction(SIGINT, &sa, 0);
+-	sigaction(SIGTERM, &sa, 0);
++	sigaction(SIGINT, &sa, NULL);
++	sigaction(SIGTERM, &sa, NULL);
+ 
+ 	setbuf(stdout, NULL);
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index 873ab87..48937c4 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -309,6 +309,7 @@ void sig_block(int);
+ void sig_unblock(int);
+ /* UNUSED: void sig_blocknone(void); */
+ void sig_pause(void);
++void kill_myself_with_sig(int sig) ATTRIBUTE_NORETURN;
+ 
+ 
+ void xsetgid(gid_t gid);
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index dc61d6f..b3a2c7a 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -68,7 +68,7 @@ static void sig_term_handler(int sig)
+ {
+ 	if (verbose)
+ 		printf("%s: info: sigterm received, exit\n", applet_name);
+-	exit(0);
++	kill_myself_with_sig(sig);
+ }
+ 
+ /* Little bloated, but tries to give accurate info how child exited.
+diff --git a/libbb/signals.c b/libbb/signals.c
+index f7e4908..b46b595 100644
+--- a/libbb/signals.c
++++ b/libbb/signals.c
+@@ -78,3 +78,17 @@ void sig_pause(void)
+ 	sigemptyset(&ss);
+ 	sigsuspend(&ss);
+ }
++
++/* Assuming the sig is fatal */
++void kill_myself_with_sig(int sig)
++{
++	sigset_t set;
++
++	signal(sig, SIG_DFL);
++
++	sigemptyset(&set);
++	sigaddset(&set, sig);
++	sigprocmask(SIG_UNBLOCK, &set, NULL);
++	raise(sig);
++	_exit(1); /* Should not reach it */
++}
+diff --git a/loginutils/login.c b/loginutils/login.c
+index a5b6369..bc437bb 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -214,13 +214,12 @@ static void alarm_handler(int sig ATTRIBUTE_UNUSED)
+ 	 * arrive here when their connection is broken.
+ 	 * We don't want to block here */
+ 	ndelay_on(1);
+-	ndelay_on(2);
+ 	printf("\r\nLogin timed out after %d seconds\r\n", TIMEOUT);
++	fflush(stdout);
+ 	/* unix API is brain damaged regarding O_NONBLOCK,
+ 	 * we should undo it, or else we can affect other processes */
+ 	ndelay_off(1);
+-	ndelay_off(2);
+-	exit(EXIT_SUCCESS);
++	_exit(EXIT_SUCCESS);
+ }
+ 
+ int login_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+diff --git a/miscutils/less.c b/miscutils/less.c
+index f3be2cf..7351a63 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -174,7 +174,9 @@ static void less_exit(int code)
+ {
+ 	bb_putchar('\n');
+ 	set_tty_cooked();
+-	exit(code); /* TODO: "suicide mode" for code == -signal */
++	if (code < 0)
++		kill_myself_with_sig(- code); /* does not return */
++	exit(code);
+ }
+ 
+ /* Move the cursor to a position (x,y), where (0,0) is the
+@@ -1328,9 +1330,9 @@ static void keypress_process(int keypress)
+ 		number_process(keypress);
+ }
+ 
+-static void sig_catcher(int sig ATTRIBUTE_UNUSED)
++static void sig_catcher(int sig)
+ {
+-	less_exit(1) /* TODO: "suicide mode" for code == -signal */
++	less_exit(- sig);
+ }
+ 
+ int less_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+diff --git a/miscutils/rx.c b/miscutils/rx.c
+index 898703c..8ccea49 100644
+--- a/miscutils/rx.c
++++ b/miscutils/rx.c
+@@ -43,7 +43,7 @@ Cf:
+ #define TIMEOUT_LONG 10
+ #define MAXERRORS 10
+ 
+-static int read_byte(int fd, unsigned int timeout)
++static int read_byte(int fd, unsigned timeout)
+ {
+ 	char buf[1];
+ 	int n;
+diff --git a/networking/inetd.c b/networking/inetd.c
+index a7259f3..fd865ef 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1327,7 +1327,7 @@ int inetd_main(int argc, char **argv)
+ 	}
+ 
+ 	memset((char *) &sa, 0, sizeof(sa));
+-	sigemptyset(&sa.sa_mask);
++	/*sigemptyset(&sa.sa_mask); - memset did it */
+ 	sigaddset(&sa.sa_mask, SIGALRM);
+ 	sigaddset(&sa.sa_mask, SIGCHLD);
+ 	sigaddset(&sa.sa_mask, SIGHUP);
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 853577a..dd62e5d 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -163,7 +163,7 @@ static void catch(int sig)
+ 	if (o_verbose > 1)                /* normally we don't care */
+ 		fprintf(stderr, SENT_N_RECV_M, wrote_net, wrote_out);
+ 	fprintf(stderr, "punt!\n");
+-	exit(1);
++	kill_myself_with_sig(sig);
+ }
+ 
+ /* unarm  */
+diff --git a/networking/slattach.c b/networking/slattach.c
+index e501d82..1987eb3 100644
+--- a/networking/slattach.c
++++ b/networking/slattach.c
+@@ -43,7 +43,7 @@ static void save_state(void)
+ 	xioctl(handle, TIOCGETD, &saved_disc);
+ }
+ 
+-static int set_termios_state_and_warn(struct termios *state)
++static int set_termios_state_or_warn(struct termios *state)
+ {
+ 	int ret;
+ 
+@@ -78,12 +78,12 @@ static void restore_state_and_exit(int exitcode)
+ 	memcpy(&state, &saved_state, sizeof(state));
+ 	cfsetispeed(&state, B0);
+ 	cfsetospeed(&state, B0);
+-	if (set_termios_state_and_warn(&state))
++	if (set_termios_state_or_warn(&state))
+ 		exitcode = 1;
+ 	sleep(1);
+ 
+ 	/* Restore line status */
+-	if (set_termios_state_and_warn(&saved_state))
++	if (set_termios_state_or_warn(&saved_state))
+ 		exit(EXIT_FAILURE);
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		close(handle);
+@@ -99,7 +99,7 @@ static void set_state(struct termios *state, int encap)
+ 	int disc;
+ 
+ 	/* Set line status */
+-	if (set_termios_state_and_warn(state))
++	if (set_termios_state_or_warn(state))
+ 		goto bad;
+ 	/* Set line discliple (N_SLIP always) */
+ 	disc = N_SLIP;
+diff --git a/shell/hush.c b/shell/hush.c
+index 820fd88..d9ef239 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -808,12 +808,7 @@ static void sigexit(int sig)
+ 	if (sig <= 0)
+ 		_exit(- sig);
+ 
+-	/* Enable only this sig and kill ourself with it */
+-	signal(sig, SIG_DFL);
+-	sigdelset(&block_all, sig);
+-	sigprocmask(SIG_SETMASK, &block_all, NULL);
+-	raise(sig);
+-	_exit(1); /* Should not reach it */
++	kill_myself_with_sig(sig); /* does not return */
+ }
+ 
+ /* Restores tty foreground process group, and exits. */
+diff --git a/sysklogd/klogd.c b/sysklogd/klogd.c
+index 6a675b8..01d5971 100644
+--- a/sysklogd/klogd.c
++++ b/sysklogd/klogd.c
+@@ -26,7 +26,7 @@ static void klogd_signal(int sig ATTRIBUTE_UNUSED)
+ 	klogctl(7, NULL, 0);
+ 	klogctl(0, NULL, 0);
+ 	syslog(LOG_NOTICE, "klogd: exiting");
+-	exit(EXIT_SUCCESS);
++	kill_myself_with_sig(sig);
+ }
+ 
+ #define log_buffer bb_common_bufsiz1
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index c713507..0dc69d8 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -475,7 +475,7 @@ static void quit_signal(int sig)
+ 	puts("syslogd exiting");
+ 	if (ENABLE_FEATURE_IPC_SYSLOG)
+ 		ipcsyslog_cleanup();
+-	exit(1);
++	kill_myself_with_sig(sig);
+ }
+ 
+ #ifdef SYSLOGD_MARK

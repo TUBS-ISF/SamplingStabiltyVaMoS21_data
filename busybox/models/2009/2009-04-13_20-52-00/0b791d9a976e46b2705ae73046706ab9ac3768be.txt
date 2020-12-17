@@ -1,0 +1,123 @@
+2009-04-13 20:52:00 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index babf9c9..0b94f70 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -859,6 +859,7 @@ void *llist_pop(llist_t **elm) FAST_FUNC;
+ void llist_unlink(llist_t **head, llist_t *elm) FAST_FUNC;
+ void llist_free(llist_t *elm, void (*freeit)(void *data)) FAST_FUNC;
+ llist_t *llist_rev(llist_t *list) FAST_FUNC;
++llist_t *llist_find_str(llist_t *first, const char *str) FAST_FUNC;
+ /* BTW, surprisingly, changing API to
+  *   llist_t *llist_add_to(llist_t *old_head, void *data)
+  * etc does not result in smaller code... */
+diff --git a/libbb/llist.c b/libbb/llist.c
+index 5ba7f60..51b1ce6 100644
+--- a/libbb/llist.c
++++ b/libbb/llist.c
+@@ -86,3 +86,13 @@ llist_t* FAST_FUNC llist_rev(llist_t *list)
+ 	}
+ 	return rev;
+ }
++
++llist_t* FAST_FUNC llist_find_str(llist_t *list, const char *str)
++{
++	while (list) {
++		if (strcmp(list->data, str) == 0)
++			break;
++		list = list->link;
++	}
++	return list;
++}
+diff --git a/modutils/modutils.c b/modutils/modutils.c
+index 44dae7b..0f6cb0f 100644
+--- a/modutils/modutils.c
++++ b/modutils/modutils.c
+@@ -16,19 +16,6 @@ extern int delete_module(const char *module, unsigned int flags);
+ # define delete_module(mod, flags) syscall(__NR_delete_module, mod, flags)
+ #endif
+ 
+-/*
+- a libbb candidate from ice age!
+-*/
+-llist_t FAST_FUNC *llist_find(llist_t *first, const char *str)
+-{
+-	while (first != NULL) {
+-		if (strcmp(first->data, str) == 0)
+-			return first;
+-		first = first->link;
+-	}
+-	return NULL;
+-}
+-
+ void FAST_FUNC replace(char *s, char what, char with)
+ {
+ 	while (*s) {
+diff --git a/modutils/modutils.h b/modutils/modutils.h
+index 086bb39..5104f1b 100644
+--- a/modutils/modutils.h
++++ b/modutils/modutils.h
+@@ -18,7 +18,6 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ #define MODULE_NAME_LEN 256
+ 
+ const char *moderror(int err) FAST_FUNC;
+-llist_t *llist_find(llist_t *first, const char *str) FAST_FUNC;
+ void replace(char *s, char what, char with) FAST_FUNC;
+ char *replace_underscores(char *s) FAST_FUNC;
+ int string_to_llist(char *string, llist_t **llist, const char *delim) FAST_FUNC;
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index c9371cc..dc7ed49 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -692,20 +692,6 @@ static const struct method_t *get_method(const struct address_family_t *af, char
+ 	return NULL;
+ }
+ 
+-static const llist_t *find_list_string(const llist_t *list, const char *string)
+-{
+-	if (string == NULL)
+-		return NULL;
+-
+-	while (list) {
+-		if (strcmp(list->data, string) == 0) {
+-			return list;
+-		}
+-		list = list->link;
+-	}
+-	return NULL;
+-}
+-
+ static struct interfaces_file_t *read_interfaces(const char *filename)
+ {
+ 	/* Let's try to be compatible.
+@@ -836,7 +822,7 @@ static struct interfaces_file_t *read_interfaces(const char *filename)
+ 			while ((first_word = next_word(&rest_of_line)) != NULL) {
+ 
+ 				/* Check the interface isnt already listed */
+-				if (find_list_string(defn->autointerfaces, first_word)) {
++				if (llist_find_str(defn->autointerfaces, first_word)) {
+ 					bb_perror_msg_and_die("interface declared auto twice \"%s\"", buf);
+ 				}
+ 
+diff --git a/procps/pidof.c b/procps/pidof.c
+index 7805044..1942399 100644
+--- a/procps/pidof.c
++++ b/procps/pidof.c
+@@ -35,12 +35,12 @@ int pidof_main(int argc UNUSED_PARAM, char **argv)
+ 	/* fill omit list.  */
+ 	{
+ 		llist_t *omits_p = omits;
+-		while (omits_p) {
++		while (1) {
++			omits_p = llist_find_str(omits_p, "%PPID");
++			if (!omits_p)
++				break;
+ 			/* are we asked to exclude the parent's process ID?  */
+-			if (strcmp(omits_p->data, "%PPID") == 0) {
+-				omits_p->data = utoa((unsigned)getppid());
+-			}
+-			omits_p = omits_p->link;
++			omits_p->data = utoa((unsigned)getppid());
+ 		}
+ 	}
+ #endif

@@ -1,0 +1,28 @@
+2010-02-09 00:26:10 +0100
+diff --git a/coreutils/fsync.c b/coreutils/fsync.c
+index f00803c..53900f8 100644
+--- a/coreutils/fsync.c
++++ b/coreutils/fsync.c
+@@ -7,6 +7,9 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ #include "libbb.h"
++#ifndef O_NOATIME
++# define O_NOATIME 0
++#endif
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+diff --git a/miscutils/fbsplash.c b/miscutils/fbsplash.c
+index 4560bb2..3bf16ab 100644
+--- a/miscutils/fbsplash.c
++++ b/miscutils/fbsplash.c
+@@ -301,7 +301,7 @@ static void fb_drawimage(void)
+  */
+ static void init(const char *cfg_filename)
+ {
+-	static const char const param_names[] ALIGN1 =
++	static const char param_names[] ALIGN1 =
+ 		"BAR_WIDTH\0" "BAR_HEIGHT\0"
+ 		"BAR_LEFT\0" "BAR_TOP\0"
+ 		"BAR_R\0" "BAR_G\0" "BAR_B\0"

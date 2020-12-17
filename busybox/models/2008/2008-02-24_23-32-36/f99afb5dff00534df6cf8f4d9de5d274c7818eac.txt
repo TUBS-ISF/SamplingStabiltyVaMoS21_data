@@ -1,0 +1,109 @@
+2008-02-24 23:32:36 +0000
+diff --git a/include/applets.h b/include/applets.h
+index ffd7afc..cdb1995 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -227,6 +227,7 @@ USE_LOGIN(APPLET(login, _BB_DIR_BIN, _BB_SUID_ALWAYS))
+ USE_LOGNAME(APPLET_NOFORK(logname, logname, _BB_DIR_USR_BIN, _BB_SUID_NEVER, logname))
+ USE_LOGREAD(APPLET(logread, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_LOSETUP(APPLET(losetup, _BB_DIR_SBIN, _BB_SUID_NEVER))
++USE_LPD(APPLET(lpd, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_LPQ(APPLET_ODDNAME(lpq, lpqr, _BB_DIR_USR_BIN, _BB_SUID_NEVER, lpq))
+ USE_LPR(APPLET_ODDNAME(lpr, lpqr, _BB_DIR_USR_BIN, _BB_SUID_NEVER, lpr))
+ USE_LS(APPLET_NOEXEC(ls, ls, _BB_DIR_BIN, _BB_SUID_NEVER, ls))
+diff --git a/include/usage.h b/include/usage.h
+index c9329b3..7c9a90e 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2051,6 +2051,12 @@ USE_FEATURE_BRCTL_FANCY("\n" \
+        "with an optional offset (-o 12345). Encryption is not yet supported.\n" \
+        "losetup -f will show the first loop free loop device\n\n"
+ 
++#define lpd_trivial_usage \
++       "SPOOLDIR"
++#define lpd_full_usage \
++       "Example:" \
++       "\n	tcpsvd -E localhost 515 lpd /var/spool"
++
+ #define lpq_trivial_usage \
+        "[-P queue[@host[:port]]] [-U USERNAME] [-d JOBID...] [-fs]"
+ #define lpq_full_usage \
+diff --git a/libbb/read.c b/libbb/read.c
+index 640293b..4ad41d5 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -161,8 +161,7 @@ char *xmalloc_reads(int fd, char *buf)
+ 		}
+ 		/* nonblock_safe_read() because we are used by e.g. shells */
+ 		if (nonblock_safe_read(fd, p, 1) != 1) { /* EOF/error */
+-			if (p == buf) {
+-				/* we read nothing [and buf was NULL initially] */
++			if (p == buf) { /* we read nothing */
+ 				free(buf);
+ 				return NULL;
+ 			}
+diff --git a/printutils/Config.in b/printutils/Config.in
+index b53b9e7..e5f1864 100644
+--- a/printutils/Config.in
++++ b/printutils/Config.in
+@@ -1,5 +1,11 @@
+ menu "print support"
+ 
++config LPD
++	bool "lpd"
++	default n
++	help
++	  lpd is a print spooling daemon.
++
+ config LPR
+ 	bool "lpr"
+ 	default n
+diff --git a/printutils/Kbuild b/printutils/Kbuild
+index 4f97d0d..008290e 100644
+--- a/printutils/Kbuild
++++ b/printutils/Kbuild
+@@ -4,5 +4,6 @@
+ 
+ lib-y :=
+ 
++lib-$(CONFIG_LPD) += lpd.o
+ lib-$(CONFIG_LPR) += lpr.o
+ lib-$(CONFIG_LPQ) += lpr.o
+diff --git a/printutils/lpr.c b/printutils/lpr.c
+index 86fcd9b..52983bf 100644
+--- a/printutils/lpr.c
++++ b/printutils/lpr.c
+@@ -19,6 +19,7 @@
+  */
+ static void get_response_or_say_and_die(const char *errmsg)
+ {
++	static const char newline = '\n';
+ 	char buf = ' ';
+ 
+ 	fflush(stdout);
+@@ -28,8 +29,9 @@ static void get_response_or_say_and_die(const char *errmsg)
+ 		// request has failed
+ 		bb_error_msg("error while %s. Server said:", errmsg);
+ 		safe_write(STDERR_FILENO, &buf, 1);
+-		logmode = 0; /* no errors from bb_copyfd_eof() */
++		logmode = 0; /* no error messages from bb_copyfd_eof() pls */
+ 		bb_copyfd_eof(STDOUT_FILENO, STDERR_FILENO);
++		safe_write(STDERR_FILENO, &newline, 1);
+ 		xfunc_die();
+ 	}
+ }
+@@ -190,8 +192,12 @@ int lpqr_main(int argc, char *argv[])
+ 			, remote_filename
+ 		);
+ 		// delete possible "\nX\n" patterns
+-		while ((c = strchr(controlfile, '\n')) != NULL && c[1] && c[2] == '\n')
+-			memmove(c, c+2, strlen(c+1)); /* strlen(c+1) == strlen(c+2) + 1 */
++		c = controlfile;
++		while ((c = strchr(c, '\n')) != NULL) {
++			c++;
++			while (c[0] && c[1] == '\n')
++				memmove(c, c+2, strlen(c+1)); /* strlen(c+1) == strlen(c+2) + 1 */
++		}
+ 
+ 		// send control file
+ 		if (opts & LPR_V)

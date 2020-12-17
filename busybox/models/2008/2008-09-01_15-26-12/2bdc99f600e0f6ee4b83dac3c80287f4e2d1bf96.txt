@@ -1,0 +1,14 @@
+2008-09-01 15:26:12 +0000
+diff --git a/init/Config.in b/init/Config.in
+index c26c4c5..6a45e7d 100644
+--- a/init/Config.in
++++ b/init/Config.in
+@@ -83,8 +83,6 @@ config FEATURE_INIT_COREDUMPS
+ 	  core file sizes. If this option is disabled, processes
+ 	  will not generate any core files.
+ 
+-
+-
+ config FEATURE_INITRD
+ 	bool "Support running init from within an initrd (not initramfs)"
+ 	default y

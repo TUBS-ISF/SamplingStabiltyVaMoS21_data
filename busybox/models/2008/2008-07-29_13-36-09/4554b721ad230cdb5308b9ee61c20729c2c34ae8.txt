@@ -1,0 +1,49 @@
+2008-07-29 13:36:09 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index a2649d0..ab067dd 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2131,6 +2131,8 @@ static int run_list(struct pipe *pi)
+ 				/* ctrl-C. We just stop doing whatever we were doing */
+ 				bb_putchar('\n');
+ 			}
++			loop_top = NULL;
++			depth_of_loop = 0;
+ 			rcode = 0;
+ 			goto ret;
+ 		}
+@@ -2152,7 +2154,9 @@ static int run_list(struct pipe *pi)
+ 		debug_printf_exec(": rword=%d cond_code=%d skip_more=%d\n",
+ 				rword, cond_code, skip_more_for_this_rword);
+ #if ENABLE_HUSH_LOOPS
+-		if (rword == RES_WHILE || rword == RES_UNTIL || rword == RES_FOR) {
++		if ((rword == RES_WHILE || rword == RES_UNTIL || rword == RES_FOR)
++		 && loop_top == NULL /* avoid bumping depth_of_loop twice */
++		) {
+ 			/* start of a loop: remember where loop starts */
+ 			loop_top = pi;
+ 			depth_of_loop++;
+diff --git a/shell/hush_test/hush-misc/continue1.right b/shell/hush_test/hush-misc/continue1.right
+new file mode 100644
+index 0000000..c4a5565
+--- /dev/null
++++ b/shell/hush_test/hush-misc/continue1.right
+@@ -0,0 +1,8 @@
++A:a
++A:b
++A:c
++OK1
++A:a
++A:b
++A:c
++OK2
+diff --git a/shell/hush_test/hush-misc/continue1.tests b/shell/hush_test/hush-misc/continue1.tests
+new file mode 100755
+index 0000000..72d3566
+--- /dev/null
++++ b/shell/hush_test/hush-misc/continue1.tests
+@@ -0,0 +1,4 @@
++for v in a b c; do echo A:$v; continue 666; done
++echo OK1
++for v in a b c; do echo A:$v; continue 666; done
++echo OK2

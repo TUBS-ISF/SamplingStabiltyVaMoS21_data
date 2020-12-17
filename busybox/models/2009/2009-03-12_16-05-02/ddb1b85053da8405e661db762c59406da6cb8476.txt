@@ -1,0 +1,20 @@
+2009-03-12 16:05:02 +0000
+diff --git a/libbb/sha1.c b/libbb/sha1.c
+index 1584e98..745ac69 100644
+--- a/libbb/sha1.c
++++ b/libbb/sha1.c
+@@ -19,7 +19,13 @@
+  *
+  * SHA256 and SHA512 parts are:
+  * Released into the Public Domain by Ulrich Drepper <drepper@redhat.com>.
+- * TODO: shrink them.
++ * Shrank by Denys Vlasenko.
++ *
++ * ---------------------------------------------------------------------------
++ *
++ * The best way to test random blocksizes is to go to coreutils/md5_sha1_sum.c
++ * and replace "4096" with something like "2000 + time(NULL) % 2097",
++ * then rebuild and compare "shaNNNsum bigfile" results.
+  */
+ 
+ #include "libbb.h"

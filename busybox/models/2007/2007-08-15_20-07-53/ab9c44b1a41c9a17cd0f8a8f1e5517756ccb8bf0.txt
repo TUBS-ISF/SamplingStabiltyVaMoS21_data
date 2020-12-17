@@ -1,0 +1,154 @@
+2007-08-15 20:07:53 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index d60b410..6c6bec7 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -649,15 +649,12 @@ extern void bb_error_msg(const char *s, ...) __attribute__ ((format (printf, 1,
+ extern void bb_error_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
+ extern void bb_perror_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2)));
+ extern void bb_perror_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
+-extern void bb_vherror_msg(const char *s, va_list p);
+ extern void bb_herror_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2)));
+ extern void bb_herror_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
+ extern void bb_perror_nomsg_and_die(void) ATTRIBUTE_NORETURN;
+ extern void bb_perror_nomsg(void);
+ extern void bb_info_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2)));
+-/* These are used internally -- you shouldn't need to use them */
+ extern void bb_verror_msg(const char *s, va_list p, const char *strerr);
+-extern void bb_vperror_msg(const char *s, va_list p);
+ 
+ 
+ /* applets which are useful from another applets */
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 3ffda12..1800bde 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -87,8 +87,6 @@ lib-y += uuencode.o
+ lib-y += vdprintf.o
+ lib-y += verror_msg.o
+ lib-y += vfork_daemon_rexec.o
+-lib-y += vherror_msg.o
+-lib-y += vperror_msg.o
+ lib-y += warn_ignoring_args.o
+ lib-y += wfopen.o
+ lib-y += wfopen_input.o
+diff --git a/libbb/herror_msg.c b/libbb/herror_msg.c
+index 943702c..264690b 100644
+--- a/libbb/herror_msg.c
++++ b/libbb/herror_msg.c
+@@ -14,6 +14,6 @@ void bb_herror_msg(const char *s, ...)
+ 	va_list p;
+ 
+ 	va_start(p, s);
+-	bb_vherror_msg(s, p);
++	bb_verror_msg(s, p, hstrerror(h_errno));
+ 	va_end(p);
+ }
+diff --git a/libbb/herror_msg_and_die.c b/libbb/herror_msg_and_die.c
+index 8c77378..894c80f 100644
+--- a/libbb/herror_msg_and_die.c
++++ b/libbb/herror_msg_and_die.c
+@@ -14,7 +14,7 @@ void bb_herror_msg_and_die(const char *s, ...)
+ 	va_list p;
+ 
+ 	va_start(p, s);
+-	bb_vherror_msg(s, p);
++	bb_verror_msg(s, p, hstrerror(h_errno));
+ 	va_end(p);
+ 	xfunc_die();
+ }
+diff --git a/libbb/perror_msg.c b/libbb/perror_msg.c
+index 2ec1a9b..a958cff 100644
+--- a/libbb/perror_msg.c
++++ b/libbb/perror_msg.c
+@@ -15,9 +15,6 @@ void bb_perror_msg(const char *s, ...)
+ 
+ 	va_start(p, s);
+ 	/* Guard against "<error message>: Success" */
+-	if (!errno)
+-		bb_verror_msg(s, p, NULL);
+-	else
+-		bb_vperror_msg(s, p);
++	bb_verror_msg(s, p, errno ? strerror(errno) : NULL);
+ 	va_end(p);
+ }
+diff --git a/libbb/perror_msg_and_die.c b/libbb/perror_msg_and_die.c
+index 90f56e0..15f46fc 100644
+--- a/libbb/perror_msg_and_die.c
++++ b/libbb/perror_msg_and_die.c
+@@ -15,10 +15,7 @@ void bb_perror_msg_and_die(const char *s, ...)
+ 
+ 	va_start(p, s);
+ 	/* Guard against "<error message>: Success" */
+-	if (!errno)
+-		bb_verror_msg(s, p, NULL);
+-	else
+-		bb_vperror_msg(s, p);
++	bb_verror_msg(s, p, errno ? strerror(errno) : NULL);
+ 	va_end(p);
+ 	xfunc_die();
+ }
+diff --git a/libbb/vherror_msg.c b/libbb/vherror_msg.c
+deleted file mode 100644
+index 04446a0..0000000
+--- a/libbb/vherror_msg.c
++++ /dev/null
+@@ -1,15 +0,0 @@
+-/* vi: set sw=4 ts=4: */
+-/*
+- * Utility routines.
+- *
+- * Copyright (C) 1999-2004 by Erik Andersen <andersen@codepoet.org>
+- *
+- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+- */
+-
+-#include "libbb.h"
+-
+-void bb_vherror_msg(const char *s, va_list p)
+-{
+-	bb_verror_msg(s, p, hstrerror(h_errno));
+-}
+diff --git a/libbb/vperror_msg.c b/libbb/vperror_msg.c
+deleted file mode 100644
+index c3f79c2..0000000
+--- a/libbb/vperror_msg.c
++++ /dev/null
+@@ -1,15 +0,0 @@
+-/* vi: set sw=4 ts=4: */
+-/*
+- * Utility routines.
+- *
+- * Copyright (C) 1999-2004 by Erik Andersen <andersen@codepoet.org>
+- *
+- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+- */
+-
+-#include "libbb.h"
+-
+-void bb_vperror_msg(const char *s, va_list p)
+-{
+-	bb_verror_msg(s, p, strerror(errno));
+-}
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 4e17c28..64061e4 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -648,7 +648,7 @@ void ioctl_or_perror_and_die(int fd, int request, void *argp, const char *fmt,..
+ 
+ 	if (ioctl(fd, request, argp) < 0) {
+ 		va_start(p, fmt);
+-		bb_vperror_msg(fmt, p);
++		bb_verror_msg(fmt, p, strerror(errno));
+ 		/* xfunc_die can actually longjmp, so be nice */
+ 		va_end(p);
+ 		xfunc_die();
+@@ -662,7 +662,7 @@ int ioctl_or_perror(int fd, int request, void *argp, const char *fmt,...)
+ 
+ 	if (ret < 0) {
+ 		va_start(p, fmt);
+-		bb_vperror_msg(fmt, p);
++		bb_verror_msg(fmt, p, strerror(errno));
+ 		va_end(p);
+ 	}
+ 	return ret;

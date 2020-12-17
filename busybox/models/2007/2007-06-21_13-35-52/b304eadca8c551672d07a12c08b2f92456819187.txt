@@ -1,0 +1,96 @@
+2007-06-21 13:35:52 +0000
+diff --git a/coreutils/test.c b/coreutils/test.c
+index 3796e2c..5ca4672 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -155,7 +155,7 @@ typedef int arith_t;
+ #endif
+ 
+ /* Cannot eliminate these static data (do the G trick)
+- * because of bb_test usage from other applets */
++ * because of test_main usage from other applets */
+ static char **t_wp;
+ static struct t_op const *t_wp_op;
+ static gid_t *group_array;
+@@ -179,7 +179,7 @@ static int test_eaccess(char *path, int mode);
+ static int is_a_group_member(gid_t gid);
+ static void initialize_group_array(void);
+ 
+-int bb_test(int argc, char **argv)
++int test_main(int argc, char **argv)
+ {
+ 	int res;
+ 	char *arg0;
+@@ -188,21 +188,19 @@ int bb_test(int argc, char **argv)
+ 	arg0 = strrchr(argv[0], '/');
+ 	if (!arg0++) arg0 = argv[0];
+ 	if (arg0[0] == '[') {
++		--argc;
+ 		if (!arg0[1]) { /* "[" ? */
+-			--argc;
+ 			if (NOT_LONE_CHAR(argv[argc], ']')) {
+ 				bb_error_msg("missing ]");
+ 				return 2;
+ 			}
+-			argv[argc] = NULL;
+-		} else if (LONE_CHAR(arg0+1, '[') == 0) { /* "[[" ? */
+-			--argc;
++		} else { /* assuming "[[" */
+ 			if (strcmp(argv[argc], "]]") != 0) {
+ 				bb_error_msg("missing ]]");
+ 				return 2;
+ 			}
+-			argv[argc] = NULL;
+ 		}
++		argv[argc] = NULL;
+ 	}
+ 
+ 	res = setjmp(leaving);
+@@ -571,7 +569,7 @@ static void initialize_group_array(void)
+ 	if (ngroups > 0) {
+ 		/* FIXME: ash tries so hard to not die on OOM,
+ 		 * and we spoil it with just one xrealloc here */
+-		/* We realloc, because bb_test can be entered repeatedly by shell.
++		/* We realloc, because test_main can be entered repeatedly by shell.
+ 		 * Testcase (ash): 'while true; do test -x some_file; done'
+ 		 * and watch top. (some_file must have owner != you) */
+ 		group_array = xrealloc(group_array, ngroups * sizeof(gid_t));
+@@ -601,12 +599,3 @@ static int is_a_group_member(gid_t gid)
+ 
+ 	return 0;
+ }
+-
+-
+-/* applet entry point */
+-
+-int test_main(int argc, char **argv);
+-int test_main(int argc, char **argv)
+-{
+-	return bb_test(argc, argv);
+-}
+diff --git a/include/libbb.h b/include/libbb.h
+index 9ca5653..b7b0657 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -653,7 +653,7 @@ extern void bb_vinfo_msg(const char *s, va_list p);
+ /* applets which are useful from another applets */
+ int bb_cat(char** argv);
+ int bb_echo(char** argv);
+-int bb_test(int argc, char** argv);
++int test_main(int argc, char** argv);
+ int kill_main(int argc, char **argv);
+ #if ENABLE_ROUTE
+ void bb_displayroutes(int noresolve, int netstatfmt);
+diff --git a/shell/ash.c b/shell/ash.c
+index 35eec42..b54f666 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -10985,7 +10985,7 @@ echocmd(int argc, char **argv)
+ static int
+ testcmd(int argc, char **argv)
+ {
+-	return bb_test(argc, argv);
++	return test_main(argc, argv);
+ }
+ #endif
+ 

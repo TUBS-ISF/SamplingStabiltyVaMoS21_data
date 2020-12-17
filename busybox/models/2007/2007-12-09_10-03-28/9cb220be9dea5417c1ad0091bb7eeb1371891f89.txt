@@ -1,0 +1,42 @@
+2007-12-09 10:03:28 +0000
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 1397409..a0f190f 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1343,8 +1343,10 @@ int read_line_input(const char *prompt, char *command, int maxsize, line_input_t
+ 		int len;
+ 		parse_and_put_prompt(prompt);
+ 		fflush(stdout);
+-		fgets(command, maxsize, stdin);
+-		len = strlen(command);
++		if (fgets(command, maxsize, stdin) == NULL)
++			len = -1; /* EOF or error */
++		else
++			len = strlen(command);
+ 		DEINIT_S();
+ 		return len;
+ 	}
+diff --git a/shell/ash.c b/shell/ash.c
+index 9b9fe5b..4c8a289 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -8553,7 +8553,7 @@ preadfd(void)
+ 			goto retry;
+ 		}
+ 		if (nr < 0 && errno == 0) {
+-			/* Ctrl+D presend */
++			/* Ctrl+D pressed */
+ 			nr = 0;
+ 		}
+ 	}
+@@ -8564,8 +8564,8 @@ preadfd(void)
+ 	if (nr < 0) {
+ 		if (parsefile->fd == 0 && errno == EWOULDBLOCK) {
+ 			int flags = fcntl(0, F_GETFL);
+-			if (flags >= 0 && flags & O_NONBLOCK) {
+-				flags &=~ O_NONBLOCK;
++			if (flags >= 0 && (flags & O_NONBLOCK)) {
++				flags &= ~O_NONBLOCK;
+ 				if (fcntl(0, F_SETFL, flags) >= 0) {
+ 					out2str("sh: turning off NDELAY mode\n");
+ 					goto retry;

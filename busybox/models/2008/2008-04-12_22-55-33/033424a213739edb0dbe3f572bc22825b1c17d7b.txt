@@ -1,0 +1,36 @@
+2008-04-12 22:55:33 +0000
+diff --git a/shell/ash_test/ash-vars/var_posix1.right b/shell/ash_test/ash-vars/var_posix1.right
+new file mode 100644
+index 0000000..013b223
+--- /dev/null
++++ b/shell/ash_test/ash-vars/var_posix1.right
+@@ -0,0 +1,10 @@
++abcdcd
++abcdcd
++abcdcd
++cdcd
++babcdcd
++ababcd
++ababcd
++ababcd
++abab
++ababcdc
+diff --git a/shell/ash_test/ash-vars/var_posix1.tests b/shell/ash_test/ash-vars/var_posix1.tests
+new file mode 100755
+index 0000000..a7c85cb
+--- /dev/null
++++ b/shell/ash_test/ash-vars/var_posix1.tests
+@@ -0,0 +1,13 @@
++var=ababcdcd
++
++echo ${var#ab}
++echo ${var#a*b}
++echo ${var##ab}
++echo ${var##a*b}
++echo ${var#?}
++
++echo ${var%cd}
++echo ${var%c*d}
++echo ${var%%cd}
++echo ${var%%c*d}
++echo ${var%?}

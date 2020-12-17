@@ -1,0 +1,22 @@
+2008-09-06 14:52:28 +0000
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index 89a3f9e..ae97457 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -100,11 +100,15 @@
+ 
+ #include "libbb.h"
+ 
+-#include <net/if.h>
++/* #include <net/if.h> - no. linux/if_bonding.h pulls in linux/if.h */
+ #include <net/if_arp.h>
+ #include <linux/if_bonding.h>
+ #include <linux/sockios.h>
+ 
++#ifndef IFNAMSIZ
++#define IFNAMSIZ 16
++#endif
++
+ typedef uint64_t u64; /* hack, so we may include kernel's ethtool.h */
+ typedef uint32_t u32; /* ditto */
+ typedef uint16_t u16; /* ditto */

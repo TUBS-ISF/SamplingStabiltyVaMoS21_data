@@ -1,0 +1,187 @@
+2007-08-19 13:42:08 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 2519aeb..e514fe2 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -611,8 +611,7 @@ extern const char *opt_complementary;
+ extern const char *applet_long_options;
+ #endif
+ extern uint32_t option_mask32;
+-/* TODO: don't pass argc, determine it by looking at argv */
+-extern uint32_t getopt32(int argc, char **argv, const char *applet_opts, ...);
++extern uint32_t getopt32(char **argv, const char *applet_opts, ...);
+ 
+ 
+ typedef struct llist_t {
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 5a1090e..fa9fc10 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -161,12 +161,12 @@ void xunlink(const char *pathname)
+ // Turn on nonblocking I/O on a fd
+ int ndelay_on(int fd)
+ {
+-	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL,0) | O_NONBLOCK);
++	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL) | O_NONBLOCK);
+ }
+ 
+ int ndelay_off(int fd)
+ {
+-	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL,0) & ~O_NONBLOCK);
++	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL) & ~O_NONBLOCK);
+ }
+ 
+ void xdup2(int from, int to)
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 0c00066..db8d7ce 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -232,13 +232,11 @@ static void open_tty(const char *tty, struct termios *tp, int local)
+ 	int chdir_to_root = 0;
+ 
+ 	/* Set up new standard input, unless we are given an already opened port. */
+-
+ 	if (NOT_LONE_DASH(tty)) {
+ 		struct stat st;
+ 		int fd;
+ 
+ 		/* Sanity checks... */
+-
+ 		xchdir("/dev");
+ 		chdir_to_root = 1;
+ 		xstat(tty, &st);
+@@ -246,18 +244,17 @@ static void open_tty(const char *tty, struct termios *tp, int local)
+ 			bb_error_msg_and_die("%s: not a character device", tty);
+ 
+ 		/* Open the tty as standard input. */
+-
+ 		debug("open(2)\n");
+ 		fd = xopen(tty, O_RDWR | O_NONBLOCK);
+ 		xdup2(fd, 0);
+-		while (fd > 2) close(fd--);
++		while (fd > 2)
++			close(fd--);
+ 	} else {
+ 		/*
+ 		 * Standard input should already be connected to an open port. Make
+ 		 * sure it is open for read/write.
+ 		 */
+-
+-		if ((fcntl(0, F_GETFL, 0) & O_RDWR) != O_RDWR)
++		if ((fcntl(0, F_GETFL) & O_RDWR) != O_RDWR)
+ 			bb_error_msg_and_die("stdin is not open for read/write");
+ 	}
+ 
+@@ -274,7 +271,6 @@ static void open_tty(const char *tty, struct termios *tp, int local)
+ 	 * by patching the SunOS kernel variable "zsadtrlow" to a larger value;
+ 	 * 5 seconds seems to be a good value.
+ 	 */
+-
+ 	ioctl_or_perror_and_die(0, TCGETS, tp, "%s: TCGETS", tty);
+ 
+ 	/*
+@@ -362,7 +358,7 @@ static void termios_init(struct termios *tp, int speed, struct options *op)
+ 	ioctl(0, TCSETS, tp);
+ 
+ 	/* go to blocking input even in local mode */
+-	fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) & ~O_NONBLOCK);
++	ndelay_off(0);
+ 
+ 	debug("term_io 2\n");
+ }
+@@ -791,7 +787,7 @@ int getty_main(int argc, char **argv)
+ 
+ 	if (!(options.flags & F_LOCAL)) {
+ 		/* go to blocking write mode unless -L is specified */
+-		fcntl(1, F_SETFL, fcntl(1, F_GETFL, 0) & ~O_NONBLOCK);
++		ndelay_off(1);
+ 	}
+ 
+ 	/* Optionally detect the baud rate from the modem status message. */
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 117a8b1..3c73c73 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -137,7 +137,7 @@ int crond_main(int ac, char **av)
+ 
+ 	opt_complementary = "f-b:b-f:S-L:L-S" USE_DEBUG_CROND_OPTION(":d-l");
+ 	opterr = 0;			/* disable getopt 'errors' message. */
+-	opt = getopt32(ac, av, "l:L:fbSc:" USE_DEBUG_CROND_OPTION("d:"),
++	opt = getopt32(av, "l:L:fbSc:" USE_DEBUG_CROND_OPTION("d:"),
+ 			&lopt, &Lopt, &copt USE_DEBUG_CROND_OPTION(, &dopt));
+ 	if (opt & 1) /* -l */
+ 		LogLevel = xatou(lopt);
+diff --git a/networking/isrv.c b/networking/isrv.c
+index a51618a..1a41dd4 100644
+--- a/networking/isrv.c
++++ b/networking/isrv.c
+@@ -301,7 +301,7 @@ void isrv_run(
+ 	isrv_want_rd(state, listen_fd);
+ 	/* remember flags to make blocking<->nonblocking switch faster */
+ 	/* (suppress gcc warning "cast from ptr to int of different size") */
+-	PARAM_TBL[0] = (void*)(ptrdiff_t)(fcntl(listen_fd, F_GETFL, 0));
++	PARAM_TBL[0] = (void*)(ptrdiff_t)(fcntl(listen_fd, F_GETFL));
+ 
+ 	while (1) {
+ 		struct timeval tv;
+diff --git a/networking/isrv_identd.c b/networking/isrv_identd.c
+index 23f6758..9bc3b60 100644
+--- a/networking/isrv_identd.c
++++ b/networking/isrv_identd.c
+@@ -32,7 +32,7 @@ static int new_peer(isrv_state_t *state, int fd)
+ 	if (isrv_register_fd(state, peer, fd) < 0)
+ 		return peer; /* failure, unregister peer */
+ 
+-	buf->fd_flag = fcntl(fd, F_GETFL, 0) | O_NONBLOCK;
++	buf->fd_flag = fcntl(fd, F_GETFL) | O_NONBLOCK;
+ 	isrv_want_rd(state, fd);
+ 	return 0;
+ }
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 4678451..8632ba6 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -800,7 +800,7 @@ int svlogd_main(int argc, char **argv)
+ 	/* We cannot set NONBLOCK on fd #0 permanently - this setting
+ 	 * _isn't_ per-process! It is shared among all other processes
+ 	 * with the same stdin */
+-	fl_flag_0 = fcntl(0, F_GETFL, 0);
++	fl_flag_0 = fcntl(0, F_GETFL);
+ 
+ 	blocked_sigset = &ss;
+ 	sigemptyset(&ss);
+diff --git a/shell/ash.c b/shell/ash.c
+index 9aec8ee..46f00dd 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -726,7 +726,7 @@ opentrace(void)
+ 		}
+ 	}
+ #ifdef O_APPEND
+-	flags = fcntl(fileno(tracefile), F_GETFL, 0);
++	flags = fcntl(fileno(tracefile), F_GETFL);
+ 	if (flags >= 0)
+ 		fcntl(fileno(tracefile), F_SETFL, flags | O_APPEND);
+ #endif
+@@ -8565,7 +8565,7 @@ preadfd(void)
+ 
+ 	if (nr < 0) {
+ 		if (parsefile->fd == 0 && errno == EWOULDBLOCK) {
+-			int flags = fcntl(0, F_GETFL, 0);
++			int flags = fcntl(0, F_GETFL);
+ 			if (flags >= 0 && flags & O_NONBLOCK) {
+ 				flags &=~ O_NONBLOCK;
+ 				if (fcntl(0, F_SETFL, flags) >= 0) {
+diff --git a/shell/lash.c b/shell/lash.c
+index c28a103..d4dba8e 100644
+--- a/shell/lash.c
++++ b/shell/lash.c
+@@ -1524,7 +1524,7 @@ int lash_main(int argc_l, char **argv_l)
+ 		}
+ 	}
+ 
+-	opt = getopt32(argc_l, argv_l, "+ic:", &local_pending_command);
++	opt = getopt32(argv_l, "+ic:", &local_pending_command);
+ #define LASH_OPT_i (1<<0)
+ #define LASH_OPT_c (1<<1)
+ 	if (opt & LASH_OPT_c) {

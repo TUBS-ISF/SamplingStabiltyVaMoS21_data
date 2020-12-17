@@ -1,0 +1,62 @@
+2010-01-20 02:45:23 +0100
+diff --git a/editors/Config.in b/editors/Config.in
+index e1285f4..e4fdd0f 100644
+--- a/editors/Config.in
++++ b/editors/Config.in
+@@ -35,6 +35,13 @@ config DIFF
+ 	  differences between them in a form that can be given to
+ 	  the patch command.
+ 
++config FEATURE_DIFF_LONG_OPTIONS
++	bool "Enable long options"
++	default n
++	depends on DIFF && LONG_OPTS
++	help
++	  Enable use of long options.
++
+ config FEATURE_DIFF_DIR
+ 	bool "Enable directory support"
+ 	default y
+diff --git a/editors/diff.c b/editors/diff.c
+index 7726104..9d0373f 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -876,6 +876,28 @@ static void diffdir(char *p[2], const char *s_start)
+ }
+ #endif
+ 
++#if ENABLE_FEATURE_DIFF_LONG_OPTIONS
++static const char diff_longopts[] ALIGN1 =
++	"ignore-case\0"              No_argument       "i"
++	"ignore-tab-expansion\0"     No_argument       "E"
++	"ignore-space-change\0"      No_argument       "b"
++	"ignore-all-space\0"         No_argument       "w"
++	"ignore-blank-lines\0"       No_argument       "B"
++	"text\0"                     No_argument       "a"
++	"unified\0"                  Required_argument "U"
++	"label\0"                    Required_argument "L"
++	"show-c-function\0"          No_argument       "p"
++	"brief\0"                    No_argument       "q"
++	"expand-tabs\0"              No_argument       "t"
++	"initial-tab\0"              No_argument       "T"
++	"recursive\0"                No_argument       "r"
++	"new-file\0"                 No_argument       "N"
++	"report-identical-files\0"   No_argument       "s"
++	"starting-file\0"            Required_argument "S"
++	"minimal\0"                  No_argument       "d"
++	;
++#endif
++
+ int diff_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int diff_main(int argc UNUSED_PARAM, char **argv)
+ {
+@@ -887,6 +909,9 @@ int diff_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* exactly 2 params; collect multiple -L <label>; -U N */
+ 	opt_complementary = "=2:L::U+";
++#if ENABLE_FEATURE_DIFF_LONG_OPTIONS
++	applet_long_options = diff_longopts;
++#endif
+ 	getopt32(argv, "abdiL:NqrsS:tTU:wupBE",
+ 			&L_arg, &s_start, &opt_U_context);
+ 	argv += optind;

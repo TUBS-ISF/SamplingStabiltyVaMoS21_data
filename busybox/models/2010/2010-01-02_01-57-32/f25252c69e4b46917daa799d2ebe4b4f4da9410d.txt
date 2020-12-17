@@ -1,0 +1,14 @@
+2010-01-02 01:57:32 +0100
+diff --git a/procps/watch.c b/procps/watch.c
+index f446ec9..ad44b3a 100644
+--- a/procps/watch.c
++++ b/procps/watch.c
+@@ -62,7 +62,7 @@ int watch_main(int argc UNUSED_PARAM, char **argv)
+ 				strftime(header + width - time_len, time_len,
+ 					"%Y-%m-%d %H:%M:%S", localtime(&t));
+ 
+-			puts(header);
++			printf("%s\n\n", header); /* compat: empty line */
+ 		}
+ 		fflush_all();
+ 		// TODO: 'real' watch pipes cmd's output to itself

@@ -1,0 +1,25 @@
+2007-11-26 07:23:27 +0000
+diff --git a/testsuite/cut.tests b/testsuite/cut.tests
+new file mode 100755
+index 0000000..2788d1f
+--- /dev/null
++++ b/testsuite/cut.tests
+@@ -0,0 +1,18 @@
++#!/bin/sh
++
++# Copyright 2007 by Denys Vlasenko <vda.linux@googlemail.com>
++# Licensed under GPL v2, see file LICENSE for details.
++
++. testing.sh
++
++# testing "test name" "options" "expected result" "file input" "stdin"
++#   file input will be file called "input"
++#   test can create a file "actual" instead of writing to stdout
++
++testing "cut '-' (stdin) and multi file handling" \
++	"cut -d' ' -f2 - input" \
++	"over\n""quick\n" \
++	"the quick brown fox\n" \
++	"jumps over the lazy dog\n" \
++
++exit $FAILCOUNT

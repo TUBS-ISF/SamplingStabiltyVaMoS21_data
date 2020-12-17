@@ -1,0 +1,38 @@
+2008-11-14 21:52:16 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 9f73589..69d37f9 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1840,14 +1840,15 @@
+ #define inotifyd_trivial_usage \
+ 	"/user/space/agent dir/or/file/being/watched[:mask] ..."
+ #define inotifyd_full_usage "\n\n" \
+-       "Spawn userspace agent on filesystem changes." \
++       "Run userspace agent on filesystem changes." \
+      "\nWhen a filesystem event matching the mask occurs" \
+-     "\non specified file/directory an userspace agent is spawned" \
++     "\non specified file /user/space/agent is run" \
+      "\nwith the parameters:" \
+      "\n1. actual event(s)" \
+-     "\n2. file/directory name" \
++     "\n2. file name" \
+      "\n3. name of subfile (if any), in case of watching a directory" \
+-     "\n" \
++     "\ninotify waits for agent to exit." \
++     "\nEvents:" \
+      "\n	a	File is accessed" \
+      "\n	c	File is modified" \
+      "\n	e	Metadata changed" \
+diff --git a/miscutils/inotifyd.c b/miscutils/inotifyd.c
+index 0c4b067..216a696 100644
+--- a/miscutils/inotifyd.c
++++ b/miscutils/inotifyd.c
+@@ -103,7 +103,7 @@ int inotifyd_main(int argc UNUSED_PARAM, char **argv)
+ 		if (bb_got_signal)
+ 			break;
+ 		n = poll(&pfd, 1, -1);
+-		/* Signal interrupted us? */
++		// Signal interrupted us?
+ 		if (n < 0 && errno == EINTR)
+ 			goto again;
+ 		// Under Linux, above if() is not necessary.

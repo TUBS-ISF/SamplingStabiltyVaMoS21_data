@@ -1,0 +1,133 @@
+2009-11-11 21:05:42 +0100
+diff --git a/console-tools/openvt.c b/console-tools/openvt.c
+index 0906de4..7bd6072 100644
+--- a/console-tools/openvt.c
++++ b/console-tools/openvt.c
+@@ -61,9 +61,7 @@ static int get_vt_fd(void)
+ 	for (fd = 0; fd < 3; fd++)
+ 		if (!not_vt_fd(fd))
+ 			return fd;
+-	/* _only_ O_NONBLOCK: ask for neither read nor write perms */
+-	/*FIXME: use? device_open(DEV_CONSOLE,0); */
+-	fd = open(DEV_CONSOLE, O_NONBLOCK);
++	fd = open(DEV_CONSOLE, O_RDONLY | O_NONBLOCK);
+ 	if (fd >= 0 && !not_vt_fd(fd))
+ 		return fd;
+ 	bb_error_msg_and_die("can't find open VT");
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index cb9b183..f29fa64 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -1293,17 +1293,9 @@ int stty_main(int argc, char **argv)
+ 
+ 	/* Now it is safe to start doing things */
+ 	if (file_name) {
+-		int fd, fdflags;
+ 		G.device_name = file_name;
+-		fd = xopen_nonblocking(G.device_name);
+-		if (fd != STDIN_FILENO) {
+-			dup2(fd, STDIN_FILENO);
+-			close(fd);
+-		}
+-		fdflags = fcntl(STDIN_FILENO, F_GETFL);
+-		if (fdflags < 0 ||
+-			fcntl(STDIN_FILENO, F_SETFL, fdflags & ~O_NONBLOCK) < 0)
+-			perror_on_device_and_die("%s: cannot reset non-blocking mode");
++		xmove_fd(xopen_nonblocking(G.device_name), STDIN_FILENO);
++		ndelay_off(STDIN_FILENO);
+ 	}
+ 
+ 	/* Initialize to all zeroes so there is no risk memcmp will report a
+diff --git a/e2fsprogs/e2fs_lib.c b/e2fsprogs/e2fs_lib.c
+index 70ae1f4..f033a19 100644
+--- a/e2fsprogs/e2fs_lib.c
++++ b/e2fsprogs/e2fs_lib.c
+@@ -53,7 +53,7 @@ int fgetsetversion(const char *name, unsigned long *get_version, unsigned long s
+ 	int fd, r;
+ 	IF_LONG_IS_WIDER(int ver;)
+ 
+-	fd = open(name, O_NONBLOCK);
++	fd = open(name, O_RDONLY | O_NONBLOCK);
+ 	if (fd == -1)
+ 		return -1;
+ 	if (!get_version) {
+@@ -95,7 +95,7 @@ int fgetsetflags(const char *name, unsigned long *get_flags, unsigned long set_f
+ 	) {
+ 		goto notsupp;
+ 	}
+-	fd = open(name, O_NONBLOCK); /* neither read nor write asked for */
++	fd = open(name, O_RDONLY | O_NONBLOCK); /* neither read nor write asked for */
+ 	if (fd == -1)
+ 		return -1;
+ 
+diff --git a/libbb/read.c b/libbb/read.c
+index b93a695..06ce297 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -39,18 +39,18 @@ ssize_t FAST_FUNC safe_read(int fd, void *buf, size_t count)
+  * *** BIG SURPRISE! It stays even after child exits! ***
+  *
+  * This is a design bug in UNIX API.
+- *      fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) | O_NONBLOCK);
++ *      fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
+  * will set nonblocking mode not only on _your_ stdin, but
+  * also on stdin of your parent, etc.
+  *
+  * In general,
+  *      fd2 = dup(fd1);
+- *      fcntl(fd2, F_SETFL, fcntl(fd2, F_GETFL, 0) | O_NONBLOCK);
++ *      fcntl(fd2, F_SETFL, fcntl(fd2, F_GETFL) | O_NONBLOCK);
+  * sets both fd1 and fd2 to O_NONBLOCK. This includes cases
+  * where duping is done implicitly by fork() etc.
+  *
+  * We need
+- *      fcntl(fd2, F_SETFD, fcntl(fd2, F_GETFD, 0) | O_NONBLOCK);
++ *      fcntl(fd2, F_SETFD, fcntl(fd2, F_GETFD) | O_NONBLOCK);
+  * (note SETFD, not SETFL!) but such thing doesn't exist.
+  *
+  * Alternatively, we need nonblocking_read(fd, ...) which doesn't
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index e47b01d..aac46f4 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -27,12 +27,12 @@
+ /* Turn on nonblocking I/O on a fd */
+ int FAST_FUNC ndelay_on(int fd)
+ {
+-	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL) | O_NONBLOCK);
++	return fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+ }
+ 
+ int FAST_FUNC ndelay_off(int fd)
+ {
+-	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL) & ~O_NONBLOCK);
++	return fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) & ~O_NONBLOCK);
+ }
+ 
+ int FAST_FUNC close_on_exec_on(int fd)
+diff --git a/miscutils/microcom.c b/miscutils/microcom.c
+index a322197..fe6661f 100644
+--- a/miscutils/microcom.c
++++ b/miscutils/microcom.c
+@@ -92,7 +92,7 @@ int microcom_main(int argc UNUSED_PARAM, char **argv)
+ 	sfd = open_or_warn(argv[0], O_RDWR | O_NOCTTY | O_NONBLOCK);
+ 	if (sfd < 0)
+ 		goto done;
+-	fcntl(sfd, F_SETFL, 0);
++	fcntl(sfd, F_SETFL, O_RDWR);
+ 
+ 	// put device to "raw mode"
+ 	xget1(sfd, &tio, &tiosfd);
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index 0d65d5f..ca85ee7 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -373,7 +373,7 @@ int modprobe_main(int argc UNUSED_PARAM, char **argv)
+ 			 * "If name is NULL, all unused modules marked
+ 			 * autoclean will be removed".
+ 			 */
+-			if (bb_delete_module(NULL, O_NONBLOCK|O_EXCL) != 0)
++			if (bb_delete_module(NULL, O_NONBLOCK | O_EXCL) != 0)
+ 				bb_perror_msg_and_die("rmmod");
+ 		}
+ 		return EXIT_SUCCESS;

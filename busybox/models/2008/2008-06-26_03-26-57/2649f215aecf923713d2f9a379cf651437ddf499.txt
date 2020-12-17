@@ -1,0 +1,84 @@
+2008-06-26 03:26:57 +0000
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index d0a2b7c..86415c7 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -40,7 +40,8 @@ int open_transformer(int src_fd,
+ 			close(fd_pipe.wr); /* Send EOF */
+ 			close(src_fd);
+ 		}
+-		exit(EXIT_SUCCESS);
++		/* must be _exit! bug was actually seen here */
++		_exit(EXIT_SUCCESS);
+ #else
+ 		{
+ 			char *argv[4];
+@@ -60,5 +61,7 @@ int open_transformer(int src_fd,
+ 	/* parent process */
+ 	close(fd_pipe.wr); /* Don't want to write to the child */
+ 
+-	return fd_pipe.rd;
++//TODO: get rid of return value (become void)?
++	xmove_fd(fd_pipe.rd, src_fd);
++	return src_fd;
+ }
+diff --git a/libbb/recursive_action.c b/libbb/recursive_action.c
+index 513aff3..fe9ba2e 100644
+--- a/libbb/recursive_action.c
++++ b/libbb/recursive_action.c
+@@ -34,9 +34,19 @@ static int true_action(const char *fileName ATTRIBUTE_UNUSED,
+  * recursive_action() return 0, but it doesn't stop directory traversal
+  * (fileAction/dirAction will be called on each file).
+  *
+- * if !depthFirst, dirAction return value of 0 (FALSE) or 2 (SKIP)
+- * prevents recursion into that directory, instead
+- * recursive_action() returns 0 (if FALSE) or 1 (if SKIP).
++ * If !ACTION_RECURSE, dirAction is called on the directory and its
++ * return value is returned from recursive_action(). No recursion.
++ *
++ * If ACTION_RECURSE, recursive_action() is called on each directory.
++ * If any one of these calls returns 0, current recursive_action() returns 0.
++ *
++ * If ACTION_DEPTHFIRST, dirAction is called after recurse.
++ * If it returns 0, the warning is printed and recursive_action() returns 0.
++ *
++ * If !ACTION_DEPTHFIRST, dirAction is called before we recurse.
++ * Return value of 0 (FALSE) or 2 (SKIP) prevents recursion
++ * into that directory, instead recursive_action() returns 0 (if FALSE)
++ * or 1 (if SKIP)
+  *
+  * followLinks=0/1 differs mainly in handling of links to dirs.
+  * 0: lstat(statbuf). Calls fileAction on link name even if points to dir.
+@@ -59,7 +69,8 @@ int recursive_action(const char *fileName,
+ 	if (!dirAction) dirAction = true_action;
+ 
+ 	status = ACTION_FOLLOWLINKS; /* hijack a variable for bitmask... */
+-	if (!depth) status = ACTION_FOLLOWLINKS | ACTION_FOLLOWLINKS_L0;
++	if (!depth)
++		status = ACTION_FOLLOWLINKS | ACTION_FOLLOWLINKS_L0;
+ 	status = ((flags & status) ? stat : lstat)(fileName, &statbuf);
+ 	if (status < 0) {
+ #ifdef DEBUG_RECURS_ACTION
+@@ -105,8 +116,9 @@ int recursive_action(const char *fileName,
+ 		nextFile = concat_subpath_file(fileName, next->d_name);
+ 		if (nextFile == NULL)
+ 			continue;
+-		/* now descend into it (NB: ACTION_RECURSE is set in flags) */
+-		if (!recursive_action(nextFile, flags, fileAction, dirAction, userData, depth+1))
++		/* process every file (NB: ACTION_RECURSE is set in flags) */
++		if (!recursive_action(nextFile, flags, fileAction, dirAction,
++						userData, depth + 1))
+ 			status = FALSE;
+ 		free(nextFile);
+ 	}
+@@ -117,9 +129,7 @@ int recursive_action(const char *fileName,
+ 			goto done_nak_warn;
+ 	}
+ 
+-	if (!status)
+-		return FALSE;
+-	return TRUE;
++	return status;
+ 
+  done_nak_warn:
+ 	bb_simple_perror_msg(fileName);

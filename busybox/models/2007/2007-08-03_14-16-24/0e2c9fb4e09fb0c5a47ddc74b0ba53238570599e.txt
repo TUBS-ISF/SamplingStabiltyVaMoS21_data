@@ -1,0 +1,155 @@
+2007-08-03 14:16:24 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 13bd2d6..546bbaf 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -733,7 +733,10 @@ extern int get_linux_version_code(void);
+ 
+ extern char *query_loop(const char *device);
+ extern int del_loop(const char *device);
+-extern int set_loop(char **device, const char *file, unsigned long long offset);
++/* If *devname is not NULL, use that name, otherwise try to find free one,
++ * malloc and return it in *devname.
++ * return value: 1: read-only loopdev was setup, 0: rw, < 0: error */
++extern int set_loop(char **devname, const char *file, unsigned long long offset);
+ 
+ 
+ //TODO: pass buf pointer or return allocated buf (avoid statics)?
+@@ -1061,6 +1064,7 @@ extern const char bb_default_login_shell[];
+ #endif
+ # define VC_FORMAT "/dev/vc/%d"
+ # define LOOP_FORMAT "/dev/loop/%d"
++# define LOOP_NAMESIZE (sizeof("/dev/loop/") + sizeof(int)*3 + 1)
+ # define LOOP_NAME "/dev/loop/"
+ # define FB_0 "/dev/fb/0"
+ #else
+@@ -1081,6 +1085,7 @@ extern const char bb_default_login_shell[];
+ #endif
+ # define VC_FORMAT "/dev/tty%d"
+ # define LOOP_FORMAT "/dev/loop%d"
++# define LOOP_NAMESIZE (sizeof("/dev/loop") + sizeof(int)*3 + 1)
+ # define LOOP_NAME "/dev/loop"
+ # define FB_0 "/dev/fb0"
+ #endif
+diff --git a/libbb/loop.c b/libbb/loop.c
+index 9559d42..6934b7a 100644
+--- a/libbb/loop.c
++++ b/libbb/loop.c
+@@ -81,7 +81,8 @@ int del_loop(const char *device)
+  */
+ int set_loop(char **device, const char *file, unsigned long long offset)
+ {
+-	char dev[20], *try;
++	char dev[LOOP_NAMESIZE];
++	char *try;
+ 	bb_loop_info loopinfo;
+ 	struct stat statbuf;
+ 	int i, dfd, ffd, mode, rc = -1;
+@@ -140,14 +141,14 @@ int set_loop(char **device, const char *file, unsigned long long offset)
+ 			rc = -1;
+ 		}
+ 		close(dfd);
+-try_again:
++ try_again:
+ 		if (*device) break;
+ 	}
+ 	close(ffd);
+ 	if (!rc) {
+ 		if (!*device)
+ 			*device = xstrdup(dev);
+-		return (mode == O_RDONLY) ? 1 : 0;
++		return (mode == O_RDONLY); /* 1:ro, 0:rw */
+ 	}
+ 	return rc;
+ }
+diff --git a/libbb/perror_msg.c b/libbb/perror_msg.c
+index 5145795..2ec1a9b 100644
+--- a/libbb/perror_msg.c
++++ b/libbb/perror_msg.c
+@@ -14,6 +14,10 @@ void bb_perror_msg(const char *s, ...)
+ 	va_list p;
+ 
+ 	va_start(p, s);
+-	bb_vperror_msg(s, p);
++	/* Guard against "<error message>: Success" */
++	if (!errno)
++		bb_verror_msg(s, p, NULL);
++	else
++		bb_vperror_msg(s, p);
+ 	va_end(p);
+ }
+diff --git a/libbb/perror_msg_and_die.c b/libbb/perror_msg_and_die.c
+index 3a06b65..90f56e0 100644
+--- a/libbb/perror_msg_and_die.c
++++ b/libbb/perror_msg_and_die.c
+@@ -14,7 +14,11 @@ void bb_perror_msg_and_die(const char *s, ...)
+ 	va_list p;
+ 
+ 	va_start(p, s);
+-	bb_vperror_msg(s, p);
++	/* Guard against "<error message>: Success" */
++	if (!errno)
++		bb_verror_msg(s, p, NULL);
++	else
++		bb_vperror_msg(s, p);
+ 	va_end(p);
+ 	xfunc_die();
+ }
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 7ee24ca..a7b0a98 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -1439,7 +1439,7 @@ static int singlemount(struct mntent *mp, int ignore_busy)
+ 	// Might this be an NFS filesystem?
+ 
+ 	if (ENABLE_FEATURE_MOUNT_NFS
+-	 && (!mp->mnt_type || !strcmp(mp->mnt_type,"nfs"))
++	 && (!mp->mnt_type || !strcmp(mp->mnt_type, "nfs"))
+ 	 && strchr(mp->mnt_fsname, ':') != NULL
+ 	) {
+ 		rc = nfsmount(mp, vfsflags, filteropts);
+@@ -1458,15 +1458,12 @@ static int singlemount(struct mntent *mp, int ignore_busy)
+ 
+ 		if (ENABLE_FEATURE_MOUNT_LOOP && S_ISREG(st.st_mode)) {
+ 			loopFile = bb_simplify_path(mp->mnt_fsname);
+-			mp->mnt_fsname = 0;
+-			switch (set_loop(&(mp->mnt_fsname), loopFile, 0)) {
+-			case 0:
+-			case 1:
+-				break;
+-			default:
+-				bb_error_msg( errno == EPERM || errno == EACCES
+-					? bb_msg_perm_denied_are_you_root
+-					: "cannot setup loop device");
++			mp->mnt_fsname = NULL; /* will receive malloced loop dev name */
++			if (set_loop(&(mp->mnt_fsname), loopFile, 0) < 0) {
++				if (errno == EPERM || errno == EACCES)
++					bb_error_msg(bb_msg_perm_denied_are_you_root);
++				else
++					bb_perror_msg("cannot setup loop device");
+ 				return errno;
+ 			}
+ 
+@@ -1516,10 +1513,10 @@ static int singlemount(struct mntent *mp, int ignore_busy)
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		free(filteropts);
+ 
+-	if (rc && errno == EBUSY && ignore_busy) rc = 0;
++	if (rc && errno == EBUSY && ignore_busy)
++		rc = 0;
+ 	if (rc < 0)
+-		/* perror here sometimes says "mounting ... on ... failed: Success" */
+-		bb_error_msg("mounting %s on %s failed", mp->mnt_fsname, mp->mnt_dir);
++		bb_perror_msg("mounting %s on %s failed", mp->mnt_fsname, mp->mnt_dir);
+ 
+ 	return rc;
+ }
+@@ -1527,7 +1524,7 @@ static int singlemount(struct mntent *mp, int ignore_busy)
+ // Parse options, if necessary parse fstab/mtab, and call singlemount for
+ // each directory to be mounted.
+ 
+-const char must_be_root[] = "you must be root";
++static const char must_be_root[] = "you must be root";
+ 
+ int mount_main(int argc, char **argv);
+ int mount_main(int argc, char **argv)

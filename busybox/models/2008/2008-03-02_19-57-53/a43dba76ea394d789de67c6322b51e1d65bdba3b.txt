@@ -1,0 +1,626 @@
+2008-03-02 19:57:53 +0000
+diff --git a/shell/hush_test/zbad b/shell/hush_test/zbad
+new file mode 100644
+index 0000000..e4b5caa
+--- /dev/null
++++ b/shell/hush_test/zbad
+@@ -0,0 +1,3 @@
++# TODO: hush doesn't know ':' null command
++
++while :; do exit; done
+diff --git a/shell/msh_test/TODO_bug846 b/shell/msh_test/TODO_bug846
+deleted file mode 100644
+index 5c777fe..0000000
+--- a/shell/msh_test/TODO_bug846
++++ /dev/null
+@@ -1,29 +0,0 @@
+-#!/bin/sh
+-# For future msh testsuite:
+-# Testcase for http://bugs.busybox.net/view.php?id=846
+-
+-n=0
+-while :
+-do
+-        echo A
+-        while :
+-        do
+-    		echo B
+-                break
+-        done
+-        echo iteration
+-        [ $n = 1 ] && break
+-	echo C
+-        n=`expr $n + 1`
+-done
+-echo D
+-
+-# output should be:
+-# A
+-# B
+-# iteration
+-# C
+-# A
+-# B
+-# iteration
+-# D
+diff --git a/shell/msh_test/msh-bugs/noeol3.right b/shell/msh_test/msh-bugs/noeol3.right
+new file mode 100644
+index 0000000..56f8515
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/noeol3.right
+@@ -0,0 +1 @@
++hush: syntax error: unterminated "
+diff --git a/shell/msh_test/msh-bugs/noeol3.tests b/shell/msh_test/msh-bugs/noeol3.tests
+new file mode 100755
+index 0000000..ec958ed
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/noeol3.tests
+@@ -0,0 +1,2 @@
++# last line has no EOL!
++echo "unterminated
+\ No newline at end of file
+diff --git a/shell/msh_test/msh-bugs/process_subst.right b/shell/msh_test/msh-bugs/process_subst.right
+new file mode 100644
+index 0000000..397bc80
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/process_subst.right
+@@ -0,0 +1,3 @@
++TESTzzBEST
++TEST$(echo zz)BEST
++TEST'BEST
+diff --git a/shell/msh_test/msh-bugs/process_subst.tests b/shell/msh_test/msh-bugs/process_subst.tests
+new file mode 100755
+index 0000000..21996bc
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/process_subst.tests
+@@ -0,0 +1,3 @@
++echo "TEST`echo zz;echo;echo`BEST"
++echo "TEST`echo '$(echo zz)'`BEST"
++echo "TEST`echo "'"`BEST"
+diff --git a/shell/msh_test/msh-bugs/read.right b/shell/msh_test/msh-bugs/read.right
+new file mode 100644
+index 0000000..0e50e2a
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/read.right
+@@ -0,0 +1,4 @@
++read
++cat
++echo "REPLY=$REPLY"
++REPLY=exec <read.tests
+diff --git a/shell/msh_test/msh-bugs/read.tests b/shell/msh_test/msh-bugs/read.tests
+new file mode 100755
+index 0000000..ff1acbd
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/read.tests
+@@ -0,0 +1,4 @@
++exec <read.tests
++read
++cat
++echo "REPLY=$REPLY"
+diff --git a/shell/msh_test/msh-bugs/shift.right b/shell/msh_test/msh-bugs/shift.right
+new file mode 100644
+index 0000000..d281e35
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/shift.right
+@@ -0,0 +1,6 @@
++./shift.tests abc d e
++./shift.tests d e 123
++./shift.tests d e 123
++./shift.tests
++./shift.tests
++./shift.tests
+diff --git a/shell/msh_test/msh-bugs/shift.tests b/shell/msh_test/msh-bugs/shift.tests
+new file mode 100755
+index 0000000..53ef249
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/shift.tests
+@@ -0,0 +1,14 @@
++if test $# = 0; then
++    exec "$THIS_SH" $0 abc "d e" 123
++fi
++echo $0 $1 $2
++shift
++echo $0 $1 $2
++shift 999
++echo $0 $1 $2
++shift 2
++echo $0 $1 $2
++shift 2
++echo $0 $1 $2
++shift
++echo $0 $1 $2
+diff --git a/shell/msh_test/msh-bugs/starquoted.right b/shell/msh_test/msh-bugs/starquoted.right
+new file mode 100644
+index 0000000..b56323f
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/starquoted.right
+@@ -0,0 +1,8 @@
++.1 abc d e f.
++.1.
++.abc.
++.d e f.
++.-1 abc d e f-.
++.-1.
++.abc.
++.d e f-.
+diff --git a/shell/msh_test/msh-bugs/starquoted.tests b/shell/msh_test/msh-bugs/starquoted.tests
+new file mode 100755
+index 0000000..2fe49b1
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/starquoted.tests
+@@ -0,0 +1,8 @@
++if test $# = 0; then
++    exec "$THIS_SH" "$0" 1 abc 'd e f'
++fi
++
++for a in "$*"; do echo ".$a."; done
++for a in "$@"; do echo ".$a."; done
++for a in "-$*-"; do echo ".$a."; done
++for a in "-$@-"; do echo ".$a."; done
+diff --git a/shell/msh_test/msh-bugs/syntax_err.right b/shell/msh_test/msh-bugs/syntax_err.right
+new file mode 100644
+index 0000000..08a270c
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/syntax_err.right
+@@ -0,0 +1,2 @@
++shown
++hush: syntax error: unterminated '
+diff --git a/shell/msh_test/msh-bugs/syntax_err.tests b/shell/msh_test/msh-bugs/syntax_err.tests
+new file mode 100755
+index 0000000..d10ed42
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/syntax_err.tests
+@@ -0,0 +1,3 @@
++echo shown
++echo test `echo 'aa`
++echo not shown
+diff --git a/shell/msh_test/msh-bugs/var_expand_in_assign.right b/shell/msh_test/msh-bugs/var_expand_in_assign.right
+new file mode 100644
+index 0000000..352210d
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/var_expand_in_assign.right
+@@ -0,0 +1,5 @@
++. .
++.abc d e.
++.abc d e.
++.abc d e.
++.abc d e.
+diff --git a/shell/msh_test/msh-bugs/var_expand_in_assign.tests b/shell/msh_test/msh-bugs/var_expand_in_assign.tests
+new file mode 100755
+index 0000000..18cdc74
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/var_expand_in_assign.tests
+@@ -0,0 +1,15 @@
++if test $# = 0; then
++    exec "$THIS_SH" "$0" abc "d e"
++fi
++
++space=' '
++echo .$space.
++
++a=$*
++echo .$a.
++a=$@
++echo .$a.
++a="$*"
++echo .$a.
++a="$@"
++echo .$a.
+diff --git a/shell/msh_test/msh-bugs/var_expand_in_redir.right b/shell/msh_test/msh-bugs/var_expand_in_redir.right
+new file mode 100644
+index 0000000..423299c
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/var_expand_in_redir.right
+@@ -0,0 +1,3 @@
++TEST1
++TEST2
++TEST3
+diff --git a/shell/msh_test/msh-bugs/var_expand_in_redir.tests b/shell/msh_test/msh-bugs/var_expand_in_redir.tests
+new file mode 100755
+index 0000000..bda6bdd
+--- /dev/null
++++ b/shell/msh_test/msh-bugs/var_expand_in_redir.tests
+@@ -0,0 +1,13 @@
++if test $# = 0; then
++    exec "$THIS_SH" "$0" abc "d e"
++fi
++
++echo TEST1 >"$1.out"
++echo TEST2 >"$2.out"
++# bash says: "$@.out": ambiguous redirect
++# ash handles it as if it is '$*' - we do the same
++echo TEST3 >"$@.out"
++
++cat abc.out "d e.out" "abc d e.out"
++
++rm abc.out "d e.out" "abc d e.out"
+diff --git a/shell/msh_test/msh-execution/nested_break.right b/shell/msh_test/msh-execution/nested_break.right
+new file mode 100644
+index 0000000..4e8b6b0
+--- /dev/null
++++ b/shell/msh_test/msh-execution/nested_break.right
+@@ -0,0 +1,8 @@
++A
++B
++iteration
++C
++A
++B
++iteration
++D
+diff --git a/shell/msh_test/msh-execution/nested_break.tests b/shell/msh_test/msh-execution/nested_break.tests
+new file mode 100755
+index 0000000..f2e6f81
+--- /dev/null
++++ b/shell/msh_test/msh-execution/nested_break.tests
+@@ -0,0 +1,17 @@
++# Testcase for http://bugs.busybox.net/view.php?id=846
++
++n=0
++while :
++do
++        echo A
++        while :
++        do
++    		echo B
++                break
++        done
++        echo iteration
++        [ $n = 1 ] && break
++	echo C
++        n=`expr $n + 1`
++done
++echo D
+diff --git a/shell/msh_test/msh-misc/tick.right b/shell/msh_test/msh-misc/tick.right
+new file mode 100644
+index 0000000..6ed281c
+--- /dev/null
++++ b/shell/msh_test/msh-misc/tick.right
+@@ -0,0 +1,2 @@
++1
++1
+diff --git a/shell/msh_test/msh-misc/tick.tests b/shell/msh_test/msh-misc/tick.tests
+new file mode 100755
+index 0000000..1f749a9
+--- /dev/null
++++ b/shell/msh_test/msh-misc/tick.tests
+@@ -0,0 +1,4 @@
++true
++false; echo `echo $?`
++true
++{ false; echo `echo $?`; }
+diff --git a/shell/msh_test/msh-parsing/argv0.right b/shell/msh_test/msh-parsing/argv0.right
+new file mode 100644
+index 0000000..d86bac9
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/argv0.right
+@@ -0,0 +1 @@
++OK
+diff --git a/shell/msh_test/msh-parsing/argv0.tests b/shell/msh_test/msh-parsing/argv0.tests
+new file mode 100755
+index 0000000..f5c40f6
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/argv0.tests
+@@ -0,0 +1,4 @@
++if test $# = 0; then
++    exec "$THIS_SH" "$0" arg
++fi
++echo OK
+diff --git a/shell/msh_test/msh-parsing/noeol.right b/shell/msh_test/msh-parsing/noeol.right
+new file mode 100644
+index 0000000..e427984
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/noeol.right
+@@ -0,0 +1 @@
++HELLO
+diff --git a/shell/msh_test/msh-parsing/noeol.tests b/shell/msh_test/msh-parsing/noeol.tests
+new file mode 100755
+index 0000000..a93113a
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/noeol.tests
+@@ -0,0 +1,2 @@
++# next line has no EOL!
++echo HELLO
+\ No newline at end of file
+diff --git a/shell/msh_test/msh-parsing/noeol2.right b/shell/msh_test/msh-parsing/noeol2.right
+new file mode 100644
+index 0000000..d00491f
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/noeol2.right
+@@ -0,0 +1 @@
++1
+diff --git a/shell/msh_test/msh-parsing/noeol2.tests b/shell/msh_test/msh-parsing/noeol2.tests
+new file mode 100755
+index 0000000..1220f05
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/noeol2.tests
+@@ -0,0 +1,7 @@
++# last line has no EOL!
++if true
++then
++  echo 1
++else
++  echo 2
++fi
+\ No newline at end of file
+diff --git a/shell/msh_test/msh-parsing/quote1.right b/shell/msh_test/msh-parsing/quote1.right
+new file mode 100644
+index 0000000..cb38205
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/quote1.right
+@@ -0,0 +1 @@
++'1'
+diff --git a/shell/msh_test/msh-parsing/quote1.tests b/shell/msh_test/msh-parsing/quote1.tests
+new file mode 100755
+index 0000000..f558954
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/quote1.tests
+@@ -0,0 +1,2 @@
++a=1
++echo "'$a'"
+diff --git a/shell/msh_test/msh-parsing/quote2.right b/shell/msh_test/msh-parsing/quote2.right
+new file mode 100644
+index 0000000..3bc9edc
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/quote2.right
+@@ -0,0 +1 @@
++>1
+diff --git a/shell/msh_test/msh-parsing/quote2.tests b/shell/msh_test/msh-parsing/quote2.tests
+new file mode 100755
+index 0000000..bd966f3
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/quote2.tests
+@@ -0,0 +1,2 @@
++a=1
++echo ">$a"
+diff --git a/shell/msh_test/msh-parsing/quote3.right b/shell/msh_test/msh-parsing/quote3.right
+new file mode 100644
+index 0000000..069a46e
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/quote3.right
+@@ -0,0 +1,3 @@
++Testing: in $empty""
++..
++Finished
+diff --git a/shell/msh_test/msh-parsing/quote3.tests b/shell/msh_test/msh-parsing/quote3.tests
+new file mode 100755
+index 0000000..075e785
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/quote3.tests
+@@ -0,0 +1,8 @@
++if test $# = 0; then
++    exec "$THIS_SH" quote3.tests abc "d e"
++fi
++
++echo 'Testing: in $empty""'
++empty=''
++for a in $empty""; do echo ".$a."; done
++echo Finished
+diff --git a/shell/msh_test/msh-parsing/quote4.right b/shell/msh_test/msh-parsing/quote4.right
+new file mode 100644
+index 0000000..b2901ea
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/quote4.right
+@@ -0,0 +1 @@
++a b
+diff --git a/shell/msh_test/msh-parsing/quote4.tests b/shell/msh_test/msh-parsing/quote4.tests
+new file mode 100755
+index 0000000..f1dabfa
+--- /dev/null
++++ b/shell/msh_test/msh-parsing/quote4.tests
+@@ -0,0 +1,2 @@
++a_b='a b'
++echo "$a_b"
+diff --git a/shell/msh_test/msh-vars/star.right b/shell/msh_test/msh-vars/star.right
+new file mode 100644
+index 0000000..0ecc55b
+--- /dev/null
++++ b/shell/msh_test/msh-vars/star.right
+@@ -0,0 +1,6 @@
++.1.
++.abc.
++.d.
++.e.
++.f.
++.1 abc d e f.
+diff --git a/shell/msh_test/msh-vars/star.tests b/shell/msh_test/msh-vars/star.tests
+new file mode 100755
+index 0000000..5554c40
+--- /dev/null
++++ b/shell/msh_test/msh-vars/star.tests
+@@ -0,0 +1,8 @@
++if test $# = 0; then
++    exec "$THIS_SH" star.tests 1 abc 'd e f'
++fi
++# 'd e f' should be split into 3 separate args:
++for a in $*; do echo ".$a."; done
++
++# must produce .1 abc d e f.
++for a in "$*"; do echo ".$a."; done
+diff --git a/shell/msh_test/msh-vars/var.right b/shell/msh_test/msh-vars/var.right
+new file mode 100644
+index 0000000..14b2314
+--- /dev/null
++++ b/shell/msh_test/msh-vars/var.right
+@@ -0,0 +1,4 @@
++http://busybox.net
++http://busybox.net_abc
++1
++1
+diff --git a/shell/msh_test/msh-vars/var.tests b/shell/msh_test/msh-vars/var.tests
+new file mode 100755
+index 0000000..0a63696
+--- /dev/null
++++ b/shell/msh_test/msh-vars/var.tests
+@@ -0,0 +1,9 @@
++URL=http://busybox.net
++
++echo $URL
++echo ${URL}_abc
++
++true
++false; echo $?
++true
++{ false; echo $?; }
+diff --git a/shell/msh_test/msh-vars/var_subst_in_for.right b/shell/msh_test/msh-vars/var_subst_in_for.right
+new file mode 100644
+index 0000000..c8aca1c
+--- /dev/null
++++ b/shell/msh_test/msh-vars/var_subst_in_for.right
+@@ -0,0 +1,40 @@
++Testing: in x y z
++.x.
++.y.
++.z.
++Testing: in u $empty v
++.u.
++.v.
++Testing: in u " $empty" v
++.u.
++. .
++.v.
++Testing: in u $empty $empty$a v
++.u.
++.a.
++.v.
++Testing: in $a_b
++.a.
++.b.
++Testing: in $*
++.abc.
++.d.
++.e.
++Testing: in $@
++.abc.
++.d.
++.e.
++Testing: in -$*-
++.-abc.
++.d.
++.e-.
++Testing: in -$@-
++.-abc.
++.d.
++.e-.
++Testing: in $a_b -$a_b-
++.a.
++.b.
++.-a.
++.b-.
++Finished
+diff --git a/shell/msh_test/msh-vars/var_subst_in_for.tests b/shell/msh_test/msh-vars/var_subst_in_for.tests
+new file mode 100755
+index 0000000..4d1c112
+--- /dev/null
++++ b/shell/msh_test/msh-vars/var_subst_in_for.tests
+@@ -0,0 +1,40 @@
++if test $# = 0; then
++    exec "$THIS_SH" var_subst_in_for.tests abc "d e"
++fi
++
++echo 'Testing: in x y z'
++for a in x y z; do echo ".$a."; done
++
++echo 'Testing: in u $empty v'
++empty=''
++for a in u $empty v; do echo ".$a."; done
++
++echo 'Testing: in u " $empty" v'
++empty=''
++for a in u " $empty" v; do echo ".$a."; done
++
++echo 'Testing: in u $empty $empty$a v'
++a='a'
++for a in u $empty $empty$a v; do echo ".$a."; done
++
++echo 'Testing: in $a_b'
++a_b='a b'
++for a in $a_b; do echo ".$a."; done
++
++echo 'Testing: in $*'
++for a in $*; do echo ".$a."; done
++
++echo 'Testing: in $@'
++for a in $@; do echo ".$a."; done
++
++echo 'Testing: in -$*-'
++for a in -$*-; do echo ".$a."; done
++
++echo 'Testing: in -$@-'
++for a in -$@-; do echo ".$a."; done
++
++echo 'Testing: in $a_b -$a_b-'
++a_b='a b'
++for a in $a_b -$a_b-; do echo ".$a."; done
++
++echo Finished
+diff --git a/shell/msh_test/run-all b/shell/msh_test/run-all
+new file mode 100755
+index 0000000..43bc9fc
+--- /dev/null
++++ b/shell/msh_test/run-all
+@@ -0,0 +1,64 @@
++#!/bin/sh
++
++test -x msh || {
++    echo "No ./msh?! Perhaps you want to run 'ln -s ../../busybox msh'"
++    exit
++}
++
++PATH="$PWD:$PATH" # for msh
++export PATH
++
++THIS_SH="$PWD/msh"
++export THIS_SH
++
++do_test()
++{
++    test -d "$1" || return 0
++#   echo Running tests in directory "$1"
++    (
++    cd "$1" || { echo "cannot cd $1!"; exit 1; }
++    for x in run-*; do
++	test -f "$x" || continue
++	case "$x" in
++	    "$0"|run-minimal|run-gprof) ;;
++	    *.orig|*~) ;;
++	    #*) echo $x ; sh $x ;;
++	    *)
++	    sh "$x" >"../$1-$x.fail" 2>&1 && \
++	    { echo "$1/$x: ok"; rm "../$1-$x.fail"; } || echo "$1/$x: fail";
++	    ;;
++	esac
++    done
++    # Many bash run-XXX scripts just do this,
++    # no point in duplication it all over the place
++    for x in *.tests; do
++	test -x "$x" || continue
++	name="${x%%.tests}"
++	test -f "$name.right" || continue
++#	echo Running test: "$name.right"
++	{
++	    "$THIS_SH" "./$x" >"$name.xx" 2>&1
++	    diff -u "$name.xx" "$name.right" >"../$1-$x.fail" && rm -f "$name.xx" "../$1-$x.fail"
++	} && echo "$1/$x: ok" || echo "$1/$x: fail"
++    done
++    )
++}
++
++# Main part of this script
++# Usage: run-all [directories]
++
++if [ $# -lt 1 ]; then
++    # All sub directories
++    modules=`ls -d msh-*`
++
++    for module in $modules; do
++	do_test $module
++    done
++else
++    while [ $# -ge 1 ]; do
++	if [ -d $1 ]; then
++	    do_test $1
++	fi
++	shift
++    done
++fi

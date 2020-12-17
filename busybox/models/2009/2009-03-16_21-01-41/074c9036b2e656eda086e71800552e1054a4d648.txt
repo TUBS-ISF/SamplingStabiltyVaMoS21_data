@@ -1,0 +1,14 @@
+2009-03-16 21:01:41 +0000
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index 3b98bac..9a1ea65 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -522,7 +522,7 @@ handle_port(void)
+ 	G.port_addr = xdotted2sockaddr(raw, port);
+ #else
+ 	G.port_addr = get_peer_lsa(STDIN_FILENO);
+-	set_nport(G.port_addr, port);
++	set_nport(G.port_addr, htons(port));
+ #endif
+ 	WRITE_OK(FTP_PORTOK);
+ }

@@ -1,0 +1,5 @@
+2008-10-09 13:52:30 +0000
+diff --git a/archival/unzip_cant_handle.odt b/archival/unzip_cant_handle.odt
+deleted file mode 100644
+index 715e4a9..0000000
+Binary files a/archival/unzip_cant_handle.odt and /dev/null differ

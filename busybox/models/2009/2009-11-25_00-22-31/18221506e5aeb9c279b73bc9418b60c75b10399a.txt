@@ -1,0 +1,31 @@
+2009-11-25 00:22:31 +0100
+diff --git a/Makefile b/Makefile
+index 7084c5c..3a49a69 100644
+--- a/Makefile
++++ b/Makefile
+@@ -359,8 +359,10 @@ scripts_basic:
+ scripts/basic/%: scripts_basic ;
+ 
+ # bbox: we have helpers in applets/
++# we depend on scripts_basic, since scripts/basic/fixdep
++# must be built before any other host prog
+ PHONY += applets_dir
+-applets_dir:
++applets_dir: scripts_basic
+ 	$(Q)$(MAKE) $(build)=applets
+ 
+ applets/%: applets_dir ;
+diff --git a/applets/Kbuild b/applets/Kbuild
+index 88e9816..a6b0cf6 100644
+--- a/applets/Kbuild
++++ b/applets/Kbuild
+@@ -12,9 +12,6 @@ hostprogs-y += usage usage_pod applet_tables
+ 
+ always:= $(hostprogs-y)
+ 
+-# fixdep is needed to compile other host programs
+-$(addprefix $(obj)/,$(always)): $(objtree)/scripts/basic/fixdep
+-
+ # Generated files need additional love
+ 
+ # This trick decreases amount of rebuilds

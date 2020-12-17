@@ -1,0 +1,490 @@
+2008-02-22 22:24:48 +0000
+diff --git a/Config.in b/Config.in
+index d2bb632..73736e3 100644
+--- a/Config.in
++++ b/Config.in
+@@ -566,4 +566,5 @@ source shell/Config.in
+ source sysklogd/Config.in
+ source runit/Config.in
+ source selinux/Config.in
++source printutils/Config.in
+ source ipsvd/Config.in
+diff --git a/Makefile b/Makefile
+index 0f21ccf..ab9698e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -446,6 +446,7 @@ libs-y		:= \
+ 		networking/ \
+ 		networking/libiproute/ \
+ 		networking/udhcp/ \
++		printutils/ \
+ 		procps/ \
+ 		runit/ \
+ 		selinux/ \
+diff --git a/include/applets.h b/include/applets.h
+index 1c654cd..f2de31c 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -227,6 +227,8 @@ USE_LOGIN(APPLET(login, _BB_DIR_BIN, _BB_SUID_ALWAYS))
+ USE_LOGNAME(APPLET_NOFORK(logname, logname, _BB_DIR_USR_BIN, _BB_SUID_NEVER, logname))
+ USE_LOGREAD(APPLET(logread, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_LOSETUP(APPLET(losetup, _BB_DIR_SBIN, _BB_SUID_NEVER))
++USE_LPQ(APPLET(lpq, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
++USE_LPR(APPLET(lpr, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_LS(APPLET_NOEXEC(ls, ls, _BB_DIR_BIN, _BB_SUID_NEVER, ls))
+ USE_LSATTR(APPLET(lsattr, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_LSMOD(APPLET(lsmod, _BB_DIR_SBIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index 0422c7f..11d3e3a 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2051,6 +2051,25 @@ USE_FEATURE_BRCTL_FANCY("\n" \
+        "with an optional offset (-o 12345). Encryption is not yet supported.\n" \
+        "losetup -f will show the first loop free loop device\n\n"
+ 
++#define lpq_trivial_usage \
++       "[-P lp[@host[:port]]] [-t DELAY] [-d JOBID] [-fs]"
++#define lpq_full_usage \
++     "Options:" \
++     "\n	-P	lp service to connect to (else uses $PRINTER)" \
++     "\n	-t	Scan the queue every DELAY seconds" \
++     "\n	-d	Delete job" \
++     "\n	-f	Force any waiting job to be printed" \
++     "\n	-s	Short display" \
++
++#define lpr_trivial_usage \
++       "-P lp[@host[:port]] -U USERNAME -J TITLE -Vmh [filenames]"
++#define lpr_full_usage \
++     "Options:" \
++     "\n	-P	lp service to connect to (else uses $PRINTER)"\
++     "\n	-m	Send mail to LOGNAME@HOSTNAME" \
++     "\n	-h	Banner or header for this job" \
++     "\n	-V	Verbose" \
++
+ #define ls_trivial_usage \
+        "[-1Aa" USE_FEATURE_LS_TIMESTAMPS("c") "Cd" \
+ 	USE_FEATURE_LS_TIMESTAMPS("e") USE_FEATURE_LS_FILETYPES("F") "iln" \
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index b4c059f..17760a3 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -76,7 +76,7 @@ char * xstrdup(const char *s)
+ 
+ // Die if we can't allocate n+1 bytes (space for the null terminator) and copy
+ // the (possibly truncated to length n) string into it.
+-char * xstrndup(const char *s, int n)
++char *xstrndup(const char *s, int n)
+ {
+ 	int m;
+ 	char *t;
+diff --git a/printutils/Config.in b/printutils/Config.in
+new file mode 100644
+index 0000000..b53b9e7
+--- /dev/null
++++ b/printutils/Config.in
+@@ -0,0 +1,15 @@
++menu "print support"
++
++config LPR
++	bool "lpr"
++	default n
++	help
++	  lpr sends files (or standard input) to a print spooling daemon.
++
++config LPQ
++	bool "lpq"
++	default n
++	help
++	  lpq is a print spool queue examination and manipulation program.
++
++endmenu
+diff --git a/printutils/Kbuild b/printutils/Kbuild
+new file mode 100644
+index 0000000..f322723
+--- /dev/null
++++ b/printutils/Kbuild
+@@ -0,0 +1,8 @@
++# Makefile for busybox
++#
++# Licensed under the GPL v2, see the file LICENSE in this tarball.
++
++lib-y :=
++
++lib-$(CONFIG_LPR) += lpr.o parse_prt.o
++lib-$(CONFIG_LPQ) += lpq.o parse_prt.o
+diff --git a/printutils/lpq.c b/printutils/lpq.c
+new file mode 100644
+index 0000000..ce9a10c
+--- /dev/null
++++ b/printutils/lpq.c
+@@ -0,0 +1,108 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Copyright 2008 Walter Harms (WHarms@bfs.de)
++ *
++ * Licensed under the GPL v2, see the file LICENSE in this tarball.
++ */
++#include "libbb.h"
++#include "lpr.h"
++
++/*
++  this is a *very* resticted form of lpq
++  since we do not read /etc/printcap (and never will)
++  we can only do things rfc1179 allows:
++  - show print jobs for a given queue long/short form
++  - remove a job from a given queue
++
++  -P <queue>
++  -s short
++  -d delete job
++  -f force any waiting job to be printed
++*/
++enum {
++	LPQ_SHORT = 1 << 0,
++	LPQ_DELETE = 1 << 1,
++	LPQ_FORCE = 1 << 2,
++	LPQ_P = 1 << 3,
++	LPQ_t = 1 << 4,
++};
++
++/*
++  print everthing that comes
++*/
++static void get_answer(int sockfd)
++{
++	char buf[80];
++	int n;
++
++	buf[0] = '\n';
++	while (1) {
++		n = safe_read(sockfd, buf, sizeof(buf));
++		if (n <= 0)
++			break;
++		full_write(STDOUT_FILENO, buf, n);
++		buf[0] = buf[n-1]; /* last written char */
++	}
++	
++	/* Don't leave last output line unterminated */
++	if (buf[0] != '\n')
++		full_write(STDOUT_FILENO, "\n", 1);
++}
++
++/*
++  is this too simple ?
++  should we support more ENV ?
++  PRINTER, LPDEST, NPRINTER, NGPRINTER
++*/
++int lpq_main(int argc, char *argv[]) MAIN_EXTERNALLY_VISIBLE;
++int lpq_main(int argc, char *argv[])
++{
++	struct netprint netprint;
++	const char *netopt;
++	const char *delopt = "0";
++	int sockfd = sockfd; /* for compiler */
++	unsigned opt;
++	int delay; /* delay in [s] */
++
++	netopt = NULL;
++	opt = getopt32(argv, "sdfP:t:", &netopt, &delopt);
++	argv += optind;
++	delay = xatoi_u(delopt);
++	parse_prt(netopt, &netprint);
++
++	/* do connect */
++	if (opt & (LPQ_FORCE|LPQ_DELETE))
++		sockfd = xconnect_stream(netprint.lsa);
++
++	/* force printing of every job still in queue */
++	if (opt & LPQ_FORCE) {
++		fdprintf(sockfd, "\x1" "%s", netprint.queue);
++		get_answer(sockfd);
++		return EXIT_SUCCESS;
++	}
++
++	/* delete job (better a list of jobs). username is now LOGNAME */
++	if (opt & LPQ_DELETE) {
++		while (*argv) {
++			fdprintf(sockfd, "\x5" "%s %s %s",
++					netprint.queue,
++					getenv("LOGNAME"), /* FIXME - may be NULL? */
++					*argv);
++			get_answer(sockfd);
++			argv++;
++		}
++		return EXIT_SUCCESS;
++	}
++
++	do {
++		sockfd = xconnect_stream(netprint.lsa);
++		fdprintf(sockfd, "%c%s\n", (opt & LPQ_SHORT) ? 3 : 4,
++				netprint.queue);
++
++		get_answer(sockfd);
++		close(sockfd);
++		sleep(delay);
++	} while (delay != 0);
++
++	return EXIT_SUCCESS;
++}
+diff --git a/printutils/lpr.c b/printutils/lpr.c
+new file mode 100644
+index 0000000..b8c77bf
+--- /dev/null
++++ b/printutils/lpr.c
+@@ -0,0 +1,200 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Copyright 2008 Walter Harms (WHarms@bfs.de)
++ *
++ * Licensed under the GPL v2, see the file LICENSE in this tarball.
++ */
++#include "libbb.h"
++#include "lpr.h"
++
++static char *mygethostname31(void)
++{
++	char *s = xzalloc(32);
++	if (gethostname(s, 31) < 0)
++		bb_perror_msg_and_die("gethostname");
++	/* gethostname() does not guarantee NUL-termination. xzalloc does. */
++	return s;
++}
++
++static int xmkstemp(char *temp_name)
++{
++	int fd;
++
++	fd = mkstemp(temp_name);
++	if (fd < 0)
++		bb_perror_msg_and_die("mkstemp");
++	return fd;
++}
++
++/* lpd server sends NUL byte on success.
++ * Else read the errormessage and exit.
++ */
++static void get_response(int server_sock, const char *emsg)
++{
++	char buf = '\0';
++
++	safe_read(server_sock, &buf, 1);
++	if (buf != '\0') {
++		bb_error_msg("%s. Server said:", emsg);
++		fputc(buf, stderr);
++		logmode = 0; /* no errors from bb_copyfd_eof() */
++		bb_copyfd_eof(server_sock, STDERR_FILENO);
++		xfunc_die();
++	}
++}
++
++int lpr_main(int argc, char *argv[]) MAIN_EXTERNALLY_VISIBLE;
++int lpr_main(int argc, char *argv[])
++{
++	struct netprint netprint;
++	char temp_name[] = "/tmp/lprXXXXXX"; /* for mkstemp */
++	char *strings[5];
++	const char *netopt;
++	const char *jobtitle;
++	const char *hostname;
++	const char *jobclass;
++	char *logname;
++	int pid1000;
++	int server_sock, tmp_fd;
++	unsigned opt;
++	enum {
++		VERBOSE = 1 << 0,
++		USE_HEADER = 1 << 1, /* -h banner or header for this job */
++		USE_MAIL = 1 << 2, /* send mail to user@hostname */
++		OPT_U = 1 << 3, /* -U <username> */
++		OPT_J = 1 << 4, /* -J <title> is the jobtitle for the banner page */
++		OPT_C = 1 << 5, /* -C <class> job classification */
++		OPT_P = 1 << 6, /* -P <queue[@host[:port]]> */
++		/* if no -P is given use $PRINTER, then "lp@localhost:515" */
++	};
++
++	/* Set defaults, parse options */
++	hostname = mygethostname31();
++	netopt = NULL;
++	logname = getenv("LOGNAME");
++	if (logname == NULL)
++		logname = (char*)"user"; /* TODO: getpwuid(getuid())->pw_name? */
++	opt = getopt32(argv, "VhmU:J:C:P:",
++			&logname, &jobtitle, &jobclass, &netopt);
++	argv += optind;
++	parse_prt(netopt, &netprint);
++	logname = xstrndup(logname, 31);
++
++	/* For stdin we need to save it to a tempfile,
++	 * otherwise we can't know the size. */
++	tmp_fd = -1;
++	if (!*argv) {
++		if (jobtitle == NULL)
++			jobtitle = (char *) bb_msg_standard_input;
++
++		tmp_fd = xmkstemp(temp_name);
++		if (bb_copyfd_eof(STDIN_FILENO, tmp_fd) < 0)
++			goto del_temp_file;
++		/* TODO: we actually can have deferred write errors... */
++		close(tmp_fd);
++		argv--; /* back off from NULL */
++		*argv = temp_name;
++	}
++
++	if (opt & VERBOSE)
++		puts("connect to server");
++	server_sock = xconnect_stream(netprint.lsa);
++
++	/* "Receive a printer job" command */
++	fdprintf(server_sock, "\x2" "%s\n", netprint.queue);
++	get_response(server_sock, "set queue failed");
++
++	pid1000 = getpid() % 1000;
++	while (*argv) {
++		char dfa_name[sizeof("dfAnnn") + 32];
++		struct stat st;
++		char **sptr;
++		unsigned size;
++		int fd;
++
++		fd = xopen(*argv, O_RDONLY);
++
++		/* "The name ... should start with ASCII "dfA",
++		 * followed by a three digit job number, followed
++		 * by the host name which has constructed the file." */
++		snprintf(dfa_name, sizeof(dfa_name),
++			"dfA%03u%s", pid1000, hostname);
++		pid1000 = (pid1000 + 1) % 1000;
++
++		/*
++		 * Generate control file contents
++		 */
++		/* H HOST, P USER, l DATA_FILE_NAME, J JOBNAME */
++		strings[0] = xasprintf("H%.32s\n" "P%.32s\n" "l%.32s\n"
++			"J%.99s\n",
++			hostname, logname, dfa_name,
++			!(opt & OPT_J) ? *argv : jobtitle);
++		sptr = &strings[1];
++		/* C CLASS - printed on banner page (if L cmd is also given) */
++		if (opt & OPT_J) /* [1] */
++			*sptr++ = xasprintf("C%.32s\n", jobclass);
++		/* M WHOM_TO_MAIL */
++		if (opt & USE_MAIL) /* [2] */
++			*sptr++ = xasprintf("M%.32s\n", logname);
++		/* H USER - print banner page, with given user's name */
++		if (opt & USE_HEADER) /* [3] */
++			*sptr++ = xasprintf("L%.32s\n", logname);
++		*sptr = NULL; /* [4] max */
++
++		/* RFC 1179: "LPR servers MUST be able
++		 * to receive the control file subcommand first
++		 * and SHOULD be able to receive the data file
++		 * subcommand first".
++		 * Ok, we'll send control file first. */
++		size = 0;
++		sptr = strings;
++		while (*sptr)
++			size += strlen(*sptr++);
++		if (opt & VERBOSE)
++			puts("send control file");
++		/* 2: "Receive control file" subcommand */
++		fdprintf(server_sock, "\x2" "%u c%s\n", size, dfa_name + 1);
++		sptr = strings;
++		while (*sptr) {
++			xwrite(server_sock, *sptr, strlen(*sptr));
++			free(*sptr);
++			sptr++;
++		}
++		free(strings);
++		/* "Once all of the contents have
++		 * been delivered, an octet of zero bits is sent as
++		 * an indication that the file being sent is complete.
++		 * A second level of acknowledgement processing
++		 * must occur at this point." */
++		xwrite(server_sock, "", 1);
++		get_response(server_sock, "send control file failed");
++
++		/* Sending data */
++		st.st_size = 0; /* paranoia */
++		fstat(fd, &st);
++		if (opt & VERBOSE)
++			puts("send data file");
++		/* 3: "Receive data file" subcommand */
++		fdprintf(server_sock, "\x3" "%"OFF_FMT"u %s\n", st.st_size, dfa_name);
++		/* TODO: if file shrank and we wrote less than st.st_size,
++		 * pad output with NUL bytes? Otherwise server won't know
++		 * that we are done. */
++		if (bb_copyfd_size(fd, server_sock, st.st_size) < 0)
++			xfunc_die();
++		close(fd);
++		xwrite(server_sock, "", 1);
++		get_response(server_sock, "send file failed");
++
++		argv++;
++	}
++
++	if (ENABLE_FEATURE_CLEAN_UP)
++		close(server_sock);
++
++	if (tmp_fd >= 0) {
++ del_temp_file:
++		unlink(temp_name);
++	}
++
++	return 0;
++}
+diff --git a/printutils/lpr.h b/printutils/lpr.h
+new file mode 100644
+index 0000000..8898b98
+--- /dev/null
++++ b/printutils/lpr.h
+@@ -0,0 +1,17 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Copyright 2008 Walter Harms (WHarms@bfs.de)
++ *
++ * Licensed under the GPL v2, see the file LICENSE in this tarball.
++ */
++#ifndef _LPR_H_
++#define _LPR_H_
++
++struct netprint {
++	char *queue;
++	char *server;
++	struct len_and_sockaddr *lsa;
++};
++
++void parse_prt(const char *buf, struct netprint *netprint);
++#endif
+diff --git a/printutils/parse_prt.c b/printutils/parse_prt.c
+new file mode 100644
+index 0000000..2de0a92
+--- /dev/null
++++ b/printutils/parse_prt.c
+@@ -0,0 +1,27 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Copyright 2008 Walter Harms (WHarms@bfs.de)
++ *
++ * Licensed under the GPL v2, see the file LICENSE in this tarball.
++ */
++#include "libbb.h"
++#include "lpr.h"
++
++void parse_prt(const char *buf, struct netprint *netprint)
++{
++	const char *p;
++
++	if (!buf) {
++		buf = getenv("PRINTER");
++		if (!buf)
++			buf = "lp"; /* "...@localhost:515" is implied */
++	}
++	p = strchrnul(buf, '@');
++	netprint->queue = xstrndup(buf, p - buf);
++	if (!*p) /* just queue? example: "lpq -Pcopie" */
++		p = "localhost";
++	netprint->server = xstrdup(p);
++
++	netprint->lsa = xhost2sockaddr(netprint->server,
++			bb_lookup_port(NULL, "tcp", 515));
++}

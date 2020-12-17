@@ -1,0 +1,27 @@
+2007-11-10 01:32:18 +0000
+diff --git a/archival/dpkg_deb.c b/archival/dpkg_deb.c
+index e1d2cd0..cbacc91 100644
+--- a/archival/dpkg_deb.c
++++ b/archival/dpkg_deb.c
+@@ -41,7 +41,7 @@ int dpkg_deb_main(int argc, char **argv)
+ 	llist_add_to(&control_tar_llist, (char*)"control.tar.bz2");
+ #endif
+ 
+-	opt_complementary = "?c--efXx:e--cfXx:f--ceXx:X--cefx:x--cefX";
++	opt_complementary = "c--efXx:e--cfXx:f--ceXx:X--cefx:x--cefX";
+ 	opt = getopt32(argv, "cefXx");
+ 
+ 	if (opt & DPKG_DEB_OPT_CONTENTS) {
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index dafbb4e..bc2dbd1 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -865,7 +865,7 @@ int modprobe_main(int argc, char **argv)
+ 	int rc = EXIT_SUCCESS;
+ 	char *unused;
+ 
+-	opt_complementary = "?V-:q-v:v-q";
++	opt_complementary = "q-v:v-q";
+ 	getopt32(argv, MAIN_OPT_STR, &unused, &unused);
+ 
+ 	if (option_mask32 & (DUMP_CONF_EXIT | LIST_ALL))

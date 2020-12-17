@@ -1,0 +1,14 @@
+2008-04-19 09:27:14 +0000
+diff --git a/docs/busybox.net/header.html b/docs/busybox.net/header.html
+index 9be13bb..b83fdcb 100644
+--- a/docs/busybox.net/header.html
++++ b/docs/busybox.net/header.html
+@@ -65,7 +65,7 @@
+     <ul>
+         <li><a href="/cgi-bin/viewcvs.cgi/trunk/busybox/">Browse Source</a></li>
+         <li><a href="subversion.html">Source Control</a></li>
+-        <li><a href="/downloads/patches/recent.html">Recent Changes</a></li>
++        <!--li><a href="/downloads/patches/recent.html">Recent Changes</a></li-->
+         <li><a href="lists.html">Mailing Lists</a></li>
+         <li><a href="http://bugs.busybox.net/">Bug Tracking</a></li>
+     </ul>

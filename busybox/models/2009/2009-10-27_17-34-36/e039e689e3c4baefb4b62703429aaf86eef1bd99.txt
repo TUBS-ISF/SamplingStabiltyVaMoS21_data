@@ -1,0 +1,113 @@
+2009-10-27 17:34:36 +0100
+diff --git a/include/applets.h b/include/applets.h
+index 134f21e..9683f1e 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -417,6 +417,7 @@ IF_VCONFIG(APPLET(vconfig, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_VI(APPLET(vi, _BB_DIR_BIN, _BB_SUID_DROP))
+ IF_VLOCK(APPLET(vlock, _BB_DIR_USR_BIN, _BB_SUID_REQUIRE))
+ IF_VOLNAME(APPLET(volname, _BB_DIR_USR_BIN, _BB_SUID_DROP))
++IF_WALL(APPLET(wall, _BB_DIR_USR_BIN, _BB_SUID_REQUIRE))
+ IF_WATCH(APPLET(watch, _BB_DIR_BIN, _BB_SUID_DROP))
+ IF_WATCHDOG(APPLET(watchdog, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_WC(APPLET(wc, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+diff --git a/include/usage.h b/include/usage.h
+index 93eb2f6..72b6acc 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4950,6 +4950,14 @@
+ #define volname_full_usage "\n\n" \
+        "Show CD volume name of the DEVICE (default /dev/cdrom)"
+ 
++#define wall_trivial_usage \
++	"[file]"
++#define wall_full_usage "\n\n" \
++	"Write content of file or standard-input to all logged-in users"
++#define wall_sample_usage \
++	"echo foo | wall\n" \
++	"wall ./mymessage"
++
+ #define watch_trivial_usage \
+        "[-n seconds] [-t] PROG [ARGS]"
+ #define watch_full_usage "\n\n" \
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 9b80488..842f7f9 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -612,6 +612,12 @@ config VOLNAME
+ 	help
+ 	  Prints a CD-ROM volume name.
+ 
++config WALL
++	bool "wall"
++	default n
++	help
++	  Write a message to all users that are logged in.
++
+ config WATCHDOG
+ 	bool "watchdog"
+ 	default n
+diff --git a/miscutils/Kbuild b/miscutils/Kbuild
+index d88cb39..22a9adb 100644
+--- a/miscutils/Kbuild
++++ b/miscutils/Kbuild
+@@ -42,4 +42,5 @@ lib-$(CONFIG_TIME)        += time.o
+ lib-$(CONFIG_TIMEOUT)     += timeout.o
+ lib-$(CONFIG_TTYSIZE)     += ttysize.o
+ lib-$(CONFIG_VOLNAME)     += volname.o
++lib-$(CONFIG_WALL)        += wall.o
+ lib-$(CONFIG_WATCHDOG)    += watchdog.o
+diff --git a/miscutils/wall.c b/miscutils/wall.c
+new file mode 100644
+index 0000000..2dbab60
+--- /dev/null
++++ b/miscutils/wall.c
+@@ -0,0 +1,36 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * wall - write a message to all logged-in users
++ * Copyright (c) 2009 Bernhard Reutner-Fischer
++ *
++ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
++ */
++
++#include "libbb.h"
++#include <utmp.h>
++
++int wall_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int wall_main(int argc UNUSED_PARAM, char **argv)
++{
++	struct utmp *ut;
++	char *msg;
++	int fd = argv[1] ? xopen(argv[1], O_RDONLY) : STDIN_FILENO;
++
++	msg = xmalloc_read(fd, NULL);
++	if (ENABLE_FEATURE_CLEAN_UP && argv[1])
++		close(fd);
++	setutent();
++	while ((ut = getutent()) != NULL) {
++		char *line;
++		if (ut->ut_type != USER_PROCESS)
++			continue;
++		line = concat_path_file("/dev", ut->ut_line);
++		xopen_xwrite_close(line, msg);
++		free(line);
++	}
++	if (ENABLE_FEATURE_CLEAN_UP) {
++		endutent();
++		free(msg);
++	}
++	return EXIT_SUCCESS;
++}
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 797f275..f8a92d4 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -638,6 +638,7 @@ CONFIG_TIME=y
+ CONFIG_TIMEOUT=y
+ CONFIG_TTYSIZE=y
+ CONFIG_VOLNAME=y
++CONFIG_WALL=y
+ CONFIG_WATCHDOG=y
+ 
+ #

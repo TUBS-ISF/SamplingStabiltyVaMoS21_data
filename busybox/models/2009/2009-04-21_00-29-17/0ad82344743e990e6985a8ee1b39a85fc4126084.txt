@@ -1,0 +1,14 @@
+2009-04-21 00:29:17 +0000
+diff --git a/util-linux/switch_root.c b/util-linux/switch_root.c
+index 21cc992..08aa725 100644
+--- a/util-linux/switch_root.c
++++ b/util-linux/switch_root.c
+@@ -97,7 +97,7 @@ int switch_root_main(int argc UNUSED_PARAM, char **argv)
+ 	// Overmount / with newdir and chroot into it.  The chdir is needed to
+ 	// recalculate "." and ".." links.
+ 	if (mount(".", "/", NULL, MS_MOVE, NULL))
+-		bb_error_msg_and_die("error moving root");
++		bb_perror_msg_and_die("error moving root");
+ 	xchroot(".");
+ 	xchdir("/");
+ 

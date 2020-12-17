@@ -1,0 +1,27 @@
+2010-02-10 19:37:29 +0100
+diff --git a/include/usage.h b/include/usage.h
+index c2ffb6d..643d35f 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -5083,7 +5083,7 @@
+ 	IF_FEATURE_WGET_LONG_OPTIONS( \
+        "[-c|--continue] [-s|--spider] [-q|--quiet] [-O|--output-document file]\n" \
+        "	[--header 'header: value'] [-Y|--proxy on/off] [-P DIR]\n" \
+-       "	[-U|--user-agent agent] url" \
++       "	[--no-check-certificate] [-U|--user-agent agent] url" \
+ 	) \
+ 	IF_NOT_FEATURE_WGET_LONG_OPTIONS( \
+        "[-csq] [-O file] [-Y on/off] [-P DIR] [-U agent] url" \
+diff --git a/networking/wget.c b/networking/wget.c
+index 9d813dc..2b9ba55 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -546,6 +546,8 @@ int wget_main(int argc UNUSED_PARAM, char **argv)
+ 		"passive-ftp\0"      No_argument       "\xff"
+ 		"header\0"           Required_argument "\xfe"
+ 		"post-data\0"        Required_argument "\xfd"
++		/* Ignored (we don't do ssl) */
++		"no-check-certificate\0" No_argument   "\xfc"
+ 		;
+ #endif
+ 

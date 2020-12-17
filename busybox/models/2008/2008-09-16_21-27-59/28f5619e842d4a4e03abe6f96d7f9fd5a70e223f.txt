@@ -1,0 +1,14 @@
+2008-09-16 21:27:59 +0000
+diff --git a/networking/slattach.c b/networking/slattach.c
+index 52f7f3c..d3212bb 100644
+--- a/networking/slattach.c
++++ b/networking/slattach.c
+@@ -206,6 +206,8 @@ int slattach_main(int argc UNUSED_PARAM, char **argv)
+ 		state.c_cflag = CS8 | HUPCL | CREAD
+ 		              | ((opt & OPT_L_local) ? CLOCAL : 0)
+ 		              | ((opt & OPT_F_noflow) ? 0 : CRTSCTS);
++		cfsetispeed(&state, cfgetispeed(&saved_state));
++		cfsetospeed(&state, cfgetospeed(&saved_state));
+ 	}
+ 
+ 	if (opt & OPT_s_baud) {

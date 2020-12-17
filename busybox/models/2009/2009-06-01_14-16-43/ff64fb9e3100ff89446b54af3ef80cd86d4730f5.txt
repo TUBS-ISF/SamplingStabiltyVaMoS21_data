@@ -1,0 +1,16 @@
+2009-06-01 14:16:43 -0400
+diff --git a/shell/hush_test/run-all b/shell/hush_test/run-all
+index 57a5c25..cb9c5f3 100755
+--- a/shell/hush_test/run-all
++++ b/shell/hush_test/run-all
+@@ -52,6 +52,10 @@ do_test()
+ #	echo Running test: "$x"
+ 	(
+ 	    "$THIS_SH" "./$x" >"$name.xx" 2>&1
++	    # filter C library differences
++	    sed -i \
++		-e "/: invalid option /s:'::g" \
++		"$name.xx"
+ 	    test $? -eq 77 && rm -f "../$1-$x.fail" && exit 77
+ 	    diff -u "$name.xx" "$name.right" >"../$1-$x.fail" && rm -f "$name.xx" "../$1-$x.fail"
+ 	)

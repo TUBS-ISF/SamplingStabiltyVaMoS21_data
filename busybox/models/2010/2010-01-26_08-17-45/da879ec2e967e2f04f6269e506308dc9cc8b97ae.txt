@@ -1,0 +1,26 @@
+2010-01-26 08:17:45 +0100
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index 2860ae0..f339fbd 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -80,12 +80,14 @@ static int read_config(const char *path);
+ static char *gather_options_str(char *opts, const char *append)
+ {
+ 	/* Speed-optimized. We call gather_options_str many times. */
+-	if (opts == NULL) {
+-		opts = xstrdup(append);
+-	} else {
+-		int optlen = strlen(opts);
+-		opts = xrealloc(opts, optlen + strlen(append) + 2);
+-		sprintf(opts + optlen, " %s", append);
++	if (append) {
++		if (opts == NULL) {
++			opts = xstrdup(append);
++		} else {
++			int optlen = strlen(opts);
++			opts = xrealloc(opts, optlen + strlen(append) + 2);
++			sprintf(opts + optlen, " %s", append);
++		}
+ 	}
+ 	return opts;
+ }

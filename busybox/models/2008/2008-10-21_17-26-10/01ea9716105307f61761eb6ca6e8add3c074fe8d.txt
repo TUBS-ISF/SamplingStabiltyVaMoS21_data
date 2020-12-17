@@ -1,0 +1,14 @@
+2008-10-21 17:26:10 +0000
+diff --git a/miscutils/inotifyd.c b/miscutils/inotifyd.c
+index 3b11dc2..5ac4738 100644
+--- a/miscutils/inotifyd.c
++++ b/miscutils/inotifyd.c
+@@ -28,7 +28,7 @@
+  */
+ 
+ #include "libbb.h"
+-#include <linux/inotify.h>
++#include <sys/inotify.h>
+ 
+ static const char mask_names[] ALIGN1 =
+ 	"a"	// 0x00000001	File was accessed

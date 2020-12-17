@@ -1,0 +1,977 @@
+2007-11-18 22:56:25 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 2593c3a..3bec432 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -289,6 +289,30 @@ void xpipe(int filedes[2]);
+ off_t xlseek(int fd, off_t offset, int whence);
+ off_t fdlength(int fd);
+ 
++/* Useful for having small structure members/global variables */
++typedef int8_t socktype_t;
++typedef int8_t family_t;
++struct BUG_too_small {
++	char BUG_socktype_t_too_small[(0
++			| SOCK_STREAM
++			| SOCK_DGRAM
++			| SOCK_RDM
++			| SOCK_SEQPACKET
++			| SOCK_RAW
++			) <= 127 ? 1 : -1];
++	char BUG_family_t_too_small[(0
++			| AF_UNSPEC
++			| AF_INET
++			| AF_INET6
++			| AF_UNIX
++			| AF_PACKET
++			| AF_NETLINK
++			/* | AF_DECnet */
++			/* | AF_IPX */
++			) <= 127 ? 1 : -1];
++};
++
++
+ int xsocket(int domain, int type, int protocol);
+ void xbind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen);
+ void xlisten(int s, int backlog);
+diff --git a/networking/inetd.c b/networking/inetd.c
+index d76b75d..5d37746 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -206,21 +206,6 @@ extern char **environ;
+ # define INETD_SETPROCTITLE
+ #endif
+ 
+-typedef int8_t socktype_t;
+-typedef int8_t family_t;
+-struct BUG_too_small {
+-	char BUG_socktype_t_too_small[(0
+-			| SOCK_STREAM
+-			| SOCK_DGRAM
+-			| SOCK_RDM
+-			| SOCK_SEQPACKET
+-			| SOCK_RAW) <= 127 ? 1 : -1];
+-	char BUG_family_t_too_small[(0
+-			| AF_INET
+-			| AF_INET6
+-			| AF_UNIX) <= 127 ? 1 : -1];
+-};
+-
+ typedef struct servtab_t {
+ 	/* The most frequently referenced one: */
+ 	int se_fd;                            /* open descriptor */
+diff --git a/networking/ip.c b/networking/ip.c
+index 3ea1b62..182813d 100644
+--- a/networking/ip.c
++++ b/networking/ip.c
+@@ -24,57 +24,50 @@
+  || ENABLE_FEATURE_IP_TUNNEL \
+  || ENABLE_FEATURE_IP_RULE
+ 
+-static int ATTRIBUTE_NORETURN ip_print_help(int ATTRIBUTE_UNUSED ac, char ATTRIBUTE_UNUSED **av)
++static int ATTRIBUTE_NORETURN ip_print_help(char ATTRIBUTE_UNUSED **argv)
+ {
+ 	bb_show_usage();
+ }
+ 
+-static int (*ip_func)(int argc, char **argv) = ip_print_help;
+-
+-static int ip_do(int argc, char **argv)
++static int ip_do(int (*ip_func)(char **argv), char **argv)
+ {
+-	ip_parse_common_args(&argc, &argv);
+-	return ip_func(argc-1, argv+1);
++	argv = ip_parse_common_args(argv);
++	return ip_func(argv);
+ }
+ 
+ #if ENABLE_FEATURE_IP_ADDRESS
+ int ipaddr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ipaddr_main(int argc, char **argv)
+ {
+-    ip_func = do_ipaddr;
+-    return ip_do(argc, argv);
++    return ip_do(do_ipaddr, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_LINK
+ int iplink_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iplink_main(int argc, char **argv)
+ {
+-    ip_func = do_iplink;
+-    return ip_do(argc, argv);
++    return ip_do(do_iplink, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_ROUTE
+ int iproute_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iproute_main(int argc, char **argv)
+ {
+-    ip_func = do_iproute;
+-    return ip_do(argc, argv);
++    return ip_do(do_iproute, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_RULE
+ int iprule_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iprule_main(int argc, char **argv)
+ {
+-    ip_func = do_iprule;
+-    return ip_do(argc, argv);
++    return ip_do(do_iprule, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_TUNNEL
+ int iptunnel_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iptunnel_main(int argc, char **argv)
+ {
+-    ip_func = do_iptunnel;
+-    return ip_do(argc, argv);
++    return ip_do(do_iptunnel, argv);
+ }
+ #endif
+ 
+@@ -97,12 +90,12 @@ int ip_main(int argc, char **argv)
+ 		USE_FEATURE_IP_RULE(IP_rule,)
+ 		IP_none
+ 	};
++	int (*ip_func)(char **argv) = ip_print_help;
+ 
+-	ip_parse_common_args(&argc, &argv);
+-	if (argc > 1) {
+-		int key = index_in_substrings(keywords, argv[1]);
+-		argc -= 2;
+-		argv += 2;
++	argv = ip_parse_common_args(argv + 1);
++	if (*argv) {
++		int key = index_in_substrings(keywords, *argv);
++		argv++;
+ #if ENABLE_FEATURE_IP_ADDRESS
+ 		if (key == IP_addr)
+ 			ip_func = do_ipaddr;
+@@ -124,7 +117,7 @@ int ip_main(int argc, char **argv)
+ 			ip_func = do_iprule;
+ #endif
+ 	}
+-	return ip_func(argc, argv);
++	return ip_func(argv);
+ }
+ 
+ #endif /* any of ENABLE_FEATURE_IP_xxx is 1 */
+diff --git a/networking/libiproute/ip_common.h b/networking/libiproute/ip_common.h
+index 9710107..c047356 100644
+--- a/networking/libiproute/ip_common.h
++++ b/networking/libiproute/ip_common.h
+@@ -13,20 +13,20 @@
+ #include <linux/if_link.h>
+ #endif
+ 
+-extern void ip_parse_common_args(int *argcp, char ***argvp);
++extern char **ip_parse_common_args(char **argv);
+ extern int print_neigh(struct sockaddr_nl *who, struct nlmsghdr *n, void *arg);
+-extern int ipaddr_list_or_flush(int argc, char **argv, int flush);
+-extern int iproute_monitor(int argc, char **argv);
++extern int ipaddr_list_or_flush(char **argv, int flush);
++extern int iproute_monitor(char **argv);
+ extern void iplink_usage(void) ATTRIBUTE_NORETURN;
+ extern void ipneigh_reset_filter(void);
+ 
+-extern int do_ipaddr(int argc, char **argv);
+-extern int do_iproute(int argc, char **argv);
+-extern int do_iprule(int argc, char **argv);
+-extern int do_ipneigh(int argc, char **argv);
+-extern int do_iptunnel(int argc, char **argv);
+-extern int do_iplink(int argc, char **argv);
+-extern int do_ipmonitor(int argc, char **argv);
+-extern int do_multiaddr(int argc, char **argv);
+-extern int do_multiroute(int argc, char **argv);
++extern int do_ipaddr(char **argv);
++extern int do_iproute(char **argv);
++extern int do_iprule(char **argv);
++extern int do_ipneigh(char **argv);
++extern int do_iptunnel(char **argv);
++extern int do_iplink(char **argv);
++extern int do_ipmonitor(char **argv);
++extern int do_multiaddr(char **argv);
++extern int do_multiroute(char **argv);
+ #endif /* ip_common.h */
+diff --git a/networking/libiproute/ip_parse_common_args.c b/networking/libiproute/ip_parse_common_args.c
+index ff33399..294bde5 100644
+--- a/networking/libiproute/ip_parse_common_args.c
++++ b/networking/libiproute/ip_parse_common_args.c
+@@ -18,71 +18,67 @@
+ #include "ip_common.h"  /* #include "libbb.h" is inside */
+ #include "utils.h"
+ 
+-int preferred_family = AF_UNSPEC;
++family_t preferred_family = AF_UNSPEC;
+ smallint oneline;
+ char _SL_;
+ 
+-void ip_parse_common_args(int *argcp, char ***argvp)
++char **ip_parse_common_args(char **argv)
+ {
+-	int argc = *argcp;
+-	char **argv = *argvp;
+ 	static const char ip_common_commands[] ALIGN1 =
+-		"-family\0""inet\0""inet6\0""link\0"
+-		"-4\0""-6\0""-0\0""-oneline\0";
++		"oneline" "\0"
++		"family" "\0"
++		"4" "\0"
++		"6" "\0"
++		"0" "\0"
++		;
+ 	enum {
+-		ARG_family = 1,
+-		ARG_inet,
+-		ARG_inet6,
+-		ARG_link,
++		ARG_oneline,
++		ARG_family,
+ 		ARG_IPv4,
+ 		ARG_IPv6,
+ 		ARG_packet,
+-		ARG_oneline
+ 	};
+-	smalluint arg;
++	static const family_t af_numbers[] = { AF_INET, AF_INET6, AF_PACKET };
++	int arg;
+ 
+-	while (argc > 1) {
+-		char *opt = argv[1];
++	while (*argv) {
++		char *opt = *argv;
+ 
+-		if (strcmp(opt,"--") == 0) {
+-			argc--;
+-			argv++;
+-			break;
+-		}
+ 		if (opt[0] != '-')
+ 			break;
+-		if (opt[1] == '-')
++		opt++;
++		if (opt[0] == '-') {
+ 			opt++;
+-		arg = index_in_strings(ip_common_commands, opt) + 1;
++			if (!opt[0]) { /* "--" */
++				argv++;
++				break;
++			}
++		}
++		arg = index_in_strings(ip_common_commands, opt);
++		if (arg < 0)
++			bb_show_usage();
++		if (arg == ARG_oneline) {
++			oneline = 1;
++			argv++;
++			continue;
++		}
+ 		if (arg == ARG_family) {
+-			argc--;
++			static const char families[] ALIGN1 =
++				"inet" "\0" "inet6" "\0" "link" "\0";
+ 			argv++;
+-			if (!argv[1])
++			if (!*argv)
+ 				bb_show_usage();
+-			arg = index_in_strings(ip_common_commands, argv[1]) + 1;
+-			if (arg == ARG_inet)
+-				preferred_family = AF_INET;
+-			else if (arg == ARG_inet6)
+-				preferred_family = AF_INET6;
+-			else if (arg == ARG_link)
+-				preferred_family = AF_PACKET;
+-			else
+-				invarg(argv[1], "protocol family");
+-		} else if (arg == ARG_IPv4) {
+-			preferred_family = AF_INET;
+-		} else if (arg == ARG_IPv6) {
+-			preferred_family = AF_INET6;
+-		} else if (arg == ARG_packet) {
+-			preferred_family = AF_PACKET;
+-		} else if (arg == ARG_oneline) {
+-			++oneline;
++			arg = index_in_strings(families, *argv);
++			if (arg < 0)
++				invarg(*argv, "protocol family");
++			/* now arg == 0, 1 or 2 */
+ 		} else {
+-			bb_show_usage();
++			arg -= ARG_IPv4;
++			/* now arg == 0, 1 or 2 */
+ 		}
+-		argc--;
++		preferred_family = af_numbers[arg];
+ 		argv++;
+ 	}
+ 	_SL_ = oneline ? '\\' : '\n';
+-	*argcp = argc;
+-	*argvp = argv;
++	return argv;
+ }
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index b259819..044538a 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -410,7 +410,7 @@ static void ipaddr_reset_filter(int _oneline)
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-int ipaddr_list_or_flush(int argc, char **argv, int flush)
++int ipaddr_list_or_flush(char **argv, int flush)
+ {
+ 	static const char option[] ALIGN1 = "to\0""scope\0""up\0""label\0""dev\0";
+ 
+@@ -428,7 +428,7 @@ int ipaddr_list_or_flush(int argc, char **argv, int flush)
+ 		filter.family = preferred_family;
+ 
+ 	if (flush) {
+-		if (argc <= 0) {
++		if (!*argv) {
+ 			bb_error_msg_and_die(bb_msg_requires_arg, "flush");
+ 		}
+ 		if (filter.family == AF_PACKET) {
+@@ -436,7 +436,7 @@ int ipaddr_list_or_flush(int argc, char **argv, int flush)
+ 		}
+ 	}
+ 
+-	while (argc > 0) {
++	while (*argv) {
+ 		const int option_num = index_in_strings(option, *argv);
+ 		switch (option_num) {
+ 			case 0: /* to */
+@@ -477,7 +477,6 @@ int ipaddr_list_or_flush(int argc, char **argv, int flush)
+ 				filter_dev = *argv;
+ 		}
+ 		argv++;
+-		argc--;
+ 	}
+ 
+ 	xrtnl_open(&rth);
+@@ -517,26 +516,26 @@ int ipaddr_list_or_flush(int argc, char **argv, int flush)
+ 
+ 	if (filter.family && filter.family != AF_PACKET) {
+ 		struct nlmsg_list **lp;
+-		lp=&linfo;
++		lp = &linfo;
+ 
+ 		if (filter.oneline)
+ 			no_link = 1;
+ 
+-		while ((l=*lp)!=NULL) {
++		while ((l = *lp) != NULL) {
+ 			int ok = 0;
+ 			struct ifinfomsg *ifi = NLMSG_DATA(&l->h);
+ 			struct nlmsg_list *a;
+ 
+-			for (a=ainfo; a; a=a->next) {
++			for (a = ainfo; a; a = a->next) {
+ 				struct nlmsghdr *n = &a->h;
+ 				struct ifaddrmsg *ifa = NLMSG_DATA(n);
+ 
+ 				if (ifa->ifa_index != ifi->ifi_index ||
+ 				    (filter.family && filter.family != ifa->ifa_family))
+ 					continue;
+-				if ((filter.scope^ifa->ifa_scope)&filter.scopemask)
++				if ((filter.scope ^ ifa->ifa_scope) & filter.scopemask)
+ 					continue;
+-				if ((filter.flags^ifa->ifa_flags)&filter.flagmask)
++				if ((filter.flags ^ ifa->ifa_flags) & filter.flagmask)
+ 					continue;
+ 				if (filter.pfx.family || filter.label) {
+ 					struct rtattr *tb[IFA_MAX+1];
+@@ -581,7 +580,6 @@ int ipaddr_list_or_flush(int argc, char **argv, int flush)
+ 			if (filter.family != AF_PACKET)
+ 				print_selected_addrinfo(ifi->ifi_index, ainfo, stdout);
+ 		}
+-		fflush(stdout); /* why? */
+ 	}
+ 
+ 	return 0;
+@@ -597,7 +595,7 @@ static int default_scope(inet_prefix *lcl)
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-static int ipaddr_modify(int cmd, int argc, char **argv)
++static int ipaddr_modify(int cmd, char **argv)
+ {
+ 	static const char option[] ALIGN1 =
+ 		"peer\0""remote\0""broadcast\0""brd\0"
+@@ -625,7 +623,7 @@ static int ipaddr_modify(int cmd, int argc, char **argv)
+ 	req.n.nlmsg_type = cmd;
+ 	req.ifa.ifa_family = preferred_family;
+ 
+-	while (argc > 0) {
++	while (*argv) {
+ 		const int option_num = index_in_strings(option, *argv);
+ 		switch (option_num) {
+ 			case 0: /* peer */
+@@ -653,8 +651,7 @@ static int ipaddr_modify(int cmd, int argc, char **argv)
+ 				}
+ 				if (LONE_CHAR(*argv, '+')) {
+ 					brd_len = -1;
+-				}
+-				else if (LONE_DASH(*argv)) {
++				} else if (LONE_DASH(*argv)) {
+ 					brd_len = -2;
+ 				} else {
+ 					get_addr(&addr, *argv, req.ifa.ifa_family);
+@@ -713,12 +710,11 @@ static int ipaddr_modify(int cmd, int argc, char **argv)
+ 				addattr_l(&req.n, sizeof(req), IFA_LOCAL, &lcl.data, lcl.bytelen);
+ 				local_len = lcl.bytelen;
+ 		}
+-		argc--;
+ 		argv++;
+ 	}
+ 
+ 	if (d == NULL) {
+-		bb_error_msg(bb_msg_requires_arg,"\"dev\"");
++		bb_error_msg(bb_msg_requires_arg, "\"dev\"");
+ 		return -1;
+ 	}
+ 	if (l && strncmp(d, l, strlen(d)) != 0) {
+@@ -766,7 +762,7 @@ static int ipaddr_modify(int cmd, int argc, char **argv)
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-int do_ipaddr(int argc, char **argv)
++int do_ipaddr(char **argv)
+ {
+ 	static const char commands[] ALIGN1 =
+ 		"add\0""delete\0""list\0""show\0""lst\0""flush\0";
+@@ -775,17 +771,16 @@ int do_ipaddr(int argc, char **argv)
+ 
+ 	if (*argv) {
+ 		command_num = index_in_substrings(commands, *argv);
++		if (command_num < 0 || command_num > 5)
++			bb_error_msg_and_die("unknown command %s", *argv);
++		argv++;
+ 	}
+-	if (command_num < 0 || command_num > 5)
+-		bb_error_msg_and_die("unknown command %s", *argv);
+-	--argc;
+-	++argv;
+ 	if (command_num == 0) /* add */
+-		return ipaddr_modify(RTM_NEWADDR, argc, argv);
+-	else if (command_num == 1) /* delete */
+-		return ipaddr_modify(RTM_DELADDR, argc, argv);
+-	else if (command_num == 5) /* flush */
+-		return ipaddr_list_or_flush(argc, argv, 1);
+-	else /* 2 == list, 3 == show, 4 == lst */
+-		return ipaddr_list_or_flush(argc, argv, 0);
++		return ipaddr_modify(RTM_NEWADDR, argv);
++	if (command_num == 1) /* delete */
++		return ipaddr_modify(RTM_DELADDR, argv);
++	if (command_num == 5) /* flush */
++		return ipaddr_list_or_flush(argv, 1);
++	/* 2 == list, 3 == show, 4 == lst */
++	return ipaddr_list_or_flush(argv, 0);
+ }
+diff --git a/networking/libiproute/iplink.c b/networking/libiproute/iplink.c
+index e1c9c60..494b223 100644
+--- a/networking/libiproute/iplink.c
++++ b/networking/libiproute/iplink.c
+@@ -21,12 +21,6 @@
+ /* taken from linux/sockios.h */
+ #define SIOCSIFNAME	0x8923		/* set interface name */
+ 
+-static void on_off(const char *msg) ATTRIBUTE_NORETURN;
+-static void on_off(const char *msg)
+-{
+-	bb_error_msg_and_die("error: argument of \"%s\" must be \"on\" or \"off\"", msg);
+-}
+-
+ /* Exits on error */
+ static int get_ctl_fd(void)
+ {
+@@ -158,8 +152,14 @@ static void set_address(struct ifreq *ifr, int brd)
+ }
+ 
+ 
++static void die_must_be_on_off(const char *msg) ATTRIBUTE_NORETURN;
++static void die_must_be_on_off(const char *msg)
++{
++	bb_error_msg_and_die("argument of \"%s\" must be \"on\" or \"off\"", msg);
++}
++
+ /* Return value becomes exitcode. It's okay to not return at all */
+-static int do_set(int argc, char **argv)
++static int do_set(char **argv)
+ {
+ 	char *dev = NULL;
+ 	uint32_t mask = 0;
+@@ -172,53 +172,63 @@ static int do_set(int argc, char **argv)
+ 	char *newname = NULL;
+ 	int htype, halen;
+ 	static const char keywords[] ALIGN1 =
+-		"up\0""down\0""name\0""mtu\0""multicast\0""arp\0""addr\0""dev\0"
+-		"on\0""off\0";
+-	enum { ARG_up = 1, ARG_down, ARG_name, ARG_mtu, ARG_multicast, ARG_arp,
+-		ARG_addr, ARG_dev, PARM_on, PARM_off };
++		"up\0""down\0""name\0""mtu\0""multicast\0""arp\0""addr\0""dev\0";
++	enum { ARG_up = 0, ARG_down, ARG_name, ARG_mtu, ARG_multicast, ARG_arp,
++		ARG_addr, ARG_dev };
++	static const char str_on_off[] ALIGN1 = "on\0""off\0";
++	enum { PARM_on = 0, PARM_off };
+ 	smalluint key;
+ 
+-	while (argc > 0) {
+-		key = index_in_strings(keywords, *argv) + 1;
++	while (*argv) {
++		key = index_in_strings(keywords, *argv);
+ 		if (key == ARG_up) {
+ 			mask |= IFF_UP;
+ 			flags |= IFF_UP;
+-		} else if (key == ARG_down) {
++		}
++		if (key == ARG_down) {
+ 			mask |= IFF_UP;
+ 			flags &= ~IFF_UP;
+-		} else if (key == ARG_name) {
++		}
++		if (key == ARG_name) {
+ 			NEXT_ARG();
+ 			newname = *argv;
+-		} else if (key == ARG_mtu) {
++		}
++		if (key == ARG_mtu) {
+ 			NEXT_ARG();
+ 			if (mtu != -1)
+ 				duparg("mtu", *argv);
+ 			if (get_integer(&mtu, *argv, 0))
+ 				invarg(*argv, "mtu");
+-		} else if (key == ARG_multicast) {
++		}
++		if (key == ARG_multicast) {
++			int param;
+ 			NEXT_ARG();
+ 			mask |= IFF_MULTICAST;
+-			key = index_in_strings(keywords, *argv) + 1;
+-			if (key == PARM_on) {
++			param = index_in_strings(str_on_off, *argv);
++			if (param < 0)
++				die_must_be_on_off("multicast");
++			if (param == PARM_on)
+ 				flags |= IFF_MULTICAST;
+-			} else if (key == PARM_off) {
++			else
+ 				flags &= ~IFF_MULTICAST;
+-			} else
+-				on_off("multicast");
+-		} else if (key == ARG_arp) {
++		}
++		if (key == ARG_arp) {
++			int param;
+ 			NEXT_ARG();
+ 			mask |= IFF_NOARP;
+-			key = index_in_strings(keywords, *argv) + 1;
+-			if (key == PARM_on) {
++			param = index_in_strings(str_on_off, *argv);
++			if (param < 0)
++				die_must_be_on_off("arp");
++			if (param == PARM_on)
+ 				flags &= ~IFF_NOARP;
+-			} else if (key == PARM_off) {
++			else
+ 				flags |= IFF_NOARP;
+-			} else
+-				on_off("arp");
+-		} else if (key == ARG_addr) {
++		}
++		if (key == ARG_addr) {
+ 			NEXT_ARG();
+ 			newaddr = *argv;
+-		} else {
++		}
++		if (key >= ARG_dev) {
+ 			if (key == ARG_dev) {
+ 				NEXT_ARG();
+ 			}
+@@ -226,7 +236,7 @@ static int do_set(int argc, char **argv)
+ 				duparg2("dev", *argv);
+ 			dev = *argv;
+ 		}
+-		argc--; argv++;
++		argv++;
+ 	}
+ 
+ 	if (!dev) {
+@@ -266,26 +276,26 @@ static int do_set(int argc, char **argv)
+ 	return 0;
+ }
+ 
+-static int ipaddr_list_link(int argc, char **argv)
++static int ipaddr_list_link(char **argv)
+ {
+ 	preferred_family = AF_PACKET;
+-	return ipaddr_list_or_flush(argc, argv, 0);
++	return ipaddr_list_or_flush(argv, 0);
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-int do_iplink(int argc, char **argv)
++int do_iplink(char **argv)
+ {
+ 	static const char keywords[] ALIGN1 =
+ 		"set\0""show\0""lst\0""list\0";
+-	smalluint key;
+-	if (argc <= 0)
+-		return ipaddr_list_link(0, NULL);
+-	key = index_in_substrings(keywords, *argv) + 1;
+-	if (key == 0)
++	int key;
++	if (!*argv)
++		return ipaddr_list_link(argv);
++	key = index_in_substrings(keywords, *argv);
++	if (key < 0)
+ 		bb_error_msg_and_die(bb_msg_invalid_arg, *argv, applet_name);
+-	argc--; argv++;
+-	if (key == 1) /* set */
+-		return do_set(argc, argv);
+-	else /* show, lst, list */
+-		return ipaddr_list_link(argc, argv);
++	argv++;
++	if (key == 0) /* set */
++		return do_set(argv);
++	/* show, lst, list */
++	return ipaddr_list_link(argv);
+ }
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index 9181111..ec09526 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -292,7 +292,7 @@ static int print_route(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-static int iproute_modify(int cmd, unsigned flags, int argc, char **argv)
++static int iproute_modify(int cmd, unsigned flags, char **argv)
+ {
+ 	static const char keywords[] ALIGN1 =
+ 		"src\0""via\0""mtu\0""lock\0""protocol\0"USE_FEATURE_IP_RULE("table\0")
+@@ -344,7 +344,7 @@ USE_FEATURE_IP_RULE(ARG_table,)
+ 	mxrta->rta_type = RTA_METRICS;
+ 	mxrta->rta_len = RTA_LENGTH(0);
+ 
+-	while (argc > 0) {
++	while (*argv) {
+ 		arg = index_in_substrings(keywords, *argv);
+ 		if (arg == ARG_src) {
+ 			inet_prefix addr;
+@@ -417,7 +417,7 @@ USE_FEATURE_IP_RULE(ARG_table,)
+ 				addattr_l(&req.n, sizeof(req), RTA_DST, &dst.data, dst.bytelen);
+ 			}
+ 		}
+-		argc--; argv++;
++		argv++;
+ 	}
+ 
+ 	xrtnl_open(&rth);
+@@ -511,7 +511,7 @@ static void iproute_reset_filter(void)
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-static int iproute_list_or_flush(int argc, char **argv, int flush)
++static int iproute_list_or_flush(char **argv, int flush)
+ {
+ 	int do_ipv6 = preferred_family;
+ 	struct rtnl_handle rth;
+@@ -534,10 +534,10 @@ static int iproute_list_or_flush(int argc, char **argv, int flush)
+ 	iproute_reset_filter();
+ 	filter.tb = RT_TABLE_MAIN;
+ 
+-	if (flush && argc <= 0)
++	if (flush && !*argv)
+ 		bb_error_msg_and_die(bb_msg_requires_arg, "\"ip route flush\"");
+ 
+-	while (argc > 0) {
++	while (*argv) {
+ 		arg = index_in_substrings(keywords, *argv);
+ 		if (arg == ARG_proto) {
+ 			uint32_t prot = 0;
+@@ -602,7 +602,6 @@ static int iproute_list_or_flush(int argc, char **argv, int flush)
+ 				filter.rdst = filter.mdst;
+ 			}
+ 		}
+-		argc--;
+ 		argv++;
+ 	}
+ 
+@@ -667,7 +666,7 @@ static int iproute_list_or_flush(int argc, char **argv, int flush)
+ 
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-static int iproute_get(int argc, char **argv)
++static int iproute_get(char **argv)
+ {
+ 	struct rtnl_handle rth;
+ 	struct {
+@@ -698,7 +697,7 @@ static int iproute_get(int argc, char **argv)
+ 	req.r.rtm_dst_len = 0;
+ 	req.r.rtm_tos = 0;
+ 
+-	while (argc > 0) {
++	while (*argv) {
+ 		switch (index_in_strings(options, *argv)) {
+ 			case 0: /* from */
+ 			{
+@@ -744,7 +743,7 @@ static int iproute_get(int argc, char **argv)
+ 				}
+ 				req.r.rtm_dst_len = addr.bitlen;
+ 			}
+-			argc--; argv++;
++			argv++;
+ 		}
+ 	}
+ 
+@@ -822,7 +821,7 @@ static int iproute_get(int argc, char **argv)
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-int do_iproute(int argc, char **argv)
++int do_iproute(char **argv)
+ {
+ 	static const char ip_route_commands[] ALIGN1 =
+ 	/*0-3*/	"add\0""append\0""change\0""chg\0"
+@@ -852,10 +851,10 @@ int do_iproute(int argc, char **argv)
+ 			cmd = RTM_DELROUTE;
+ 			break;
+ 		case 5: /* get */
+-			return iproute_get(argc-1, argv+1);
++			return iproute_get(argv+1);
+ 		case 6: /* list */
+ 		case 7: /* show */
+-			return iproute_list_or_flush(argc-1, argv+1, 0);
++			return iproute_list_or_flush(argv+1, 0);
+ 		case 8: /* prepend */
+ 			flags = NLM_F_CREATE;
+ 			break;
+@@ -866,10 +865,10 @@ int do_iproute(int argc, char **argv)
+ 			flags = NLM_F_EXCL;
+ 			break;
+ 		case 11: /* flush */
+-			return iproute_list_or_flush(argc-1, argv+1, 1);
++			return iproute_list_or_flush(argv+1, 1);
+ 		default:
+ 			bb_error_msg_and_die("unknown command %s", *argv);
+ 	}
+ 
+-	return iproute_modify(cmd, flags, argc-1, argv+1);
++	return iproute_modify(cmd, flags, argv+1);
+ }
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index 3c276e6..6442992 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -161,7 +161,7 @@ static int print_rule(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-static int iprule_list(int argc, char **argv)
++static int iprule_list(char **argv)
+ {
+ 	struct rtnl_handle rth;
+ 	int af = preferred_family;
+@@ -169,9 +169,9 @@ static int iprule_list(int argc, char **argv)
+ 	if (af == AF_UNSPEC)
+ 		af = AF_INET;
+ 
+-	if (argc > 0) {
++	if (*argv) {
+ 		//bb_error_msg("\"rule show\" needs no arguments");
+-		bb_warn_ignoring_args(argc);
++		bb_warn_ignoring_args(1);
+ 		return -1;
+ 	}
+ 
+@@ -184,7 +184,7 @@ static int iprule_list(int argc, char **argv)
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-static int iprule_modify(int cmd, int argc, char **argv)
++static int iprule_modify(int cmd, char **argv)
+ {
+ 	static const char keywords[] ALIGN1 =
+ 		"from\0""to\0""preference\0""order\0""priority\0"
+@@ -220,7 +220,7 @@ static int iprule_modify(int cmd, int argc, char **argv)
+ 		req.r.rtm_type = RTN_UNICAST;
+ 	}
+ 
+-	while (argc > 0) {
++	while (*argv) {
+ 		key = index_in_substrings(keywords, *argv) + 1;
+ 		if (key == 0) /* no match found in keywords array, bail out. */
+ 			bb_error_msg_and_die(bb_msg_invalid_arg, *argv, applet_name);
+@@ -291,7 +291,6 @@ static int iprule_modify(int cmd, int argc, char **argv)
+ 				invarg(*argv, "type");
+ 			req.r.rtm_type = type;
+ 		}
+-		argc--;
+ 		argv++;
+ 	}
+ 
+@@ -310,17 +309,16 @@ static int iprule_modify(int cmd, int argc, char **argv)
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-int do_iprule(int argc, char **argv)
++int do_iprule(char **argv)
+ {
+ 	static const char ip_rule_commands[] ALIGN1 =
+ 		"add\0""delete\0""list\0""show\0";
+ 	int cmd = 2; /* list */
+ 
+-	if (argc < 1)
+-		return iprule_list(0, NULL);
+-	if (*argv)
+-		cmd = index_in_substrings(ip_rule_commands, *argv);
++	if (!*argv)
++		return iprule_list(argv);
+ 
++	cmd = index_in_substrings(ip_rule_commands, *argv);
+ 	switch (cmd) {
+ 		case 0: /* add */
+ 			cmd = RTM_NEWRULE;
+@@ -330,10 +328,10 @@ int do_iprule(int argc, char **argv)
+ 			break;
+ 		case 2: /* list */
+ 		case 3: /* show */
+-			return iprule_list(argc-1, argv+1);
++			return iprule_list(argv+1);
+ 			break;
+ 		default:
+ 			bb_error_msg_and_die("unknown command %s", *argv);
+ 	}
+-	return iprule_modify(cmd, argc-1, argv+1);
++	return iprule_modify(cmd, argv+1);
+ }
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index a45e64d..ad909ff 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -126,7 +126,7 @@ static int do_del_ioctl(const char *basedev, struct ip_tunnel_parm *p)
+ }
+ 
+ /* Dies on error */
+-static void parse_args(int argc, char **argv, int cmd, struct ip_tunnel_parm *p)
++static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ {
+ 	static const char keywords[] ALIGN1 =
+ 		"mode\0""ipip\0""ip/ip\0""gre\0""gre/ip\0""sit\0""ipv6/ip\0"
+@@ -157,7 +157,7 @@ static void parse_args(int argc, char **argv, int cmd, struct ip_tunnel_parm *p)
+ #endif
+ 	p->iph.frag_off = htons(IP_DF);
+ 
+-	while (argc > 0) {
++	while (*argv) {
+ 		key = index_in_strings(keywords, *argv);
+ 		if (key == ARG_mode) {
+ 			NEXT_ARG();
+@@ -289,7 +289,6 @@ static void parse_args(int argc, char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			}
+ 		}
+ 		count++;
+-		argc--;
+ 		argv++;
+ 	}
+ 
+@@ -327,11 +326,11 @@ static void parse_args(int argc, char **argv, int cmd, struct ip_tunnel_parm *p)
+ 
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-static int do_add(int cmd, int argc, char **argv)
++static int do_add(int cmd, char **argv)
+ {
+ 	struct ip_tunnel_parm p;
+ 
+-	parse_args(argc, argv, cmd, &p);
++	parse_args(argv, cmd, &p);
+ 
+ 	if (p.iph.ttl && p.iph.frag_off == 0) {
+ 		bb_error_msg_and_die("ttl != 0 and noptmudisc are incompatible");
+@@ -350,11 +349,11 @@ static int do_add(int cmd, int argc, char **argv)
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-static int do_del(int argc, char **argv)
++static int do_del(char **argv)
+ {
+ 	struct ip_tunnel_parm p;
+ 
+-	parse_args(argc, argv, SIOCDELTUNNEL, &p);
++	parse_args(argv, SIOCDELTUNNEL, &p);
+ 
+ 	switch (p.iph.protocol) {
+ 	case IPPROTO_IPIP:
+@@ -487,12 +486,12 @@ static void do_tunnels_list(struct ip_tunnel_parm *p)
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-static int do_show(int argc, char **argv)
++static int do_show(char **argv)
+ {
+ 	int err;
+ 	struct ip_tunnel_parm p;
+ 
+-	parse_args(argc, argv, SIOCGETTUNNEL, &p);
++	parse_args(argv, SIOCGETTUNNEL, &p);
+ 
+ 	switch (p.iph.protocol) {
+ 	case IPPROTO_IPIP:
+@@ -517,25 +516,24 @@ static int do_show(int argc, char **argv)
+ }
+ 
+ /* Return value becomes exitcode. It's okay to not return at all */
+-int do_iptunnel(int argc, char **argv)
++int do_iptunnel(char **argv)
+ {
+ 	static const char keywords[] ALIGN1 =
+ 		"add\0""change\0""delete\0""show\0""list\0""lst\0";
+ 	enum { ARG_add = 0, ARG_change, ARG_del, ARG_show, ARG_list, ARG_lst };
+ 	int key;
+ 
+-	if (argc) {
++	if (*argv) {
+ 		key = index_in_substrings(keywords, *argv);
+ 		if (key < 0)
+ 			bb_error_msg_and_die(bb_msg_invalid_arg, *argv, applet_name);
+-		--argc;
+-		++argv;
++		argv++;
+ 		if (key == ARG_add)
+-			return do_add(SIOCADDTUNNEL, argc, argv);
++			return do_add(SIOCADDTUNNEL, argv);
+ 		if (key == ARG_change)
+-			return do_add(SIOCCHGTUNNEL, argc, argv);
++			return do_add(SIOCCHGTUNNEL, argv);
+ 		if (key == ARG_del)
+-			return do_del(argc, argv);
++			return do_del(argv);
+ 	}
+-	return do_show(argc, argv);
++	return do_show(argv);
+ }
+diff --git a/networking/libiproute/utils.h b/networking/libiproute/utils.h
+index 2c4dffd..cd65049 100644
+--- a/networking/libiproute/utils.h
++++ b/networking/libiproute/utils.h
+@@ -6,7 +6,7 @@
+ #include "ll_map.h"
+ #include "rtm_map.h"
+ 
+-extern int preferred_family;
++extern family_t preferred_family;
+ extern smallint show_stats;    /* UNUSED */
+ extern smallint show_details;  /* UNUSED */
+ extern smallint show_raw;      /* UNUSED */
+@@ -26,7 +26,7 @@ extern char _SL_;
+ 
+ extern void incomplete_command(void) ATTRIBUTE_NORETURN;
+ 
+-#define NEXT_ARG() do { argv++; if (--argc <= 0) incomplete_command(); } while (0)
++#define NEXT_ARG() do { if (!*++argv) incomplete_command(); } while (0)
+ 
+ typedef struct
+ {

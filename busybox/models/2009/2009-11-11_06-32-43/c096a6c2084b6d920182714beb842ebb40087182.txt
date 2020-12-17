@@ -1,0 +1,22 @@
+2009-11-11 06:32:43 +0100
+diff --git a/examples/mdev_fat.conf b/examples/mdev_fat.conf
+index 8b94636..df329b4 100644
+--- a/examples/mdev_fat.conf
++++ b/examples/mdev_fat.conf
+@@ -7,7 +7,7 @@
+ # instead of the default 0:0 660.
+ #
+ # Syntax:
+-# devicename_regex user:group mode [>|=path] [@|$|*cmd args...]
++# [-]devicename_regex user:group mode [>|=path] [@|$|*cmd args...]
+ #
+ # =: move, >: move and create a symlink
+ # @|$|*: run $cmd on delete, @cmd on create, *cmd on both
+@@ -49,6 +49,7 @@ sr[0-9]*	root:cdrom 660 @ln -sf $MDEV cdrom
+ fd[0-9]*	root:floppy 660
+ 
+ # net devices
++-net/.*		root:root 600 @nameif
+ tun[0-9]*	root:root 600 =net/
+ tap[0-9]*	root:root 600 =net/
+ 

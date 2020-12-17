@@ -1,0 +1,468 @@
+2010-03-26 19:08:53 +0100
+diff --git a/coreutils/realpath.c b/coreutils/realpath.c
+index 28906ba..90a71ed 100644
+--- a/coreutils/realpath.c
++++ b/coreutils/realpath.c
+@@ -17,30 +17,20 @@ int realpath_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+ 
+-#if PATH_MAX > (BUFSIZ+1)
+-	RESERVE_CONFIG_BUFFER(resolved_path, PATH_MAX);
+-# define resolved_path_MUST_FREE 1
+-#else
+-#define resolved_path bb_common_bufsiz1
+-# define resolved_path_MUST_FREE 0
+-#endif
+-
+ 	if (!*++argv) {
+ 		bb_show_usage();
+ 	}
+ 
+ 	do {
+-		if (realpath(*argv, resolved_path) != NULL) {
++		char *resolved_path = xmalloc_realpath(*argv);
++	       	if (resolved_path != NULL) {
+ 			puts(resolved_path);
++			free(resolved_path);
+ 		} else {
+ 			retval = EXIT_FAILURE;
+ 			bb_simple_perror_msg(*argv);
+ 		}
+ 	} while (*++argv);
+ 
+-#if ENABLE_FEATURE_CLEAN_UP && resolved_path_MUST_FREE
+-	RELEASE_CONFIG_BUFFER(resolved_path);
+-#endif
+-
+ 	fflush_stdout_and_exit(retval);
+ }
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index dfc72f0..0a08025 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -89,16 +89,17 @@ enum {
+ #define TEST  (option_mask32 & OPT_TEST)
+ 
+ struct globals {
+-	struct pid_list *found;
++	struct pid_list *found_procs;
+ 	char *userspec;
+ 	char *cmdname;
+ 	char *execname;
+ 	char *pidfile;
++	char *execname_cmpbuf;
++	unsigned execname_sizeof;
+ 	int user_id;
+ 	smallint signal_nr;
+ } FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+-#define found             (G.found               )
+ #define userspec          (G.userspec            )
+ #define cmdname           (G.cmdname             )
+ #define execname          (G.execname            )
+@@ -118,7 +119,7 @@ struct globals {
+ static int pid_is_exec(pid_t pid)
+ {
+ 	struct stat st;
+-	char buf[sizeof("/proc//exe") + sizeof(int)*3];
++	char buf[sizeof("/proc/%u/exe") + sizeof(int)*3];
+ 
+ 	sprintf(buf, "/proc/%u/exe", (unsigned)pid);
+ 	if (stat(buf, &st) < 0)
+@@ -133,13 +134,13 @@ static int pid_is_exec(pid_t pid)
+ static int pid_is_exec(pid_t pid)
+ {
+ 	ssize_t bytes;
+-	char buf[PATH_MAX];
++	char buf[sizeof("/proc/%u/cmdline") + sizeof(int)*3];
+ 
+ 	sprintf(buf, "/proc/%u/cmdline", (unsigned)pid);
+-	bytes = open_read_close(buf, buf, sizeof(buf) - 1);
++	bytes = open_read_close(buf, G.execname_cmpbuf, G.execname_sizeof);
+ 	if (bytes > 0) {
+-		buf[bytes] = '\0';
+-		return strcmp(buf, execname) == 0;
++		G.execname_cmpbuf[bytes] = '\0';
++		return strcmp(execname, G.execname_cmpbuf) == 0;
+ 	}
+ 	return 0;
+ }
+@@ -194,9 +195,9 @@ static void check(int pid)
+ 		return;
+ 	}
+ 	p = xmalloc(sizeof(*p));
+-	p->next = found;
++	p->next = G.found_procs;
+ 	p->pid = pid;
+-	found = p;
++	G.found_procs = p;
+ }
+ 
+ static void do_pidfile(void)
+@@ -266,13 +267,13 @@ static int do_stop(void)
+ 		bb_error_msg_and_die("internal error, please report");
+ 	}
+ 
+-	if (!found) {
++	if (!G.found_procs) {
+ 		if (!QUIET)
+ 			printf("no %s found; none killed\n", what);
+ 		killed = -1;
+ 		goto ret;
+ 	}
+-	for (p = found; p; p = p->next) {
++	for (p = G.found_procs; p; p = p->next) {
+ 		if (TEST || kill(p->pid, signal_nr) == 0) {
+ 			killed++;
+ 		} else {
+@@ -282,7 +283,7 @@ static int do_stop(void)
+ 	}
+ 	if (!QUIET && killed) {
+ 		printf("stopped %s (pid", what);
+-		for (p = found; p; p = p->next)
++		for (p = G.found_procs; p; p = p->next)
+ 			if (p->pid)
+ 				printf(" %u", (unsigned)p->pid);
+ 		puts(")");
+@@ -365,6 +366,10 @@ int start_stop_daemon_main(int argc UNUSED_PARAM, char **argv)
+ 		startas = execname;
+ 	if (!execname) /* in case -a is given and -x is not */
+ 		execname = startas;
++	if (execname) {
++		G.execname_sizeof = strlen(execname) + 1;
++		G.execname_cmpbuf = xmalloc(G.execname_sizeof + 1);
++	}
+ 
+ //	IF_FEATURE_START_STOP_DAEMON_FANCY(
+ //		if (retry_arg)
+@@ -386,9 +391,9 @@ int start_stop_daemon_main(int argc UNUSED_PARAM, char **argv)
+ 		return (opt & OPT_OKNODO) ? 0 : (i <= 0);
+ 	}
+ 
+-	if (found) {
++	if (G.found_procs) {
+ 		if (!QUIET)
+-			printf("%s is already running\n%u\n", execname, (unsigned)found->pid);
++			printf("%s is already running\n%u\n", execname, (unsigned)G.found_procs->pid);
+ 		return !(opt & OPT_OKNODO);
+ 	}
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index 72d6c7d..794e438 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -339,7 +339,7 @@ void xmove_fd(int, int) FAST_FUNC;
+ DIR *xopendir(const char *path) FAST_FUNC;
+ DIR *warn_opendir(const char *path) FAST_FUNC;
+ 
+-/* UNUSED: char *xmalloc_realpath(const char *path) FAST_FUNC RETURNS_MALLOC; */
++char *xmalloc_realpath(const char *path) FAST_FUNC RETURNS_MALLOC;
+ char *xmalloc_readlink(const char *path) FAST_FUNC RETURNS_MALLOC;
+ char *xmalloc_readlink_or_warn(const char *path) FAST_FUNC RETURNS_MALLOC;
+ /* !RETURNS_MALLOC: it's a realloc-like function */
+diff --git a/libbb/safe_gethostname.c b/libbb/safe_gethostname.c
+index 7407fb7..e93254b 100644
+--- a/libbb/safe_gethostname.c
++++ b/libbb/safe_gethostname.c
+@@ -59,8 +59,12 @@ char* FAST_FUNC safe_gethostname(void)
+  */
+ char* FAST_FUNC safe_getdomainname(void)
+ {
++/* The field domainname of struct utsname is Linux specific. */
++#if defined(__linux__)
+ 	struct utsname uts;
+-
+ 	uname(&uts);
+ 	return xstrndup(!uts.domainname[0] ? "?" : uts.domainname, sizeof(uts.domainname));
++#else
++	return xstrdup("?");
++#endif
+ }
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index 97751eb..d8c8d02 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -21,6 +21,8 @@ int FAST_FUNC setsockopt_broadcast(int fd)
+ {
+ 	return setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &const_int_1, sizeof(const_int_1));
+ }
++
++#ifdef SO_BINDTODEVICE
+ int FAST_FUNC setsockopt_bindtodevice(int fd, const char *iface)
+ {
+ 	int r;
+@@ -36,6 +38,14 @@ int FAST_FUNC setsockopt_bindtodevice(int fd, const char *iface)
+ 		bb_perror_msg("can't bind to interface %s", iface);
+ 	return r;
+ }
++#else
++int FAST_FUNC setsockopt_bindtodevice(int fd UNUSED_PARAM,
++		const char *iface UNUSED_PARAM)
++{
++	bb_error_msg("SO_BINDTODEVICE is not supported on this system");
++	return -1;
++}
++#endif
+ 
+ len_and_sockaddr* FAST_FUNC get_sock_lsa(int fd)
+ {
+diff --git a/libbb/xreadlink.c b/libbb/xreadlink.c
+index 8d232f1..faa0e16 100644
+--- a/libbb/xreadlink.c
++++ b/libbb/xreadlink.c
+@@ -100,18 +100,16 @@ char* FAST_FUNC xmalloc_readlink_or_warn(const char *path)
+ 	return buf;
+ }
+ 
+-/* UNUSED */
+-#if 0
+ char* FAST_FUNC xmalloc_realpath(const char *path)
+ {
+ #if defined(__GLIBC__) && !defined(__UCLIBC__)
+ 	/* glibc provides a non-standard extension */
++	/* new: POSIX.1-2008 specifies this behavior as well */
+ 	return realpath(path, NULL);
+ #else
+ 	char buf[PATH_MAX+1];
+ 
+-	/* on error returns NULL (xstrdup(NULL) ==NULL) */
++	/* on error returns NULL (xstrdup(NULL) == NULL) */
+ 	return xstrdup(realpath(path, buf));
+ #endif
+ }
+-#endif
+diff --git a/scripts/basic/docproc.c b/scripts/basic/docproc.c
+index dc7a0fc..ef51812 100644
+--- a/scripts/basic/docproc.c
++++ b/scripts/basic/docproc.c
+@@ -79,7 +79,9 @@ void exec_kernel_doc(char **svec)
+ {
+ 	pid_t pid;
+ 	int ret;
+-	char real_filename[PATH_MAX + 1];
++	char *real_filename;
++	int rflen;
++
+ 	/* Make sure output generated so far are flushed */
+ 	fflush(stdout);
+ 	switch(pid=fork()) {
+@@ -87,10 +89,11 @@ void exec_kernel_doc(char **svec)
+ 			perror("fork");
+ 			exit(1);
+ 		case  0:
+-			memset(real_filename, 0, sizeof(real_filename));
+-			strncat(real_filename, getenv("SRCTREE"), PATH_MAX);
+-			strncat(real_filename, KERNELDOCPATH KERNELDOC,
+-					PATH_MAX - strlen(real_filename));
++			rflen  = strlen(getenv("SRCTREE"));
++			rflen += strlen(KERNELDOCPATH KERNELDOC);
++			real_filename = alloca(rflen + 1);
++			strcpy(real_filename, getenv("SRCTREE"));
++			strcat(real_filename, KERNELDOCPATH KERNELDOC);
+ 			execvp(real_filename, svec);
+ 			fprintf(stderr, "exec ");
+ 			perror(real_filename);
+@@ -166,11 +169,10 @@ void find_export_symbols(char * filename)
+ 	struct symfile *sym;
+ 	char line[MAXLINESZ];
+ 	if (filename_exist(filename) == NULL) {
+-		char real_filename[PATH_MAX + 1];
+-		memset(real_filename, 0, sizeof(real_filename));
+-		strncat(real_filename, getenv("SRCTREE"), PATH_MAX);
+-		strncat(real_filename, filename,
+-				PATH_MAX - strlen(real_filename));
++		int rflen = strlen(getenv("SRCTREE")) + strlen(filename);
++		char *real_filename = alloca(rflen + 1);
++		strcpy(real_filename, getenv("SRCTREE"));
++		strcat(real_filename, filename);
+ 		sym = add_new_file(filename);
+ 		fp = fopen(real_filename, "r");
+ 		if (fp == NULL)
+diff --git a/scripts/basic/fixdep.c b/scripts/basic/fixdep.c
+index 6d61044..bbb575c 100644
+--- a/scripts/basic/fixdep.c
++++ b/scripts/basic/fixdep.c
+@@ -203,7 +203,7 @@ void clear_config(void)
+  */
+ void use_config(char *m, int slen)
+ {
+-	char s[PATH_MAX];
++	char *s = alloca(slen+1);
+ 	char *p;
+ 
+ 	if (is_defined_config(m, slen))
+@@ -310,7 +310,7 @@ void parse_dep_file(void *map, size_t len)
+ 	char *m = map;
+ 	char *end = m + len;
+ 	char *p;
+-	char s[PATH_MAX];
++	char *s = alloca(len);
+ 
+ 	p = memchr(m, ':', len);
+ 	if (!p) {
+diff --git a/scripts/kconfig/confdata.c b/scripts/kconfig/confdata.c
+index 9365a12..4f83fbf 100644
+--- a/scripts/kconfig/confdata.c
++++ b/scripts/kconfig/confdata.c
+@@ -70,12 +70,13 @@ static char *conf_expand_value(const char *in)
+ char *conf_get_default_confname(void)
+ {
+ 	struct stat buf;
+-	static char fullname[PATH_MAX+1];
++	static char *fullname = NULL;
+ 	char *env, *name;
+ 
+ 	name = conf_expand_value(conf_defname);
+ 	env = getenv(SRCTREE);
+ 	if (env) {
++		fullname = realloc(fullname, strlen(env) + strlen(name) + 2);
+ 		sprintf(fullname, "%s/%s", env, name);
+ 		if (!stat(fullname, &buf))
+ 			return fullname;
+diff --git a/scripts/kconfig/mconf.c b/scripts/kconfig/mconf.c
+index 647ec09..0c548bf 100644
+--- a/scripts/kconfig/mconf.c
++++ b/scripts/kconfig/mconf.c
+@@ -258,7 +258,7 @@ search_help[] = N_(
+ 
+ static char buf[4096], *bufptr = buf;
+ static char input_buf[4096];
+-static char filename[PATH_MAX+1] = ".config";
++static const char filename[] = ".config";
+ static char *args[1024], **argptr = args;
+ static int indent;
+ static struct termios ios_org;
+diff --git a/scripts/kconfig/zconf.l b/scripts/kconfig/zconf.l
+index d839577..6a58b80 100644
+--- a/scripts/kconfig/zconf.l
++++ b/scripts/kconfig/zconf.l
+@@ -265,13 +265,14 @@ static void zconf_endhelp(void)
+  */
+ FILE *zconf_fopen(const char *name)
+ {
+-	char *env, fullname[PATH_MAX+1];
++	char *env;
+ 	FILE *f;
+ 
+ 	f = fopen(name, "r");
+ 	if (!f && name[0] != '/') {
+ 		env = getenv(SRCTREE);
+ 		if (env) {
++			char *fullname = alloca(strlen(env) + strlen(name) + 2);
+ 			sprintf(fullname, "%s/%s", env, name);
+ 			f = fopen(fullname, "r");
+ 		}
+diff --git a/scripts/kconfig/zconf.y b/scripts/kconfig/zconf.y
+index 0a7a796..2007a4e 100644
+--- a/scripts/kconfig/zconf.y
++++ b/scripts/kconfig/zconf.y
+@@ -14,8 +14,6 @@
+ #define LKC_DIRECT_LINK
+ #include "lkc.h"
+ 
+-#include "zconf.hash.c"
+-
+ #define printd(mask, fmt...) if (cdebug & (mask)) printf(fmt)
+ 
+ #define PRINTD		0x0001
+@@ -99,6 +97,10 @@ static struct menu *current_menu, *current_entry;
+ 		menu_end_menu();
+ } if_entry menu_entry choice_entry
+ 
++%{
++#include "zconf.hash.c"
++%}
++
+ %%
+ input: stmt_list;
+ 
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index a4b2bd0..a19f86c 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -39,6 +39,10 @@
+ # define MS_RELATIME    (1 << 21)
+ #endif
+ #include "libbb.h"
++#ifndef PATH_MAX
++# define PATH_MAX (4*1024)
++#endif
++
+ 
+ #if defined(__dietlibc__)
+ /* 16.12.2006, Sampo Kellomaki (sampo@iki.fi)
+@@ -69,7 +73,7 @@ int umount_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int umount_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	int doForce;
+-	char *const path = xmalloc(PATH_MAX + 2); /* to save stack */
++	char *const buf = xmalloc(PATH_MAX * 2 + 128); /* to save stack */
+ 	struct mntent me;
+ 	FILE *fp;
+ 	char *fstype = NULL;
+@@ -100,7 +104,7 @@ int umount_main(int argc UNUSED_PARAM, char **argv)
+ 		if (opt & OPT_ALL)
+ 			bb_error_msg_and_die("can't open '%s'", bb_path_mtab_file);
+ 	} else {
+-		while (getmntent_r(fp, &me, path, PATH_MAX)) {
++		while (getmntent_r(fp, &me, buf, PATH_MAX * 2 + 128)) {
+ 			/* Match fstype if passed */
+ 			if (!match_fstype(&me, fstype))
+ 				continue;
+@@ -124,10 +128,11 @@ int umount_main(int argc UNUSED_PARAM, char **argv)
+ 	for (;;) {
+ 		int curstat;
+ 		char *zapit = *argv;
++		char *path;
+ 
+ 		// Do we already know what to umount this time through the loop?
+ 		if (m)
+-			safe_strncpy(path, m->dir, PATH_MAX);
++			path = xstrdup(m->dir);
+ 		// For umount -a, end of mtab means time to exit.
+ 		else if (opt & OPT_ALL)
+ 			break;
+@@ -136,10 +141,12 @@ int umount_main(int argc UNUSED_PARAM, char **argv)
+ 			if (!zapit)
+ 				break;
+ 			argv++;
+-			realpath(zapit, path);
+-			for (m = mtl; m; m = m->next)
+-				if (!strcmp(path, m->dir) || !strcmp(path, m->device))
+-					break;
++			path = xmalloc_realpath(zapit);
++			if (path) {
++				for (m = mtl; m; m = m->next)
++					if (strcmp(path, m->dir) == 0 || strcmp(path, m->device) == 0)
++						break;
++			}
+ 		}
+ 		// If we couldn't find this sucker in /etc/mtab, punt by passing our
+ 		// command line argument straight to the umount syscall.  Otherwise,
+@@ -181,9 +188,13 @@ int umount_main(int argc UNUSED_PARAM, char **argv)
+ 		// Find next matching mtab entry for -a or umount /dev
+ 		// Note this means that "umount /dev/blah" will unmount all instances
+ 		// of /dev/blah, not just the most recent.
+-		if (m) while ((m = m->next) != NULL)
+-			if ((opt & OPT_ALL) || !strcmp(path, m->device))
+-				break;
++		if (m) {
++			while ((m = m->next) != NULL)
++				// NB: if m is non-NULL, path is non-NULL as well
++				if ((opt & OPT_ALL) || strcmp(path, m->device) == 0)
++					break;
++		}
++		free(path);
+ 	}
+ 
+ 	// Free mtab list if necessary
+@@ -195,7 +206,7 @@ int umount_main(int argc UNUSED_PARAM, char **argv)
+ 			free(mtl);
+ 			mtl = m;
+ 		}
+-		free(path);
++		free(buf);
+ 	}
+ 
+ 	return status;

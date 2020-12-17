@@ -1,0 +1,254 @@
+2009-10-08 14:35:37 +0200
+diff --git a/archival/libunarchive/decompress_unzip.c b/archival/libunarchive/decompress_unzip.c
+index c571ab4..feaa047 100644
+--- a/archival/libunarchive/decompress_unzip.c
++++ b/archival/libunarchive/decompress_unzip.c
+@@ -503,7 +503,7 @@ static void inflate_codes_setup(STATE_PARAM unsigned my_bl, unsigned my_bd)
+ 	md = mask_bits[bd];
+ }
+ /* called once from inflate_get_next_window */
+-static int inflate_codes(STATE_PARAM_ONLY)
++static NOINLINE int inflate_codes(STATE_PARAM_ONLY)
+ {
+ 	unsigned e;	/* table entry flag/number of extra bits */
+ 	huft_t *t;	/* pointer to table entry */
+diff --git a/docs/keep_data_small.txt b/docs/keep_data_small.txt
+index 2ba24e4..079bac3 100644
+--- a/docs/keep_data_small.txt
++++ b/docs/keep_data_small.txt
+@@ -245,3 +245,7 @@ subCommand             -     841    +841 loss
+ receive                -     834    +834 loss
+ 
+ 855 bytes saved in total.
++
++scripts/mkdiff_obj_bloat may be useful to automate this process: run
++"scripts/mkdiff_obj_bloat NORMALLY_BUILT_TREE FORCED_NOINLINE_TREE"
++and select modules which shrank.
+diff --git a/editors/ed.c b/editors/ed.c
+index 9084a17..dbd8020 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -951,7 +951,7 @@ static void deleteLines(int num1, int num2)
+  * Returns the line number which matches, or 0 if there was no match
+  * with an error printed.
+  */
+-static int searchLines(const char *str, int num1, int num2)
++static NOINLINE int searchLines(const char *str, int num1, int num2)
+ {
+ 	const LINE *lp;
+ 	int len;
+diff --git a/editors/vi.c b/editors/vi.c
+index 4decbea..a24b723 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -1210,7 +1210,7 @@ static int next_tabstop(int col)
+ }
+ 
+ //----- Synchronize the cursor to Dot --------------------------
+-static void sync_cursor(char *d, int *row, int *col)
++static NOINLINE void sync_cursor(char *d, int *row, int *col)
+ {
+ 	char *beg_cur;	// begin and end of "d" line
+ 	char *tp;
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 838adf2..f44d387 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -583,7 +583,7 @@ static void touch(const char *filename)
+ }
+ 
+ /* update_utmp - update our utmp entry */
+-static void update_utmp(const char *line, char *fakehost)
++static NOINLINE void update_utmp(const char *line, char *fakehost)
+ {
+ 	struct utmp ut;
+ 	struct utmp *utp;
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index d042af0..39af883 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -94,7 +94,7 @@ static void print_queuelen(char *name)
+ 		printf("qlen %d", ifr.ifr_qlen);
+ }
+ 
+-static int print_linkinfo(const struct nlmsghdr *n)
++static NOINLINE int print_linkinfo(const struct nlmsghdr *n)
+ {
+ 	struct ifinfomsg *ifi = NLMSG_DATA(n);
+ 	struct rtattr * tb[IFLA_MAX+1];
+diff --git a/networking/route.c b/networking/route.c
+index 5d25408..241be8e 100644
+--- a/networking/route.c
++++ b/networking/route.c
+@@ -151,7 +151,7 @@ static int kw_lookup(const char *kwtbl, char ***pargs)
+ 
+ /* Add or delete a route, depending on action. */
+ 
+-static void INET_setroute(int action, char **args)
++static NOINLINE void INET_setroute(int action, char **args)
+ {
+ 	struct rtentry rt;
+ 	const char *netmask = NULL;
+@@ -336,7 +336,7 @@ static void INET_setroute(int action, char **args)
+ 
+ #if ENABLE_FEATURE_IPV6
+ 
+-static void INET6_setroute(int action, char **args)
++static NOINLINE void INET6_setroute(int action, char **args)
+ {
+ 	struct sockaddr_in6 sa6;
+ 	struct in6_rtmsg rt;
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 21297da..270ec0a 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -92,7 +92,7 @@ enum {
+ 	OPT_2 = (1 << 20) * ENABLE_CHPST,
+ };
+ 
+-static void edir(const char *directory_name)
++static NOINLINE void edir(const char *directory_name)
+ {
+ 	int wdir;
+ 	DIR *dir;
+diff --git a/scripts/mkdiff_obj b/scripts/mkdiff_obj
+new file mode 100755
+index 0000000..a6ec5e6
+--- /dev/null
++++ b/scripts/mkdiff_obj
+@@ -0,0 +1,39 @@
++#!/bin/sh
++
++filter() {
++	# sed removes " address: " prefixes which mess up diff
++	sed $'s/^\\(\t*\\)[ ]*[0-9a-f][0-9a-f]*:[ \t]*/\\1/' \
++	| sed 's/__GI_//g'
++}
++
++test -d "$1" || exit 1
++test -d "$2" || exit 1
++
++{
++	(
++		cd "$1" || exit 1
++		find -name '*.o' -o -name '*.os' # -o -name '*.so'
++	)
++	(
++		cd "$2" || exit 1
++		find -name '*.o' -o -name '*.os' # -o -name '*.so'
++	)
++} | sed 's:^\./::' | sort | uniq | \
++tee LST | \
++(
++IFS=''
++while read -r oname; do
++	if ! test -f "$1/$oname"; then
++		echo "Only $2/$oname"
++		continue
++	fi
++	if ! test -f "$2/$oname"; then
++		echo "Only $1/$oname"
++		continue
++	fi
++	diff -q -- "$1/$oname" "$2/$oname" >/dev/null && continue
++	(cd "$1"; objdump -dr "$oname" | filter >"$oname.disasm")
++	(cd "$2"; objdump -dr "$oname" | filter >"$oname.disasm")
++	diff -u "$1/$oname.disasm" "$2/$oname.disasm"
++done
++)
+diff --git a/scripts/mkdiff_obj_bloat b/scripts/mkdiff_obj_bloat
+new file mode 100755
+index 0000000..63b2c2e
+--- /dev/null
++++ b/scripts/mkdiff_obj_bloat
+@@ -0,0 +1,33 @@
++#!/bin/sh
++
++test -d "$1" || exit 1
++test -d "$2" || exit 1
++
++{
++	(
++		cd "$1" || exit 1
++		find -name '*.o' -o -name '*.os' # -o -name '*.so'
++	)
++	(
++		cd "$2" || exit 1
++		find -name '*.o' -o -name '*.os' # -o -name '*.so'
++	)
++} | sed 's:^\./::' | sort | uniq | \
++tee LST | \
++(
++IFS=''
++while read -r oname; do
++	if ! test -f "$1/$oname"; then
++		echo "Only $2/$oname"
++		continue
++	fi
++	if ! test -f "$2/$oname"; then
++		echo "Only $1/$oname"
++		continue
++	fi
++	$1/scripts/bloat-o-meter $1/$oname $2/$oname | grep 'otal: 0 byte' >/dev/null && continue
++	$1/scripts/bloat-o-meter $1/$oname $2/$oname
++	size $1/$oname $2/$oname
++	echo
++done
++)
+diff --git a/shell/ash.c b/shell/ash.c
+index 54af39a..f2d372f 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -6376,7 +6376,7 @@ subevalvar(char *p, char *str, int strloc, int subtype,
+  * ash -c 'echo ${#$1}'  name:'$=1'
+  * ash -c 'echo ${#1#}'  name:'1=#'
+  */
+-static ssize_t
++static NOINLINE ssize_t
+ varvalue(char *name, int varflags, int flags, struct strlist *var_str_list)
+ {
+ 	int num;
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index c8c6d76..c1103b0 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -242,7 +242,7 @@ static NOINLINE void do_shm(void)
+ }
+ 
+ 
+-static void do_sem(void)
++static NOINLINE void do_sem(void)
+ {
+ 	int maxid, semid, id;
+ 	struct semid_ds semary;
+@@ -348,7 +348,7 @@ static void do_sem(void)
+ }
+ 
+ 
+-static void do_msg(void)
++static NOINLINE void do_msg(void)
+ {
+ 	int maxid, msqid, id;
+ 	struct msqid_ds msgque;
+diff --git a/util-linux/rtcwake.c b/util-linux/rtcwake.c
+index 278acf3..ee2f031 100644
+--- a/util-linux/rtcwake.c
++++ b/util-linux/rtcwake.c
+@@ -32,7 +32,7 @@
+ 
+ static time_t rtc_time;
+ 
+-static bool may_wakeup(const char *rtcname)
++static NOINLINE bool may_wakeup(const char *rtcname)
+ {
+ 	ssize_t ret;
+ 	char buf[128];
+@@ -50,7 +50,7 @@ static bool may_wakeup(const char *rtcname)
+ 	return strncmp(buf, "enabled\n", 8) == 0;
+ }
+ 
+-static void setup_alarm(int fd, time_t *wakeup)
++static NOINLINE void setup_alarm(int fd, time_t *wakeup)
+ {
+ 	struct tm *tm;
+ 	struct linux_rtc_wkalrm	wake;

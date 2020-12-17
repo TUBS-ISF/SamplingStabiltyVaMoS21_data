@@ -1,0 +1,157 @@
+2009-07-29 01:35:13 +0200
+diff --git a/include/libbb.h b/include/libbb.h
+index c7b4de1..51ac69e 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1280,6 +1280,7 @@ typedef struct procps_status_t {
+ /* Fields are set to 0/NULL if failed to determine (or not requested) */
+ 	uint16_t argv_len;
+ 	char *argv0;
++	char *exe;
+ 	IF_SELINUX(char *context;)
+ 	/* Everything below must contain no ptrs to malloc'ed data:
+ 	 * it is memset(0) for each process in procps_scan() */
+@@ -1327,7 +1328,7 @@ enum {
+ 	PSSCAN_COMM     = 1 << 5,
+ 	/* PSSCAN_CMD      = 1 << 6, - use read_cmdline instead */
+ 	PSSCAN_ARGV0    = 1 << 7,
+-	/* PSSCAN_EXE      = 1 << 8, - not implemented */
++	PSSCAN_EXE      = 1 << 8,
+ 	PSSCAN_STATE    = 1 << 9,
+ 	PSSCAN_VSZ      = 1 << 10,
+ 	PSSCAN_RSS      = 1 << 11,
+diff --git a/libbb/find_pid_by_name.c b/libbb/find_pid_by_name.c
+index 600d4e1..52a0c6d 100644
+--- a/libbb/find_pid_by_name.c
++++ b/libbb/find_pid_by_name.c
+@@ -41,18 +41,20 @@ and therefore comm field contains "exe".
+ static int comm_match(procps_status_t *p, const char *procName)
+ {
+ 	int argv1idx;
++	const char *argv1;
+ 
+-	/* comm does not match */
+ 	if (strncmp(p->comm, procName, 15) != 0)
+-		return 0;
++		return 0; /* comm does not match */
+ 
+-	/* in Linux, if comm is 15 chars, it may be a truncated */
+-	if (p->comm[14] == '\0') /* comm is not truncated - match */
+-		return 1;
++	/* In Linux, if comm is 15 chars, it is truncated.
++	 * (or maybe the name was exactly 15 chars, but there is
++	 * no way to know that) */
++	if (p->comm[14] == '\0')
++		return 1; /* comm is not truncated - matches */
+ 
+ 	/* comm is truncated, but first 15 chars match.
+ 	 * This can be crazily_long_script_name.sh!
+-	 * The telltale sign is basename(argv[1]) == procName. */
++	 * The telltale sign is basename(argv[1]) == procName */
+ 
+ 	if (!p->argv0)
+ 		return 0;
+@@ -60,8 +62,9 @@ static int comm_match(procps_status_t *p, const char *procName)
+ 	argv1idx = strlen(p->argv0) + 1;
+ 	if (argv1idx >= p->argv_len)
+ 		return 0;
++	argv1 = p->argv0 + argv1idx;
+ 
+-	if (strcmp(bb_basename(p->argv0 + argv1idx), procName) != 0)
++	if (strcmp(bb_basename(argv1), procName) != 0)
+ 		return 0;
+ 
+ 	return 1;
+@@ -83,11 +86,12 @@ pid_t* FAST_FUNC find_pid_by_name(const char *procName)
+ 	procps_status_t* p = NULL;
+ 
+ 	pidList = xzalloc(sizeof(*pidList));
+-	while ((p = procps_scan(p, PSSCAN_PID|PSSCAN_COMM|PSSCAN_ARGVN))) {
++	while ((p = procps_scan(p, PSSCAN_PID|PSSCAN_COMM|PSSCAN_ARGVN|PSSCAN_EXE))) {
+ 		if (comm_match(p, procName)
+ 		/* or we require argv0 to match (essential for matching reexeced /proc/self/exe)*/
+ 		 || (p->argv0 && strcmp(bb_basename(p->argv0), procName) == 0)
+-		/* TODO: we can also try /proc/NUM/exe link, do we want that? */
++		/* or we require /proc/PID/exe link to match */
++		 || (p->exe && strcmp(bb_basename(p->exe), procName) == 0)
+ 		) {
+ 			pidList = xrealloc_vector(pidList, 2, i);
+ 			pidList[i++] = p->pid;
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 6e122c4..307d8d6 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -111,6 +111,7 @@ void FAST_FUNC free_procps_scan(procps_status_t* sp)
+ {
+ 	closedir(sp->dir);
+ 	free(sp->argv0);
++	free(sp->exe);
+ 	IF_SELINUX(free(sp->context);)
+ 	free(sp);
+ }
+@@ -213,7 +214,7 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 		}
+ #endif
+ 
+-		filename_tail = filename + sprintf(filename, "/proc/%d", pid);
++		filename_tail = filename + sprintf(filename, "/proc/%u/", pid);
+ 
+ 		if (flags & PSSCAN_UIDGID) {
+ 			if (stat(filename, &sb))
+@@ -230,7 +231,7 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 			unsigned long vsz, rss;
+ #endif
+ 			/* see proc(5) for some details on this */
+-			strcpy(filename_tail, "/stat");
++			strcpy(filename_tail, "stat");
+ 			n = read_to_buf(filename, buf);
+ 			if (n < 0)
+ 				break;
+@@ -340,7 +341,7 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 		if (flags & (PSSCAN_SMAPS)) {
+ 			FILE *file;
+ 
+-			strcpy(filename_tail, "/smaps");
++			strcpy(filename_tail, "smaps");
+ 			file = fopen_for_read(filename);
+ 			if (!file)
+ 				break;
+@@ -390,7 +391,7 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 		if (flags & PSSCAN_RUIDGID) {
+ 			FILE *file;
+ 
+-			strcpy(filename_tail, "/status");
++			strcpy(filename_tail, "status");
+ 			file = fopen_for_read(filename);
+ 			if (!file)
+ 				break;
+@@ -415,7 +416,7 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 			sp->argv0 = NULL;
+ 			free(sp->cmd);
+ 			sp->cmd = NULL;
+-			strcpy(filename_tail, "/cmdline");
++			strcpy(filename_tail, "cmdline");
+ 			/* TODO: to get rid of size limits, read into malloc buf,
+ 			 * then realloc it down to real size. */
+ 			n = read_to_buf(filename, buf);
+@@ -436,7 +437,7 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 		if (flags & (PSSCAN_ARGV0|PSSCAN_ARGVN)) {
+ 			free(sp->argv0);
+ 			sp->argv0 = NULL;
+-			strcpy(filename_tail, "/cmdline");
++			strcpy(filename_tail, "cmdline");
+ 			n = read_to_buf(filename, buf);
+ 			if (n <= 0)
+ 				break;
+@@ -451,6 +452,11 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 			}
+ 		}
+ #endif
++		if (flags & PSSCAN_EXE) {
++			strcpy(filename_tail, "exe");
++			free(sp->exe);
++			sp->exe = xmalloc_readlink(filename);
++		}
+ 		break;
+ 	}
+ 	return sp;

@@ -1,0 +1,59 @@
+2008-08-03 19:12:25 +0000
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index 8f0a3d4..92d01f7 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -376,6 +376,8 @@ enum {
+ int xargs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int xargs_main(int argc, char **argv)
+ {
++	static const char const_eof_str[] ALIGN1 = "_";
++
+ 	char **args;
+ 	int i, n;
+ 	xlist_t *list = NULL;
+@@ -385,7 +387,7 @@ int xargs_main(int argc, char **argv)
+ 	int n_max_arg;
+ 	size_t n_chars = 0;
+ 	long orig_arg_max;
+-	const char *eof_str = "_";
++	const char *eof_str = const_eof_str;
+ 	unsigned opt;
+ 	size_t n_max_chars;
+ #if ENABLE_FEATURE_XARGS_SUPPORT_ZERO_TERM
+@@ -396,6 +398,10 @@ int xargs_main(int argc, char **argv)
+ 
+ 	opt = getopt32(argv, OPTION_STR, &max_args, &max_chars, &eof_str);
+ 
++	/* -e without optional param? */
++	if ((opt & OPT_EOF_STRING) && eof_str == const_eof_str)
++		eof_str = NULL;
++
+ 	if (opt & OPT_ZEROTERM)
+ 		USE_FEATURE_XARGS_SUPPORT_ZERO_TERM(read_args = process0_stdin);
+ 
+diff --git a/testsuite/xargs.tests b/testsuite/xargs.tests
+new file mode 100755
+index 0000000..e041d59
+--- /dev/null
++++ b/testsuite/xargs.tests
+@@ -0,0 +1,19 @@
++#!/bin/sh
++# Copyright 2008 by Denys Vlasenko
++# Licensed under GPL v2, see file LICENSE for details.
++
++. testing.sh
++
++# testing "test name" "command" "expected result" "file input" "stdin"
++
++testing "xargs stops on underscore" \
++	"xargs" \
++	"a\n" \
++	"" "a\n_\nb\n"
++
++testing "xargs -e without param" \
++	"xargs -e" \
++	"a _ b\n" \
++	"" "a\n_\nb\n"
++
++exit $FAILCOUNT

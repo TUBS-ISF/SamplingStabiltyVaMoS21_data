@@ -1,0 +1,200 @@
+2007-09-21 13:16:32 +0000
+diff --git a/AUTHORS b/AUTHORS
+index 8f6498b..9755ad9 100644
+--- a/AUTHORS
++++ b/AUTHORS
+@@ -95,7 +95,7 @@ Stephan Linz <linz@li-pro.net>
+ John Lombardo <john@deltanet.com>
+     tr
+ 
+-Glenn McGrath <bug1@iinet.net.au>
++Glenn McGrath <glenn.l.mcgrath@gmail.com>
+     Common unarchiving code and unarchiving applets, ifupdown, ftpgetput,
+     nameif, sed, patch, fold, install, uudecode.
+     Various bugfixes, review and apply numerous patches.
+diff --git a/archival/ar.c b/archival/ar.c
+index db23c2b..cbe4d8e 100644
+--- a/archival/ar.c
++++ b/archival/ar.c
+@@ -3,7 +3,6 @@
+  * Mini ar implementation for busybox
+  *
+  * Copyright (C) 2000 by Glenn McGrath
+- * Written by Glenn McGrath <bug1@iinet.net.au> 1 June 2000
+  *
+  * Based in part on BusyBox tar, Debian dpkg-deb and GNU ar.
+  *
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index a4e525f..c5a5337 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -138,7 +138,7 @@ char* make_new_name_generic(char *filename, const char *expected_ext)
+ 
+ 
+ /*
+- *  Modified for busybox by Glenn McGrath <bug1@iinet.net.au>
++ *  Modified for busybox by Glenn McGrath
+  *  Added support output to stdout by Thomas Lundquist <thomasez@zelow.no>
+  *
+  *  Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+@@ -185,7 +185,7 @@ int bunzip2_main(int argc, char **argv)
+  * handling.
+  *
+  * General cleanup to better adhere to the style guide and make use of standard
+- * busybox functions by Glenn McGrath <bug1@iinet.net.au>
++ * busybox functions by Glenn McGrath
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  *
+diff --git a/archival/libunarchive/decompress_unzip.c b/archival/libunarchive/decompress_unzip.c
+index ead628e..275f80b 100644
+--- a/archival/libunarchive/decompress_unzip.c
++++ b/archival/libunarchive/decompress_unzip.c
+@@ -12,7 +12,7 @@
+  * command line handling.
+  *
+  * General cleanup to better adhere to the style guide and make use of standard
+- * busybox functions by Glenn McGrath <bug1@iinet.net.au>
++ * busybox functions by Glenn McGrath
+  *
+  * read_gz interface + associated hacking by Laurence Anderson
+  *
+diff --git a/archival/tar.c b/archival/tar.c
+index 45fa4bd..11f5eba 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -3,7 +3,7 @@
+  * Mini tar implementation for busybox
+  *
+  * Modified to use common extraction code used by ar, cpio, dpkg-deb, dpkg
+- *  Glenn McGrath <bug1@iinet.net.au>
++ *  by Glenn McGrath
+  *
+  * Note, that as of BusyBox-0.43, tar has been completely rewritten from the
+  * ground up.  It still has remnants of the old code lying about, but it is
+diff --git a/coreutils/fold.c b/coreutils/fold.c
+index 0184961..6e422de 100644
+--- a/coreutils/fold.c
++++ b/coreutils/fold.c
+@@ -5,7 +5,7 @@
+    Copyright (C) 91, 1995-2002 Free Software Foundation, Inc.
+ 
+    Modified for busybox based on coreutils v 5.0
+-   Copyright (C) 2003 Glenn McGrath <bug1@iinet.net.au>
++   Copyright (C) 2003 Glenn McGrath
+ 
+    Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ */
+diff --git a/coreutils/install.c b/coreutils/install.c
+index 8575043..3cbae18 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * Copyright (C) 2003 by Glenn McGrath <bug1@iinet.net.au>
++ * Copyright (C) 2003 by Glenn McGrath
+  * SELinux support: by Yuichi Nakamura <ynakam@hitachisoft.jp>
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+diff --git a/coreutils/uudecode.c b/coreutils/uudecode.c
+index 4c918ff..7a52bdb 100644
+--- a/coreutils/uudecode.c
++++ b/coreutils/uudecode.c
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- *  Copyright 2003, Glenn McGrath <bug1@iinet.net.au>
++ *  Copyright 2003, Glenn McGrath
+  *
+  *  Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  *
+diff --git a/editors/patch.c b/editors/patch.c
+index 94f6641..65791df 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -1,7 +1,7 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+  *  busybox patch applet to handle the unified diff format.
+- *  Copyright (C) 2003 Glenn McGrath <bug1@iinet.net.au>
++ *  Copyright (C) 2003 Glenn McGrath
+  *
+  *  Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  *
+diff --git a/editors/sed.c b/editors/sed.c
+index 26fdeaf..a2e2b73 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -5,7 +5,7 @@
+  * Copyright (C) 1999,2000,2001 by Lineo, inc. and Mark Whitley
+  * Copyright (C) 1999,2000,2001 by Mark Whitley <markw@codepoet.org>
+  * Copyright (C) 2002  Matt Kraai
+- * Copyright (C) 2003 by Glenn McGrath <bug1@iinet.net.au>
++ * Copyright (C) 2003 by Glenn McGrath
+  * Copyright (C) 2003,2004 by Rob Landley <rob@landley.net>
+  *
+  * MAINTAINER: Rob Landley <rob@landley.net>
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index d7e2bfa..58847a9 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -5,7 +5,7 @@
+  * Mini implementation of FTP to retrieve a remote file.
+  *
+  * Copyright (C) 2002 Jeff Angielski, The PTR Group <jeff@theptrgroup.com>
+- * Copyright (C) 2002 Glenn McGrath <bug1@iinet.net.au>
++ * Copyright (C) 2002 Glenn McGrath
+  *
+  * Based on wget.c by Chip Rosenthal Covad Communications
+  * <chip@laserlink.net>
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 128cc37..299d363 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -1,7 +1,7 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+  *  ifupdown for busybox
+- *  Copyright (c) 2002 Glenn McGrath <bug1@iinet.net.au>
++ *  Copyright (c) 2002 Glenn McGrath
+  *  Copyright (c) 2003-2004 Erik Andersen <andersen@codepoet.org>
+  *
+  *  Based on ifupdown v 0.6.4 by Anthony Towns
+diff --git a/networking/nameif.c b/networking/nameif.c
+index daac191..2114516 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -4,7 +4,7 @@
+  *
+  * Written 2000 by Andi Kleen.
+  * Busybox port 2002 by Nick Fedchik <nick@fedchik.org.ua>
+- *			Glenn McGrath <bug1@iinet.net.au>
++ *			Glenn McGrath 
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+diff --git a/testsuite/tar/tar-extracts-multiple-files b/testsuite/tar/tar-extracts-multiple-files
+index 8ae8cdd..7897d81 100644
+--- a/testsuite/tar/tar-extracts-multiple-files
++++ b/testsuite/tar/tar-extracts-multiple-files
+@@ -1,5 +1,5 @@
+ touch foo bar
+-busybox tar cf foo.tar foo bar
++tar cf foo.tar foo bar
+ rm foo bar
+ busybox tar -xf foo.tar
+ test -f foo
+diff --git a/testsuite/unzip.tests b/testsuite/unzip.tests
+index 7781488..975079d 100755
+--- a/testsuite/unzip.tests
++++ b/testsuite/unzip.tests
+@@ -2,7 +2,7 @@
+ 
+ # Tests for unzip.
+ # Copyright 2006 Rob Landley <rob@landley.net>
+-# Copyright 2006 Glenn McGrath <bug1@ihug.co.nz>
++# Copyright 2006 Glenn McGrath
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+ . testing.sh

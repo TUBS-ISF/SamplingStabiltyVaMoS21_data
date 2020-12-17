@@ -1,0 +1,53 @@
+2008-06-17 12:28:44 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 45448c5..e49e6e9 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -395,6 +395,7 @@ struct globals {
+ 	int run_list_level;
+ 	pid_t saved_task_pgrp;
+ 	pid_t saved_tty_pgrp;
++	pid_t root_pid;
+ 	int last_jobid;
+ 	struct pipe *job_list;
+ 	struct pipe *toplevel_list;
+@@ -441,6 +442,7 @@ enum { run_list_level = 0 };
+ #define run_list_level   (G.run_list_level  )
+ #define saved_task_pgrp  (G.saved_task_pgrp )
+ #define saved_tty_pgrp   (G.saved_tty_pgrp  )
++#define root_pid         (G.root_pid        )
+ #define last_jobid       (G.last_jobid      )
+ #define job_list         (G.job_list        )
+ #define toplevel_list    (G.toplevel_list   )
+@@ -2353,7 +2355,7 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 		/* Highest bit in first_ch indicates that var is double-quoted */
+ 		case '$': /* pid */
+ 			/* FIXME: (echo $$) should still print pid of main shell */
+-			val = utoa(getpid()); /* rootpid? */
++			val = utoa(root_pid);
+ 			break;
+ 		case '!': /* bg pid */
+ 			val = last_bg_pid ? utoa(last_bg_pid) : (char*)"";
+@@ -3752,6 +3754,8 @@ int hush_main(int argc, char **argv)
+ 
+ 	INIT_G();
+ 
++	root_pid = getpid();
++
+ 	/* Deal with HUSH_VERSION */
+ 	shell_ver = const_shell_ver; /* copying struct here */
+ 	top_var = &shell_ver;
+diff --git a/shell/hush_test/hush-misc/pid.right b/shell/hush_test/hush-misc/pid.right
+new file mode 100644
+index 0000000..573541a
+--- /dev/null
++++ b/shell/hush_test/hush-misc/pid.right
+@@ -0,0 +1 @@
++0
+diff --git a/shell/hush_test/hush-misc/pid.tests b/shell/hush_test/hush-misc/pid.tests
+new file mode 100755
+index 0000000..eaeaa71
+--- /dev/null
++++ b/shell/hush_test/hush-misc/pid.tests
+@@ -0,0 +1 @@
++test `(echo $$)` = `echo $$`; echo $?

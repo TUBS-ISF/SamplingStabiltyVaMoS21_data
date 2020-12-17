@@ -1,0 +1,35 @@
+2008-04-10 19:59:20 +0000
+diff --git a/Makefile b/Makefile
+index af602d7..f110fed 100644
+--- a/Makefile
++++ b/Makefile
+@@ -361,7 +361,8 @@ endif
+ # of make so .config is not included in this case either (for *config).
+ 
+ no-dot-config-targets := clean mrproper distclean \
+-			 cscope TAGS tags help %docs check%
++			 cscope TAGS tags help %docs
++#bbox# check% is removed from above
+ 
+ config-targets := 0
+ mixed-targets  := 0
+diff --git a/Makefile.custom b/Makefile.custom
+index a4db141..e4a616f 100644
+--- a/Makefile.custom
++++ b/Makefile.custom
+@@ -46,9 +46,13 @@ ifneq ($(strip $(DO_INSTALL_LIBS)),n)
+ 	done
+ endif
+ 
++# Not very elegant: copies testsuite to objdir...
++.PHONY: check
++.PHONY: test
+ check test: busybox busybox.links
+-	bindir=$(objtree) srcdir=$(srctree)/testsuite SED="$(SED)" \
+-	$(SHELL) $(srctree)/testsuite/runtest $(if $(KBUILD_VERBOSE:0=),-v)
++	test -d $(objtree)/testsuite || cp -a $(srctree)/testsuite $(objtree)
++	bindir=$(objtree) srcdir=$(srctree)/testsuite \
++	$(SHELL) -c "cd $(objtree)/testsuite && $(srctree)/testsuite/runtest $(if $(KBUILD_VERBOSE:0=),-v)"
+ 
+ .PHONY: release
+ release: distclean

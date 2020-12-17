@@ -1,0 +1,14 @@
+2009-07-06 23:24:20 +0200
+diff --git a/libbb/Config.in b/libbb/Config.in
+index 9b616d1..bdb6dfa 100644
+--- a/libbb/Config.in
++++ b/libbb/Config.in
+@@ -13,7 +13,7 @@ config PASSWORD_MINLEN
+ 	  Minimum allowable password length.
+ 
+ config MD5_SIZE_VS_SPEED
+-	int "MD5: Trade Bytes for Speed"
++	int "MD5: Trade bytes for speed (0:fast, 3:slow)"
+ 	default 2
+ 	range 0 3
+ 	help

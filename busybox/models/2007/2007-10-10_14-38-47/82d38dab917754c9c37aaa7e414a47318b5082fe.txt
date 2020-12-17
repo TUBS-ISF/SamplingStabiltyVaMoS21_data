@@ -1,0 +1,185 @@
+2007-10-10 14:38:47 +0000
+diff --git a/applets/applets.c b/applets/applets.c
+index 55f8e6b..3b4f395 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -28,7 +28,6 @@
+ #endif
+ 
+ 
+-const struct bb_applet *current_applet;
+ const char *applet_name;
+ #if !BB_MMU
+ bool re_execed;
+@@ -507,7 +506,7 @@ static int busybox_main(char **argv)
+ 	bb_error_msg_and_die("applet not found");
+ }
+ 
+-void run_current_applet_and_exit(char **argv)
++void run_appletstruct_and_exit(const struct bb_applet *applet, char **argv)
+ {
+ 	int argc = 1;
+ 
+@@ -518,19 +517,19 @@ void run_current_applet_and_exit(char **argv)
+ 	optind = 1;
+ 	xfunc_error_retval = EXIT_FAILURE;
+ 
+-	applet_name = current_applet->name;
++	applet_name = applet->name;
+ 	if (argc == 2 && !strcmp(argv[1], "--help"))
+ 		bb_show_usage();
+ 	if (ENABLE_FEATURE_SUID)
+-		check_suid(current_applet);
+-	exit(current_applet->main(argc, argv));
++		check_suid(applet);
++	exit(applet->main(argc, argv));
+ }
+ 
+ void run_applet_and_exit(const char *name, char **argv)
+ {
+-	current_applet = find_applet_by_name(name);
+-	if (current_applet)
+-		run_current_applet_and_exit(argv);
++	const struct bb_applet *applet = find_applet_by_name(name);
++	if (applet)
++		run_appletstruct_and_exit(applet, argv);
+ 	if (!strncmp(name, "busybox", 7))
+ 		exit(busybox_main(argv));
+ }
+diff --git a/docs/busybox.net/FAQ.html b/docs/busybox.net/FAQ.html
+index 7b15bf7..e0a7597 100644
+--- a/docs/busybox.net/FAQ.html
++++ b/docs/busybox.net/FAQ.html
+@@ -568,7 +568,7 @@ functionality: main() looks up argv[0] in applets[] to get a function pointer
+ to APPLET_main().</p>
+ 
+ <p>Busybox applets may also be invoked through the multiplexor applet
+-"busybox" (see busybox_main() in applets/busybox.c), and through the
++"busybox" (see busybox_main() in libbb/appletlib.c), and through the
+ standalone shell (grep for STANDALONE_SHELL in applets/shell/*.c).
+ See <a href="FAQ.html#getting_started">getting started</a> in the
+ FAQ for more information on these alternate usage mechanisms, which are
+diff --git a/include/libbb.h b/include/libbb.h
+index d76571b..9d8b5f3 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -564,7 +564,7 @@ int wait_nohang(int *wstat);
+ int spawn_and_wait(char **argv);
+ struct nofork_save_area {
+ 	jmp_buf die_jmp;
+-	const struct bb_applet *current_applet;
++	const char *applet_name;
+ 	int xfunc_error_retval;
+ 	uint32_t option_mask32;
+ 	int die_sleep;
+@@ -748,7 +748,7 @@ const struct hwtype *get_hwntype(int type);
+ extern const struct bb_applet *find_applet_by_name(const char *name);
+ /* Returns only if applet is not found. */
+ extern void run_applet_and_exit(const char *name, char **argv);
+-extern void run_current_applet_and_exit(char **argv) ATTRIBUTE_NORETURN;
++extern void run_appletstruct_and_exit(const struct bb_applet *a, char **argv) ATTRIBUTE_NORETURN;
+ #endif
+ 
+ extern int match_fstype(const struct mntent *mt, const char *fstypes);
+@@ -1040,7 +1040,6 @@ enum {	/* DO NOT CHANGE THESE VALUES!  cp.c, mv.c, install.c depend on them. */
+ };
+ 
+ #define FILEUTILS_CP_OPTSTR "pdRfils" USE_SELINUX("c")
+-extern const struct bb_applet *current_applet;
+ extern const char *applet_name;
+ /* "BusyBox vN.N.N (timestamp or extra_vestion)" */
+ extern const char bb_banner[];
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 565dacf..cfa60a9 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -133,7 +133,10 @@ void bbox_prepare_main(char **argv)
+ 	if (ENABLE_LOCALE_SUPPORT && getpid() != 1)
+ 		setlocale(LC_ALL, "");
+ 
+-	/* Redundant for busybox, but needed for individual applets */
++#if ENABLE_FEATURE_INDIVIDUAL
++	/* Redundant for busybox (run_applet_and_exit covers that case)
++	 * but needed for "individual applet" mode */
+ 	if (argv[1] && strcmp(argv[1], "--help") == 0)
+ 		bb_show_usage();
++#endif
+ }
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 80c72f1..a01065d 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -104,7 +104,7 @@ int wait_pid(int *wstat, int pid)
+ void save_nofork_data(struct nofork_save_area *save)
+ {
+ 	memcpy(&save->die_jmp, &die_jmp, sizeof(die_jmp));
+-	save->current_applet = current_applet;
++	save->applet_name = applet_name;
+ 	save->xfunc_error_retval = xfunc_error_retval;
+ 	save->option_mask32 = option_mask32;
+ 	save->die_sleep = die_sleep;
+@@ -114,19 +114,16 @@ void save_nofork_data(struct nofork_save_area *save)
+ void restore_nofork_data(struct nofork_save_area *save)
+ {
+ 	memcpy(&die_jmp, &save->die_jmp, sizeof(die_jmp));
+-	current_applet = save->current_applet;
++	applet_name = save->applet_name;
+ 	xfunc_error_retval = save->xfunc_error_retval;
+ 	option_mask32 = save->option_mask32;
+ 	die_sleep = save->die_sleep;
+-
+-	applet_name = current_applet->name;
+ }
+ 
+ int run_nofork_applet_prime(struct nofork_save_area *old, const struct bb_applet *a, char **argv)
+ {
+ 	int rc, argc;
+ 
+-	current_applet = a;
+ 	applet_name = a->name;
+ 	xfunc_error_retval = EXIT_FAILURE;
+ 	/*option_mask32 = 0; - not needed */
+@@ -193,8 +190,7 @@ int spawn_and_wait(char **argv)
+ 			return wait4pid(rc);
+ 		/* child */
+ 		xfunc_error_retval = EXIT_FAILURE;
+-		current_applet = a;
+-		run_current_applet_and_exit(argv);
++		run_appletstruct_and_exit(a, argv);
+ #endif
+ 	}
+ #endif /* FEATURE_PREFER_APPLETS */
+diff --git a/shell/ash.c b/shell/ash.c
+index 8b21e65..af96c4d 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -6470,10 +6470,8 @@ tryexec(char *cmd, char **argv, char **envp)
+ 
+ 		a = find_applet_by_name(cmd);
+ 		if (a) {
+-			if (a->noexec) {
+-				current_applet = a;
+-				run_current_applet_and_exit(argv);
+-			}
++			if (a->noexec)
++				run_appletstruct_and_exit(a, argv);
+ 			/* re-exec ourselves with the new arguments */
+ 			execve(bb_busybox_exec_path, argv, envp);
+ 			/* If they called chroot or otherwise made the binary no longer
+diff --git a/shell/hush.c b/shell/hush.c
+index 90ed155..1977da0 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1399,10 +1399,9 @@ static void pseudo_exec_argv(char **argv)
+ 		const struct bb_applet *a = find_applet_by_name(argv[0]);
+ 		if (a) {
+ 			if (a->noexec) {
+-				current_applet = a;
+ 				debug_printf_exec("running applet '%s'\n", argv[0]);
+-// is it ok that run_current_applet_and_exit() does exit(), not _exit()?
+-				run_current_applet_and_exit(argv);
++// is it ok that run_appletstruct_and_exit() does exit(), not _exit()?
++				run_appletstruct_and_exit(a, argv);
+ 			}
+ 			/* re-exec ourselves with the new arguments */
+ 			debug_printf_exec("re-execing applet '%s'\n", argv[0]);

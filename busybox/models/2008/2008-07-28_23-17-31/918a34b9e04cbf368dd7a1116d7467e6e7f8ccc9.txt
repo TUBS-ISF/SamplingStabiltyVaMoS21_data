@@ -1,0 +1,62 @@
+2008-07-28 23:17:31 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index a74fe47..5b2f188 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2305,8 +2305,10 @@ static int run_list(struct pipe *pi)
+ #endif
+ #if ENABLE_HUSH_LOOPS
+ 		if (rword == RES_WHILE) {
+-			if (rcode)
++			if (rcode) {
++				rcode = 0; /* "while false; do...done" - exitcode 0 */
+ 				goto check_jobs_and_break;
++			}
+ 		}
+ 		if (rword == RES_UNTIL) {
+ 			if (!rcode) {
+diff --git a/shell/hush_test/hush-misc/break4.right b/shell/hush_test/hush-misc/break4.right
+new file mode 100644
+index 0000000..6f41c14
+--- /dev/null
++++ b/shell/hush_test/hush-misc/break4.right
+@@ -0,0 +1,6 @@
++A
++AA
++TRUE
++A
++AA
++OK:0
+diff --git a/shell/hush_test/hush-misc/break4.tests b/shell/hush_test/hush-misc/break4.tests
+new file mode 100755
+index 0000000..67da288
+--- /dev/null
++++ b/shell/hush_test/hush-misc/break4.tests
+@@ -0,0 +1,12 @@
++cond=true
++while $cond; do
++    echo A
++    if test "$cond" = true; then
++	cond='echo TRUE'
++    else
++	cond=false
++    fi
++    while true; do echo AA; continue 2; echo BB; done
++    echo B
++done
++echo OK:$?
+diff --git a/shell/hush_test/hush-misc/while1.right b/shell/hush_test/hush-misc/while1.right
+new file mode 100644
+index 0000000..7c4d7be
+--- /dev/null
++++ b/shell/hush_test/hush-misc/while1.right
+@@ -0,0 +1 @@
++OK:0
+diff --git a/shell/hush_test/hush-misc/while1.tests b/shell/hush_test/hush-misc/while1.tests
+new file mode 100755
+index 0000000..11e201e
+--- /dev/null
++++ b/shell/hush_test/hush-misc/while1.tests
+@@ -0,0 +1,2 @@
++while false; do echo NOT SHOWN; done
++echo OK:$?

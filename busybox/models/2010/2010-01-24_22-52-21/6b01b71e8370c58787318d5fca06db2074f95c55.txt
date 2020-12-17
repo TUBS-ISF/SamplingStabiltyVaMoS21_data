@@ -1,0 +1,105 @@
+2010-01-24 22:52:21 +0100
+diff --git a/archival/Config.in b/archival/Config.in
+index cf771f9..fb79c7b 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -281,7 +281,8 @@ config FEATURE_TAR_NOPRESERVE_TIME
+ 	default n
+ 	depends on TAR
+ 	help
+-	  With this option busybox supports GNU tar -m (do not preserve time) option.
++	  With this option busybox supports GNU tar -m
++	  (do not preserve time) option.
+ 
+ endif #tar
+ 
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index e754447..6c898b7 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -509,15 +509,10 @@ static int sortcmp(const void *a, const void *b)
+ 
+ 	/* Make dif fit into an int */
+ 	if (sizeof(dif) > sizeof(int)) {
+-		if (sizeof(dif) == sizeof(int)*2) {
+-			/* typical on many arches */
+-			if (dif != 0) {
+-				dif = 1 | (int)((uoff_t)dif >> (sizeof(int)*8));
+-			}
+-		} else {
+-			while ((dif & ~(off_t)INT_MAX) != 0) {
+-				dif >>= (sizeof(int)*8 / 2);
+-			}
++		enum { BITS_TO_SHIFT = 8 * (sizeof(dif) - sizeof(int)) };
++		/* shift leaving only "int" worth of bits */
++		if (dif != 0) {
++			dif = 1 | (int)((uoff_t)dif >> BITS_TO_SHIFT);
+ 		}
+ 	}
+ 
+diff --git a/include/unarchive.h b/include/unarchive.h
+index e3afb8a..8bfc92c 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -53,14 +53,14 @@ typedef struct archive_handle_t {
+ 	off_t offset;
+ 
+ 	/* Archiver specific. Can make it a union if it ever gets big */
+-#if ENABLE_TAR
++#if ENABLE_TAR || ENABLE_DPKG || ENABLE_DPKG_DEB
+ 	smallint tar__end;
+ # if ENABLE_FEATURE_TAR_GNU_EXTENSIONS
+ 	char* tar__longname;
+ 	char* tar__linkname;
+ # endif
+ #endif
+-#if ENABLE_CPIO
++#if ENABLE_CPIO || ENABLE_RPM2CPIO || ENABLE_RPM
+ 	uoff_t cpio__blocks;
+ 	struct hardlinks_t *cpio__hardlinks_to_create;
+ 	struct hardlinks_t *cpio__created_hardlinks;
+diff --git a/shell/hush.c b/shell/hush.c
+index 810009a..9a9b5bb 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1516,13 +1516,13 @@ static char* FAST_FUNC endofname(const char *name)
+ 	}
+ 	return p;
+ }
++#endif
+ 
+ static void FAST_FUNC set_local_var_from_halves(const char *name, const char *val)
+ {
+ 	char *var = xasprintf("%s=%s", name, val);
+ 	set_local_var(var, /*flags:*/ 0, /*lvl:*/ 0, /*ro:*/ 0);
+ }
+-#endif
+ 
+ 
+ /*
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index dc3245b..2769a37 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -189,17 +189,17 @@ static const struct cmdoptions_t {
+ #endif
+ };
+ 
+-#if ENABLE_FEATURE_FBSET_READMODE
+ /* taken from linux/fb.h */
+ enum {
+-	FB_VMODE_INTERLACED = 1,        /* interlaced */
+-	FB_VMODE_DOUBLE = 2,            /* double scan */
+ 	FB_SYNC_HOR_HIGH_ACT = 1,       /* horizontal sync high active */
+ 	FB_SYNC_VERT_HIGH_ACT = 2,      /* vertical sync high active */
++#if ENABLE_FEATURE_FBSET_READMODE
++	FB_VMODE_INTERLACED = 1,        /* interlaced */
++	FB_VMODE_DOUBLE = 2,            /* double scan */
+ 	FB_SYNC_EXT = 4,                /* external sync */
+ 	FB_SYNC_COMP_HIGH_ACT = 8,      /* composite sync high active */
+-};
+ #endif
++};
+ 
+ #if ENABLE_FEATURE_FBSET_READMODE
+ static void ss(uint32_t *x, uint32_t flag, char *buf, const char *what)

@@ -1,0 +1,146 @@
+2008-03-24 00:04:42 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 9f208b3..07f74e4 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -529,7 +529,7 @@ extern char *reads(int fd, char *buf, size_t count);
+ // Read one line a-la fgets. Reads byte-by-byte.
+ // Useful when it is important to not read ahead.
+ // Bytes are appended to pfx (which must be malloced, or NULL).
+-extern char *xmalloc_reads(int fd, char *pfx);
++extern char *xmalloc_reads(int fd, char *pfx, size_t *maxsz_p);
+ extern ssize_t read_close(int fd, void *buf, size_t count);
+ extern ssize_t open_read_close(const char *filename, void *buf, size_t count);
+ extern void *xmalloc_open_read_close(const char *filename, size_t *sizep);
+diff --git a/libbb/read.c b/libbb/read.c
+index 5754465..9c025e3 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -152,13 +152,14 @@ char *reads(int fd, char *buffer, size_t size)
+ // Read one line a-la fgets. Reads byte-by-byte.
+ // Useful when it is important to not read ahead.
+ // Bytes are appended to pfx (which must be malloced, or NULL).
+-char *xmalloc_reads(int fd, char *buf)
++char *xmalloc_reads(int fd, char *buf, size_t *maxsz_p)
+ {
+ 	char *p;
+-	int sz = buf ? strlen(buf) : 0;
++	size_t sz = buf ? strlen(buf) : 0;
++	size_t maxsz = maxsz_p ? *maxsz_p : MAXINT(size_t);
+ 
+ 	goto jump_in;
+-	while (1) {
++	while (sz < maxsz) {
+ 		if (p - buf == sz) {
+  jump_in:
+ 			buf = xrealloc(buf, sz + 128);
+@@ -178,6 +179,8 @@ char *xmalloc_reads(int fd, char *buf)
+ 		p++;
+ 	}
+ 	*p++ = '\0';
++	if (maxsz_p)
++		*maxsz_p  = p - buf - 1;
+ 	return xrealloc(buf, p - buf);
+ }
+ 
+diff --git a/printutils/lpd.c b/printutils/lpd.c
+index 45ad6d7..fe89593 100644
+--- a/printutils/lpd.c
++++ b/printutils/lpd.c
+@@ -58,8 +58,6 @@
+  */
+ #include "libbb.h"
+ 
+-// TODO: xmalloc_reads is vulnerable to remote OOM attack!
+-
+ // strip argument of bad chars
+ static char *sane(char *str)
+ {
+@@ -75,6 +73,21 @@ static char *sane(char *str)
+ 	return str;
+ }
+ 
++/* vfork() disables some optimizations. Moving its use
++ * to minimal, non-inlined function saves bytes */
++static NOINLINE void vfork_close_stdio_and_exec(char **argv)
++{
++	if (vfork() == 0) {
++		// CHILD
++		// we are the helper. we wanna be silent.
++		// this call reopens stdio fds to "/dev/null"
++		// (no daemonization is done)
++		bb_daemonize_or_rexec(DAEMON_DEVNULL_STDIO | DAEMON_ONLY_SANITIZE, NULL);
++		BB_EXECVP(*argv, argv);
++		_exit(127);
++	}
++}
++
+ static void exec_helper(const char *fname, char **argv)
+ {
+ 	char *p, *q, *file;
+@@ -103,26 +116,24 @@ static void exec_helper(const char *fname, char **argv)
+ 		// next line, plz!
+ 		q = p;
+ 	}
++	free(file);
+ 
+-	if (vfork() == 0) {
+-		// CHILD
+-		// we are the helper. we wanna be silent
+-		// this call reopens stdio fds to "/dev/null"
+-		// (no daemonization is done)
+-		bb_daemonize_or_rexec(DAEMON_DEVNULL_STDIO | DAEMON_ONLY_SANITIZE, NULL);
+-		BB_EXECVP(*argv, argv);
+-		_exit(127);
+-	}
++	vfork_close_stdio_and_exec(argv);
+ 
+ 	// PARENT (or vfork error)
+ 	// clean up...
+-	free(file);
+ 	while (--env_idx >= 0) {
+ 		*strchrnul(our_env[env_idx], '=') = '\0';
+ 		unsetenv(our_env[env_idx]);
+ 	}
+ }
+ 
++static char *xmalloc_read_stdin(void)
++{
++	size_t max = 4 * 1024; /* more than enough for commands! */
++	return xmalloc_reads(STDIN_FILENO, NULL, &max);
++}
++
+ int lpd_main(int argc, char *argv[]) MAIN_EXTERNALLY_VISIBLE;
+ int lpd_main(int argc ATTRIBUTE_UNUSED, char *argv[])
+ {
+@@ -130,7 +141,7 @@ int lpd_main(int argc ATTRIBUTE_UNUSED, char *argv[])
+ 	char *s, *queue;
+ 
+ 	// read command
+-	s = xmalloc_reads(STDIN_FILENO, NULL);
++	s = xmalloc_read_stdin();
+ 
+ 	// we understand only "receive job" command
+ 	if (2 != *s) {
+@@ -168,7 +179,7 @@ int lpd_main(int argc ATTRIBUTE_UNUSED, char *argv[])
+ 		write(STDOUT_FILENO, "", 1);
+ 
+ 		// get subcommand
+-		s = xmalloc_reads(STDIN_FILENO, NULL);
++		s = xmalloc_read_stdin();
+ 		if (!s)
+ 			return EXIT_SUCCESS; // probably EOF
+ 		// we understand only "control file" or "data file" cmds
+diff --git a/shell/hush.c b/shell/hush.c
+index eb0633b..545367c 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1061,7 +1061,7 @@ static int builtin_read(char **argv)
+ 	char *string;
+ 	const char *name = argv[1] ? argv[1] : "REPLY";
+ 
+-	string = xmalloc_reads(STDIN_FILENO, xasprintf("%s=", name));
++	string = xmalloc_reads(STDIN_FILENO, xasprintf("%s=", name), NULL);
+ 	return set_local_var(string, 0);
+ }
+ 

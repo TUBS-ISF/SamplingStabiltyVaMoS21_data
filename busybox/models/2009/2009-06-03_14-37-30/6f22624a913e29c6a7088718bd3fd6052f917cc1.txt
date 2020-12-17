@@ -1,0 +1,14 @@
+2009-06-03 14:37:30 +0200
+diff --git a/shell/hush.c b/shell/hush.c
+index 1ad5fcd..de04c01 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3505,6 +3505,8 @@ static int checkjobs(struct pipe* fg_pipe)
+ #endif
+ 						return rcode;
+ 					}
++					if (!fg_pipe->alive_cmds)
++						return rcode;
+ 				}
+ 				/* There are still running processes in the fg pipe */
+ 				goto wait_more; /* do waitpid again */

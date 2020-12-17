@@ -1,0 +1,23 @@
+2007-09-28 23:45:56 +0000
+diff --git a/archival/libunarchive/decompress_bunzip2.c b/archival/libunarchive/decompress_bunzip2.c
+index fe1d3ff..17b87e2 100644
+--- a/archival/libunarchive/decompress_bunzip2.c
++++ b/archival/libunarchive/decompress_bunzip2.c
+@@ -725,14 +725,14 @@ unpack_bz2_stream(int src_fd, int dst_fd)
+ 
+ 	if (i == RETVAL_LAST_BLOCK) {
+ 		if (bd->headerCRC != bd->totalCRC) {
+-			bb_error_msg("data integrity error when decompressing");
++			bb_error_msg("CRC error");
+ 		} else {
+ 			i = RETVAL_OK;
+ 		}
+ 	} else if (i == RETVAL_UNEXPECTED_OUTPUT_EOF) {
+-		bb_error_msg("compressed file ends unexpectedly");
++		bb_error_msg("unexpected EOF");
+ 	} else {
+-		bb_error_msg("decompression failed");
++		bb_error_msg("bunzip error %d", i);
+ 	}
+ 	dealloc_bunzip(bd);
+ 	free(outbuf);

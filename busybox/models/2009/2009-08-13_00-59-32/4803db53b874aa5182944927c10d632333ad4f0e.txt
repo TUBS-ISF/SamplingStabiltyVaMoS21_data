@@ -1,0 +1,116 @@
+2009-08-13 00:59:32 +0200
+diff --git a/include/applets.h b/include/applets.h
+index e1b09cc..cb1ed56 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -416,6 +416,7 @@ IF_UUENCODE(APPLET(uuencode, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_VCONFIG(APPLET(vconfig, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_VI(APPLET(vi, _BB_DIR_BIN, _BB_SUID_DROP))
+ IF_VLOCK(APPLET(vlock, _BB_DIR_USR_BIN, _BB_SUID_REQUIRE))
++IF_VOLNAME(APPLET(volname, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_WATCH(APPLET(watch, _BB_DIR_BIN, _BB_SUID_DROP))
+ IF_WATCHDOG(APPLET(watchdog, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_WC(APPLET(wc, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+diff --git a/include/usage.h b/include/usage.h
+index 5aedeab..accda33 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4901,6 +4901,11 @@ IF_FEATURE_TUNCTL_UG( \
+      "\nOptions:" \
+      "\n	-a	Lock all VTs" \
+ 
++#define volname_trivial_usage \
++       "[DEVICE]"
++#define volname_full_usage "\n\n" \
++       "Show CD volume name of the DEVICE (default /dev/cdrom)"
++
+ #define watch_trivial_usage \
+        "[-n seconds] [-t] PROG [ARGS]"
+ #define watch_full_usage "\n\n" \
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 06ff51a..6890447 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -584,6 +584,12 @@ config TTYSIZE
+ 	  error, but returns default 80x24.
+ 	  Usage in shell scripts: width=`ttysize w`.
+ 
++config VOLNAME
++	bool "volname"
++	default n
++	help
++	  Prints a CD-ROM volume name.
++
+ config WATCHDOG
+ 	bool "watchdog"
+ 	default n
+diff --git a/miscutils/Kbuild b/miscutils/Kbuild
+index 8ae8a48..e378a09 100644
+--- a/miscutils/Kbuild
++++ b/miscutils/Kbuild
+@@ -40,4 +40,5 @@ lib-$(CONFIG_TASKSET)     += taskset.o
+ lib-$(CONFIG_TIME)        += time.o
+ lib-$(CONFIG_TIMEOUT)     += timeout.o
+ lib-$(CONFIG_TTYSIZE)     += ttysize.o
++lib-$(CONFIG_VOLNAME)     += volname.o
+ lib-$(CONFIG_WATCHDOG)    += watchdog.o
+diff --git a/miscutils/volname.c b/miscutils/volname.c
+new file mode 100644
+index 0000000..a5174e6
+--- /dev/null
++++ b/miscutils/volname.c
+@@ -0,0 +1,54 @@
++/*
++ * Reads and displays CD-ROM volume name
++ *
++ * Several people have asked how to read CD volume names so I wrote this
++ * small program to do it.
++ *
++ * usage: volname [<device-file>]
++ *
++ * Copyright (C) 2000-2001 Jeff Tranter (tranter@pobox.com)
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++/*
++ * mods from  distrubuted source (eject-2.0.13) are by
++ * Matthew Stoltenberg <d3matt@gmail.com>
++ */
++#include "libbb.h"
++
++int volname_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int volname_main(int argc UNUSED_PARAM, char **argv)
++{
++	int fd;
++	char buffer[32];
++	const char *device;
++
++	device = "/dev/cdrom";
++	if (argv[1]) {
++		device = argv[1];
++		if (argv[2])
++			bb_show_usage();
++	}
++
++	fd = xopen(device, O_RDONLY);
++	xlseek(fd, 32808, SEEK_SET);
++	xread(fd, buffer, 32);
++	printf("%32.32s\n", buffer);
++	if (ENABLE_FEATURE_CLEAN_UP) {
++		close(fd);
++	}
++	return 0;
++}

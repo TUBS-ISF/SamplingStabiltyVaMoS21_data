@@ -1,0 +1,36 @@
+2009-04-16 22:42:01 +0000
+diff --git a/testsuite/mdev.tests b/testsuite/mdev.tests
+index 90379e6..388c41d 100755
+--- a/testsuite/mdev.tests
++++ b/testsuite/mdev.tests
+@@ -49,6 +49,18 @@ brw-rw-rw- 1 1 1 8,0 sda
+ 
+ # continuing to use directory structure from prev test
+ rm -rf mdev.testdir/dev/*
++echo "-.* 1:1 666" >mdev.testdir/etc/mdev.conf
++echo "sda 2:2 444" >>mdev.testdir/etc/mdev.conf
++testing "mdev does not stop on dash-rule" \
++	"env - PATH=$PATH ACTION=add DEVPATH=/block/sda chroot mdev.testdir /mdev 2>&1;
++	ls -ln mdev.testdir/dev | $FILTER_LS" \
++"\
++br--r--r-- 1 2 2 8,0 sda
++" \
++	"" ""
++
++# continuing to use directory structure from prev test
++rm -rf mdev.testdir/dev/*
+ echo "sda 0:0 444 >disk/scsiA" >mdev.testdir/etc/mdev.conf
+ testing "mdev move/symlink rule '>bar/baz'" \
+ 	"env - PATH=$PATH ACTION=add DEVPATH=/block/sda chroot mdev.testdir /mdev 2>&1;
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index f965b60..43527f6 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -274,6 +274,7 @@ static void make_device(char *path, int delete)
+ 			if (major == root_major && minor == root_minor)
+ 				symlink(device_name, "root");
+ #if ENABLE_FEATURE_MDEV_CONF
++			chmod(device_name, mode);
+ 			chown(device_name, ugid.uid, ugid.gid);
+ # if ENABLE_FEATURE_MDEV_RENAME
+ 			if (alias) {

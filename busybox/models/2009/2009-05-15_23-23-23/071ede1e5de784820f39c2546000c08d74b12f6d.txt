@@ -1,0 +1,40 @@
+2009-05-15 23:23:23 +0200
+diff --git a/include/libbb.h b/include/libbb.h
+index 128aa92..bae7efb 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -965,6 +965,12 @@ enum {
+ 	/* How long the longest ESC sequence we know? */
+ 	KEYCODE_BUFFER_SIZE = 4
+ };
++/* Note: fd may be in blocking or non-blocking mode, both make sense.
++ * For one, less uses non-blocking mode.
++ * Only the first read syscall inside read_key may block indefinitely
++ * (unless fd is in non-blocking mode),
++ * subsequent reads will time out after a few milliseconds.
++ */
+ int read_key(int fd, smalluint *nbuffered, char *buffer) FAST_FUNC;
+ 
+ 
+diff --git a/libbb/read.c b/libbb/read.c
+index a0c0cc6..b58982b 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -229,7 +229,7 @@ void* FAST_FUNC xmalloc_read(int fd, size_t *maxsz_p)
+ 		if (size > 64*1024)
+ 			size = 64*1024;
+ 	}
+-	xrealloc(buf, total + 1);
++	buf = xrealloc(buf, total + 1);
+ 	buf[total] = '\0';
+ 
+ 	if (maxsz_p)
+@@ -273,7 +273,7 @@ void* FAST_FUNC xmalloc_open_read_close(const char *filename, size_t *maxsz_p)
+ 		free(buf);
+ 		return NULL;
+ 	}
+-	xrealloc(buf, size + 1);
++	buf = xrealloc(buf, size + 1);
+ 	buf[size] = '\0';
+ 
+ 	if (maxsz_p)

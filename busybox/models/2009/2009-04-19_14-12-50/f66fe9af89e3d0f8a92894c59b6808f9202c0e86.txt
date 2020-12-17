@@ -1,0 +1,14 @@
+2009-04-19 14:12:50 +0000
+diff --git a/applets/Kbuild b/applets/Kbuild
+index 6c1c8a3..9830379 100644
+--- a/applets/Kbuild
++++ b/applets/Kbuild
+@@ -16,7 +16,7 @@ always:= $(hostprogs-y)
+ 
+ # This trick decreases amount of rebuilds
+ # if tree is merely renamed/copied
+-ifeq ($(src),$(obj))
++ifeq ($(srctree),$(objtree))
+ srctree_slash =
+ else
+ srctree_slash = $(srctree)/

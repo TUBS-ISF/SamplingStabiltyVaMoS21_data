@@ -1,0 +1,57 @@
+2009-04-14 08:06:59 +0000
+diff --git a/libbb/update_passwd.c b/libbb/update_passwd.c
+index 3294348..35b89a5 100644
+--- a/libbb/update_passwd.c
++++ b/libbb/update_passwd.c
+@@ -224,8 +224,10 @@ int FAST_FUNC update_passwd(const char *filename,
+ 	}
+ 
+ 	if (changed_lines == 0) {
+-		if (ENABLE_FEATURE_DEL_USER_FROM_GROUP && member)
++#if ENABLE_FEATURE_DEL_USER_FROM_GROUP
++		if (member)
+ 			bb_error_msg("can't find %s in %s", member, filename);
++#endif
+ 		if ((ENABLE_ADDUSER || ENABLE_ADDGROUP)
+ 		 && applet_name[0] == 'a' && !member
+ 		) {
+diff --git a/shell/hush.c b/shell/hush.c
+index ba3e2c3..b6e49db 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -4069,11 +4069,15 @@ static void done_pipe(struct parse_context *ctx, pipe_style type)
+ 	 * RES_NONE case is for "for a in; do ..." (empty IN set)
+ 	 * and other cases to work. */
+ 	if (not_null
+-#if HAS_KEYWORDS
++#if ENABLE_HUSH_IF
+ 	 || ctx->ctx_res_w == RES_FI
++#endif
++#if ENABLE_HUSH_LOOPS
+ 	 || ctx->ctx_res_w == RES_DONE
+ 	 || ctx->ctx_res_w == RES_FOR
+ 	 || ctx->ctx_res_w == RES_IN
++#endif
++#if ENABLE_HUSH_CASE
+ 	 || ctx->ctx_res_w == RES_ESAC
+ #endif
+ 	) {
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index b1f3d05..0f7e082 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -98,10 +98,11 @@ static void make_device(char *path, int delete)
+ 	if (strstr(path, "/block/"))
+ 		type = S_IFBLK;
+ 
+-#if ENABLE_FEATURE_MDEV_CONF
+-	parser = config_open2("/etc/mdev.conf", fopen_for_read);
+-
++#if !ENABLE_FEATURE_MDEV_CONF
++	mode = 0660;
++#else
+ 	/* If we have config file, look up user settings */
++	parser = config_open2("/etc/mdev.conf", fopen_for_read);
+ 	while (1) {
+ 		regmatch_t off[1 + 9*ENABLE_FEATURE_MDEV_RENAME_REGEXP];
+ 		int keep_matching;

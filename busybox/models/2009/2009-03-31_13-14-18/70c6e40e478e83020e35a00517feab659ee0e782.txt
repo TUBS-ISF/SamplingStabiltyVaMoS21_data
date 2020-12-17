@@ -1,0 +1,13 @@
+2009-03-31 13:14:18 +0000
+diff --git a/libbb/die_if_bad_username.c b/libbb/die_if_bad_username.c
+index 602aadc..c1641d3 100644
+--- a/libbb/die_if_bad_username.c
++++ b/libbb/die_if_bad_username.c
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * Ckeck user and group names for illegal characters
++ * Check user and group names for illegal characters
+  *
+  * Copyright (C) 2008 Tito Ragusa <farmatito@tiscali.it>
+  *

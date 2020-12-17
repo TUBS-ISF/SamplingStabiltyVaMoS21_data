@@ -1,0 +1,813 @@
+2008-05-09 17:59:34 +0000
+diff --git a/coreutils/libcoreutils/coreutils.h b/coreutils/libcoreutils/coreutils.h
+index c1796b3..be9af12 100644
+--- a/coreutils/libcoreutils/coreutils.h
++++ b/coreutils/libcoreutils/coreutils.h
+@@ -6,6 +6,10 @@
+ #ifndef COREUTILS_H
+ #define COREUTILS_H		1
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ typedef int (*stat_func)(const char *fn, struct stat *ps);
+ 
+ int cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf);
+@@ -13,4 +17,8 @@ int cp_mv_stat(const char *fn, struct stat *fn_stat);
+ 
+ mode_t getopt_mk_fifo_nod(char **argv);
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif
+diff --git a/e2fsprogs/e2fs_lib.h b/e2fsprogs/e2fs_lib.h
+index d01249d..40bbd1c 100644
+--- a/e2fsprogs/e2fs_lib.h
++++ b/e2fsprogs/e2fs_lib.h
+@@ -9,6 +9,10 @@
+ /* Constants and structures */
+ #include "e2fs_defs.h"
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ /* Iterate a function on each entry of a directory */
+ int iterate_on_dir(const char *dir_name,
+ 		int (*func)(const char *, struct dirent *, void *),
+@@ -41,3 +45,7 @@ extern const char e2attr_flags_sname[];
+ #define e2attr_flags_value_chattr (&e2attr_flags_value[1])
+ #define e2attr_flags_sname_chattr (&e2attr_flags_sname[1])
+ #endif
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
+diff --git a/include/busybox.h b/include/busybox.h
+index 0c44d2f..314b951 100644
+--- a/include/busybox.h
++++ b/include/busybox.h
+@@ -9,6 +9,10 @@
+ 
+ #include "libbb.h"
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ /* order matters: used as index into "install_dir[]" in appletlib.c */
+ typedef enum bb_install_loc_t {
+ 	_BB_DIR_ROOT = 0,
+@@ -67,5 +71,8 @@ int lbb_main(char **argv);
+ #endif
+ #endif
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
+ 
+ #endif	/* _BB_INTERNAL_H_ */
+diff --git a/include/dump.h b/include/dump.h
+index 7e17154..20c39c4 100644
+--- a/include/dump.h
++++ b/include/dump.h
+@@ -1,4 +1,9 @@
+ /* vi: set sw=4 ts=4: */
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ #define	F_IGNORE	0x01		/* %_A */
+ #define	F_SETREP	0x02		/* rep count set, not default */
+ #define	F_ADDRESS	0x001		/* print offset */
+@@ -48,3 +53,7 @@ extern int bb_dump_blocksize;				/* data block size */
+ extern int bb_dump_length;			/* max bytes to read */
+ extern enum _vflag bb_dump_vflag;
+ extern off_t bb_dump_skip;                      /* bytes to skip */
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
+diff --git a/include/grp_.h b/include/grp_.h
+index 061b86e..45ee22b 100644
+--- a/include/grp_.h
++++ b/include/grp_.h
+@@ -21,15 +21,13 @@
+  *	POSIX Standard: 9.2.1 Group Database Access	<grp.h>
+  */
+ 
+-#if !ENABLE_USE_BB_PWD_GRP
+-
+-#include <grp.h>
+-
+-#else
+-
+ #ifndef	_GRP_H
+ #define	_GRP_H 1
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ /* The group structure.	 */
+ struct group {
+ 	char *gr_name;          /* Group name.  */
+@@ -128,6 +126,8 @@ extern int getgrouplist(__const char *__user, gid_t __group,
+    of which USER is a member.  Also include GROUP.  */
+ extern int initgroups(__const char *__user, gid_t __group);
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
+ 
+-#endif /* grp.h  */
+ #endif
+diff --git a/include/libbb.h b/include/libbb.h
+index 281152f..09dcc1b 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -65,15 +65,21 @@
+ #define setlocale(x,y) ((void)0)
+ #endif
+ 
+-#include "pwd_.h"
+-#include "grp_.h"
+-/* ifdef it out, because it may include <shadow.h> */
+-/* and we may not even _have_ <shadow.h>! */
++#ifdef DMALLOC
++#include <dmalloc.h>
++#endif
++
++#if !ENABLE_USE_BB_PWD_GRP
++# include <pwd.h>
++# include <grp.h>
++#endif
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+-#include "shadow_.h"
++# if !ENABLE_USE_BB_SHADOW
++#  include <shadow.h>
++# endif
+ #endif
+ 
+-/* Some libc's don't declare it, help them */
++/* Some libc's forget to declare these, help them */
+ extern char **environ;
+ 
+ #if defined(__GLIBC__) && __GLIBC__ < 2
+@@ -106,6 +112,23 @@ struct sysinfo {
+ int sysinfo(struct sysinfo* info);
+ 
+ 
++/* Make all declarations hidden (-fvisibility flag only affects definitions) */
++/* (don't include system headers after this until corresponding pop!) */
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
++
++#if ENABLE_USE_BB_PWD_GRP
++# include "pwd_.h"
++# include "grp_.h"
++#endif
++#if ENABLE_FEATURE_SHADOWPASSWDS
++# if ENABLE_USE_BB_SHADOW
++#  include "shadow_.h"
++# endif
++#endif
++
+ /* Tested to work correctly with all int types (IIRC :]) */
+ #define MAXINT(T) (T)( \
+ 	((T)-1) > 0 \
+@@ -1344,11 +1367,12 @@ extern const char bb_default_login_shell[];
+ #undef isdigit
+ #define isdigit(a) ((unsigned)((a) - '0') <= 9)
+ 
++#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+ 
+-#ifdef DMALLOC
+-#include <dmalloc.h>
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
+ #endif
+ 
+-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+ 
+ #endif /* __LIBBUSYBOX_H__ */
+diff --git a/include/platform.h b/include/platform.h
+index 57cff2c..0e0ccaf 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -17,7 +17,7 @@
+ #endif
+ 
+ /* __restrict is known in EGCS 1.2 and above. */
+-#if !__GNUC_PREREQ (2,92)
++#if !__GNUC_PREREQ(2,92)
+ # ifndef __restrict
+ #  define __restrict     /* Ignore */
+ # endif
+@@ -27,7 +27,7 @@
+    macros freely, and know that they will come into play for the
+    version of gcc in which they are supported.  */
+ 
+-#if !__GNUC_PREREQ (2,7)
++#if !__GNUC_PREREQ(2,7)
+ # ifndef __attribute__
+ #  define __attribute__(x)
+ # endif
+@@ -37,7 +37,7 @@
+ #if defined(__STDC_VERSION__) && __STDC_VERSION__ > 199901L
+ /* it's a keyword */
+ #else
+-# if __GNUC_PREREQ (2,7)
++# if __GNUC_PREREQ(2,7)
+ #  define inline __inline__
+ # else
+ #  define inline
+@@ -48,49 +48,49 @@
+ # define __const const
+ #endif
+ 
+-# define ATTRIBUTE_UNUSED __attribute__ ((__unused__))
+-# define ATTRIBUTE_NORETURN __attribute__ ((__noreturn__))
+-# define ATTRIBUTE_PACKED __attribute__ ((__packed__))
+-# define ATTRIBUTE_ALIGNED(m) __attribute__ ((__aligned__(m)))
++#define ATTRIBUTE_UNUSED __attribute__ ((__unused__))
++#define ATTRIBUTE_NORETURN __attribute__ ((__noreturn__))
++#define ATTRIBUTE_PACKED __attribute__ ((__packed__))
++#define ATTRIBUTE_ALIGNED(m) __attribute__ ((__aligned__(m)))
+ /* __NO_INLINE__: some gcc's do not honor inlining! :( */
+-# if __GNUC_PREREQ (3,0) && !defined(__NO_INLINE__)
+-#  define ALWAYS_INLINE __attribute__ ((always_inline)) inline
++#if __GNUC_PREREQ(3,0) && !defined(__NO_INLINE__)
++# define ALWAYS_INLINE __attribute__ ((always_inline)) inline
+ /* I've seen a toolchain where I needed __noinline__ instead of noinline */
+-#  define NOINLINE      __attribute__((__noinline__))
+-#  if !ENABLE_WERROR
+-#   define ATTRIBUTE_DEPRECATED __attribute__ ((__deprecated__))
+-#   define ATTRIBUTE_UNUSED_RESULT __attribute__ ((warn_unused_result))
+-#  else
+-#   define ATTRIBUTE_DEPRECATED /* n/a */
+-#   define ATTRIBUTE_UNUSED_RESULT /* n/a */
+-#  endif
++# define NOINLINE      __attribute__((__noinline__))
++# if !ENABLE_WERROR
++#  define ATTRIBUTE_DEPRECATED __attribute__ ((__deprecated__))
++#  define ATTRIBUTE_UNUSED_RESULT __attribute__ ((warn_unused_result))
+ # else
+-#  define ALWAYS_INLINE inline /* n/a */
+-#  define NOINLINE /* n/a */
+ #  define ATTRIBUTE_DEPRECATED /* n/a */
+ #  define ATTRIBUTE_UNUSED_RESULT /* n/a */
+ # endif
++#else
++# define ALWAYS_INLINE inline /* n/a */
++# define NOINLINE /* n/a */
++# define ATTRIBUTE_DEPRECATED /* n/a */
++# define ATTRIBUTE_UNUSED_RESULT /* n/a */
++#endif
+ 
+ /* -fwhole-program makes all symbols local. The attribute externally_visible
+    forces a symbol global.  */
+-# if __GNUC_PREREQ (4,1)
+-#  define EXTERNALLY_VISIBLE __attribute__(( visibility("default") ))
++#if __GNUC_PREREQ(4,1)
++# define EXTERNALLY_VISIBLE __attribute__(( visibility("default") ))
+ //__attribute__ ((__externally_visible__))
+-# else
+-#  define EXTERNALLY_VISIBLE
+-# endif /* GNUC >= 4.1 */
++#else
++# define EXTERNALLY_VISIBLE
++#endif /* GNUC >= 4.1 */
+ 
+ /* We use __extension__ in some places to suppress -pedantic warnings
+    about GCC extensions.  This feature didn't work properly before
+    gcc 2.8.  */
+-#if !__GNUC_PREREQ (2,8)
++#if !__GNUC_PREREQ(2,8)
+ # ifndef __extension__
+ #  define __extension__
+ # endif
+ #endif
+ 
+ /* gcc-2.95 had no va_copy but only __va_copy. */
+-#if !__GNUC_PREREQ (3,0)
++#if !__GNUC_PREREQ(3,0)
+ # include <stdarg.h>
+ # if !defined va_copy && defined __va_copy
+ #  define va_copy(d,s) __va_copy((d),(s))
+diff --git a/include/pwd_.h b/include/pwd_.h
+index f47e4eb..6199034 100644
+--- a/include/pwd_.h
++++ b/include/pwd_.h
+@@ -21,15 +21,13 @@
+  *	POSIX Standard: 9.2.2 User Database Access	<pwd.h>
+  */
+ 
+-#if !ENABLE_USE_BB_PWD_GRP
+-
+-#include <pwd.h>
+-
+-#else
+-
+ #ifndef	_PWD_H
+ #define	_PWD_H 1
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ /* The passwd structure.  */
+ struct passwd {
+ 	char *pw_name;          /* Username.  */
+@@ -118,5 +116,8 @@ extern int fgetpwent_r(FILE *__restrict __stream,
+    will expect, but this need not be the format of the password file.  */
+ extern int getpw(uid_t __uid, char *__buffer);
+ 
+-#endif /* pwd.h  */
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
+ #endif
++
++#endif /* pwd.h  */
+diff --git a/include/rtc_.h b/include/rtc_.h
+index df359da..b8e4de8 100644
+--- a/include/rtc_.h
++++ b/include/rtc_.h
+@@ -9,12 +9,14 @@
+ 
+ #include "libbb.h"
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ extern int rtc_adjtime_is_utc(void);
+ extern int rtc_xopen(const char **default_rtc, int flags);
+ extern time_t rtc_read_time(int fd, int utc);
+ 
+-
+-
+ /*
+  * Everything below this point has been copied from linux/rtc.h
+  * to eliminate the kernel header dependency
+@@ -70,4 +72,8 @@ struct linux_rtc_wkalrm {
+ #define RTC_AF 0x20
+ #define RTC_UF 0x10
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif
+diff --git a/include/shadow_.h b/include/shadow_.h
+index 92bcde8..5a8b71a 100644
+--- a/include/shadow_.h
++++ b/include/shadow_.h
+@@ -19,15 +19,13 @@
+ 
+ /* Declaration of types and functions for shadow password suite */
+ 
+-#if !ENABLE_USE_BB_SHADOW
+-
+-#include <shadow.h>
+-
+-#else
+-
+ #ifndef _SHADOW_H
+ #define _SHADOW_H 1
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ /* Paths to the user database files */
+ #ifndef _PATH_SHADOW
+ #define _PATH_SHADOW "/etc/shadow"
+@@ -110,5 +108,8 @@ extern int lckpwdf(void);
+ /* Unlock password file */
+ extern int ulckpwdf(void);
+ 
+-#endif /* shadow.h */
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
+ #endif
++
++#endif /* shadow.h */
+diff --git a/include/unarchive.h b/include/unarchive.h
+index b49e6cb..a6b0477 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -2,6 +2,10 @@
+ #ifndef	__UNARCHIVE_H__
+ #define	__UNARCHIVE_H__
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ #define ARCHIVE_PRESERVE_DATE           1
+ #define ARCHIVE_CREATE_LEADING_DIRS     2
+ #define ARCHIVE_EXTRACT_UNCONDITIONAL   4
+@@ -126,4 +130,8 @@ extern int open_transformer(int src_fd, const char *transform_prog);
+ #define open_transformer(src_fd, transformer, transform_prog) open_transformer(src_fd, transform_prog)
+ #endif
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif
+diff --git a/include/xatonum.h b/include/xatonum.h
+index 49ddced..6cf1299 100644
+--- a/include/xatonum.h
++++ b/include/xatonum.h
+@@ -7,6 +7,10 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ /* Provides extern declarations of functions */
+ #define DECLARE_STR_CONV(type, T, UT) \
+ \
+@@ -166,3 +170,7 @@ uint32_t bb_strtou32(const char *arg, char **endp, int base)
+ /* Floating point */
+ 
+ /* double bb_strtod(const char *arg, char **endp); */
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
+diff --git a/include/xregex.h b/include/xregex.h
+index 23cf19c..d4bf732 100644
+--- a/include/xregex.h
++++ b/include/xregex.h
+@@ -12,7 +12,16 @@
+ #define __BB_REGEX__
+ 
+ #include <regex.h>
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ char* regcomp_or_errmsg(regex_t *preg, const char *regex, int cflags);
+ void xregcomp(regex_t *preg, const char *regex, int cflags);
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif
+diff --git a/networking/isrv.h b/networking/isrv.h
+index 370ed90..c0158a3 100644
+--- a/networking/isrv.h
++++ b/networking/isrv.h
+@@ -8,6 +8,10 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ /* opaque structure */
+ struct isrv_state_t;
+ typedef struct isrv_state_t isrv_state_t;
+@@ -31,3 +35,7 @@ void isrv_run(
+ 	int timeout,
+ 	int linger_timeout
+ );
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
+diff --git a/networking/libiproute/ip_common.h b/networking/libiproute/ip_common.h
+index c047356..346d0b9 100644
+--- a/networking/libiproute/ip_common.h
++++ b/networking/libiproute/ip_common.h
+@@ -13,6 +13,10 @@
+ #include <linux/if_link.h>
+ #endif
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ extern char **ip_parse_common_args(char **argv);
+ extern int print_neigh(struct sockaddr_nl *who, struct nlmsghdr *n, void *arg);
+ extern int ipaddr_list_or_flush(char **argv, int flush);
+@@ -29,4 +33,9 @@ extern int do_iplink(char **argv);
+ extern int do_ipmonitor(char **argv);
+ extern int do_multiaddr(char **argv);
+ extern int do_multiroute(char **argv);
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif /* ip_common.h */
+diff --git a/networking/libiproute/libnetlink.h b/networking/libiproute/libnetlink.h
+index e149f52..7507c52 100644
+--- a/networking/libiproute/libnetlink.h
++++ b/networking/libiproute/libnetlink.h
+@@ -8,6 +8,11 @@
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+ 
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ struct rtnl_handle
+ {
+ 	int			fd;
+@@ -43,4 +48,8 @@ extern int rta_addattr_l(struct rtattr *rta, int maxlen, int type, void *data, i
+ 
+ extern int parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len);
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif /* __LIBNETLINK_H__ */
+diff --git a/networking/libiproute/ll_map.h b/networking/libiproute/ll_map.h
+index 55e2cf3..c425789 100644
+--- a/networking/libiproute/ll_map.h
++++ b/networking/libiproute/ll_map.h
+@@ -2,6 +2,10 @@
+ #ifndef __LL_MAP_H__
+ #define __LL_MAP_H__ 1
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ int ll_remember_index(struct sockaddr_nl *who, struct nlmsghdr *n, void *arg);
+ int ll_init_map(struct rtnl_handle *rth);
+ int xll_name_to_index(const char *const name);
+@@ -10,4 +14,8 @@ const char *ll_idx_n2a(int idx, char *buf);
+ /* int ll_index_to_type(int idx); */
+ unsigned ll_index_to_flags(int idx);
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif /* __LL_MAP_H__ */
+diff --git a/networking/libiproute/rt_names.h b/networking/libiproute/rt_names.h
+index f560f24..60baa3f 100644
+--- a/networking/libiproute/rt_names.h
++++ b/networking/libiproute/rt_names.h
+@@ -2,7 +2,9 @@
+ #ifndef RT_NAMES_H_
+ #define RT_NAMES_H_ 1
+ 
+-#include <stdint.h>
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
+ 
+ extern const char* rtnl_rtprot_n2a(int id, char *buf, int len);
+ extern const char* rtnl_rtscope_n2a(int id, char *buf, int len);
+@@ -27,4 +29,8 @@ extern const char* ll_proto_n2a(unsigned short id, char *buf, int len);
+ extern int ll_proto_a2n(unsigned short *id, char *buf);
+ #endif
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif
+diff --git a/networking/libiproute/rtm_map.h b/networking/libiproute/rtm_map.h
+index cbbcc21..02fa77e 100644
+--- a/networking/libiproute/rtm_map.h
++++ b/networking/libiproute/rtm_map.h
+@@ -2,10 +2,17 @@
+ #ifndef __RTM_MAP_H__
+ #define __RTM_MAP_H__ 1
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ const char *rtnl_rtntype_n2a(int id, char *buf, int len);
+ int rtnl_rtntype_a2n(int *id, char *arg);
+ 
+ int get_rt_realms(uint32_t *realms, char *arg);
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
+ 
+ #endif /* __RTM_MAP_H__ */
+diff --git a/networking/libiproute/utils.h b/networking/libiproute/utils.h
+index 50a6c20..b67619d 100644
+--- a/networking/libiproute/utils.h
++++ b/networking/libiproute/utils.h
+@@ -6,6 +6,10 @@
+ #include "ll_map.h"
+ #include "rtm_map.h"
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ extern family_t preferred_family;
+ extern smallint show_stats;    /* UNUSED */
+ extern smallint show_details;  /* UNUSED */
+@@ -84,4 +88,8 @@ int dnet_pton(int af, const char *src, void *addr);
+ const char *ipx_ntop(int af, const void *addr, char *str, size_t len);
+ int ipx_pton(int af, const char *src, void *addr);
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif /* __UTILS_H__ */
+diff --git a/networking/tcpudp_perhost.h b/networking/tcpudp_perhost.h
+index 9fc8cee..2e093c1 100644
+--- a/networking/tcpudp_perhost.h
++++ b/networking/tcpudp_perhost.h
+@@ -7,6 +7,10 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ struct hcc {
+ 	char *ip;
+ 	int pid;
+@@ -27,3 +31,7 @@ void ipsvd_perhost_remove(int pid);
+ 
+ //unsigned ipsvd_perhost_setpid(int pid);
+ //void ipsvd_perhost_free(void);
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index d44bca4..1131bae 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -11,6 +11,12 @@
+ #define _COMMON_H
+ 
+ #include "libbb.h"
++#include <netinet/udp.h>
++#include <netinet/ip.h>
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
+ 
+ #define DEFAULT_SCRIPT   CONFIG_DHCPC_DEFAULT_SCRIPT
+ 
+@@ -18,9 +24,6 @@ extern const uint8_t MAC_BCAST_ADDR[6]; /* six all-ones */
+ 
+ /*** packet.h ***/
+ 
+-#include <netinet/udp.h>
+-#include <netinet/ip.h>
+-
+ #define DHCP_OPTIONS_BUFSIZE  308
+ 
+ struct dhcpMessage {
+@@ -98,4 +101,8 @@ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *i
+ # define DEBUG(str, args...) do {;} while (0)
+ #endif
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index c8acd49..452afcf 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -4,6 +4,10 @@
+ #ifndef _DHCPC_H
+ #define _DHCPC_H
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ #define INIT_SELECTING	0
+ #define REQUESTING	1
+ #define BOUND		2
+@@ -60,5 +64,8 @@ int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr);
+ int send_release(uint32_t server, uint32_t ciaddr);
+ int get_raw_packet(struct dhcpMessage *payload, int fd);
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
+ 
+ #endif
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 4ce442b..8a206ea 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -4,6 +4,10 @@
+ #ifndef _DHCPD_H
+ #define _DHCPD_H
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ /************************************/
+ /* Defaults _you_ may want to tweak */
+ /************************************/
+@@ -114,4 +118,8 @@ void read_leases(const char *file);
+ struct option_set *find_option(struct option_set *opt_list, uint8_t code);
+ 
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif
+diff --git a/networking/udhcp/options.h b/networking/udhcp/options.h
+index e9eeefb..cf3fe3b 100644
+--- a/networking/udhcp/options.h
++++ b/networking/udhcp/options.h
+@@ -3,6 +3,10 @@
+ #ifndef _OPTIONS_H
+ #define _OPTIONS_H
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ #define TYPE_MASK	0x0F
+ 
+ enum {
+@@ -112,4 +116,8 @@ char *dname_dec(const uint8_t *cstr, int clen, const char *pre);
+ uint8_t *dname_enc(const uint8_t *cstr, int clen, const char *src, int *retlen);
+ #endif
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
++
+ #endif
+diff --git a/runit/runit_lib.h b/runit/runit_lib.h
+index 4b94820..c94e61c 100644
+--- a/runit/runit_lib.h
++++ b/runit/runit_lib.h
+@@ -25,6 +25,10 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
++
+ extern unsigned byte_chr(char *s,unsigned n,int c);
+ 
+ #define direntry struct dirent
+@@ -95,3 +99,7 @@ typedef struct svstatus_t {
+ struct ERR_svstatus_must_be_20_bytes {
+ 	char ERR_svstatus_must_be_20_bytes[sizeof(svstatus_t) == 20 ? 1 : -1];
+ };
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif
+diff --git a/util-linux/volume_id/volume_id_internal.h b/util-linux/volume_id/volume_id_internal.h
+index 78b4a7b..6619d2c 100644
+--- a/util-linux/volume_id/volume_id_internal.h
++++ b/util-linux/volume_id/volume_id_internal.h
+@@ -21,6 +21,9 @@
+ #include "libbb.h"
+ #include "volume_id.h"
+ 
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility push(hidden)
++#endif
+ 
+ #define dbg(...) ((void)0)
+ /* #define dbg(...) bb_error_msg(__VA_ARGS__) */
+@@ -224,3 +227,7 @@ int volume_id_probe_udf(struct volume_id *id, uint64_t off);
+ //int volume_id_probe_ufs(struct volume_id *id, uint64_t off);
+ 
+ int volume_id_probe_xfs(struct volume_id *id, uint64_t off);
++
++#if __GNUC_PREREQ(4,1)
++# pragma GCC visibility pop
++#endif

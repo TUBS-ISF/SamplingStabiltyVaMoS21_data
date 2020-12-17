@@ -1,0 +1,272 @@
+2008-08-17 14:12:26 +0000
+diff --git a/console-tools/Config.in b/console-tools/Config.in
+index 4b7f02d..efba9cd 100644
+--- a/console-tools/Config.in
++++ b/console-tools/Config.in
+@@ -95,6 +95,12 @@ config FEATURE_SETCONSOLE_LONG_OPTIONS
+ 	help
+ 	  Support long options for the setconsole applet.
+ 
++config SETFONT
++	bool "setfont"
++	default n
++	help
++	  Allows to load console screen map. Useful for i18n.
++
+ config SETKEYCODES
+ 	bool "setkeycodes"
+ 	default n
+diff --git a/console-tools/Kbuild b/console-tools/Kbuild
+index cf3825e..0a18250 100644
+--- a/console-tools/Kbuild
++++ b/console-tools/Kbuild
+@@ -16,5 +16,6 @@ lib-$(CONFIG_LOADKMAP)		+= loadkmap.o
+ lib-$(CONFIG_OPENVT)		+= openvt.o
+ lib-$(CONFIG_RESET)		+= reset.o
+ lib-$(CONFIG_RESIZE)		+= resize.o
++lib-$(CONFIG_SETFONT)		+= loadfont.o
+ lib-$(CONFIG_SETKEYCODES)	+= setkeycodes.o
+ lib-$(CONFIG_SETLOGCONS)	+= setlogcons.o
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index 567aa38..7870070 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -26,7 +26,7 @@ struct psf_header {
+ 	unsigned char charsize;         /* Character size */
+ };
+ 
+-#define PSF_MAGIC_OK(x)	((x).magic1 == PSF_MAGIC1 && (x).magic2 == PSF_MAGIC2)
++#define PSF_MAGIC_OK(x)	((x)->magic1 == PSF_MAGIC1 && (x)->magic2 == PSF_MAGIC2)
+ 
+ static void do_loadfont(int fd, unsigned char *inbuf, int unit, int fontsize)
+ {
+@@ -37,7 +37,6 @@ static void do_loadfont(int fd, unsigned char *inbuf, int unit, int fontsize)
+ 		bb_error_msg_and_die("bad character size %d", unit);
+ 
+ 	buf = xzalloc(16 * 1024);
+-	/*memset(buf, 0, 16 * 1024);*/
+ 	for (i = 0; i < fontsize; i++)
+ 		memcpy(buf + (32 * i), inbuf + (unit * i), unit);
+ 
+@@ -58,8 +57,7 @@ static void do_loadfont(int fd, unsigned char *inbuf, int unit, int fontsize)
+ 	free(buf);
+ }
+ 
+-static void
+-do_loadtable(int fd, unsigned char *inbuf, int tailsz, int fontsize)
++static void do_loadtable(int fd, unsigned char *inbuf, int tailsz, int fontsize)
+ {
+ 	struct unimapinit advice;
+ 	struct unimapdesc ud;
+@@ -68,7 +66,7 @@ do_loadtable(int fd, unsigned char *inbuf, int tailsz, int fontsize)
+ 	int glyph;
+ 	uint16_t unicode;
+ 
+-	maxct = tailsz;				/* more than enough */
++	maxct = tailsz;	/* more than enough */
+ 	up = xmalloc(maxct * sizeof(struct unipair));
+ 
+ 	for (glyph = 0; glyph < fontsize; glyph++) {
+@@ -96,86 +94,104 @@ do_loadtable(int fd, unsigned char *inbuf, int tailsz, int fontsize)
+ 	xioctl(fd, PIO_UNIMAP, &ud);
+ }
+ 
+-static void loadnewfont(int fd)
++static void do_load(int fd, struct psf_header *psfhdr, size_t len)
+ {
+-	enum { INBUF_SIZE = 32*1024 + 1 };
+-
+ 	int unit;
+-	unsigned inputlth, offset;
+-	/* Was on stack, but 32k is a bit too much: */
+-	unsigned char *inbuf = xmalloc(INBUF_SIZE);
+-
+-	/*
+-	 * We used to look at the length of the input file
+-	 * with stat(); now that we accept compressed files,
+-	 * just read the entire file.
+-	 */
+-	inputlth = full_read(STDIN_FILENO, inbuf, INBUF_SIZE);
+-	if (inputlth < 0)
+-		bb_perror_msg_and_die("error reading input font");
+-	if (inputlth >= INBUF_SIZE)
+-		bb_error_msg_and_die("font too large");
++	int fontsize;
++	int hastable;
++	unsigned head0, head = head;
+ 
+ 	/* test for psf first */
+-	{
+-		struct psf_header psfhdr;
+-		int fontsize;
+-		int hastable;
+-		unsigned head0, head;
+-
+-		if (inputlth < sizeof(struct psf_header))
+-			goto no_psf;
+-
+-		psfhdr = *(struct psf_header *) &inbuf[0];
+-
+-		if (!PSF_MAGIC_OK(psfhdr))
+-			goto no_psf;
+-
+-		if (psfhdr.mode > PSF_MAXMODE)
++	if (len >= sizeof(struct psf_header) && PSF_MAGIC_OK(psfhdr)) {
++		if (psfhdr->mode > PSF_MAXMODE)
+ 			bb_error_msg_and_die("unsupported psf file mode");
+-		fontsize = ((psfhdr.mode & PSF_MODE512) ? 512 : 256);
++		fontsize = ((psfhdr->mode & PSF_MODE512) ? 512 : 256);
+ #if !defined(PIO_FONTX) || defined(__sparc__)
+ 		if (fontsize != 256)
+ 			bb_error_msg_and_die("only fontsize 256 supported");
+ #endif
+-		hastable = (psfhdr.mode & PSF_MODEHASTAB);
+-		unit = psfhdr.charsize;
++		hastable = (psfhdr->mode & PSF_MODEHASTAB);
++		unit = psfhdr->charsize;
+ 		head0 = sizeof(struct psf_header);
+ 
+ 		head = head0 + fontsize * unit;
+-		if (head > inputlth || (!hastable && head != inputlth))
++		if (head > len || (!hastable && head != len))
+ 			bb_error_msg_and_die("input file: bad length");
+-		do_loadfont(fd, inbuf + head0, unit, fontsize);
+-		if (hastable)
+-			do_loadtable(fd, inbuf + head, inputlth - head, fontsize);
+-		return;
+-	}
+-
+- no_psf:
+-	/* file with three code pages? */
+-	if (inputlth == 9780) {
+-		offset = 40;
+-		unit = 16;
+ 	} else {
+-		/* bare font */
+-		if (inputlth & 0377)
+-			bb_error_msg_and_die("bad input file size");
+-		offset = 0;
+-		unit = inputlth / 256;
++		/* file with three code pages? */
++		if (len == 9780) {
++			head0 = 40;
++			unit = 16;
++		} else {
++			/* bare font */
++			if (len & 0377)
++				bb_error_msg_and_die("input file: bad length");
++			head0 = 0;
++			unit = len / 256;
++		}
++		fontsize = 256;
++		hastable = 0;
+ 	}
+-	do_loadfont(fd, inbuf + offset, unit, 256);
++
++	do_loadfont(fd, (unsigned char *)psfhdr + head0, unit, fontsize);
++	if (hastable)
++		do_loadtable(fd, (unsigned char *)psfhdr + head, len - head, fontsize);
+ }
+ 
++#if ENABLE_LOADFONT
+ int loadfont_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int loadfont_main(int argc, char **argv UNUSED_PARAM)
++int loadfont_main(int argc UNUSED_PARAM, char **argv)
+ {
++	size_t len;
++	struct psf_header *psfhdr;
++
++	// no arguments allowed!
++	opt_complementary = "=0";
++	getopt32(argv, "");
++
++	/*
++	 * We used to look at the length of the input file
++	 * with stat(); now that we accept compressed files,
++	 * just read the entire file.
++	 */
++	len = 32*1024; // can't be larger
++	psfhdr = (struct psf_header *) xmalloc_read(STDIN_FILENO, &len);
++	// xmalloc_open_zipped_read_close(filename, &len);
++	if (!psfhdr)
++		bb_perror_msg_and_die("error reading input font");
++	do_load(get_console_fd_or_die(), psfhdr, len);
++
++	return EXIT_SUCCESS;
++}
++#endif
++
++#if ENABLE_SETFONT
++int setfont_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int setfont_main(int argc UNUSED_PARAM, char **argv)
++{
++	size_t len;
++	struct psf_header *psfhdr;
++	char *mapfilename;
+ 	int fd;
+ 
+-	if (argc != 1)
+-		bb_show_usage();
++	opt_complementary = "=1";
++	getopt32(argv, "m:", &mapfilename);
++	argv += optind;
+ 
++	// load font
++	len = 32*1024; // can't be larger
++	psfhdr = (struct psf_header *) xmalloc_open_zipped_read_close(*argv, &len);
+ 	fd = get_console_fd_or_die();
+-	loadnewfont(fd);
++	do_load(fd, psfhdr, len);
++
++	// load the screen map, if any
++	if (option_mask32 & 1) { // -m
++		void *map = xmalloc_open_zipped_read_close(mapfilename, &len);
++		if (len == E_TABSZ || len == 2*E_TABSZ) {
++			xioctl(fd, (len == 2*E_TABSZ) ? PIO_UNISCRNMAP : PIO_SCRNMAP, map);
++		}
++	}
+ 
+ 	return EXIT_SUCCESS;
+ }
++#endif
+diff --git a/include/applets.h b/include/applets.h
+index 5dd485a..ee96357 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -220,7 +220,7 @@ USE_SETARCH(APPLET_ODDNAME(linux64, setarch, _BB_DIR_BIN, _BB_SUID_NEVER, linux6
+ USE_FEATURE_INITRD(APPLET_ODDNAME(linuxrc, init, _BB_DIR_ROOT, _BB_SUID_NEVER, linuxrc))
+ USE_LN(APPLET_NOEXEC(ln, ln, _BB_DIR_BIN, _BB_SUID_NEVER, ln))
+ USE_LOAD_POLICY(APPLET(load_policy, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+-USE_LOADFONT(APPLET(loadfont, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
++USE_LOADFONT(APPLET(loadfont, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_LOADKMAP(APPLET(loadkmap, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_LOGGER(APPLET(logger, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_LOGIN(APPLET(login, _BB_DIR_BIN, _BB_SUID_ALWAYS))
+@@ -319,6 +319,7 @@ USE_SETARCH(APPLET(setarch, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_SETCONSOLE(APPLET(setconsole, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_SETENFORCE(APPLET(setenforce, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_SETFILES(APPLET(setfiles, _BB_DIR_SBIN, _BB_SUID_NEVER))
++USE_SETFONT(APPLET(setfont, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_SETKEYCODES(APPLET(setkeycodes, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_SETLOGCONS(APPLET(setlogcons, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_SETSEBOOL(APPLET(setsebool, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index e242990..feeaadd 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3501,6 +3501,15 @@
+      "\n	-vv	Show changes in file labels, if type, role, or user are changing" \
+      "\n	-W	Display warnings about entries that had no matching files" \
+ 
++#define setfont_trivial_usage \
++       "[-m mapfile] font"
++#define setfont_full_usage "\n\n" \
++       "Load a console font\n" \
++     "\nOptions:" \
++     "\n	-m mapfile	Load console screen map from mapfile"
++#define setfont_example_usage \
++       "$ setfont -m koi8-r /etc/i18n/fontname\n"
++
+ #define setkeycodes_trivial_usage \
+        "SCANCODE KEYCODE..."
+ #define setkeycodes_full_usage "\n\n" \

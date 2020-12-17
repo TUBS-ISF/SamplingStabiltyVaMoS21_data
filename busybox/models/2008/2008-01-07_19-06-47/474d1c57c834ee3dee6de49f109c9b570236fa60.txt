@@ -1,0 +1,59 @@
+2008-01-07 19:06:47 +0000
+diff --git a/coreutils/tac.c b/coreutils/tac.c
+index 6aa0528..b1b4730 100644
+--- a/coreutils/tac.c
++++ b/coreutils/tac.c
+@@ -28,7 +28,7 @@ int tac_main(int argc, char **argv)
+ 	char *line;
+ 	llist_t *list = NULL;
+ 	int retval = EXIT_SUCCESS;
+-	
++
+ 	argv++;
+ 	if (!*argv)
+ 		*--argv = (char *)"-";
+@@ -48,7 +48,7 @@ int tac_main(int argc, char **argv)
+ 		errno = 0;
+ 		/* FIXME: NUL bytes are mishandled. */
+ 		while ((line = xmalloc_fgets(f)) != NULL)
+-			llist_add_to(&list, line);	
++			llist_add_to(&list, line);
+ 
+ 		/* xmalloc_fgets uses getc and returns NULL on error or EOF. */
+ 		/* It sets errno to ENOENT on EOF, but fopen_or_warn_stdin would */
+@@ -63,6 +63,6 @@ int tac_main(int argc, char **argv)
+ 		printf("%s", list->data);
+ 		list = list->link;
+ 	}
+-	
++
+ 	return retval;
+ }
+diff --git a/init/Config.in b/init/Config.in
+index efc8bea..4c56102 100644
+--- a/init/Config.in
++++ b/init/Config.in
+@@ -32,8 +32,8 @@ config FEATURE_KILL_REMOVED
+ 	default y
+ 	depends on FEATURE_USE_INITTAB
+ 	help
+-	  When respawn entries are removed from inittab and a SIGHUP is 
+-	  sent to init, this feature will kill the processes that have 
++	  When respawn entries are removed from inittab and a SIGHUP is
++	  sent to init, this feature will kill the processes that have
+ 	  been removed.
+ 
+ config FEATURE_KILL_DELAY
+diff --git a/networking/netstat.c b/networking/netstat.c
+index 348abd8..399ff9b 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -353,7 +353,7 @@ static int unix_do_one(int nr, char *line)
+ 		return 0; /* skip header */
+ 
+ 	/* 2.6.15 may report lines like "... @/tmp/fam-user-^@^@^@^@^@^@^@..."
+-	 * Other users report long lines filled by NUL bytes. 
++	 * Other users report long lines filled by NUL bytes.
+ 	 * (those ^@ are NUL bytes too). We see them as empty lines. */
+ 	if (!line[0])
+ 		return 0;

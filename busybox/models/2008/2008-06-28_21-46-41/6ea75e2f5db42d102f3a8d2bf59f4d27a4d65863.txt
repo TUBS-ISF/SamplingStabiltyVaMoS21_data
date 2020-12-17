@@ -1,0 +1,321 @@
+2008-06-28 21:46:41 +0000
+diff --git a/include/usage.h b/include/usage.h
+index dd66728..d7bc018 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1088,18 +1088,16 @@
+      "\n	-S SECTORS" \
+ 
+ #define fetchmail_trivial_usage \
+-       "[-w timeout] [-H server[:port]] [-U user] -P password [-X] [-t] [-z] maildir [prog]"
++       "[-w timeout] [-H [user:pass@]server[:port]] [-S] [-t] [-z] maildir [prog]"
+ #define fetchmail_full_usage "\n\n" \
+-       "Fetch content of remote mailbox to local Maildir.\n" \
++       "Fetch content of remote mailbox to local maildir\n" \
+      "\nOptions:" \
+-     "\n	-w timeout	Set timeout on network operations" \
+-     "\n	-H server[:port] Set server" \
+-     "\n	-U username	Authenticate with specified username/password" \
+-     "\n	-P password" \
+-     "\n	-X		Use openssl connection helper for secured servers" \
++     "\n	-w timeout	Network timeout" \
++     "\n	-H [user:pass@]server[:port] Server" \
++     "\n	-S		Use openssl connection helper for secure servers" \
+      "\n	-t		Get only headers" \
+      "\n	-z		Delete messages on server" \
+-     "\n	prog		Run prog <message_file> on message delivery" \
++     "\n	prog		Run 'prog <message_file>' on message delivery" \
+ 
+ #define findfs_trivial_usage \
+        "LABEL=label or UUID=uuid"
+@@ -3123,7 +3121,7 @@
+        "  742 andersen andersen S [bash]\n" \
+        "  743 andersen andersen S -bash\n" \
+        "  745 root     root     S [getty]\n" \
+-       " 2990 andersen andersen R ps\n"
++       " 2990 andersen andersen R ps\n" \
+ 
+ #define pscan_trivial_usage \
+        "[-cb] [-p MIN_PORT] [-P MAX_PORT] [-t TIMEOUT] [-T MIN_RTT] HOST"
+@@ -3426,33 +3424,31 @@
+ #define selinuxenabled_full_usage ""
+ 
+ #define sendmail_trivial_usage \
+-       "[-w timeout] [-H server[:port]] [-U user] [-P password] [-X]\n" \
+-       "[-c charset] [-n] [-i] [-s subject] [-a attach]... [-t] [-f sender] [rcpt]..."
++       "[-w timeout] [-H [user:pass@]server[:port]] [-S]\n" \
++       "[-c charset] [-N type] [-i] [-s subject] [-a attach]... [-t] [-f sender] [rcpt]..."
+ #define sendmail_full_usage "\n\n" \
+-       "Send an email.\n" \
+-     "\nOptions:" \
+-     "\n	-w timeout	Set timeout on network operations" \
+-     "\n	-H server[:port] Set server" \
+-     "\n	-U username	Authenticate with specified username/password" \
+-     "\n	-P password" \
+-     "\n	-X		Use openssl connection helper for secured servers" \
+-     "\n	-c charset	Assumed charset for body and subject [utf-8]" \
+-     "\n	-n		Request delivery notification to sender" \
++       "Send an email\n" \
++     "\nOptions:" \
++     "\n	-w timeout	Network timeout" \
++     "\n	-H [user:pass@]server[:port] Server" \
++     "\n	-S		Use openssl connection helper for secure servers" \
++     "\n	-c charset	Assume charset for body and subject (utf-8)" \
++     "\n	-N type		Request delivery notification. Type is ignored" \
+      "\n	-i		Ignore single dots in mail body. Implied" \
+      "\n	-s subject	Subject" \
+      "\n	-a file		File to attach. May be multiple" \
+      "\n	-t		Read recipients and subject from body" \
+-     "\n	-f		Set sender address" \
++     "\n	-f sender	Sender" \
+ 
+ #define seq_trivial_usage \
+        "[first [increment]] last"
+ #define seq_full_usage "\n\n" \
+        "Print numbers from FIRST to LAST, in steps of INCREMENT.\n" \
+-       "FIRST, INCREMENT default to 1" \
+-       "\n\nArguments:\n" \
+-       "	LAST\n" \
+-       "	FIRST LAST\n" \
+-       "	FIRST INCREMENT LAST"
++       "FIRST, INCREMENT default to 1\n" \
++     "\nArguments:" \
++     "\n	LAST" \
++     "\n	FIRST LAST" \
++     "\n	FIRST INCREMENT LAST" \
+ 
+ #define sestatus_trivial_usage \
+        "[-vb]"
+@@ -3764,7 +3760,7 @@
+        " %S	Fundamental block size (for block counts)\n" \
+        " %t	Type in hex\n" \
+        " %T	Type in human readable form" \
+-	)
++	) \
+ 
+ #define strings_trivial_usage \
+        "[-afo] [-n length] [file...]"
+@@ -3821,9 +3817,9 @@
+        "up: if service isn't running, start it. If service stops, restart it\n" \
+        "once: like 'up', but if service stops, don't restart it\n" \
+        "down: send TERM and CONT signals. If ./run exits, start ./finish\n" \
+-       "    if it exists. After it stops, do not restart service\n" \
++       "	if it exists. After it stops, do not restart service\n" \
+        "exit: send TERM and CONT signals to service and log service. If they exit,\n" \
+-       "    runsv exits too\n" \
++       "	runsv exits too\n" \
+        "pause, cont, hup, alarm, interrupt, quit, 1, 2, term, kill: send\n" \
+        "STOP, CONT, HUP, ALRM, INT, QUIT, USR1, USR2, TERM, KILL signal to service" \
+ 
+@@ -3930,10 +3926,10 @@
+      "\n	-q		Never output headers giving file names" \
+      "\n	-s SEC		Wait SEC seconds between reads with -f" \
+      "\n	-v		Always output headers giving file names" \
+-     "\n\n" \
+-       "If the first character of N (bytes or lines) is a '+', output begins with\n" \
+-       "the Nth item from the start of each file, otherwise, print the last N items\n" \
+-       "in the file. N bytes may be suffixed by k (x1024), b (x512), or m (1024^2)." ) \
++     "\n" \
++     "\nIf the first character of N (bytes or lines) is a '+', output begins with" \
++     "\nthe Nth item from the start of each file, otherwise, print the last N items" \
++     "\nin the file. N bytes may be suffixed by k (x1024), b (x512), or m (1024^2)." ) \
+ 
+ #define tail_example_usage \
+        "$ tail -n 1 /etc/resolv.conf\n" \
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 2bed5a4..27f24dd 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -33,11 +33,7 @@
+ #define SENDMAIL        "sendmail"
+ #endif
+ #ifndef SENDMAIL_ARGS
+-#	if ENABLE_SENDMAIL
+-#		define SENDMAIL_ARGS   "localhost", line->cl_MailTo
+-#	else
+-#		define SENDMAIL_ARGS   "-ti", "oem"
+-#	endif
++#define SENDMAIL_ARGS   "-ti", "oem"
+ #endif
+ #ifndef CRONUPDATE
+ #define CRONUPDATE      "cron.update"
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index 071d9d6..b81c852 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -262,32 +262,49 @@ static void pop3_message(const char *filename)
+ }
+ #endif
+ 
++static char *parse_url(char *url, char **user, char **pass)
++{
++	// parse [user[:pass]@]host
++	// return host
++	char *s = strchr(url, '@');
++	*user = *pass = NULL;
++	if (s) {
++		*s++ = '\0';
++		*user = url;
++		url = s;
++		s = strchr(*user, ':');
++		if (s) {
++			*s++ = '\0';
++			*pass = s;
++		}
++	}
++	return url;
++}
++
+ int sendgetmail_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	llist_t *opt_recipients = NULL;
+ 	llist_t *opt_attachments = NULL;
+ 	char *opt_from;
+-	const char *opt_user;
+-	const char *opt_pass;
++	char *opt_user;
++	char *opt_pass;
+ 	enum {
+ 		OPT_w = 1 << 0,         // network timeout
+-		OPT_H = 1 << 1,         // server[:port]
+-		OPT_U = 1 << 2,         // user
+-		OPT_P = 1 << 3,         // password
+-		OPT_X = 1 << 4,         // connect using openssl s_client helper
++		OPT_H = 1 << 1,         // [user:password@]server[:port]
++		OPT_S = 1 << 2,         // connect using openssl s_client helper
+ 
+-		OPTS_t = 1 << 5,        // sendmail: read addresses from body
+-		OPTF_t = 1 << 5,        // fetchmail: use "TOP" not "RETR"
++		OPTS_t = 1 << 3,        // sendmail: read addresses from body
++		OPTF_t = 1 << 3,        // fetchmail: use "TOP" not "RETR"
+ 
+-		OPTS_s = 1 << 6,        // sendmail: subject
+-		OPTF_z = 1 << 6,        // fetchmail: delete from server
++		OPTS_s = 1 << 4,        // sendmail: subject
++		OPTF_z = 1 << 4,        // fetchmail: delete from server
+ 
+-		OPTS_c = 1 << 7,        // sendmail: assumed charset
+-		OPTS_a = 1 << 8,        // sendmail: attachment(s)
+-		OPTS_i = 1 << 9,        // sendmail: ignore lone dots in message body (implied)
++		OPTS_c = 1 << 5,        // sendmail: assumed charset
++		OPTS_a = 1 << 6,        // sendmail: attachment(s)
++		OPTS_i = 1 << 7,        // sendmail: ignore lone dots in message body (implied)
+ 
+-		OPTS_n = 1 << 10,       // sendmail: request notification
++		OPTS_N = 1 << 8,        // sendmail: request notification
+ 	};
+ 	const char *options;
+ 	int opts;
+@@ -303,18 +320,18 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		// save initial stdin (body or attachements can be piped!)
+ 		xdup2(STDIN_FILENO, INITIAL_STDIN_FILENO);
+ 		opt_complementary = "w+:a::";
+-		options = "w:H:U:P:Xt" "s:c:a:inf:";
++		options = "w:H:St" "s:c:a:iN:f:";
+ 		// body is pseudo attachment read from stdin
+ 		llist_add_to_end(&opt_attachments, (char *)"-");
+ 	} else {
+ 		// FETCHMAIL
+ 		opt_after_connect = NULL;
+-		opt_complementary = "-1:w+:P";
+-		options = "w:H:U:P:Xt" "z";
++		opt_complementary = "-1:w+";
++		options = "w:H:St" "z";
+ 	}
+ 	opts = getopt32(argv, options,
+-		&timeout, &opt_connect, &opt_user, &opt_pass,
+-		&opt_subject, &opt_charset, &opt_attachments, &opt_from
++		&timeout /* -w */, &opt_connect /* -H */,
++		&opt_subject, &opt_charset, &opt_attachments, NULL, &opt_from
+ 	);
+ 	//argc -= optind;
+ 	argv += optind;
+@@ -326,8 +343,14 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		if (!opt_connect)
+ 			opt_connect = "127.0.0.1";
+ 	}
++	// fetch username and password, if any
++	// NB: parse_url modifies opt_connect[] ONLY if '@' is there.
++	// Thus "127.0.0.1" won't be modified, an is ok that it is RO.
++	opt_connect = parse_url((char*)opt_connect, &opt_user, &opt_pass);
++//	bb_error_msg("H[%s] U[%s] P[%s]", opt_connect, opt_user, opt_pass);
++
+ 	// SSL ordered? ->
+-	if (opts & OPT_X) {
++	if (opts & OPT_S) {
+ 		// ... use openssl helper
+ 		launch_helper(xargs);
+ 	// no SSL ordered? ->
+@@ -340,10 +363,8 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		xdup2(STDIN_FILENO, STDOUT_FILENO);
+ 	}
+ 
+-#if ENABLE_FETCHMAIL
+ 	// are we sendmail?
+-	if (opt_after_connect)
+-#endif
++	if (!ENABLE_FETCHMAIL || opt_after_connect)
+ /***************************************************
+  * SENDMAIL
+  ***************************************************/
+@@ -364,7 +385,7 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		}
+ 
+ 		// we didn't use SSL helper? ->
+-		if (!(opts & OPT_X)) {
++		if (!(opts & OPT_S)) {
+ 			// ... wait for initial server OK
+ 			smtp_check(NULL, 220);
+ 		}
+@@ -402,14 +423,13 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		// set sender
+ 		// NOTE: if password has not been specified
+ 		// then no authentication is possible
+-		code = (opts & OPT_P) ? -1 : 250;
++		code = (opt_pass) ? -1 : 250;
+ 		// first try softly without authentication
+ 		while (250 != smtp_checkp("MAIL FROM:<%s>", opt_from, code)) {
+ 			// MAIL FROM failed -> authentication needed
+ 			// have we got username?
+-			if (!(opts & OPT_U)) {
++			if (!opt_user) {
+ 				// no! fetch it from "from" option
+-				//opts |= OPT_U;
+ 				opt_user = xstrdup(opt_from);
+ 				*strchrnul(opt_user, '@') = '\0';
+ 			}
+@@ -450,7 +470,7 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		}
+ 
+ 		// put notification
+-		if (opts & OPTS_n)
++		if (opts & OPTS_N)
+ 			printf("Disposition-Notification-To: %s\r\n", opt_from);
+ 
+ 		// make a random string -- it will delimit message parts
+@@ -515,7 +535,6 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+  * FETCHMAIL
+  ***************************************************/
+ 	else {
+-
+ 		char *buf;
+ 		unsigned nmsg;
+ 		char *hostname;
+@@ -533,11 +552,14 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		*fargs = *argv;
+ 
+ 		// authenticate
+-		if (!(opts & OPT_U)) {
+-			//opts |= OPT_U;
++		if (!opt_user) {
+ 			// N.B. IMHO getenv("USER") can be way easily spoofed!
+ 			opt_user = bb_getpwuid(NULL, -1, getuid());
+ 		}
++		// password is mandatory
++		if (!opt_pass) {
++			bb_error_msg_and_die("no password");
++		}
+ 
+ 		// get server greeting
+ 		pop3_checkr(NULL, NULL, &buf);

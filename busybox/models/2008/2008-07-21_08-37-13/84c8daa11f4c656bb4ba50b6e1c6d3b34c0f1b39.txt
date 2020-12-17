@@ -1,0 +1,18 @@
+2008-07-21 08:37:13 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 61c5c8e..dbee32e 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4042,9 +4042,10 @@
+      "\n	-i		Run as inetd subservice" \
+ 	)
+ 
++/* "test --help" does not print help (POSIX compat), only "[ --help" does.
++ * We display "<applet> EXPRESSION ]" here (not "<applet> EXPRESSION") */
+ #define test_trivial_usage \
+-       "EXPRESSION\n" \
+-       "  or   [ EXPRESSION ]"
++       "EXPRESSION ]"
+ #define test_full_usage "\n\n" \
+        "Check file types and compares values returning an exit code\n" \
+        "determined by the value of EXPRESSION"

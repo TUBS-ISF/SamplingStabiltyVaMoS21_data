@@ -1,0 +1,59 @@
+2009-10-22 19:42:26 +0200
+diff --git a/editors/sed.c b/editors/sed.c
+index e7b2c21..9b360b6 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -359,7 +359,8 @@ static int parse_subst_cmd(sed_cmd_t *sed_cmd, const char *substr)
+ 			continue;
+ 		}
+ 		/* Skip spaces */
+-		if (isspace(substr[idx])) continue;
++		if (isspace(substr[idx]))
++			continue;
+ 
+ 		switch (substr[idx]) {
+ 		/* Replace all occurrences */
+@@ -417,8 +418,7 @@ static const char *parse_cmd_args(sed_cmd_t *sed_cmd, const char *cmdstr)
+ 	/* handle edit cmds: (a)ppend, (i)nsert, and (c)hange */
+ 	else if (strchr("aic", sed_cmd->cmd)) {
+ 		if ((sed_cmd->end_line || sed_cmd->end_match) && sed_cmd->cmd != 'c')
+-			bb_error_msg_and_die
+-				("only a beginning address can be specified for edit commands");
++			bb_error_msg_and_die("only a beginning address can be specified for edit commands");
+ 		for (;;) {
+ 			if (*cmdstr == '\n' || *cmdstr == '\\') {
+ 				cmdstr++;
+diff --git a/networking/interface.c b/networking/interface.c
+index ef187be..fe6b23d 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -410,20 +410,20 @@ static struct interface *add_interface(char *name)
+ static char *get_name(char *name, char *p)
+ {
+ 	/* Extract <name> from nul-terminated p where p matches
+-	   <name>: after leading whitespace.
+-	   If match is not made, set name empty and return unchanged p */
+-	int namestart = 0, nameend = 0;
++	 * <name>: after leading whitespace.
++	 * If match is not made, set name empty and return unchanged p
++	 */
++	char *nameend;
++	char *namestart = skip_whitespace(p);
+ 
+-	while (isspace(p[namestart]))
+-		namestart++;
+ 	nameend = namestart;
+-	while (p[nameend] && p[nameend] != ':' && !isspace(p[nameend]))
++	while (*nameend && *nameend != ':' && !isspace(*nameend))
+ 		nameend++;
+-	if (p[nameend] == ':') {
++	if (*nameend == ':') {
+ 		if ((nameend - namestart) < IFNAMSIZ) {
+-			memcpy(name, &p[namestart], nameend - namestart);
++			memcpy(name, namestart, nameend - namestart);
+ 			name[nameend - namestart] = '\0';
+-			p = &p[nameend];
++			p = nameend;
+ 		} else {
+ 			/* Interface name too large */
+ 			name[0] = '\0';

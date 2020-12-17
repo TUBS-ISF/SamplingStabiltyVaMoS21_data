@@ -1,0 +1,15 @@
+2008-01-14 14:32:56 +0000
+diff --git a/TODO b/TODO
+index 52a4aad..f68c9de 100644
+--- a/TODO
++++ b/TODO
+@@ -301,6 +301,9 @@ Minor stuff:
+ ---
+   Move __get_hz() to a better place and (re)use it in route.c, ash.c, msh.c
+ ---
++  See grep -r strtod
++  Alot of duplication that wants cleanup.
++---
+ 
+ 
+ Code cleanup:

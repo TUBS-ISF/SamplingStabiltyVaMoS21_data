@@ -1,0 +1,14 @@
+2007-07-15 17:07:58 +0000
+diff --git a/procps/top.c b/procps/top.c
+index a37a0d0..cd55ea3 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -431,7 +431,7 @@ static void display_status(int count, int scr_width)
+ 		else
+ 			sprintf(vsz_str_buf, "%7ld", s->vsz);
+ 		// PID PPID USER STAT VSZ %MEM [%CPU] COMMAND
+-		col -= printf("\n" "%5u%6u %-8s %s%s" FMT
++		col -= printf("\n" "%5u%6u %-8.8s %s%s" FMT
+ #if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
+ 				FMT
+ #endif

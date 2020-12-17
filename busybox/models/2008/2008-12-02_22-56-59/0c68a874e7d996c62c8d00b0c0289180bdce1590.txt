@@ -1,0 +1,373 @@
+2008-12-02 22:56:59 +0000
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 6ddb236..33e06f4 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -36,12 +36,8 @@ enum {
+ #endif
+ };
+ 
+-static int print_common(unsigned id,
+-		char* FAST_FUNC bb_getXXXid(char *name, int bufsize, long uid),
+-		const char *prefix)
++static int print_common(unsigned id, const char *name, const char *prefix)
+ {
+-	const char *name = bb_getXXXid(NULL, 0, id);
+-
+ 	if (prefix) {
+ 		printf("%s", prefix);
+ 	}
+@@ -65,12 +61,12 @@ static int print_common(unsigned id,
+ 
+ static int print_group(gid_t id, const char *prefix)
+ {
+-	return print_common(id, bb_getgrgid, prefix);
++	return print_common(id, gid2group(id), prefix);
+ }
+ 
+ static int print_user(uid_t id, const char *prefix)
+ {
+-	return print_common(id, bb_getpwuid, prefix);
++	return print_common(id, uid2uname(id), prefix);
+ }
+ 
+ /* On error set *n < 0 and return >= 0
+diff --git a/coreutils/whoami.c b/coreutils/whoami.c
+index 6756d4b..0dbcba9 100644
+--- a/coreutils/whoami.c
++++ b/coreutils/whoami.c
+@@ -20,7 +20,7 @@ int whoami_main(int argc, char **argv UNUSED_PARAM)
+ 		bb_show_usage();
+ 
+ 	/* Will complain and die if username not found */
+-	puts(bb_getpwuid(NULL, -1, geteuid()));
++	puts(xuid2uname(geteuid()));
+ 
+ 	return fflush(stdout);
+ }
+diff --git a/include/libbb.h b/include/libbb.h
+index e4ccc75..acae93a 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -702,14 +702,14 @@ int get_uidgid(struct bb_uidgid_t*, const char*, int numeric_ok) FAST_FUNC;
+ void xget_uidgid(struct bb_uidgid_t*, const char*) FAST_FUNC;
+ /* chown-like handling of "user[:[group]" */
+ void parse_chown_usergroup_or_die(struct bb_uidgid_t *u, char *user_group) FAST_FUNC;
+-/* bb_getpwuid, bb_getgrgid:
+- * bb_getXXXid(buf, bufsz, id) - copy user/group name or id
+- *              as a string to buf, return user/group name or NULL
+- * bb_getXXXid(NULL, 0, id) - return user/group name or NULL
+- * bb_getXXXid(NULL, -1, id) - return user/group name or exit
+-*/
+-char *bb_getpwuid(char *name, int bufsize, long uid) FAST_FUNC;
+-char *bb_getgrgid(char *group, int bufsize, long gid) FAST_FUNC;
++struct passwd* xgetpwuid(uid_t uid) FAST_FUNC;
++struct group* xgetgrgid(gid_t gid) FAST_FUNC;
++char* xuid2uname(uid_t uid) FAST_FUNC;
++char* xgid2group(gid_t gid) FAST_FUNC;
++char* uid2uname(uid_t uid) FAST_FUNC;
++char* gid2group(gid_t gid) FAST_FUNC;
++char* uid2uname_utoa(long uid) FAST_FUNC;
++char* gid2group_utoa(long gid) FAST_FUNC;
+ /* versions which cache results (useful for ps, ls etc) */
+ const char* get_cached_username(uid_t uid) FAST_FUNC;
+ const char* get_cached_groupname(gid_t gid) FAST_FUNC;
+diff --git a/libbb/bb_pwd.c b/libbb/bb_pwd.c
+index 65eb692..5e44edc 100644
+--- a/libbb/bb_pwd.c
++++ b/libbb/bb_pwd.c
+@@ -3,79 +3,72 @@
+  * password utility routines.
+  *
+  * Copyright (C) 1999-2004 by Erik Andersen <andersen@codepoet.org>
++ * Copyright (C) 2008 by Tito Ragusa <farmatito@tiscali.it>
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+ #include "libbb.h"
+ 
+-#define assert(x) ((void)0)
+-
+-/* internal function for bb_getpwuid and bb_getgrgid */
+-/* Hacked by Tito Ragusa (c) 2004 <farmatito@tiscali.it> to make it more
+- * flexible:
+- *
+- * bufsize > 0:      If idname is not NULL it is copied to buffer,
+- *                   and buffer is returned. Else id as string is written
+- *                   to buffer, and NULL is returned.
+- *
+- * bufsize == 0:     idname is returned.
+- *
+- * bufsize < 0:      If idname is not NULL it is returned.
+- *                   Else an error message is printed and the program exits.
++/* TODO: maybe change API to return malloced data?
++ * This will allow to stop using libc functions returning
++ * pointers to static data (getpwuid)
+  */
+-static char* bb_getug(char *buffer, int bufsize, char *idname, long id, char prefix)
++
++/* TODO: add xgetpwnam, this construct is used a lot */
++
++struct passwd* FAST_FUNC xgetpwuid(uid_t uid)
+ {
+-	if (bufsize > 0) {
+-		assert(buffer != NULL);
+-		if (idname) {
+-			return safe_strncpy(buffer, idname, bufsize);
+-		}
+-		snprintf(buffer, bufsize, "%ld", id);
+-	} else if (bufsize < 0 && !idname) {
+-		bb_error_msg_and_die("unknown %cid %ld", prefix, id);
+-	}
+-	return idname;
++	struct passwd *pw = getpwuid(uid);
++	if (!pw)
++		bb_error_msg_and_die("unknown uid %u", (unsigned)uid);
++	return pw;
+ }
+ 
+-/* bb_getpwuid, bb_getgrgid:
+- * bb_getXXXid(buf, bufsz, id) - copy user/group name or id
+- *               as a string to buf, return user/group name or NULL
+- * bb_getXXXid(NULL, 0, id) - return user/group name or NULL
+- * bb_getXXXid(NULL, -1, id) - return user/group name or exit
+- */
+-/* gets a username given a uid */
+-char* FAST_FUNC bb_getpwuid(char *name, int bufsize, long uid)
++struct group* FAST_FUNC xgetgrgid(gid_t gid)
+ {
+-	struct passwd *myuser = getpwuid(uid);
++	struct group *gr = getgrgid(gid);
++	if (!gr)
++		bb_error_msg_and_die("unknown gid %u", (unsigned)gid);
++	return gr;
++}
+ 
+-	return bb_getug(name, bufsize,
+-			(myuser ? myuser->pw_name : (char*)myuser),
+-			uid, 'u');
++char* FAST_FUNC xuid2uname(uid_t uid)
++{
++	struct passwd *pw = xgetpwuid(uid);
++	return pw->pw_name;
+ }
+-/* gets a groupname given a gid */
+-char* FAST_FUNC bb_getgrgid(char *group, int bufsize, long gid)
++
++char* FAST_FUNC xgid2group(gid_t gid)
+ {
+-	struct group *mygroup = getgrgid(gid);
++	struct group *gr = xgetgrgid(gid);
++	return gr->gr_name;
++}
+ 
+-	return bb_getug(group, bufsize,
+-			(mygroup ? mygroup->gr_name : (char*)mygroup),
+-			gid, 'g');
++char* FAST_FUNC uid2uname(uid_t uid)
++{
++	struct passwd *pw = getpwuid(uid);
++	return (pw) ? pw->pw_name : NULL;
+ }
+ 
+-/* returns a gid given a group name */
+-long FAST_FUNC xgroup2gid(const char *name)
++char* FAST_FUNC gid2group(gid_t gid)
+ {
+-	struct group *mygroup;
++	struct group *gr = getgrgid(gid);
++	return (gr) ? gr->gr_name : NULL;
++}
+ 
+-	mygroup = getgrnam(name);
+-	if (mygroup == NULL)
+-		bb_error_msg_and_die("unknown group name: %s", name);
++char* FAST_FUNC uid2uname_utoa(long uid)
++{
++	char *name = uid2uname(uid);
++	return (name) ? name : utoa(uid);
++}
+ 
+-	return mygroup->gr_gid;
++char* FAST_FUNC gid2group_utoa(long gid)
++{
++	char *name = gid2group(gid);
++	return (name) ? name : utoa(gid);
+ }
+ 
+-/* returns a uid given a username */
+ long FAST_FUNC xuname2uid(const char *name)
+ {
+ 	struct passwd *myuser;
+@@ -87,6 +80,17 @@ long FAST_FUNC xuname2uid(const char *name)
+ 	return myuser->pw_uid;
+ }
+ 
++long FAST_FUNC xgroup2gid(const char *name)
++{
++	struct group *mygroup;
++
++	mygroup = getgrnam(name);
++	if (mygroup == NULL)
++		bb_error_msg_and_die("unknown group %s", name);
++
++	return mygroup->gr_gid;
++}
++
+ unsigned long FAST_FUNC get_ug_id(const char *s,
+ 		long FAST_FUNC (*xname2id)(const char *))
+ {
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 4d9a95b..c5e40bf 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -13,7 +13,7 @@
+ 
+ 
+ typedef struct unsigned_to_name_map_t {
+-	unsigned id;
++	long id;
+ 	char name[USERNAME_MAX_SIZE];
+ } unsigned_to_name_map_t;
+ 
+@@ -52,8 +52,8 @@ static int get_cached(cache_t *cp, unsigned id)
+ }
+ #endif
+ 
+-typedef char* FAST_FUNC ug_func(char *name, int bufsize, long uid);
+-static char* get_cached(cache_t *cp, unsigned id, ug_func* fp)
++static char* get_cached(cache_t *cp, long id,
++			char* FAST_FUNC x2x_utoa(long id))
+ {
+ 	int i;
+ 	for (i = 0; i < cp->size; i++)
+@@ -63,16 +63,16 @@ static char* get_cached(cache_t *cp, unsigned id, ug_func* fp)
+ 	cp->cache = xrealloc_vector(cp->cache, 2, i);
+ 	cp->cache[i].id = id;
+ 	/* Never fails. Generates numeric string if name isn't found */
+-	fp(cp->cache[i].name, sizeof(cp->cache[i].name), id);
++	safe_strncpy(cp->cache[i].name, x2x_utoa(id), sizeof(cp->cache[i].name));
+ 	return cp->cache[i].name;
+ }
+ const char* FAST_FUNC get_cached_username(uid_t uid)
+ {
+-	return get_cached(&username, uid, bb_getpwuid);
++	return get_cached(&username, uid, uid2uname_utoa);
+ }
+ const char* FAST_FUNC get_cached_groupname(gid_t gid)
+ {
+-	return get_cached(&groupname, gid, bb_getgrgid);
++	return get_cached(&groupname, gid, gid2group_utoa);
+ }
+ 
+ 
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index 99fb76e..b156ab5 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -115,7 +115,7 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
+ 		bb_show_usage();
+ 
+ 	/* Will complain and die if username not found */
+-	myname = xstrdup(bb_getpwuid(NULL, -1, myuid));
++	myname = xstrdup(xuid2uname(myuid));
+ 	name = argv[0] ? argv[0] : myname;
+ 
+ 	pw = getpwnam(name);
+diff --git a/loginutils/vlock.c b/loginutils/vlock.c
+index 0262da5..85f489c 100644
+--- a/loginutils/vlock.c
++++ b/loginutils/vlock.c
+@@ -38,14 +38,9 @@ int vlock_main(int argc UNUSED_PARAM, char **argv)
+ 	struct termios term;
+ 	struct termios oterm;
+ 	struct vt_mode ovtm;
+-	uid_t uid;
+ 	struct passwd *pw;
+-/* XXX: xgetpwuid */
+-	uid = getuid();
+-	pw = getpwuid(uid);
+-	if (pw == NULL)
+-		bb_error_msg_and_die("unknown uid %d", (int)uid);
+ 
++	pw = xgetpwuid(getuid());
+ 	opt_complementary = "=0"; /* no params! */
+ 	getopt32(argv, "a");
+ 
+diff --git a/mailutils/sendmail.c b/mailutils/sendmail.c
+index 55555c3..b027f94 100644
+--- a/mailutils/sendmail.c
++++ b/mailutils/sendmail.c
+@@ -172,7 +172,7 @@ int sendmail_main(int argc UNUSED_PARAM, char **argv)
+ 	// got no sender address? -> use system username as a resort
+ 	if (!(opts & OPT_f)) {
+ 		// N.B. IMHO getenv("USER") can be way easily spoofed!
+-		G.user = bb_getpwuid(NULL, -1, getuid());
++		G.user = xuid2uname(getuid());
+ 		opt_from = xasprintf("%s@%s", G.user, domain);
+ 	}
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 673b558..9020149 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -130,11 +130,7 @@ int crontab_main(int argc UNUSED_PARAM, char **argv)
+ 		if (!pas)
+ 			bb_error_msg_and_die("user %s is not known", user_name);
+ 	} else {
+-/* XXX: xgetpwuid */
+-		uid_t my_uid = getuid();
+-		pas = getpwuid(my_uid);
+-		if (!pas)
+-			bb_perror_msg_and_die("unknown uid %d", (int)my_uid);
++		pas = xgetpwuid(getuid());
+ 	}
+ 
+ #define user_name DONT_USE_ME_BEYOND_THIS_POINT
+diff --git a/printutils/lpr.c b/printutils/lpr.c
+index 25cbcbc..f21cffd 100644
+--- a/printutils/lpr.c
++++ b/printutils/lpr.c
+@@ -65,7 +65,7 @@ int lpqr_main(int argc UNUSED_PARAM, char *argv[])
+ 	const char *server = "localhost"; // server[:port] of printer queue
+ 	char *hostname;
+ 	// N.B. IMHO getenv("USER") can be way easily spoofed!
+-	const char *user = bb_getpwuid(NULL, -1, getuid());
++	const char *user = xuid2uname(getuid());
+ 	unsigned job;
+ 	unsigned opts;
+ 	int fd;
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index 6258113..759981c 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -72,22 +72,21 @@ int logger_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int logger_main(int argc, char **argv)
+ {
+ 	char *str_p, *str_t;
++	int opt;
+ 	int i = 0;
+-	char name[80];
+ 
+ 	/* Fill out the name string early (may be overwritten later) */
+-	bb_getpwuid(name, sizeof(name), geteuid());
+-	str_t = name;
++	str_t = uid2uname_utoa(geteuid());
+ 
+ 	/* Parse any options */
+-	getopt32(argv, "p:st:", &str_p, &str_t);
++	opt = getopt32(argv, "p:st:", &str_p, &str_t);
+ 
+-	if (option_mask32 & 0x2) /* -s */
++	if (opt & 0x2) /* -s */
+ 		i |= LOG_PERROR;
+-	//if (option_mask32 & 0x4) /* -t */
++	//if (opt & 0x4) /* -t */
+ 	openlog(str_t, i, 0);
+ 	i = LOG_USER | LOG_NOTICE;
+-	if (option_mask32 & 0x1) /* -p */
++	if (opt & 0x1) /* -p */
+ 		i = pencode(str_p);
+ 
+ 	argc -= optind;

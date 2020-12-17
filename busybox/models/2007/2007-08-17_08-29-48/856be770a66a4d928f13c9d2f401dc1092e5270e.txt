@@ -1,0 +1,221 @@
+2007-08-17 08:29:48 +0000
+diff --git a/applets/applets.c b/applets/applets.c
+index 6ff4301..6de6db3 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -48,6 +48,9 @@ static const char usage_messages[] ALIGN1 = ""
+ #include "applets.h"
+ /* The -1 arises because of the {0,NULL,0,-1} entry. */
+ 
++#if ENABLE_FEATURE_SH_STANDALONE
++const unsigned short NUM_APPLETS = ARRAY_SIZE(applets);
++#endif
+ const struct bb_applet *current_applet;
+ const char *applet_name ATTRIBUTE_EXTERNALLY_VISIBLE;
+ #if !BB_MMU
+diff --git a/archival/libunarchive/Kbuild b/archival/libunarchive/Kbuild
+index 412a233..3c29d54 100644
+--- a/archival/libunarchive/Kbuild
++++ b/archival/libunarchive/Kbuild
+@@ -58,6 +58,7 @@ lib-$(CONFIG_GUNZIP)			+= $(GUNZIP_FILES)
+ lib-$(CONFIG_FEATURE_GUNZIP_UNCOMPRESS)	+= decompress_uncompress.o
+ lib-$(CONFIG_RPM2CPIO)			+= $(GUNZIP_FILES) get_header_cpio.o
+ lib-$(CONFIG_RPM)			+= $(GUNZIP_FILES) get_header_cpio.o
++lib-$(CONFIG_FEATURE_RPM_BZ2)		+= decompress_bunzip2.o
+ lib-$(CONFIG_TAR)			+= get_header_tar.o
+ lib-$(CONFIG_FEATURE_TAR_BZIP2)		+= decompress_bunzip2.o get_header_tar_bz2.o
+ lib-$(CONFIG_FEATURE_TAR_LZMA)		+= decompress_unlzma.o get_header_tar_lzma.o
+@@ -66,3 +67,4 @@ lib-$(CONFIG_FEATURE_TAR_COMPRESS)	+= decompress_uncompress.o
+ lib-$(CONFIG_UNCOMPRESS)		+= decompress_uncompress.o
+ lib-$(CONFIG_UNZIP)			+= $(GUNZIP_FILES)
+ lib-$(CONFIG_FEATURE_COMPRESS_USAGE)	+= decompress_bunzip2.o
++
+diff --git a/editors/vi.c b/editors/vi.c
+index 461cf98..afbddc2 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -2420,14 +2420,17 @@ static int file_insert(const char * fn, char *p
+ 		file_modified++;
+ 	close(fd);
+  fi0:
+-	if (ENABLE_FEATURE_VI_READONLY && update_ro_status
+-			&& ((access(fn, W_OK) < 0) ||
+-			/* root will always have access()
+-			 * so we check fileperms too */
+-			!(statbuf.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH))))
+-	{
++#if ENABLE_FEATURE_VI_READONLY
++	if (update_ro_status
++	 && ((access(fn, W_OK) < 0) ||
++		/* root will always have access()
++		 * so we check fileperms too */
++		!(statbuf.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH))
++	    )
++	) {
+ 		SET_READONLY_FILE(readonly_mode);
+ 	}
++#endif
+ 	return cnt;
+ }
+ 
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 6b31f36..bfa5c17 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -631,7 +631,8 @@ static void process_config_line(const char *line, unsigned long *event_mask)
+ 		last_config->next = new;
+ 	last_config = new;
+ 	return;
+-process_config_line_err:
++
++ process_config_line_err:
+ 	msg_logger_and_die(LOG_ERR, bb_msg_bad_config, msg , line);
+ }  /*  End Function process_config_line   */
+ 
+@@ -644,11 +645,9 @@ static int do_servicing(int fd, unsigned long event_mask)
+ {
+ 	ssize_t bytes;
+ 	struct devfsd_notify_struct info;
+-	unsigned long tmp_event_mask;
+ 
+-	/*  Tell devfs what events we care about  */
+-	tmp_event_mask = event_mask;
+-	xioctl(fd, DEVFSDIOC_SET_EVENT_MASK, tmp_event_mask);
++	/* (void*) cast is only in order to match prototype */
++	xioctl(fd, DEVFSDIOC_SET_EVENT_MASK, (void*)event_mask);
+ 	while (!caught_signal) {
+ 		errno = 0;
+ 		bytes = read(fd,(char *) &info, sizeof info);
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 040bbe3..e1c1e65 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -484,12 +484,12 @@ static const struct dhcp_client_t ext_dhcp_clients[] = {
+ static int dhcp_up(struct interface_defn_t *ifd, execfn *exec)
+ {
+ #if ENABLE_FEATURE_IFUPDOWN_EXTERNAL_DHCP
++	int i;
+ #if ENABLE_FEATURE_IFUPDOWN_IP
+ 	/* ip doesn't up iface when it configures it (unlike ifconfig) */
+ 	if (!execute("ip link set %iface% up", ifd, exec))
+ 		return 0;
+ #endif
+-	int i;
+ 	for (i = 0; i < ARRAY_SIZE(ext_dhcp_clients); i++) {
+ 		if (exists_execable(ext_dhcp_clients[i].name))
+ 			return execute(ext_dhcp_clients[i].startcmd, ifd, exec);
+diff --git a/networking/libiproute/Kbuild b/networking/libiproute/Kbuild
+index 95d37e8..9e9e760 100644
+--- a/networking/libiproute/Kbuild
++++ b/networking/libiproute/Kbuild
+@@ -6,6 +6,10 @@
+ #
+ 
+ lib-y:=
++
++lib-$(CONFIG_SLATTACH) += \
++	utils.o
++
+ lib-$(CONFIG_IP) += \
+ 	ip_parse_common_args.o \
+ 	libnetlink.o \
+diff --git a/procps/top.c b/procps/top.c
+index e9ccac0..85699b0 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -219,7 +219,9 @@ static unsigned long display_generic(int scr_width)
+ 	char buf[80];
+ 	char scrbuf[80];
+ 	unsigned long total, used, mfree, shared, buffers, cached;
++#if ENABLE_FEATURE_TOP_DECIMALS || ENABLE_FEATURE_TOP_CPU_GLOBAL_PERCENTS
+ 	unsigned total_diff;
++#endif
+ 
+ #if ENABLE_FEATURE_TOP_DECIMALS
+ 	/* formats 7 char string (8 with terminating NUL) */
+@@ -305,12 +307,12 @@ static unsigned long display_generic(int scr_width)
+ 	/* clear screen & go to top */
+ 	printf(OPT_BATCH_MODE ? "%s\n" : "\e[H\e[J%s\n", scrbuf);
+ 
+-	if (ENABLE_FEATURE_TOP_CPU_GLOBAL_PERCENTS) {
+-		/*
+-		 * xxx% = (jif.xxx - prev_jif.xxx) / (jif.total - prev_jif.total) * 100%
+-		 */
+-		/* using (unsigned) casts to make operations cheaper */
+-		total_diff = ((unsigned)(jif.total - prev_jif.total) ? : 1);
++#if ENABLE_FEATURE_TOP_CPU_GLOBAL_PERCENTS
++	/*
++	 * xxx% = (jif.xxx - prev_jif.xxx) / (jif.total - prev_jif.total) * 100%
++	 */
++	/* using (unsigned) casts to make operations cheaper */
++	total_diff = ((unsigned)(jif.total - prev_jif.total) ? : 1);
+ #if ENABLE_FEATURE_TOP_DECIMALS
+ /* Generated code is approx +0.3k */
+ #define CALC_STAT(xxx) char xxx[8]
+@@ -321,30 +323,30 @@ static unsigned long display_generic(int scr_width)
+ #define SHOW_STAT(xxx) xxx
+ #define FMT "%4u%% "
+ #endif
+-		{ /* need block: CALC_STAT are declarations */
+-			CALC_STAT(usr);
+-			CALC_STAT(sys);
+-			CALC_STAT(nic);
+-			CALC_STAT(idle);
+-			CALC_STAT(iowait);
+-			CALC_STAT(irq);
+-			CALC_STAT(softirq);
+-			//CALC_STAT(steal);
+-
+-			snprintf(scrbuf, scr_width,
+-				/* Barely fits in 79 chars when in "decimals" mode. */
+-				"CPU:"FMT"usr"FMT"sys"FMT"nice"FMT"idle"FMT"io"FMT"irq"FMT"softirq",
+-				SHOW_STAT(usr), SHOW_STAT(sys), SHOW_STAT(nic), SHOW_STAT(idle),
+-				SHOW_STAT(iowait), SHOW_STAT(irq), SHOW_STAT(softirq)
+-				//, SHOW_STAT(steal) - what is this 'steal' thing?
+-				// I doubt anyone wants to know it
+-			);
+-		}
+-		puts(scrbuf);
++	{ /* need block: CALC_STAT are declarations */
++		CALC_STAT(usr);
++		CALC_STAT(sys);
++		CALC_STAT(nic);
++		CALC_STAT(idle);
++		CALC_STAT(iowait);
++		CALC_STAT(irq);
++		CALC_STAT(softirq);
++		//CALC_STAT(steal);
++
++		snprintf(scrbuf, scr_width,
++			/* Barely fits in 79 chars when in "decimals" mode. */
++			"CPU:"FMT"usr"FMT"sys"FMT"nice"FMT"idle"FMT"io"FMT"irq"FMT"softirq",
++			SHOW_STAT(usr), SHOW_STAT(sys), SHOW_STAT(nic), SHOW_STAT(idle),
++			SHOW_STAT(iowait), SHOW_STAT(irq), SHOW_STAT(softirq)
++			//, SHOW_STAT(steal) - what is this 'steal' thing?
++			// I doubt anyone wants to know it
++		);
++	}
++	puts(scrbuf);
+ #undef SHOW_STAT
+ #undef CALC_STAT
+ #undef FMT
+-	}
++#endif
+ 
+ 	/* read load average as a string */
+ 	buf[0] = '\0';
+diff --git a/util-linux/more.c b/util-linux/more.c
+index 92ebdfe..dc5b4c9 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -154,8 +154,10 @@ int more_main(int argc, char **argv)
+ 
+ 				/* The user may have resized the terminal.
+ 				 * Re-read the dimensions. */
++#if ENABLE_FEATURE_USE_TERMIOS
+ 				get_terminal_width_height(cin_fileno, &terminal_width, &terminal_height);
+ 				terminal_height -= 1;
++#endif
+ 			}
+ 
+ 			/* Crudely convert tabs into spaces, which are

@@ -1,0 +1,14 @@
+2009-10-02 01:13:45 +0200
+diff --git a/applets/usage_pod.c b/applets/usage_pod.c
+index 058e0c8..c1182fd 100644
+--- a/applets/usage_pod.c
++++ b/applets/usage_pod.c
+@@ -66,7 +66,7 @@ int main(void)
+ 
+ 	names = applet_names;
+ 	usage = usage_messages;
+-	while (*names && usage) {
++	while (*names && *usage) {
+ 		if (*names >= 'a' && *names <= 'z'
+ 		 && *usage != NOUSAGE_STR[0]
+ 		) {

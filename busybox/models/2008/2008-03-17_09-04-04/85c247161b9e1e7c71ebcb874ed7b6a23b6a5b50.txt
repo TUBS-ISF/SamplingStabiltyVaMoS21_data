@@ -1,0 +1,824 @@
+2008-03-17 09:04:04 +0000
+diff --git a/applets/applets.c b/applets/applets.c
+index 40c4824..fbe7666 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -11,8 +11,8 @@
+ #include "busybox.h"
+ 
+ #if ENABLE_BUILD_LIBBUSYBOX
+-int main(int argc, char **argv)
++int main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	return lbb_main(argc, argv);
++	return lbb_main(argv);
+ }
+ #endif
+diff --git a/archival/bzip2.c b/archival/bzip2.c
+index 7696336..eb570c4 100644
+--- a/archival/bzip2.c
++++ b/archival/bzip2.c
+@@ -141,7 +141,7 @@ char* make_new_name_bzip2(char *filename)
+ }
+ 
+ int bzip2_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int bzip2_main(int argc, char **argv)
++int bzip2_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned opt;
+ 
+diff --git a/archival/gzip.c b/archival/gzip.c
+index 36502fa..a96d029 100644
+--- a/archival/gzip.c
++++ b/archival/gzip.c
+@@ -2026,7 +2026,11 @@ USE_DESKTOP(long long) int pack_gzip(void)
+ }
+ 
+ int gzip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++#if ENABLE_GUNZIP
+ int gzip_main(int argc, char **argv)
++#else
++int gzip_main(int argc ATTRIBUTE_UNUSED, char **argv)
++#endif
+ {
+ 	unsigned opt;
+ 
+diff --git a/console-tools/reset.c b/console-tools/reset.c
+index f36ef54..a2bf44d 100644
+--- a/console-tools/reset.c
++++ b/console-tools/reset.c
+@@ -40,7 +40,7 @@ int reset_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ #if ENABLE_STTY
+ 		return stty_main(2, (char**)args);
+ #else
+-		execvp("stty", args);
++		execvp("stty", (char**)args);
+ #endif
+ 	}
+ 	return EXIT_SUCCESS;
+diff --git a/coreutils/stat.c b/coreutils/stat.c
+index 5996268..b2b1913 100644
+--- a/coreutils/stat.c
++++ b/coreutils/stat.c
+@@ -21,6 +21,12 @@
+ #define OPT_DEREFERENCE (1 << 2)
+ #define OPT_SELINUX     (1 << 3)
+ 
++#if ENABLE_FEATURE_STAT_FORMAT
++typedef bool (*statfunc_ptr)(const char *, const char *);
++#else
++typedef bool (*statfunc_ptr)(const char *);
++#endif
++
+ static const char *file_type(const struct stat *st)
+ {
+ 	/* See POSIX 1003.1-2001 XCU Table 4-8 lines 17093-17107
+@@ -338,8 +344,14 @@ static void print_it(const char *masterformat, const char *filename,
+ #endif
+ 
+ /* Stat the file system and print what we find.  */
++#if !ENABLE_FEATURE_STAT_FORMAT
++#define do_statfs(filename, format) do_statfs(filename)
++#endif
+ static bool do_statfs(const char *filename, const char *format)
+ {
++#if !ENABLE_FEATURE_STAT_FORMAT
++	const char *format;
++#endif
+ 	struct statfs statfsbuf;
+ #if ENABLE_SELINUX
+ 	security_context_t scontext = NULL;
+@@ -447,6 +459,9 @@ static bool do_statfs(const char *filename, const char *format)
+ }
+ 
+ /* stat the file and print what we find */
++#if !ENABLE_FEATURE_STAT_FORMAT
++#define do_stat(filename, format) do_stat(filename)
++#endif
+ static bool do_stat(const char *filename, const char *format)
+ {
+ 	struct stat statbuf;
+@@ -612,10 +627,10 @@ static bool do_stat(const char *filename, const char *format)
+ int stat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int stat_main(int argc, char **argv)
+ {
+-	char *format = NULL;
++	USE_FEATURE_STAT_FORMAT(char *format = NULL;)
+ 	int i;
+ 	int ok = 1;
+-	bool (*statfunc)(const char *, const char *) = do_stat;
++	statfunc_ptr statfunc = do_stat;
+ 
+ 	getopt32(argv, "ftL"
+ 		USE_SELINUX("Z")
+@@ -633,7 +648,7 @@ int stat_main(int argc, char **argv)
+ 	}
+ #endif	/* ENABLE_SELINUX */
+ 	for (i = optind; i < argc; ++i)
+-		ok &= statfunc(argv[i], format);
++		ok &= statfunc(argv[i] USE_FEATURE_STAT_FORMAT(, format));
+ 
+ 	return (ok ? EXIT_SUCCESS : EXIT_FAILURE);
+ }
+diff --git a/findutils/find.c b/findutils/find.c
+index 50c7901..634fbd1 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -374,7 +374,10 @@ ACTF(context)
+ #endif
+ 
+ 
+-static int fileAction(const char *fileName, struct stat *statbuf, void *userData, int depth)
++static int fileAction(const char *fileName,
++		struct stat *statbuf,
++		void *userData SKIP_FEATURE_FIND_MAXDEPTH(ATTRIBUTE_UNUSED),
++		int depth SKIP_FEATURE_FIND_MAXDEPTH(ATTRIBUTE_UNUSED))
+ {
+ 	int i;
+ #if ENABLE_FEATURE_FIND_MAXDEPTH
+diff --git a/include/busybox.h b/include/busybox.h
+index 5272024..cad45ac 100644
+--- a/include/busybox.h
++++ b/include/busybox.h
+@@ -64,9 +64,9 @@ void lbb_prepare(const char *applet
+ 	) MAIN_EXTERNALLY_VISIBLE;
+ #if ENABLE_BUILD_LIBBUSYBOX
+ #if ENABLE_FEATURE_SHARED_BUSYBOX
+-int lbb_main(int argc, char **argv) EXTERNALLY_VISIBLE;
++int lbb_main(char **argv) EXTERNALLY_VISIBLE;
+ #else
+-int lbb_main(int argc, char **argv);
++int lbb_main(char **argv);
+ #endif
+ #endif
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index df8b0ec..c6c2be2 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -237,7 +237,8 @@ extern int recursive_action(const char *fileName, unsigned flags,
+ 	int (*dirAction) (const char *fileName, struct stat* statbuf, void* userData, int depth),
+ 	void* userData, unsigned depth);
+ extern int device_open(const char *device, int mode);
+-extern int getpty(char *line, int size);
++enum { GETPTY_BUFSIZE = 16 }; /* more than enough for "/dev/ttyXXX" */
++extern int getpty(char *line);
+ extern int get_console_fd(void);
+ extern char *find_block_device(const char *path);
+ /* bb_copyfd_XX print read/write errors and return -1 if they occur */
+diff --git a/include/usage.h b/include/usage.h
+index f94fa2f..507a52d 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -989,6 +989,7 @@
+        ""
+ #define false_full_usage \
+        "Return an exit code of FALSE (1)"
++
+ #define false_example_usage \
+        "$ false\n" \
+        "$ echo $?\n" \
+diff --git a/init/halt.c b/init/halt.c
+index c50d8af..1f0fae3 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -16,7 +16,7 @@
+ #endif
+ 
+ int halt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int halt_main(int argc, char **argv)
++int halt_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	static const int magic[] = {
+ #ifdef RB_HALT_SYSTEM
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index de27dd8..aade904 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -661,7 +661,7 @@ void run_applet_and_exit(const char *name, char **argv)
+ 
+ 
+ #if ENABLE_BUILD_LIBBUSYBOX
+-int lbb_main(int argc, char **argv)
++int lbb_main(char **argv)
+ #else
+ int main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #endif
+diff --git a/libbb/getpty.c b/libbb/getpty.c
+index c006e34..36b3c68 100644
+--- a/libbb/getpty.c
++++ b/libbb/getpty.c
+@@ -10,7 +10,9 @@
+ 
+ #define DEBUG 0
+ 
+-int getpty(char *line, int size)
++#define DEBUG 0
++
++int getpty(char *line)
+ {
+ 	int p;
+ #if ENABLE_FEATURE_DEVPTS
+@@ -24,7 +26,7 @@ int getpty(char *line, int size)
+ 			bb_perror_msg("ptsname error (is /dev/pts mounted?)");
+ 			return -1;
+ 		}
+-		safe_strncpy(line, name, size);
++		safe_strncpy(line, name, GETPTY_BUFSIZE);
+ 		return p;
+ 	}
+ #else
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 7e40820..b25386b 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -294,7 +294,12 @@ static void redraw(int y, int back_cursor)
+ 
+ /* Delete the char in front of the cursor, optionally saving it
+  * for later putback */
++#if !ENABLE_FEATURE_EDITING_VI
++static void input_delete(void)
++#define input_delete(save) input_delete()
++#else
+ static void input_delete(int save)
++#endif
+ {
+ 	int j = cursor;
+ 
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 79e7494..d7eb8d3 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -130,9 +130,7 @@ static void die_if_nologin(void)
+ 		fclose(fp);
+ 	} else
+ 		puts("\r\nSystem closed for routine maintenance\r");
+-	if (!amroot)
+-		exit(1);
+-	puts("\r\n[Disconnect bypassed -- root login allowed]\r");
++	exit(1);
+ }
+ #else
+ static ALWAYS_INLINE void die_if_nologin(void) {}
+diff --git a/miscutils/bbconfig.c b/miscutils/bbconfig.c
+index ee56678..f3aef42 100644
+--- a/miscutils/bbconfig.c
++++ b/miscutils/bbconfig.c
+@@ -5,7 +5,7 @@
+ #include "bbconfigopts.h"
+ 
+ int bbconfig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int bbconfig_main(int argc, char **argv)
++int bbconfig_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	printf(bbconfig_config);
+ 	return 0;
+diff --git a/miscutils/chat.c b/miscutils/chat.c
+index 50c5ad9..64d4ba4 100644
+--- a/miscutils/chat.c
++++ b/miscutils/chat.c
+@@ -233,7 +233,8 @@ int chat_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			//-----------------------
+ 			// do expect
+ 			//-----------------------
+-			size_t expect_len, buf_len = 0;
++			int expect_len;
++			size_t buf_len = 0;
+ 			size_t max_len = max_abort_len;
+ 
+ 			struct pollfd pfd;
+@@ -315,7 +316,7 @@ int chat_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				exitcode = ERR_OK;
+ 
+ 				// expected reply received? -> goto next command
+-				delta = buf_len-expect_len;
++				delta = buf_len - expect_len;
+ 				if (delta >= 0 && !memcmp(buf+delta, expect, expect_len))
+ 					goto expect_done;
+ #undef buf
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 079de69..6274a8d 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -3680,6 +3680,9 @@ static void check_tainted_module(struct obj_file *f, char *m_name)
+  * start of some sections.  this info is used by ksymoops to do better
+  * debugging.
+  */
++#if !ENABLE_FEATURE_INSMOD_VERSION_CHECKING
++#define get_module_version(f, str) get_module_version(str)
++#endif
+ static int
+ get_module_version(struct obj_file *f, char str[STRVERSIONLEN])
+ {
+diff --git a/modutils/lsmod.c b/modutils/lsmod.c
+index baf0e2a..da8663a 100644
+--- a/modutils/lsmod.c
++++ b/modutils/lsmod.c
+@@ -75,7 +75,7 @@ enum {
+ };
+ 
+ int lsmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int lsmod_main(int argc, char **argv)
++int lsmod_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	struct module_info info;
+ 	char *module_names, *mn, *deps, *dn;
+diff --git a/networking/Kbuild b/networking/Kbuild
+index e06a124..44258e9 100644
+--- a/networking/Kbuild
++++ b/networking/Kbuild
+@@ -17,7 +17,7 @@ lib-$(CONFIG_FTPPUT)       += ftpgetput.o
+ lib-$(CONFIG_HOSTNAME)     += hostname.o
+ lib-$(CONFIG_HTTPD)        += httpd.o
+ lib-$(CONFIG_IFCONFIG)     += ifconfig.o interface.o
+-lib-$(CONFIG_IFENSLAVE)    += ifenslave.o
++lib-$(CONFIG_IFENSLAVE)    += ifenslave.o interface.o
+ lib-$(CONFIG_IFUPDOWN)     += ifupdown.o
+ lib-$(CONFIG_INETD)        += inetd.o
+ lib-$(CONFIG_IP)           += ip.o
+diff --git a/networking/ether-wake.c b/networking/ether-wake.c
+index b752152..fcd7dd2 100644
+--- a/networking/ether-wake.c
++++ b/networking/ether-wake.c
+@@ -179,7 +179,7 @@ static int get_wol_pw(const char *ethoptarg, unsigned char *wol_passwd)
+ }
+ 
+ int ether_wake_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ether_wake_main(int argc, char **argv)
++int ether_wake_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *ifname = "eth0";
+ 	char *pass;
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 54f288c..522e7ee 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1972,7 +1972,11 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
+ 			/* Try and do our best to parse more lines */
+ 			if ((STRNCASECMP(iobuf, "Content-length:") == 0)) {
+ 				/* extra read only for POST */
+-				if (prequest != request_GET && prequest != request_HEAD) {
++				if (prequest != request_GET
++#if ENABLE_FEATURE_HTTPD_CGI
++				 && prequest != request_HEAD
++#endif
++				) {
+ 					tptr = iobuf + sizeof("Content-length:") - 1;
+ 					if (!tptr[0])
+ 						send_headers_and_exit(HTTP_BAD_REQUEST);
+@@ -2129,7 +2133,12 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
+ 	 */
+ 
+ 	send_file_and_exit(tptr,
+-		(prequest != request_HEAD ? SEND_HEADERS_AND_BODY : SEND_HEADERS));
++#if ENABLE_FEATURE_HTTPD_CGI
++		(prequest != request_HEAD ? SEND_HEADERS_AND_BODY : SEND_HEADERS)
++#else
++		SEND_HEADERS_AND_BODY
++#endif
++	);
+ }
+ 
+ /*
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 6aa929a..586c3db 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -483,9 +483,9 @@ static const struct dhcp_client_t ext_dhcp_clients[] = {
+ };
+ #endif /* ENABLE_FEATURE_IFUPDOWN_EXTERNAL_DHCPC */
+ 
++#if ENABLE_FEATURE_IFUPDOWN_EXTERNAL_DHCP
+ static int dhcp_up(struct interface_defn_t *ifd, execfn *exec)
+ {
+-#if ENABLE_FEATURE_IFUPDOWN_EXTERNAL_DHCP
+ 	int i;
+ #if ENABLE_FEATURE_IFUPDOWN_IP
+ 	/* ip doesn't up iface when it configures it (unlike ifconfig) */
+@@ -498,7 +498,10 @@ static int dhcp_up(struct interface_defn_t *ifd, execfn *exec)
+ 	}
+ 	bb_error_msg("no dhcp clients found");
+ 	return 0;
++}
+ #elif ENABLE_APP_UDHCPC
++static int dhcp_up(struct interface_defn_t *ifd, execfn *exec)
++{
+ #if ENABLE_FEATURE_IFUPDOWN_IP
+ 	/* ip doesn't up iface when it configures it (unlike ifconfig) */
+ 	if (!execute("ip link set %iface% up", ifd, exec))
+@@ -507,14 +510,18 @@ static int dhcp_up(struct interface_defn_t *ifd, execfn *exec)
+ 	return execute("udhcpc -R -n -p /var/run/udhcpc.%iface%.pid "
+ 			"-i %iface%[[ -H %hostname%]][[ -c %clientid%]][[ -s %script%]]",
+ 			ifd, exec);
++}
+ #else
++static int dhcp_up(struct interface_defn_t *ifd ATTRIBUTE_UNUSED,
++		execfn *exec ATTRIBUTE_UNUSED)
++{
+ 	return 0; /* no dhcp support */
+-#endif
+ }
++#endif
+ 
++#if ENABLE_FEATURE_IFUPDOWN_EXTERNAL_DHCP
+ static int dhcp_down(struct interface_defn_t *ifd, execfn *exec)
+ {
+-#if ENABLE_FEATURE_IFUPDOWN_EXTERNAL_DHCP
+ 	int i;
+ 	for (i = 0; i < ARRAY_SIZE(ext_dhcp_clients); i++) {
+ 		if (exists_execable(ext_dhcp_clients[i].name))
+@@ -522,13 +529,20 @@ static int dhcp_down(struct interface_defn_t *ifd, execfn *exec)
+ 	}
+ 	bb_error_msg("no dhcp clients found, using static interface shutdown");
+ 	return static_down(ifd, exec);
++}
+ #elif ENABLE_APP_UDHCPC
++static int dhcp_down(struct interface_defn_t *ifd, execfn *exec)
++{
+ 	return execute("kill "
+ 	               "`cat /var/run/udhcpc.%iface%.pid` 2>/dev/null", ifd, exec);
++}
+ #else
++static int dhcp_down(struct interface_defn_t *ifd ATTRIBUTE_UNUSED,
++		execfn *exec ATTRIBUTE_UNUSED)
++{
+ 	return 0; /* no dhcp support */
+-#endif
+ }
++#endif
+ 
+ static int manual_up_down(struct interface_defn_t *ifd ATTRIBUTE_UNUSED, execfn *exec ATTRIBUTE_UNUSED)
+ {
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 0ddfa6b..b931aa1 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1331,10 +1331,10 @@ int inetd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				continue; /* -> check next fd in fd set */
+ 			}
+ 
+-			/* we are either child or didn't fork at all */
++			/* we are either child or didn't vfork at all */
+ #ifdef INETD_BUILTINS_ENABLED
+ 			if (sep->se_builtin) {
+-				if (pid) { /* "pid" is -1: we did fork */
++				if (pid) { /* "pid" is -1: we did vfork */
+ 					close(sep->se_fd); /* listening socket */
+ 					logmode = 0; /* make xwrite etc silent */
+ 				}
+@@ -1343,8 +1343,8 @@ int inetd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					sep->se_builtin->bi_stream_fn(ctrl, sep);
+ 				else
+ 					sep->se_builtin->bi_dgram_fn(ctrl, sep);
+-				if (pid) /* we did fork */
+-					_exit(0);
++				if (pid) /* we did vfork */
++					_exit(1);
+ 				maybe_close(accepted_fd);
+ 				continue; /* -> check next fd in fd set */
+ 			}
+@@ -1430,11 +1430,15 @@ static void echo_stream(int s, servtab_t *sep ATTRIBUTE_UNUSED)
+ 		xwrite(s, line, sz);
+ 	}
+ #else
++	/* We are after vfork here! */
+ 	static const char *const args[] = { "cat", NULL };
+-	/* no error messages */
++	/* move network socket to stdin */
++	xmove_fd(s, STDIN_FILENO);
++	xdup2(STDIN_FILENO, STDOUT_FILENO);
++	/* no error messages please... */
+ 	xmove_fd(xopen("/dev/null", O_WRONLY), STDERR_FILENO);
+ 	BB_EXECVP("cat", (char**)args);
+-	_exit(1);
++	/* on failure we return to main, which does exit(1) */
+ #endif
+ }
+ static void echo_dg(int s, servtab_t *sep)
+@@ -1463,11 +1467,15 @@ static void discard_stream(int s, servtab_t *sep ATTRIBUTE_UNUSED)
+ 	while (safe_read(s, line, LINE_SIZE) > 0)
+ 		continue;
+ #else
++	/* We are after vfork here! */
+ 	static const char *const args[] = { "dd", "of=/dev/null", NULL };
++	/* move network socket to stdin */
++	xmove_fd(s, STDIN_FILENO);
++	xdup2(STDIN_FILENO, STDOUT_FILENO);
+ 	/* no error messages */
+ 	xmove_fd(xopen("/dev/null", O_WRONLY), STDERR_FILENO);
+ 	BB_EXECVP("dd", (char**)args);
+-	_exit(1);
++	/* on failure we return to main, which does exit(1) */
+ #endif
+ }
+ /* ARGSUSED */
+diff --git a/networking/nc.c b/networking/nc.c
+index 7c2aafa..7d4a6e0 100644
+--- a/networking/nc.c
++++ b/networking/nc.c
+@@ -17,7 +17,7 @@
+  * when compared to "standard" nc
+  */
+ 
+-static void timeout(int signum)
++static void timeout(int signum ATTRIBUTE_UNUSED)
+ {
+ 	bb_error_msg_and_die("timed out");
+ }
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index 241028b..2eb01dc 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -551,11 +551,11 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			int rc;
+ 
+ 			// retrieve message in ./tmp/
+-			pop3_check(retr, (const char *)nmsg);
++			pop3_check(retr, (const char *)(ptrdiff_t)nmsg);
+ 			pop3_message(filename);
+ 			// delete message from server
+ 			if (opts & OPTF_z)
+-				pop3_check("DELE %u", (const char*)nmsg);
++				pop3_check("DELE %u", (const char*)(ptrdiff_t)nmsg);
+ 
+ 			// run postprocessing program
+ 			if (*fargs) {
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 20c5792..2ed3b74 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -161,14 +161,14 @@ make_new_session(
+ 	const char *login_argv[2];
+ 	struct termios termbuf;
+ 	int fd, pid;
+-	char tty_name[32];
++	char tty_name[GETPTY_BUFSIZE];
+ 	struct tsession *ts = xzalloc(sizeof(struct tsession) + BUFSIZE * 2);
+ 
+ 	/*ts->buf1 = (char *)(ts + 1);*/
+ 	/*ts->buf2 = ts->buf1 + BUFSIZE;*/
+ 
+ 	/* Got a new connection, set up a tty. */
+-	fd = getpty(tty_name, 32);
++	fd = getpty(tty_name);
+ 	if (fd < 0) {
+ 		bb_error_msg("can't create pty");
+ 		return NULL;
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 582840a..c0b4a3f 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -729,6 +729,10 @@ pr_type(unsigned char t)
+ }
+ #endif
+ 
++#if !ENABLE_FEATURE_TRACEROUTE_VERBOSE
++#define packet_ok(buf, cc, from, seq) \
++	packet_ok(buf, cc, seq)
++#endif
+ static int
+ packet_ok(unsigned char *buf, int cc, struct sockaddr_in *from, int seq)
+ {
+diff --git a/networking/udhcp/clientsocket.c b/networking/udhcp/clientsocket.c
+index b5534f8..0be661d 100644
+--- a/networking/udhcp/clientsocket.c
++++ b/networking/udhcp/clientsocket.c
+@@ -76,7 +76,7 @@ int raw_socket(int ifindex)
+ 		BPF_STMT(BPF_LD|BPF_W|BPF_IND, 0),
+ 		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, SERVER_AND_CLIENT_PORTS, 0, 1),	/* L3, L4 */
+ 		/* returns */
+-		BPF_STMT(BPF_RET|BPF_K, ~0UL),                          /* L3: pass */
++		BPF_STMT(BPF_RET|BPF_K, (~(uint32_t)0) ),               /* L3: pass */
+ 		BPF_STMT(BPF_RET|BPF_K, 0),                             /* L4: reject */
+ 	};
+ 	static const struct sock_fprog filter_prog = {
+diff --git a/networking/wget.c b/networking/wget.c
+index dc1dc2a..f8adcd7 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -189,7 +189,7 @@ static void progressmeter(int flag)
+  */
+ #else /* FEATURE_WGET_STATUSBAR */
+ 
+-static ALWAYS_INLINE void progressmeter(int flag) { }
++static ALWAYS_INLINE void progressmeter(int flag ATTRIBUTE_UNUSED) { }
+ 
+ #endif
+ 
+diff --git a/procps/ps.c b/procps/ps.c
+index 647e03f..aeb8cec 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -484,7 +484,7 @@ int ps_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 
+ int ps_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ps_main(int argc, char **argv)
++int ps_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	procps_status_t *p = NULL;
+ 	int len;
+diff --git a/shell/ash.c b/shell/ash.c
+index 580918c..d9ce202 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -3247,6 +3247,9 @@ static pid_t backgndpid;        /* pid of last background process */
+ static smallint job_warning;    /* user was warned about stopped jobs (can be 2, 1 or 0). */
+ 
+ static struct job *makejob(/*union node *,*/ int);
++#if !JOBS
++#define forkshell(job, node, mode) forkshell(job, mode)
++#endif
+ static int forkshell(struct job *, union node *, int);
+ static int waitforjob(struct job *);
+ 
+@@ -3424,6 +3427,9 @@ jobno(const struct job *jp)
+ /*
+  * Convert a job name to a job structure.
+  */
++#if !JOBS
++#define getjob(name, getctl) getjob(name)
++#endif
+ static struct job *
+ getjob(const char *name, int getctl)
+ {
+@@ -4533,6 +4539,9 @@ forkchild(struct job *jp, /*union node *n,*/ int mode)
+ }
+ 
+ /* Called after fork(), in parent */
++#if !JOBS
++#define forkparent(jp, n, mode, pid) forkparent(jp, mode, pid)
++#endif
+ static void
+ forkparent(struct job *jp, union node *n, int mode, pid_t pid)
+ {
+@@ -8674,8 +8683,8 @@ preadfd(void)
+ 	char *buf =  parsefile->buf;
+ 	parsenextc = buf;
+ 
+- retry:
+ #if ENABLE_FEATURE_EDITING
++ retry:
+ 	if (!iflag || parsefile->fd)
+ 		nr = nonblock_safe_read(parsefile->fd, buf, BUFSIZ - 1);
+ 	else {
+@@ -8876,8 +8885,11 @@ pungetc(void)
+  * Push a string back onto the input at this current parsefile level.
+  * We handle aliases this way.
+  */
++#if !ENABLE_ASH_ALIAS
++#define pushstring(s, ap) pushstring(s)
++#endif
+ static void
+-pushstring(char *s, void *ap)
++pushstring(char *s, struct alias *ap)
+ {
+ 	struct strpush *sp;
+ 	size_t len;
+@@ -8894,9 +8906,9 @@ pushstring(char *s, void *ap)
+ 	sp->prevstring = parsenextc;
+ 	sp->prevnleft = parsenleft;
+ #if ENABLE_ASH_ALIAS
+-	sp->ap = (struct alias *)ap;
++	sp->ap = ap;
+ 	if (ap) {
+-		((struct alias *)ap)->flag |= ALIASINUSE;
++		ap->flag |= ALIASINUSE;
+ 		sp->string = s;
+ 	}
+ #endif
+diff --git a/shell/cttyhack.c b/shell/cttyhack.c
+index 4041817..bbe5149 100644
+--- a/shell/cttyhack.c
++++ b/shell/cttyhack.c
+@@ -38,7 +38,7 @@ struct serial_struct {
+ };
+ 
+ int cttyhack_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int cttyhack_main(int argc, char **argv)
++int cttyhack_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int fd;
+ 	char console[sizeof(int)*3 + 16];
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index d616abd..ab7770d 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -170,10 +170,10 @@ enum {
+ };
+ #endif
+ 
++#if ENABLE_FEATURE_FBSET_READMODE
+ static int readmode(struct fb_var_screeninfo *base, const char *fn,
+ 					const char *mode)
+ {
+-#if ENABLE_FEATURE_FBSET_READMODE
+ 	FILE *f;
+ 	char buf[256];
+ 	char *p = buf;
+@@ -257,11 +257,9 @@ static int readmode(struct fb_var_screeninfo *base, const char *fn,
+ 				return 1;
+ 		}
+ 	}
+-#else
+-	bb_error_msg("mode reading not compiled in");
+-#endif
+ 	return 0;
+ }
++#endif
+ 
+ static inline void setmode(struct fb_var_screeninfo *base,
+ 					struct fb_var_screeninfo *set)
+@@ -389,9 +387,13 @@ int fbset_main(int argc, char **argv)
+ 	fh = xopen(fbdev, O_RDONLY);
+ 	xioctl(fh, FBIOGET_VSCREENINFO, &var);
+ 	if (g_options & OPT_READMODE) {
++#if !ENABLE_FEATURE_FBSET_READMODE
++		bb_show_usage();
++#else
+ 		if (!readmode(&var, modefile, mode)) {
+ 			bb_error_msg_and_die("unknown video mode '%s'", mode);
+ 		}
++#endif
+ 	}
+ 
+ 	setmode(&var, &varset);
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index a75b4f8..dcfae96 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -128,7 +128,11 @@ static unsigned read_int(unsigned low, unsigned dflt, unsigned high, unsigned ba
+ #endif
+ static const char *partition_type(unsigned char type);
+ static void get_geometry(void);
++#if ENABLE_FEATURE_SUN_LABEL || ENABLE_FEATURE_FDISK_WRITABLE
+ static int get_boot(enum action what);
++#else
++static int get_boot(void);
++#endif
+ 
+ #define PLURAL   0
+ #define SINGULAR 1
+@@ -1237,8 +1241,12 @@ get_geometry(void)
+  *    0: found or created label
+  *    1: I/O error
+  */
+-static int
+-get_boot(enum action what)
++#if ENABLE_FEATURE_SUN_LABEL || ENABLE_FEATURE_FDISK_WRITABLE
++static int get_boot(enum action what)
++#else
++static int get_boot(void)
++#define get_boot(what) get_boot()
++#endif
+ {
+ 	int i;
+ 
+diff --git a/util-linux/script.c b/util-linux/script.c
+index c37fd9d..1c95ea5 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -29,7 +29,7 @@ int script_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	int attr_ok; /* NB: 0: ok */
+ 	int winsz_ok;
+ 	int pty;
+-	char pty_line[32];
++	char pty_line[GETPTY_BUFSIZE];
+ 	struct termios tt, rtt;
+ 	struct winsize win;
+ 	const char *fname = "typescript";
+@@ -69,7 +69,7 @@ int script_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		shell = DEFAULT_SHELL;
+ 	}
+ 
+-	pty = getpty(pty_line, sizeof(pty_line));
++	pty = getpty(pty_line);
+ 	if (pty < 0) {
+ 		bb_perror_msg_and_die("can't get pty");
+ 	}
+diff --git a/util-linux/volume_id/get_devname.c b/util-linux/volume_id/get_devname.c
+index 75060b0..af03d07 100644
+--- a/util-linux/volume_id/get_devname.c
++++ b/util-linux/volume_id/get_devname.c
+@@ -26,6 +26,10 @@ static struct uuidCache_s {
+ } *uuidCache;
+ 
+ /* for now, only ext2, ext3 and xfs are supported */
++#if !ENABLE_FEATURE_VOLUMEID_ISO9660
++#define get_label_uuid(device, label, uuid, iso_only) \
++	get_label_uuid(device, label, uuid)
++#endif
+ static int
+ get_label_uuid(const char *device, char **label, char **uuid, int iso_only)
+ {
+@@ -83,6 +87,10 @@ uuidcache_addentry(char * device, int major, int minor, char *label, char *uuid)
+ 	memcpy(last->uuid, uuid, sizeof(last->uuid));
+ }
+ 
++#if !ENABLE_FEATURE_VOLUMEID_ISO9660
++#define uuidcache_check_device(device_name, ma, mi, iso_only) \
++	uuidcache_check_device(device_name, ma, mi)
++#endif
+ static void
+ uuidcache_check_device(const char *device_name, int ma, int mi, int iso_only)
+ {

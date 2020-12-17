@@ -1,0 +1,14 @@
+2008-05-05 14:45:32 +0000
+diff --git a/miscutils/last.c b/miscutils/last.c
+index f823a13..de2d2bb 100644
+--- a/miscutils/last.c
++++ b/miscutils/last.c
+@@ -49,7 +49,7 @@ int last_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ 				ut.ut_type = SHUTDOWN_TIME;
+ 			else if (strncmp(ut.ut_user, "reboot", 6) == 0)
+ 				ut.ut_type = BOOT_TIME;
+-			else if (strncmp(ut.ut_user, "runlevel", 7) == 0)
++			else if (strncmp(ut.ut_user, "runlevel", 8) == 0)
+ 				ut.ut_type = RUN_LVL;
+ 		} else {
+ 			if (ut.ut_name[0] == '\0' || strcmp(ut.ut_name, "LOGIN") == 0) {

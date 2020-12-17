@@ -1,0 +1,36 @@
+2008-05-31 07:34:14 +0000
+diff --git a/libbb/compare_string_array.c b/libbb/compare_string_array.c
+index 151b508..ec7f94e 100644
+--- a/libbb/compare_string_array.c
++++ b/libbb/compare_string_array.c
+@@ -23,7 +23,7 @@ int index_in_strings(const char *strings, const char *key)
+ {
+ 	int idx = 0;
+ 
+-	while (strings[0]) {
++	while (*strings) {
+ 		if (strcmp(strings, key) == 0) {
+ 			return idx;
+ 		}
+@@ -57,7 +57,7 @@ int index_in_substrings(const char *strings, const char *key)
+ 
+ 	if (len) {
+ 		int idx = 0;
+-		while (strings[0]) {
++		while (*strings) {
+ 			if (strncmp(strings, key, len) == 0) {
+ 				return idx;
+ 			}
+diff --git a/networking/libiproute/ip_parse_common_args.c b/networking/libiproute/ip_parse_common_args.c
+index 294bde5..5e4012b 100644
+--- a/networking/libiproute/ip_parse_common_args.c
++++ b/networking/libiproute/ip_parse_common_args.c
+@@ -54,7 +54,7 @@ char **ip_parse_common_args(char **argv)
+ 				break;
+ 			}
+ 		}
+-		arg = index_in_strings(ip_common_commands, opt);
++		arg = index_in_substrings(ip_common_commands, opt);
+ 		if (arg < 0)
+ 			bb_show_usage();
+ 		if (arg == ARG_oneline) {

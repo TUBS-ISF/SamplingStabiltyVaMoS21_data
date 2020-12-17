@@ -1,0 +1,337 @@
+2008-11-24 13:25:20 +0000
+diff --git a/findutils/grep.c b/findutils/grep.c
+index 73e74f4..6a6ddb6 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -374,11 +374,11 @@ static int grep_file(FILE *file)
+ 						break;
+ #else
+ 						if (re_search(&gl->compiled_regex, line, line_len,
+-								gl->matched_range.rm_eo, line_len - gl->matched_range.rm_eo, 
++								gl->matched_range.rm_eo, line_len - gl->matched_range.rm_eo,
+ 								&gl->matched_range) < 0)
+ 							break;
+ #endif
+-					} 
++					}
+ 				} else {
+ 					print_line(line, line_len, linenum, ':');
+ 				}
+diff --git a/include/applets.h b/include/applets.h
+index 286f71d..fb904bb 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -372,6 +372,7 @@ USE_TFTP(APPLET(tftp, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_TFTPD(APPLET(tftpd, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ #endif
+ USE_TIME(APPLET(time, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
++USE_TIMEOUT(APPLET(timeout, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_TOP(APPLET(top, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_TOUCH(APPLET_NOFORK(touch, touch, _BB_DIR_BIN, _BB_SUID_NEVER, touch))
+ USE_TR(APPLET(tr, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+diff --git a/include/libbb.h b/include/libbb.h
+index 85a915e..77c4c60 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -923,7 +923,7 @@ void bb_displayroutes(int noresolve, int netstatfmt) FAST_FUNC;
+  * yet doesn't represent any valid Unicode characher.
+  * Also, -1 is reserved for error indication and we don't use it. */
+ enum {
+-	KEYCODE_UP       =  -2, 
++	KEYCODE_UP       =  -2,
+ 	KEYCODE_DOWN     =  -3,
+ 	KEYCODE_RIGHT    =  -4,
+ 	KEYCODE_LEFT     =  -5,
+diff --git a/include/usage.h b/include/usage.h
+index 49c9400..3c657a1 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4321,6 +4321,12 @@
+      "\nOptions:" \
+      "\n	-v	Verbose" \
+ 
++#define timeout_trivial_usage \
++	"[-t SECS] [-s SIG] PROG [ARGS]"
++#define timeout_full_usage "\n\n" \
++       "Runs PROG. Sends SIG to it if it is not gone in SECS seconds.\n" \
++       "Defaults: SECS: 10, SIG: TERM.\n" \
++
+ #define top_trivial_usage \
+        "[-b] [-nCOUNT] [-dSECONDS]"
+ #define top_full_usage "\n\n" \
+diff --git a/libbb/pw_encrypt_sha.c b/libbb/pw_encrypt_sha.c
+index 3173506..e71f96f 100644
+--- a/libbb/pw_encrypt_sha.c
++++ b/libbb/pw_encrypt_sha.c
+@@ -210,7 +210,7 @@ do {							\
+ 			b64_from_24bit(alt_result[i], alt_result[j], alt_result[k], 4);
+ 			if (k == 29)
+ 				break;
+-			i = k + 1; 
++			i = k + 1;
+ 		}
+ 		b64_from_24bit(0, alt_result[31], alt_result[30], 3);
+ 		/* was:
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index fc7333b..68732e6 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -529,6 +529,13 @@ config TIME
+ 	  When the command finishes, time writes a message to standard output
+ 	  giving timing statistics about this program run.
+ 
++config TIMEOUT
++	bool "timeout"
++	default n
++	help
++	  Runs a program and watches it. If it does not terminate in
++	  specified number of seconds, it is sent a signal.
++
+ config TTYSIZE
+ 	bool "ttysize"
+ 	default n
+diff --git a/miscutils/Kbuild b/miscutils/Kbuild
+index 13791ef..e6e4347 100644
+--- a/miscutils/Kbuild
++++ b/miscutils/Kbuild
+@@ -34,5 +34,6 @@ lib-$(CONFIG_SETSID)      += setsid.o
+ lib-$(CONFIG_STRINGS)     += strings.o
+ lib-$(CONFIG_TASKSET)     += taskset.o
+ lib-$(CONFIG_TIME)        += time.o
++lib-$(CONFIG_TIMEOUT)     += timeout.o
+ lib-$(CONFIG_TTYSIZE)     += ttysize.o
+ lib-$(CONFIG_WATCHDOG)    += watchdog.o
+diff --git a/miscutils/timeout.c b/miscutils/timeout.c
+new file mode 100644
+index 0000000..6a0a9a6
+--- /dev/null
++++ b/miscutils/timeout.c
+@@ -0,0 +1,228 @@
++/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
++ * COPYING NOTES
++ *
++ * timeout.c -- a timeout handler for shell commands
++ *
++ * Copyright (C) 2005-6, Roberto A. Foglietta <me@roberto.foglietta.name>
++ *
++ *   This program is free software; you can redistribute it and/or modify
++ *   it under the terms of the GNU General Public License as published by
++ *   the Free Software Foundation; version 2 of the License.
++ *
++ *   This program is distributed in the hope that it will be useful,
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *   GNU General Public License for more details.
++ *
++ *   You should have received a copy of the GNU General Public License
++ *   along with this program; if not, write to the Free Software
++ *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
++ */
++/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
++ * REVISION NOTES:
++ * released 17-11-2005 by Roberto A. Foglietta
++ * talarm   04-12-2005 by Roberto A. Foglietta
++ * modified 05-12-2005 by Roberto A. Foglietta
++ * sizerdct 06-12-2005 by Roberto A. Foglietta
++ * splitszf 12-05-2006 by Roberto A. Foglietta
++ * rewrite  14-11-2008 vda
++ */
++
++#include "libbb.h"
++
++int timeout_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int timeout_main(int argc UNUSED_PARAM, char **argv)
++{
++	int signo;
++	int status;
++	int parent = 0;
++	int timeout = 10;
++	pid_t pid;
++#if !BB_MMU
++	char *sv1, *sv2;
++#endif
++	const char *opt_s = "TERM";
++
++	/* -p option is not documented, it is needed to support NOMMU. */
++
++	/* -t SECONDS; -p PARENT_PID */
++	opt_complementary = "t+" USE_FOR_NOMMU(":p+");
++	getopt32(argv, "s:t" USE_FOR_NOMMU(":p:"), &opt_s, &timeout, &parent);
++	/*argv += optind; - no, wait for bb_daemonize_or_rexec! */
++	signo = get_signum(opt_s);
++	if (signo < 0)
++		bb_error_msg_and_die("unknown signal '%s'", opt_s);
++
++	/* We want to create a grandchild which will watch
++	 * and kill the grandparent. Other methods:
++	 * making parent watch child disrupts parent<->child link
++	 * (example: "tcpsvd 0.0.0.0 1234 timeout service_prog" -
++	 * it's better if service_prog is a child of tcpsvd!),
++	 * making child watch parent results in programs having
++	 * unexpected children. */
++
++	if (parent) /* we were re-execed, already grandchild */
++		goto grandchild;
++	if (!argv[optind]) /* no PROG? */
++		bb_show_usage();
++
++	pid = vfork();
++	if (pid < 0)
++		bb_perror_msg_and_die("vfork");
++#if !BB_MMU
++	sv1 = argv[optind];
++	sv2 = argv[optind + 1];
++#endif
++	if (pid == 0) {
++		/* Child: spawn grandchild and exit */
++		parent = getppid();
++#if !BB_MMU
++		argv[optind] = xasprintf("-p%u", parent);
++		argv[optind + 1] = NULL;
++#endif
++		/* NB: exits with nonzero on error: */
++		bb_daemonize_or_rexec(0, argv);
++		/* Here we are grandchild. Sleep, then kill grandparent */
++ grandchild:
++		/* Just sleep(NUGE_NUM); kill(parent) may kill wrong process! */
++		while (1) {
++			sleep(1);
++			if (--timeout <= 0)
++				break;
++			if (kill(parent, 0)) {
++				/* process is gone */
++				return EXIT_SUCCESS;
++			}
++		}
++		kill(parent, signo);
++		return EXIT_SUCCESS;
++	}
++
++	/* Parent */
++	wait(&status); /* wait for child to die */
++	/* Did intermediate [v]fork or exec fail? */
++	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
++		return EXIT_FAILURE;
++	/* Ok, exec a program as requested */
++	argv += optind;
++#if !BB_MMU
++	argv[0] = sv1;
++	argv[1] = sv2;
++#endif
++	BB_EXECVP(argv[0], argv);
++	bb_perror_msg_and_die("exec '%s'", argv[0]);
++}
++/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
++ * COPYING NOTES
++ *
++ * timeout.c -- a timeout handler for shell commands
++ *
++ * Copyright (C) 2005-6, Roberto A. Foglietta <me@roberto.foglietta.name>
++ *
++ *   This program is free software; you can redistribute it and/or modify
++ *   it under the terms of the GNU General Public License as published by
++ *   the Free Software Foundation; version 2 of the License.
++ *
++ *   This program is distributed in the hope that it will be useful,
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *   GNU General Public License for more details.
++ *
++ *   You should have received a copy of the GNU General Public License
++ *   along with this program; if not, write to the Free Software
++ *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
++ */
++/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
++ * REVISION NOTES:
++ * released 17-11-2005 by Roberto A. Foglietta
++ * talarm   04-12-2005 by Roberto A. Foglietta
++ * modified 05-12-2005 by Roberto A. Foglietta
++ * sizerdct 06-12-2005 by Roberto A. Foglietta
++ * splitszf 12-05-2006 by Roberto A. Foglietta
++ * rewrite  14-11-2008 vda
++ */
++
++#include "libbb.h"
++
++int timeout_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int timeout_main(int argc UNUSED_PARAM, char **argv)
++{
++	int signo;
++	int status;
++	int parent = 0;
++	int timeout = 10;
++	pid_t pid;
++#if !BB_MMU
++	char *sv1, *sv2;
++#endif
++	const char *opt_s = "TERM";
++
++	/* -p option is not documented, it is needed to support NOMMU. */
++
++	/* -t SECONDS; -p PARENT_PID */
++	opt_complementary = "t+" USE_FOR_NOMMU(":p+");
++	getopt32(argv, "s:t" USE_FOR_NOMMU(":p:"), &opt_s, &timeout, &parent);
++	/*argv += optind; - no, wait for bb_daemonize_or_rexec! */
++	signo = get_signum(opt_s);
++	if (signo < 0)
++		bb_error_msg_and_die("unknown signal '%s'", opt_s);
++
++	/* We want to create a grandchild which will watch
++	 * and kill the grandparent. Other methods:
++	 * making parent watch child disrupts parent<->child link
++	 * (example: "tcpsvd 0.0.0.0 1234 timeout service_prog" -
++	 * it's better if service_prog is a child of tcpsvd!),
++	 * making child watch parent results in programs having
++	 * unexpected children. */
++
++	if (parent) /* we were re-execed, already grandchild */
++		goto grandchild;
++	if (!argv[optind]) /* no PROG? */
++		bb_show_usage();
++
++	pid = vfork();
++	if (pid < 0)
++		bb_perror_msg_and_die("vfork");
++#if !BB_MMU
++	sv1 = argv[optind];
++	sv2 = argv[optind + 1];
++#endif
++	if (pid == 0) {
++		/* Child: spawn grandchild and exit */
++		parent = getppid();
++#if !BB_MMU
++		argv[optind] = xasprintf("-p%u", parent);
++		argv[optind + 1] = NULL;
++#endif
++		/* NB: exits with nonzero on error: */
++		bb_daemonize_or_rexec(0, argv);
++		/* Here we are grandchild. Sleep, then kill grandparent */
++ grandchild:
++		/* Just sleep(NUGE_NUM); kill(parent) may kill wrong process! */
++		while (1) {
++			sleep(1);
++			if (--timeout <= 0)
++				break;
++			if (kill(parent, 0)) {
++				/* process is gone */
++				return EXIT_SUCCESS;
++			}
++		}
++		kill(parent, signo);
++		return EXIT_SUCCESS;
++	}
++
++	/* Parent */
++	wait(&status); /* wait for child to die */
++	/* Did intermediate [v]fork or exec fail? */
++	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
++		return EXIT_FAILURE;
++	/* Ok, exec a program as requested */
++	argv += optind;
++#if !BB_MMU
++	argv[0] = sv1;
++	argv[1] = sv2;
++#endif
++	BB_EXECVP(argv[0], argv);
++	bb_perror_msg_and_die("exec '%s'", argv[0]);
++}

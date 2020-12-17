@@ -1,0 +1,30 @@
+2009-02-26 12:00:52 +0000
+diff --git a/modutils/modutils.c b/modutils/modutils.c
+index 0d7d72d..8836f7c 100644
+--- a/modutils/modutils.c
++++ b/modutils/modutils.c
+@@ -71,7 +71,7 @@ char * FAST_FUNC filename2modname(const char *filename, char *modname)
+ 	if (modname == NULL)
+ 		modname = xmalloc(MODULE_NAME_LEN);
+ 	from = bb_get_last_path_component_nostrip(filename);
+-	for (i = 0; i < MODULE_NAME_LEN && from[i] != '\0' && from[i] != '.'; i++)
++	for (i = 0; i < (MODULE_NAME_LEN-1) && from[i] != '\0' && from[i] != '.'; i++)
+ 		modname[i] = (from[i] == '-') ? '_' : from[i];
+ 	modname[i] = 0;
+ 
+diff --git a/modutils/modutils.h b/modutils/modutils.h
+index 6aaf79d..cc7c653 100644
+--- a/modutils/modutils.h
++++ b/modutils/modutils.h
+@@ -15,8 +15,9 @@
+ # pragma GCC visibility push(hidden)
+ #endif
+ 
+-/* As defined in linux/include/linux/module.h */
+-#define MODULE_NAME_LEN 64
++/* linux/include/linux/module.h has 64, but this is also used
++ * internally for the maximum alias name length, which can be quite long */
++#define MODULE_NAME_LEN 256
+ 
+ const char *moderror(int err) FAST_FUNC;
+ llist_t *llist_find(llist_t *first, const char *str) FAST_FUNC;

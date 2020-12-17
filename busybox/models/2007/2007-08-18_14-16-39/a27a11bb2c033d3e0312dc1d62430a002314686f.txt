@@ -1,0 +1,618 @@
+2007-08-18 14:16:39 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 52bc339..651c48b 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -241,6 +241,7 @@ extern char *bb_get_last_path_component(char *path);
+ 
+ int ndelay_on(int fd);
+ int ndelay_off(int fd);
++void xdup2(int, int);
+ void xmove_fd(int, int);
+ 
+ 
+@@ -288,8 +289,7 @@ ssize_t xsendto(int s, const void *buf, size_t len, const struct sockaddr *to,
+  * time out. Linux does not allow multiple live binds on same ip:port
+  * regardless of SO_REUSEADDR (unlike some other flavors of Unix).
+  * Turn it on before you call bind(). */
+-//TODO: it seems like in Linux this never fails. Change to void, eliminate error checks
+-int setsockopt_reuseaddr(int fd);
++void setsockopt_reuseaddr(int fd); /* On Linux this never fails. */
+ int setsockopt_broadcast(int fd);
+ /* NB: returns port in host byte order */
+ unsigned bb_lookup_port(const char *port, const char *protocol, unsigned default_port);
+@@ -360,14 +360,14 @@ void set_nport(len_and_sockaddr *lsa, unsigned port);
+ /* Retrieve sin[6]_port or return -1 for non-INET[6] lsa's */
+ int get_nport(const struct sockaddr *sa);
+ /* Reverse DNS. Returns NULL on failure. */
+-char* xmalloc_sockaddr2host(const struct sockaddr *sa, socklen_t salen);
++char* xmalloc_sockaddr2host(const struct sockaddr *sa);
+ /* This one doesn't append :PORTNUM */
+-char* xmalloc_sockaddr2host_noport(const struct sockaddr *sa, socklen_t salen);
++char* xmalloc_sockaddr2host_noport(const struct sockaddr *sa);
+ /* This one also doesn't fall back to dotted IP (returns NULL) */
+-char* xmalloc_sockaddr2hostonly_noport(const struct sockaddr *sa, socklen_t salen);
++char* xmalloc_sockaddr2hostonly_noport(const struct sockaddr *sa);
+ /* inet_[ap]ton on steroids */
+-char* xmalloc_sockaddr2dotted(const struct sockaddr *sa, socklen_t salen);
+-char* xmalloc_sockaddr2dotted_noport(const struct sockaddr *sa, socklen_t salen);
++char* xmalloc_sockaddr2dotted(const struct sockaddr *sa);
++char* xmalloc_sockaddr2dotted_noport(const struct sockaddr *sa);
+ // "old" (ipv4 only) API
+ // users: traceroute.c hostname.c - use _list_ of all IPs
+ struct hostent *xgethostbyname(const char *name);
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index 492808a..e46b3c6 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -258,7 +258,7 @@ int tcpudpsvd_main(int argc, char **argv)
+ #endif
+ 
+ 	if (verbose) {
+-		char *addr = xmalloc_sockaddr2dotted(&lsa->sa, sa_len);
++		char *addr = xmalloc_sockaddr2dotted(&lsa->sa);
+ 		printf("%s: info: listening on %s", applet_name, addr);
+ 		free(addr);
+ #ifndef SSLSVD
+@@ -302,7 +302,7 @@ int tcpudpsvd_main(int argc, char **argv)
+ 	if (max_per_host) {
+ 		/* Drop connection immediately if cur_per_host > max_per_host
+ 		 * (minimizing load under SYN flood) */
+-		remote_ip = xmalloc_sockaddr2dotted_noport(&remote.sa, sa_len);
++		remote_ip = xmalloc_sockaddr2dotted_noport(&remote.sa);
+ 		cur_per_host = ipsvd_perhost_add(remote_ip, max_per_host, &hccp);
+ 		if (cur_per_host > max_per_host) {
+ 			/* ipsvd_perhost_add detected that max is exceeded
+@@ -380,11 +380,11 @@ int tcpudpsvd_main(int argc, char **argv)
+ 		close(sock);
+ 
+ 	if (need_remote_ip)
+-		remote_addr = xmalloc_sockaddr2dotted(&remote.sa, sa_len);
++		remote_addr = xmalloc_sockaddr2dotted(&remote.sa);
+ 
+ 	if (need_hostnames) {
+ 		if (option_mask32 & OPT_h) {
+-			remote_hostname = xmalloc_sockaddr2host_noport(&remote.sa, sa_len);
++			remote_hostname = xmalloc_sockaddr2host_noport(&remote.sa);
+ 			if (!remote_hostname) {
+ 				bb_error_msg("warning: cannot look up hostname for %s", remote_addr);
+ 				remote_hostname = (char*)"";
+@@ -397,9 +397,9 @@ int tcpudpsvd_main(int argc, char **argv)
+ 			local.len = sa_len;
+ 			getsockname(0, &local.sa, &local.len);
+ 		}
+-		local_addr = xmalloc_sockaddr2dotted(&local.sa, sa_len);
++		local_addr = xmalloc_sockaddr2dotted(&local.sa);
+ 		if (!local_hostname) {
+-			local_hostname = xmalloc_sockaddr2host_noport(&local.sa, sa_len);
++			local_hostname = xmalloc_sockaddr2host_noport(&local.sa);
+ 			if (!local_hostname)
+ 				bb_error_msg_and_die("warning: cannot look up hostname for %s"+9, local_addr);
+ 		}
+@@ -426,7 +426,7 @@ int tcpudpsvd_main(int argc, char **argv)
+ 		 * an outbond connection to local handler, and it needs
+ 		 * to know where it originally tried to connect */
+ 		if (tcp && getsockopt(0, SOL_IP, SO_ORIGINAL_DST, &lsa->sa, &lsa->len) == 0) {
+-			char *addr = xmalloc_sockaddr2dotted(&lsa->sa, sa_len);
++			char *addr = xmalloc_sockaddr2dotted(&lsa->sa);
+ 			xsetenv("TCPORIGDSTADDR", addr);
+ 			free(addr);
+ 		}
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index b90aa9a..cb5ac2c 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -9,9 +9,9 @@
+ #include <netinet/in.h>
+ #include "libbb.h"
+ 
+-int setsockopt_reuseaddr(int fd)
++void setsockopt_reuseaddr(int fd)
+ {
+-	return setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &const_int_1, sizeof(const_int_1));
++	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &const_int_1, sizeof(const_int_1));
+ }
+ int setsockopt_broadcast(int fd)
+ {
+@@ -298,11 +298,21 @@ int xconnect_stream(const len_and_sockaddr *lsa)
+ /* We hijack this constant to mean something else */
+ /* It doesn't hurt because we will add this bit anyway */
+ #define IGNORE_PORT NI_NUMERICSERV
+-static char* sockaddr2str(const struct sockaddr *sa, socklen_t salen, int flags)
++static char* sockaddr2str(const struct sockaddr *sa, int flags)
+ {
+ 	char host[128];
+ 	char serv[16];
+-	int rc = getnameinfo(sa, salen,
++	int rc;
++	socklen_t salen;
++
++	salen = LSA_SIZEOF_SA;
++#if ENABLE_FEATURE_IPV6
++	if (sa->sa_family == AF_INET)
++		salen = sizeof(struct sockaddr_in);
++	if (sa->sa_family == AF_INET6)
++		salen = sizeof(struct sockaddr_in6);
++#endif
++	rc = getnameinfo(sa, salen,
+ 			host, sizeof(host),
+ 	/* can do ((flags & IGNORE_PORT) ? NULL : serv) but why bother? */
+ 			serv, sizeof(serv),
+@@ -327,26 +337,26 @@ static char* sockaddr2str(const struct sockaddr *sa, socklen_t salen, int flags)
+ 	/*return xstrdup(host);*/
+ }
+ 
+-char* xmalloc_sockaddr2host(const struct sockaddr *sa, socklen_t salen)
++char* xmalloc_sockaddr2host(const struct sockaddr *sa)
+ {
+-	return sockaddr2str(sa, salen, 0);
++	return sockaddr2str(sa, 0);
+ }
+ 
+-char* xmalloc_sockaddr2host_noport(const struct sockaddr *sa, socklen_t salen)
++char* xmalloc_sockaddr2host_noport(const struct sockaddr *sa)
+ {
+-	return sockaddr2str(sa, salen, IGNORE_PORT);
++	return sockaddr2str(sa, IGNORE_PORT);
+ }
+ 
+-char* xmalloc_sockaddr2hostonly_noport(const struct sockaddr *sa, socklen_t salen)
++char* xmalloc_sockaddr2hostonly_noport(const struct sockaddr *sa)
+ {
+-	return sockaddr2str(sa, salen, NI_NAMEREQD | IGNORE_PORT);
++	return sockaddr2str(sa, NI_NAMEREQD | IGNORE_PORT);
+ }
+-char* xmalloc_sockaddr2dotted(const struct sockaddr *sa, socklen_t salen)
++char* xmalloc_sockaddr2dotted(const struct sockaddr *sa)
+ {
+-	return sockaddr2str(sa, salen, NI_NUMERICHOST);
++	return sockaddr2str(sa, NI_NUMERICHOST);
+ }
+ 
+-char* xmalloc_sockaddr2dotted_noport(const struct sockaddr *sa, socklen_t salen)
++char* xmalloc_sockaddr2dotted_noport(const struct sockaddr *sa)
+ {
+-	return sockaddr2str(sa, salen, NI_NUMERICHOST | IGNORE_PORT);
++	return sockaddr2str(sa, NI_NUMERICHOST | IGNORE_PORT);
+ }
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 64061e4..5a1090e 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -169,13 +169,18 @@ int ndelay_off(int fd)
+ 	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL,0) & ~O_NONBLOCK);
+ }
+ 
++void xdup2(int from, int to)
++{
++	if (dup2(from, to) != to)
++		bb_perror_msg_and_die("can't duplicate file descriptor");
++}
++
+ // "Renumber" opened fd
+ void xmove_fd(int from, int to)
+ {
+ 	if (from == to)
+ 		return;
+-	if (dup2(from, to) != to)
+-		bb_perror_msg_and_die("can't duplicate file descriptor");
++	xdup2(from, to);
+ 	close(from);
+ }
+ 
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 0254d32..8b78856 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -226,12 +226,6 @@ static void parse_args(int argc, char **argv, struct options *op)
+ 	debug("exiting parseargs\n");
+ }
+ 
+-static void xdup2(int srcfd, int dstfd, const char *tty)
+-{
+-	if (dup2(srcfd, dstfd) == -1)
+-		bb_perror_msg_and_die("%s: dup", tty);
+-}
+-
+ /* open_tty - set up tty as standard { input, output, error } */
+ static void open_tty(const char *tty, struct termios *tp, int local)
+ {
+@@ -255,7 +249,7 @@ static void open_tty(const char *tty, struct termios *tp, int local)
+ 
+ 		debug("open(2)\n");
+ 		fd = xopen(tty, O_RDWR | O_NONBLOCK);
+-		xdup2(fd, 0, tty);
++		xdup2(fd, 0);
+ 		while (fd > 2) close(fd--);
+ 	} else {
+ 		/*
+@@ -269,8 +263,8 @@ static void open_tty(const char *tty, struct termios *tp, int local)
+ 
+ 	/* Replace current standard output/error fd's with new ones */
+ 	debug("duping\n");
+-	xdup2(0, 1, tty);
+-	xdup2(0, 2, tty);
++	xdup2(0, 1);
++	xdup2(0, 2);
+ 
+ 	/*
+ 	 * The following ioctl will fail if stdin is not a tty, but also when
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index 32166e5..672b729 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -375,7 +375,7 @@ int dnsd_main(int argc, char **argv)
+ 	xbind(udps, &lsa->sa, lsa->len);
+ 	/* xlisten(udps, 50); - ?!! DGRAM sockets are never listened on I think? */
+ 	bb_info_msg("Accepting UDP packets on %s",
+-			xmalloc_sockaddr2dotted(&lsa->sa, lsa->len));
++			xmalloc_sockaddr2dotted(&lsa->sa));
+ 
+ 	while (1) {
+ 		int r;
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index f3d6009..255e413 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -348,7 +348,7 @@ int ftpgetput_main(int argc, char **argv)
+ 	server->lsa = xhost2sockaddr(argv[0], bb_lookup_port(port, "tcp", 21));
+ 	if (verbose_flag) {
+ 		printf("Connecting to %s (%s)\n", argv[0],
+-			xmalloc_sockaddr2dotted(&server->lsa->sa, server->lsa->len));
++			xmalloc_sockaddr2dotted(&server->lsa->sa));
+ 	}
+ 
+ 	/*  Connect/Setup/Configure the FTP session */
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 211a8dc..a7517eb 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -453,8 +453,7 @@ static void setup(servtab_t *sep)
+ 		bb_perror_msg("%s/%s: socket", sep->se_service, sep->se_proto);
+ 		return;
+ 	}
+-	if (setsockopt_reuseaddr(sep->se_fd) < 0)
+-		bb_perror_msg("setsockopt(SO_REUSEADDR)");
++	setsockopt_reuseaddr(sep->se_fd);
+ 
+ #if ENABLE_FEATURE_INETD_RPC
+ 	if (isrpcservice(sep)) {
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 0d10714..30abb3c 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -278,7 +278,7 @@ static void dolisten(void)
+ 		rr = getsockname(netfd, &ouraddr->sa, &ouraddr->len);
+ 		if (rr < 0)
+ 			bb_perror_msg_and_die("getsockname after bind");
+-		addr = xmalloc_sockaddr2dotted(&ouraddr->sa, ouraddr->len);
++		addr = xmalloc_sockaddr2dotted(&ouraddr->sa);
+ 		fprintf(stderr, "listening on %s ...\n", addr);
+ 		free(addr);
+ 	}
+@@ -341,7 +341,7 @@ create new one, and bind() it. TODO */
+ 				/* nc 1.10 bails out instead, and its error message
+ 				 * is not suppressed by o_verbose */
+ 				if (o_verbose) {
+-					char *remaddr = xmalloc_sockaddr2dotted(&remend.sa, remend.len);
++					char *remaddr = xmalloc_sockaddr2dotted(&remend.sa);
+ 					bb_error_msg("connect from wrong ip/port %s ignored", remaddr);
+ 					free(remaddr);
+ 				}
+@@ -393,9 +393,9 @@ create new one, and bind() it. TODO */
+ 	 accept the connection and then reject undesireable ones by closing.
+ 	 In other words, we need a TCP MSG_PEEK. */
+ 	/* bbox: removed most of it */
+-		lcladdr = xmalloc_sockaddr2dotted(&ouraddr->sa, ouraddr->len);
+-		remaddr = xmalloc_sockaddr2dotted(&remend.sa, remend.len);
+-		remhostname = o_nflag ? remaddr : xmalloc_sockaddr2host(&remend.sa, remend.len);
++		lcladdr = xmalloc_sockaddr2dotted(&ouraddr->sa);
++		remaddr = xmalloc_sockaddr2dotted(&remend.sa);
++		remhostname = o_nflag ? remaddr : xmalloc_sockaddr2host(&remend.sa);
+ 		fprintf(stderr, "connect to %s from %s (%s)\n",
+ 				lcladdr, remhostname, remaddr);
+ 		free(lcladdr);
+@@ -796,7 +796,7 @@ int nc_main(int argc, char **argv)
+ 
+ 		remend = *themaddr;
+ 		if (o_verbose)
+-			themdotted = xmalloc_sockaddr2dotted(&themaddr->sa, themaddr->len);
++			themdotted = xmalloc_sockaddr2dotted(&themaddr->sa);
+ 
+ 		x = connect_w_timeout(netfd);
+ 		if (o_zero && x == 0 && o_udpmode)        /* if UDP scanning... */
+diff --git a/networking/netstat.c b/networking/netstat.c
+index 014e5e2..9fd3d2f 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -140,8 +140,8 @@ static char *ip_port_str(struct sockaddr *addr, int port, const char *proto, int
+ 	/* Code which used "*" for INADDR_ANY is removed: it's ambiguous in IPv6,
+ 	 * while "0.0.0.0" is not. */
+ 
+-	host = numeric ? xmalloc_sockaddr2dotted_noport(addr, salen)
+-	               : xmalloc_sockaddr2host_noport(addr, salen);
++	host = numeric ? xmalloc_sockaddr2dotted_noport(addr)
++	               : xmalloc_sockaddr2host_noport(addr);
+ 
+ 	host_port = xasprintf("%s:%s", host, get_sname(htons(port), proto, numeric));
+ 	free(host);
+diff --git a/networking/nslookup.c b/networking/nslookup.c
+index 608e654..0036d0d 100644
+--- a/networking/nslookup.c
++++ b/networking/nslookup.c
+@@ -72,8 +72,8 @@ static int print_host(const char *hostname, const char *header)
+ 		// printf("%s\n", cur->ai_canonname); ?
+ 		while (cur) {
+ 			char *dotted, *revhost;
+-			dotted = xmalloc_sockaddr2dotted_noport(cur->ai_addr, cur->ai_addrlen);
+-			revhost = xmalloc_sockaddr2hostonly_noport(cur->ai_addr, cur->ai_addrlen);
++			dotted = xmalloc_sockaddr2dotted_noport(cur->ai_addr);
++			revhost = xmalloc_sockaddr2hostonly_noport(cur->ai_addr);
+ 
+ 			printf("Address %u: %s%c", ++cnt, dotted, revhost ? ' ' : '\n');
+ 			if (revhost) {
+@@ -102,8 +102,7 @@ static void server_print(void)
+ {
+ 	char *server;
+ 
+-	server = xmalloc_sockaddr2dotted_noport((struct sockaddr*)&_res.nsaddr_list[0],
+-			sizeof(struct sockaddr_in));
++	server = xmalloc_sockaddr2dotted_noport((struct sockaddr*)&_res.nsaddr_list[0]);
+ 	/* I honestly don't know what to do if DNS server has _IPv6 address_.
+ 	 * Probably it is listed in
+ 	 * _res._u._ext_.nsaddrs[MAXNS] (of type "struct sockaddr_in6*" each)
+diff --git a/networking/ping.c b/networking/ping.c
+index 127474c..d1a413d 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -664,7 +664,7 @@ static void ping(len_and_sockaddr *lsa)
+ 	printf("PING %s (%s)", hostname, dotted);
+ 	if (source_lsa) {
+ 		printf(" from %s",
+-			xmalloc_sockaddr2dotted_noport(&source_lsa->sa, source_lsa->len));
++			xmalloc_sockaddr2dotted_noport(&source_lsa->sa));
+ 	}
+ 	printf(": %d data bytes\n", datalen);
+ 
+@@ -715,7 +715,7 @@ int ping_main(int argc, char **argv)
+ 		/* leaking it here... */
+ 		source_lsa = NULL;
+ 
+-	dotted = xmalloc_sockaddr2dotted_noport(&lsa->sa, lsa->len);
++	dotted = xmalloc_sockaddr2dotted_noport(&lsa->sa);
+ 	ping(lsa);
+ 	pingstats(0);
+ 	return EXIT_SUCCESS;
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 85d1a85..030c011 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -443,7 +443,7 @@ int tftp_main(int argc, char **argv)
+ 
+ #if ENABLE_DEBUG_TFTP
+ 	fprintf(stderr, "using server '%s', remotefile '%s', localfile '%s'\n",
+-			xmalloc_sockaddr2dotted(&peer_lsa->sa, peer_lsa->len),
++			xmalloc_sockaddr2dotted(&peer_lsa->sa),
+ 			remotefile, localfile);
+ #endif
+ 
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 20f304d..0923d97 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -812,7 +812,7 @@ print_inetname(struct sockaddr_in *from)
+ 	else {
+ 		char *n = NULL;
+ 		if (from->sin_addr.s_addr != INADDR_ANY)
+-			n = xmalloc_sockaddr2host_noport((struct sockaddr*)from, sizeof(*from));
++			n = xmalloc_sockaddr2host_noport((struct sockaddr*)from);
+ 		printf(" %s (%s)", (n ? n : ina), ina);
+ 		free(n);
+ 	}
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index bc21176..33417af 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -83,7 +83,7 @@ int udhcp_sp_fd_set(fd_set *rfds, int extra_fd);
+ int udhcp_sp_read(fd_set *rfds);
+ int raw_socket(int ifindex);
+ int read_interface(const char *interface, int *ifindex, uint32_t *addr, uint8_t *arp);
+-int listen_socket(uint32_t ip, int port, const char *inf);
++int listen_socket(/*uint32_t ip,*/ int port, const char *inf);
+ /* Returns 1 if no reply received */
+ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *interface);
+ 
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 7d38742..f0a3351 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -311,7 +311,7 @@ int udhcpc_main(int argc, char **argv)
+ 
+ 		if (listen_mode != LISTEN_NONE && sockfd < 0) {
+ 			if (listen_mode == LISTEN_KERNEL)
+-				sockfd = listen_socket(INADDR_ANY, CLIENT_PORT, client_config.interface);
++				sockfd = listen_socket(/*INADDR_ANY,*/ CLIENT_PORT, client_config.interface);
+ 			else
+ 				sockfd = raw_socket(client_config.ifindex);
+ 		}
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index fb42e2f..2fd16ce 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -95,7 +95,7 @@ int udhcpd_main(int argc, char **argv)
+ 	while (1) { /* loop until universe collapses */
+ 
+ 		if (server_socket < 0) {
+-			server_socket = listen_socket(INADDR_ANY, SERVER_PORT,
++			server_socket = listen_socket(/*INADDR_ANY,*/ SERVER_PORT,
+ 					server_config.interface);
+ 		}
+ 
+diff --git a/networking/udhcp/dhcprelay.c b/networking/udhcp/dhcprelay.c
+index 4ed65a2..3e1758d 100644
+--- a/networking/udhcp/dhcprelay.c
++++ b/networking/udhcp/dhcprelay.c
+@@ -167,16 +167,17 @@ static int init_sockets(char **client, int num_clients,
+ 	int i;
+ 
+ 	/* talk to real server on bootps */
+-	fds[0] = listen_socket(htonl(INADDR_ANY), 67, server);
++	fds[0] = listen_socket(/*INADDR_ANY,*/ 67, server);
+ 	*max_socket = fds[0];
+ 
+ 	/* array starts at 1 since server is 0 */
+ 	num_clients++;
+ 
+-	for (i=1; i < num_clients; i++) {
++	for (i = 1; i < num_clients; i++) {
+ 		/* listen for clients on bootps */
+-		fds[i] = listen_socket(htonl(INADDR_ANY), 67, client[i-1]);
+-		if (fds[i] > *max_socket) *max_socket = fds[i];
++		fds[i] = listen_socket(/*NADDR_ANY,*/ 67, client[i-1]);
++		if (fds[i] > *max_socket)
++			*max_socket = fds[i];
+ 	}
+ 
+ 	return i;
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index 272e79d..41cd321 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -194,17 +194,14 @@ int udhcp_kernel_packet(struct dhcpMessage *payload,
+ 	if (fd < 0)
+ 		return -1;
+ 
+-	if (setsockopt_reuseaddr(fd) == -1) {
+-		close(fd);
+-		return -1;
+-	}
++	setsockopt_reuseaddr(fd);
+ 
+ 	memset(&client, 0, sizeof(client));
+ 	client.sin_family = AF_INET;
+ 	client.sin_port = htons(source_port);
+ 	client.sin_addr.s_addr = source_ip;
+ 
+-	if (bind(fd, (struct sockaddr *)&client, sizeof(struct sockaddr)) == -1) {
++	if (bind(fd, (struct sockaddr *)&client, sizeof(client)) == -1) {
+ 		close(fd);
+ 		return -1;
+ 	}
+diff --git a/networking/udhcp/socket.c b/networking/udhcp/socket.c
+index 1e62f8e..79ddfb1 100644
+--- a/networking/udhcp/socket.c
++++ b/networking/udhcp/socket.c
+@@ -45,10 +45,6 @@ int read_interface(const char *interface, int *ifindex, uint32_t *addr, uint8_t
+ 
+ 	memset(&ifr, 0, sizeof(ifr));
+ 	fd = xsocket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+-//	if (fd < 0) {
+-//		bb_perror_msg("socket failed");
+-//		return -1;
+-//	}
+ 
+ 	ifr.ifr_addr.sa_family = AF_INET;
+ 	strncpy(ifr.ifr_name, interface, sizeof(ifr.ifr_name));
+@@ -87,40 +83,30 @@ int read_interface(const char *interface, int *ifindex, uint32_t *addr, uint8_t
+ 	return 0;
+ }
+ 
+-
+-int listen_socket(uint32_t ip, int port, const char *inf)
++/* 1. None of the callers expects it to ever fail */
++/* 2. ip was always INADDR_ANY */
++int listen_socket(/*uint32_t ip,*/ int port, const char *inf)
+ {
+-	struct ifreq interface;
+ 	int fd;
++	struct ifreq interface;
+ 	struct sockaddr_in addr;
+ 
+ 	DEBUG("Opening listen socket on 0x%08x:%d %s", ip, port, inf);
+ 	fd = xsocket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+ 
+-	memset(&addr, 0, sizeof(addr));
+-	addr.sin_family = AF_INET;
+-	addr.sin_port = htons(port);
+-	addr.sin_addr.s_addr = ip;
+-
+-	if (setsockopt_reuseaddr(fd) == -1) {
+-		close(fd);
+-		return -1;
+-	}
+-	if (setsockopt_broadcast(fd) == -1) {
+-		close(fd);
+-		return -1;
+-	}
++	setsockopt_reuseaddr(fd);
++	if (setsockopt_broadcast(fd) == -1)
++		bb_perror_msg_and_die("SO_BROADCAST");
+ 
+ 	strncpy(interface.ifr_name, inf, IFNAMSIZ);
+-	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, &interface, sizeof(interface)) < 0) {
+-		close(fd);
+-		return -1;
+-	}
++	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, &interface, sizeof(interface)) == -1)
++		bb_perror_msg_and_die("SO_BINDTODEVICE");
+ 
+-	if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+-		close(fd);
+-		return -1;
+-	}
++	memset(&addr, 0, sizeof(addr));
++	addr.sin_family = AF_INET;
++	addr.sin_port = htons(port);
++	/* addr.sin_addr.s_addr = ip; - all-zeros is INADDR_ANY */
++	xbind(fd, (struct sockaddr *)&addr, sizeof(addr));
+ 
+ 	return fd;
+ }
+diff --git a/networking/wget.c b/networking/wget.c
+index d90368c..3e61ea6 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -236,7 +236,7 @@ int wget_main(int argc, char **argv)
+ 	lsa = xhost2sockaddr(server.host, server.port);
+ 	if (!(opt & WGET_OPT_QUIET)) {
+ 		fprintf(stderr, "Connecting to %s (%s)\n", server.host,
+-				xmalloc_sockaddr2dotted(&lsa->sa, lsa->len));
++				xmalloc_sockaddr2dotted(&lsa->sa));
+ 		/* We leak result of xmalloc_sockaddr2dotted */
+ 	}
+ 
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 20f8495..f70b513 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -313,14 +313,11 @@ static void startservice(struct svdir *s)
+ 		/* child */
+ 		if (haslog) {
+ 			if (s->islog) {
+-				if (dup2(logpipe[0], 0) == -1)
+-					fatal_cannot("setup filedescriptor for ./log/run");
++				xdup2(logpipe[0], 0);
+ 				close(logpipe[1]);
+-				if (chdir("./log") == -1)
+-					fatal_cannot("change directory to ./log");
++				xchdir("./log");
+ 			} else {
+-				if (dup2(logpipe[1], 1) == -1)
+-					fatal_cannot("setup filedescriptor for ./run");
++				xdup2(logpipe[1], 1);
+ 				close(logpipe[0]);
+ 			}
+ 		}
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index c159f41..bd7ecc2 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -1413,7 +1413,7 @@ static int singlemount(struct mntent *mp, int ignore_busy)
+ 
+ 		// insert ip=... option into string flags.
+ 
+-		dotted = xmalloc_sockaddr2dotted_noport(&lsa->sa, lsa->len);
++		dotted = xmalloc_sockaddr2dotted_noport(&lsa->sa);
+ 		ip = xasprintf("ip=%s", dotted);
+ 		parse_mount_options(ip, &filteropts);
+ 

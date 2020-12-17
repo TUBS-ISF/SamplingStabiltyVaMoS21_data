@@ -1,0 +1,36 @@
+2009-09-13 14:57:24 +0200
+diff --git a/Config.in b/Config.in
+index 99f814e..05bc3a5 100644
+--- a/Config.in
++++ b/Config.in
+@@ -30,6 +30,14 @@ config EXTRA_COMPAT
+ 	  some GNU extensions in libc. You probably only need this option
+ 	  if you plan to run busybox on desktop.
+ 
++config USE_PORTABLE_CODE
++	bool "Avoid using GCC-specific code constructs"
++	default n
++	help
++	  Use this option if you are trying to compile busybox with
++	  compiler other than gcc.
++	  If you do use gcc, this option may needlessly increase code size.
++
+ choice
+ 	prompt "Buffer allocation policy"
+ 	default FEATURE_BUFFERS_USE_MALLOC
+diff --git a/findutils/find.c b/findutils/find.c
+index ba8fa08..76f6709 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -276,7 +276,11 @@ ACTF(inum)
+ ACTF(exec)
+ {
+ 	int i, rc;
++#if ENABLE_USE_PORTABLE_CODE
++	char **argv = alloca(sizeof(char*) * (ap->exec_argc + 1));
++#else /* gcc 4.3.1 generates smaller code: */
+ 	char *argv[ap->exec_argc + 1];
++#endif
+ 	for (i = 0; i < ap->exec_argc; i++)
+ 		argv[i] = subst(ap->exec_argv[i], ap->subst_count[i], fileName);
+ 	argv[i] = NULL; /* terminate the list */

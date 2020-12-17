@@ -1,0 +1,806 @@
+2007-06-10 15:08:44 +0000
+diff --git a/Makefile.flags b/Makefile.flags
+index 988d6e7..322e437 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -70,4 +70,5 @@ endif
+ #LDFLAGS += -nostdlib
+ 
+ # Busybox is a stack-fatty so make sure we increase default size
++# (TODO: use "make stksizes" to find & fix big stack users)
+ FLTFLAGS += -s 20000
+diff --git a/archival/libunarchive/decompress_uncompress.c b/archival/libunarchive/decompress_uncompress.c
+index ba73f11..8c3c65d 100644
+--- a/archival/libunarchive/decompress_uncompress.c
++++ b/archival/libunarchive/decompress_uncompress.c
+@@ -7,7 +7,6 @@
+  * (see disclaimer below)
+  */
+ 
+-
+ /* (N)compress42.c - File compression ala IEEE Computer, Mar 1992.
+  *
+  * Authors:
+@@ -34,53 +33,48 @@
+ #define	OBUFSIZ	2048
+ 
+ /* Defines for third byte of header */
+-#define	MAGIC_1		(char_type)'\037'	/* First byte of compressed file               */
+-#define	MAGIC_2		(char_type)'\235'	/* Second byte of compressed file              */
+-#define BIT_MASK	0x1f	/* Mask for 'number of compresssion bits'       */
+-							/* Masks 0x20 and 0x40 are free.                */
+-							/* I think 0x20 should mean that there is       */
+-							/* a fourth header byte (for expansion).        */
+-#define BLOCK_MODE	0x80	/* Block compresssion if table is full and      */
+-			/* compression rate is dropping flush tables    */
+-			/* the next two codes should not be changed lightly, as they must not   */
+-			/* lie within the contiguous general code space.                        */
+-#define FIRST	257		/* first free entry                             */
+-#define	CLEAR	256		/* table clear output code                      */
+-
+-#define INIT_BITS 9		/* initial number of bits/code */
+-
++#define BIT_MASK        0x1f    /* Mask for 'number of compresssion bits'       */
++                                /* Masks 0x20 and 0x40 are free.                */
++                                /* I think 0x20 should mean that there is       */
++                                /* a fourth header byte (for expansion).        */
++#define BLOCK_MODE      0x80    /* Block compression if table is full and       */
++                                /* compression rate is dropping flush tables    */
++                                /* the next two codes should not be changed lightly, as they must not   */
++                                /* lie within the contiguous general code space.                        */
++#define FIRST   257     /* first free entry */
++#define CLEAR   256     /* table clear output code */
+ 
+-/* machine variants which require cc -Dmachine:  pdp11, z8000, DOS */
+-#define FAST
++#define INIT_BITS 9     /* initial number of bits/code */
+ 
+-#define	HBITS		17	/* 50% occupancy */
+-#define	HSIZE	   (1<<HBITS)
+-#define	HMASK	   (HSIZE-1)
+-#define	HPRIME		 9941
+-#define	BITS		   16
+-#undef	MAXSEG_64K
+-#define MAXCODE(n)	(1L << (n))
+-
+-#define	htabof(i)				htab[i]
+-#define	codetabof(i)			codetab[i]
+-#define	tab_prefixof(i)			codetabof(i)
+-#define	tab_suffixof(i)			((unsigned char *)(htab))[i]
+-#define	de_stack				((unsigned char *)&(htab[HSIZE-1]))
+-#define	clear_htab()			memset(htab, -1, HSIZE)
+-#define	clear_tab_prefixof()	memset(codetab, 0, 256);
+ 
++/* machine variants which require cc -Dmachine:  pdp11, z8000, DOS */
++#define HBITS      17   /* 50% occupancy */
++#define HSIZE      (1<<HBITS)
++#define HMASK      (HSIZE-1)    /* unused */
++#define HPRIME     9941         /* unused */
++#define BITS       16
++#define BITS_STR   "16"
++#undef  MAXSEG_64K              /* unused */
++#define MAXCODE(n) (1L << (n))
++
++#define htabof(i)               htab[i]
++#define codetabof(i)            codetab[i]
++#define tab_prefixof(i)         codetabof(i)
++#define tab_suffixof(i)         ((unsigned char *)(htab))[i]
++#define de_stack                ((unsigned char *)&(htab[HSIZE-1]))
++#define clear_tab_prefixof()    memset(codetab, 0, 256)
+ 
+ /*
+  * Decompress stdin to stdout.  This routine adapts to the codes in the
+  * file building the "string" table on-the-fly; requiring no table to
+- * be stored in the compressed file.  The tables used herein are shared
+- * with those of the compress() routine.  See the definitions above.
++ * be stored in the compressed file.
+  */
+ 
+ USE_DESKTOP(long long) int
+ uncompress(int fd_in, int fd_out)
+ {
+ 	USE_DESKTOP(long long total_written = 0;)
++	USE_DESKTOP(long long) int retval = -1;
+ 	unsigned char *stackp;
+ 	long code;
+ 	int finchar;
+@@ -96,10 +90,10 @@ uncompress(int fd_in, int fd_out)
+ 	long maxmaxcode;
+ 	int n_bits;
+ 	int rsize = 0;
+-	RESERVE_CONFIG_UBUFFER(inbuf, IBUFSIZ + 64);
+-	RESERVE_CONFIG_UBUFFER(outbuf, OBUFSIZ + 2048);
+-	unsigned char htab[HSIZE];
+-	unsigned short codetab[HSIZE];
++	unsigned char *inbuf; /* were eating insane amounts of stack - */
++	unsigned char *outbuf; /* bad for some embedded targets */
++	unsigned char *htab;
++	unsigned short *codetab;
+ 
+ 	/* Hmm, these were statics - why?! */
+ 	/* user settable max # bits/code */
+@@ -107,8 +101,10 @@ uncompress(int fd_in, int fd_out)
+ 	/* block compress mode -C compatible with 2.0 */
+ 	int block_mode; /* = BLOCK_MODE; */
+ 
+-	memset(inbuf, 0, IBUFSIZ + 64);
+-	memset(outbuf, 0, OBUFSIZ + 2048);
++	inbuf = xzalloc(IBUFSIZ + 64);
++	outbuf = xzalloc(OBUFSIZ + 2048);
++	htab = xzalloc(HSIZE);  /* wsn't zeroed out before, maybe can xmalloc? */
++	codetab = xzalloc(HSIZE * sizeof(codetab[0]));
+ 
+ 	insize = 0;
+ 
+@@ -116,7 +112,7 @@ uncompress(int fd_in, int fd_out)
+ 	 * to do some cleanup (e.g. delete incomplete unpacked file etc) */
+ 	if (full_read(fd_in, inbuf, 1) != 1) {
+ 		bb_error_msg("short read");
+-		return -1;
++		goto err;
+ 	}
+ 
+ 	maxbits = inbuf[0] & BIT_MASK;
+@@ -125,8 +121,8 @@ uncompress(int fd_in, int fd_out)
+ 
+ 	if (maxbits > BITS) {
+ 		bb_error_msg("compressed with %d bits, can only handle "
+-				"%d bits", maxbits, BITS);
+-		return -1;
++				BITS_STR" bits", maxbits);
++		goto err;
+ 	}
+ 
+ 	n_bits = INIT_BITS;
+@@ -140,7 +136,7 @@ uncompress(int fd_in, int fd_out)
+ 	free_ent = ((block_mode) ? FIRST : 256);
+ 
+ 	/* As above, initialize the first 256 entries in the table. */
+-	clear_tab_prefixof();
++	/*clear_tab_prefixof(); - done by xzalloc */
+ 
+ 	for (code = 255; code >= 0; --code) {
+ 		tab_suffixof(code) = (unsigned char) code;
+@@ -232,7 +228,7 @@ uncompress(int fd_in, int fd_out)
+ 						 insize, posbits, p[-1], p[0], p[1], p[2], p[3],
+ 						 (posbits & 07));
+ 					bb_error_msg("uncompress: corrupt input");
+-					return -1;
++					goto err;
+ 				}
+ 
+ 				*--stackp = (unsigned char) finchar;
+@@ -299,7 +295,11 @@ uncompress(int fd_in, int fd_out)
+ 		USE_DESKTOP(total_written += outpos;)
+ 	}
+ 
+-	RELEASE_CONFIG_BUFFER(inbuf);
+-	RELEASE_CONFIG_BUFFER(outbuf);
+-	return USE_DESKTOP(total_written) + 0;
++	retval = USE_DESKTOP(total_written) + 0;
++ err:
++	free(inbuf);
++	free(outbuf);
++	free(htab);
++	free(codetab);
++	return retval;
+ }
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index 88d7a04..b046d40 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -21,43 +21,27 @@ enum {
+ };
+ 
+ struct psf_header {
+-	unsigned char magic1, magic2;	/* Magic number */
+-	unsigned char mode;			/* PSF font mode */
+-	unsigned char charsize;		/* Character size */
++	unsigned char magic1, magic2;   /* Magic number */
++	unsigned char mode;             /* PSF font mode */
++	unsigned char charsize;         /* Character size */
+ };
+ 
+ #define PSF_MAGIC_OK(x)	((x).magic1 == PSF_MAGIC1 && (x).magic2 == PSF_MAGIC2)
+ 
+-static void loadnewfont(int fd);
+-
+-int loadfont_main(int argc, char **argv);
+-int loadfont_main(int argc, char **argv)
+-{
+-	int fd;
+-
+-	if (argc != 1)
+-		bb_show_usage();
+-
+-	fd = xopen(CURRENT_VC, O_RDWR);
+-	loadnewfont(fd);
+-
+-	return EXIT_SUCCESS;
+-}
+-
+ static void do_loadfont(int fd, unsigned char *inbuf, int unit, int fontsize)
+ {
+-	char buf[16384];
++	char *buf;
+ 	int i;
+ 
+-	memset(buf, 0, sizeof(buf));
+-
+ 	if (unit < 1 || unit > 32)
+ 		bb_error_msg_and_die("bad character size %d", unit);
+ 
++	buf = xzalloc(16 * 1024);
++	/*memset(buf, 0, 16 * 1024);*/
+ 	for (i = 0; i < fontsize; i++)
+ 		memcpy(buf + (32 * i), inbuf + (unit * i), unit);
+ 
+-#if defined( PIO_FONTX ) && !defined( __sparc__ )
++#if defined(PIO_FONTX) && !defined(__sparc__)
+ 	{
+ 		struct consolefontdesc cfd;
+ 
+@@ -66,12 +50,14 @@ static void do_loadfont(int fd, unsigned char *inbuf, int unit, int fontsize)
+ 		cfd.chardata = buf;
+ 
+ 		if (ioctl(fd, PIO_FONTX, &cfd) == 0)
+-			return;				/* success */
+-		bb_perror_msg("PIO_FONTX ioctl error (trying PIO_FONT)");
++			goto ret;			/* success */
++		bb_perror_msg("PIO_FONTX ioctl (will try PIO_FONT)");
+ 	}
+ #endif
+ 	if (ioctl(fd, PIO_FONT, buf))
+-		bb_perror_msg_and_die("PIO_FONT ioctl error");
++		bb_perror_msg_and_die("PIO_FONT ioctl");
++ ret:
++	free(buf);
+ }
+ 
+ static void
+@@ -124,31 +110,30 @@ do_loadtable(int fd, unsigned char *inbuf, int tailsz, int fontsize)
+ 
+ static void loadnewfont(int fd)
+ {
++	enum { INBUF_SIZE = 32*1024 + 1 };
++
+ 	int unit;
+-	unsigned char inbuf[32768];			/* primitive */
+-	unsigned int inputlth, offset;
++	unsigned inputlth, offset;
++	/* Was on stack, but 32k is a bit too much: */
++	unsigned char *inbuf = xmalloc(INBUF_SIZE);
+ 
+ 	/*
+ 	 * We used to look at the length of the input file
+ 	 * with stat(); now that we accept compressed files,
+ 	 * just read the entire file.
+ 	 */
+-	inputlth = fread(inbuf, 1, sizeof(inbuf), stdin);
+-	if (ferror(stdin))
++	inputlth = full_read(STDIN_FILENO, inbuf, INBUF_SIZE);
++	if (inputlth < 0)
+ 		bb_perror_msg_and_die("error reading input font");
+-	/* use malloc/realloc in case of giant files;
+-	   maybe these do not occur: 16kB for the font,
+-	   and 16kB for the map leaves 32 unicode values
+-	   for each font position */
+-	if (!feof(stdin))
+-		bb_perror_msg_and_die("font too large");
++	if (inputlth >= INBUF_SIZE)
++		bb_error_msg_and_die("font too large");
+ 
+ 	/* test for psf first */
+ 	{
+ 		struct psf_header psfhdr;
+ 		int fontsize;
+ 		int hastable;
+-		unsigned int head0, head;
++		unsigned head0, head;
+ 
+ 		if (inputlth < sizeof(struct psf_header))
+ 			goto no_psf;
+@@ -161,7 +146,7 @@ static void loadnewfont(int fd)
+ 		if (psfhdr.mode > PSF_MAXMODE)
+ 			bb_error_msg_and_die("unsupported psf file mode");
+ 		fontsize = ((psfhdr.mode & PSF_MODE512) ? 512 : 256);
+-#if !defined( PIO_FONTX ) || defined( __sparc__ )
++#if !defined(PIO_FONTX) || defined(__sparc__)
+ 		if (fontsize != 256)
+ 			bb_error_msg_and_die("only fontsize 256 supported");
+ #endif
+@@ -177,8 +162,8 @@ static void loadnewfont(int fd)
+ 			do_loadtable(fd, inbuf + head, inputlth - head, fontsize);
+ 		return;
+ 	}
+-  no_psf:
+ 
++ no_psf:
+ 	/* file with three code pages? */
+ 	if (inputlth == 9780) {
+ 		offset = 40;
+@@ -192,3 +177,17 @@ static void loadnewfont(int fd)
+ 	}
+ 	do_loadfont(fd, inbuf + offset, unit, 256);
+ }
++
++int loadfont_main(int argc, char **argv);
++int loadfont_main(int argc, char **argv)
++{
++	int fd;
++
++	if (argc != 1)
++		bb_show_usage();
++
++	fd = xopen(CURRENT_VC, O_RDWR);
++	loadnewfont(fd);
++
++	return EXIT_SUCCESS;
++}
+diff --git a/editors/Config.in b/editors/Config.in
+index fd840ae..936004c 100644
+--- a/editors/Config.in
++++ b/editors/Config.in
+@@ -50,6 +50,16 @@ config VI
+ 	  learning curve.  If you are not already comfortable with 'vi'
+ 	  you may wish to use something else.
+ 
++config FEATURE_VI_MAX_LEN
++	int "Maximum line length in vi"
++	range 256 16384
++	default 1024
++	depends on VI
++	help
++	  vi uses on-stack buffers for intermediate line buffers.
++	  You may want to decrease this parameter if your target machine
++	  benefits from smaller stack usage.
++
+ config FEATURE_VI_COLON
+ 	bool "Enable \":\" colon commands (no \"ex\" mode)"
+ 	default y
+diff --git a/editors/vi.c b/editors/vi.c
+index cd64aac..b961ca5 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -32,7 +32,10 @@
+ #define Isprint(c) ((unsigned char)(c) >= ' ' && (c) != 0x7f && (unsigned char)(c) != 0x9b)
+ #endif
+ 
+-#define MAX_SCR_COLS		BUFSIZ
++enum {
++	MAX_LINELEN = CONFIG_FEATURE_VI_MAX_LEN,
++	MAX_SCR_COLS = CONFIG_FEATURE_VI_MAX_LEN,
++};
+ 
+ // Misc. non-Ascii keys that report an escape sequence
+ #define VI_K_UP			(char)128	// cursor key Up
+@@ -545,7 +548,7 @@ static char *get_one_address(char * p, int *addr)	// get colon addr, if present
+ 	char c;
+ #endif
+ #if ENABLE_FEATURE_VI_SEARCH
+-	char *pat, buf[BUFSIZ];
++	char *pat, buf[MAX_LINELEN];
+ #endif
+ 
+ 	*addr = -1;			// assume no addr
+@@ -648,7 +651,7 @@ static void setops(const char *args, const char *opname, int flg_no,
+ static void colon(char * buf)
+ {
+ 	char c, *orig_buf, *buf1, *q, *r;
+-	char *fn, cmd[BUFSIZ], args[BUFSIZ];
++	char *fn, cmd[MAX_LINELEN], args[MAX_LINELEN];
+ 	int i, l, li, ch, b, e;
+ 	int useforce = FALSE, forced = FALSE;
+ 	struct stat st_buf;
+@@ -679,8 +682,8 @@ static void colon(char * buf)
+ 	r = end - 1;
+ 	li = count_lines(text, end - 1);
+ 	fn = cfn;			// default to current file
+-	memset(cmd, '\0', BUFSIZ);	// clear cmd[]
+-	memset(args, '\0', BUFSIZ);	// clear args[]
++	memset(cmd, '\0', MAX_LINELEN);	// clear cmd[]
++	memset(args, '\0', MAX_LINELEN);	// clear args[]
+ 
+ 	// look for optional address(es)  :.  :1  :1,9   :'q,'a   :%
+ 	buf = get_address(buf, &b, &e);
+@@ -763,10 +766,10 @@ static void colon(char * buf)
+ 		}
+ 		if (args[0]) {
+ 			// the user supplied a file name
+-			fn= args;
++			fn = args;
+ 		} else if (cfn && cfn[0]) {
+ 			// no user supplied name- use the current filename
+-			fn= cfn;
++			fn = cfn;
+ 			goto vc5;
+ 		} else {
+ 			// no user file name, no current name- punt
+@@ -1984,8 +1987,7 @@ static void start_new_cmd_q(char c)
+ 	// release old cmd
+ 	free(last_modifying_cmd);
+ 	// get buffer for new cmd
+-	last_modifying_cmd = xmalloc(BUFSIZ);
+-	memset(last_modifying_cmd, '\0', BUFSIZ);	// clear new cmd queue
++	last_modifying_cmd = xzalloc(MAX_LINELEN);
+ 	// if there is a current cmd count put it in the buffer first
+ 	if (cmdcnt > 0)
+ 		sprintf(last_modifying_cmd, "%d%c", cmdcnt, c);
+@@ -2238,7 +2240,7 @@ static char readit(void)	// read (maybe cursor) key from stdin
+ 	if (n <= 0) {
+  ri0:
+ 		// the Q is empty, wait for a typed char
+-		n = read(0, readbuffer, BUFSIZ - 1);
++		n = read(0, readbuffer, MAX_LINELEN - 1);
+ 		if (n < 0) {
+ 			if (errno == EINTR)
+ 				goto ri0;	// interrupted sys call
+@@ -2268,9 +2270,9 @@ static char readit(void)	// read (maybe cursor) key from stdin
+ 			tv.tv_usec = 50000;	// Wait 5/100 seconds- 1 Sec=1000000
+ 
+ 			// keep reading while there are input chars and room in buffer
+-			while (select(1, &rfds, NULL, NULL, &tv) > 0 && n <= (BUFSIZ - 5)) {
++			while (select(1, &rfds, NULL, NULL, &tv) > 0 && n <= (MAX_LINELEN - 5)) {
+ 				// read the rest of the ESC string
+-				int r = read(0, (void *) (readbuffer + n), BUFSIZ - n);
++				int r = read(0, (void *) (readbuffer + n), MAX_LINELEN - n);
+ 				if (r > 0) {
+ 					n += r;
+ 				}
+@@ -2305,7 +2307,7 @@ static char readit(void)	// read (maybe cursor) key from stdin
+ 	}
+ 	// remove key sequence from Q
+ 	readed_for_parse -= n;
+-	memmove(readbuffer, readbuffer + n, BUFSIZ - n);
++	memmove(readbuffer, readbuffer + n, MAX_LINELEN - n);
+ 	alarm(3);	// we are done waiting for input, turn alarm ON
+ 	return c;
+ }
+@@ -2340,7 +2342,7 @@ static char get_one_char(void)
+ 		c = readit();	// get the users input
+ 		if (last_modifying_cmd != 0) {
+ 			int len = strlen(last_modifying_cmd);
+-			if (len + 1 >= BUFSIZ) {
++			if (len >= MAX_LINELEN - 1) {
+ 				psbs("last_modifying_cmd overrun");
+ 			} else {
+ 				// add new char to q
+@@ -2358,7 +2360,7 @@ static char *get_input_line(const char * prompt) // get input line- use "status
+ {
+ 	static char *obufp;
+ 
+-	char buf[BUFSIZ];
++	char buf[MAX_LINELEN];
+ 	char c;
+ 	int i;
+ 
+@@ -2369,7 +2371,7 @@ static char *get_input_line(const char * prompt) // get input line- use "status
+ 	write1(prompt);      // write out the :, /, or ? prompt
+ 
+ 	i = strlen(buf);
+-	while (i < BUFSIZ) {
++	while (i < MAX_LINELEN) {
+ 		c = get_one_char();	// read user input
+ 		if (c == '\n' || c == '\r' || c == 27)
+ 			break;		// is this end of input
+@@ -2514,16 +2516,16 @@ static int file_write(char * fn, char * first, char * last)
+ //----- Move the cursor to row x col (count from 0, not 1) -------
+ static void place_cursor(int row, int col, int opti)
+ {
+-	char cm1[BUFSIZ];
++	char cm1[MAX_LINELEN];
+ 	char *cm;
+ #if ENABLE_FEATURE_VI_OPTIMIZE_CURSOR
+-	char cm2[BUFSIZ];
++	char cm2[MAX_LINELEN];
+ 	char *screenp;
+-	// char cm3[BUFSIZ];
++	// char cm3[MAX_LINELEN];
+ 	int Rrow = last_row;
+ #endif
+ 
+-	memset(cm1, '\0', BUFSIZ - 1);  // clear the buffer
++	memset(cm1, '\0', MAX_LINELEN);  // clear the buffer
+ 
+ 	if (row < 0) row = 0;
+ 	if (row >= rows) row = rows - 1;
+@@ -2539,7 +2541,7 @@ static void place_cursor(int row, int col, int opti)
+ #if ENABLE_FEATURE_VI_OPTIMIZE_CURSOR
+ 	//----- find the minimum # of chars to move cursor -------------
+ 	//----- 2.  Try moving with discreet chars (Newline, [back]space, ...)
+-	memset(cm2, '\0', BUFSIZ - 1);  // clear the buffer
++	memset(cm2, '\0', MAX_LINELEN);  // clear the buffer
+ 
+ 	// move to the correct row
+ 	while (row < Rrow) {
+@@ -2696,7 +2698,7 @@ static void psb(const char *format, ...)
+ 
+ static void ni(const char * s) // display messages
+ {
+-	char buf[BUFSIZ];
++	char buf[MAX_LINELEN];
+ 
+ 	print_literal(buf, s);
+ 	psbs("\'%s\' is not implemented", buf);
+@@ -3900,7 +3902,7 @@ static void crash_dummy()
+  cd0:
+ 	startrbi = rbi = 0;
+ 	sleeptime = 0;          // how long to pause between commands
+-	memset(readbuffer, '\0', BUFSIZ);   // clear the read buffer
++	memset(readbuffer, '\0', MAX_LINELEN);   // clear the read buffer
+ 	// generate a command by percentages
+ 	percent = (int) lrand48() % 100;        // get a number from 0-99
+ 	if (percent < Mp) {     //  Movement commands
+@@ -3985,7 +3987,7 @@ static void crash_test()
+ 	static time_t oldtim;
+ 
+ 	time_t tim;
+-	char d[2], msg[BUFSIZ];
++	char d[2], msg[MAX_LINELEN];
+ 
+ 	msg[0] = '\0';
+ 	if (end < text) {
+diff --git a/libbb/Config.in b/libbb/Config.in
+index 112a3d6..a1ff7c0 100644
+--- a/libbb/Config.in
++++ b/libbb/Config.in
+@@ -30,7 +30,17 @@ config FEATURE_EDITING
+ 	bool "Command line editing"
+ 	default n
+ 	help
+-	  Enable command editing (mainly for shell).
++	  Enable line editing (mainly for shell command line).
++
++config FEATURE_EDITING_MAX_LEN
++	int "Maximum length of input"
++	range 128 8192
++	default 1024
++	depends on FEATURE_EDITING
++	help
++	  Line editing code uses on-stack buffers for storage.
++	  You may want to decrease this parameter if your target machine
++	  benefits from smaller stack usage.
+ 
+ config FEATURE_EDITING_FANCY_KEYS
+ 	bool "Additional editing keys"
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index b950d7f..1f2e6a5 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -28,7 +28,6 @@
+    - not true viewing if length prompt less terminal width
+  */
+ 
+-//#include <sys/ioctl.h>
+ #include "libbb.h"
+ 
+ 
+@@ -59,6 +58,7 @@
+ #define ENABLE_FEATURE_GETUSERNAME_AND_HOMEDIR \
+ (ENABLE_FEATURE_USERNAME_COMPLETION || ENABLE_FEATURE_EDITING_FANCY_PROMPT)
+ 
++enum { MAX_LINELEN = CONFIG_FEATURE_EDITING_MAX_LEN };
+ 
+ static line_input_t *state;
+ 
+@@ -327,8 +327,8 @@ static void username_tab_completion(char *ud, char *with_shash_flg)
+ 				home = entry->pw_dir;
+ 		}
+ 		if (home) {
+-			if ((userlen + strlen(home) + 1) < BUFSIZ) {
+-				char temp2[BUFSIZ];     /* argument size */
++			if ((userlen + strlen(home) + 1) < MAX_LINELEN) {
++				char temp2[MAX_LINELEN];     /* argument size */
+ 
+ 				/* /home/user/... */
+ 				sprintf(temp2, "%s%s", home, ud);
+@@ -410,7 +410,7 @@ static void exe_n_cwd_tab_completion(char *command, int type)
+ {
+ 	DIR *dir;
+ 	struct dirent *next;
+-	char dirbuf[BUFSIZ];
++	char dirbuf[MAX_LINELEN];
+ 	struct stat st;
+ 	char *path1[1];
+ 	char **paths = path1;
+@@ -496,16 +496,16 @@ static void exe_n_cwd_tab_completion(char *command, int type)
+ #define QUOT (UCHAR_MAX+1)
+ 
+ #define collapse_pos(is, in) { \
+-	memmove(int_buf+(is), int_buf+(in), (BUFSIZ+1-(is)-(in))*sizeof(int)); \
+-	memmove(pos_buf+(is), pos_buf+(in), (BUFSIZ+1-(is)-(in))*sizeof(int)); }
++	memmove(int_buf+(is), int_buf+(in), (MAX_LINELEN+1-(is)-(in))*sizeof(int)); \
++	memmove(pos_buf+(is), pos_buf+(in), (MAX_LINELEN+1-(is)-(in))*sizeof(int)); }
+ 
+ static int find_match(char *matchBuf, int *len_with_quotes)
+ {
+ 	int i, j;
+ 	int command_mode;
+ 	int c, c2;
+-	int int_buf[BUFSIZ + 1];
+-	int pos_buf[BUFSIZ + 1];
++	int int_buf[MAX_LINELEN + 1];
++	int pos_buf[MAX_LINELEN + 1];
+ 
+ 	/* set to integer dimension characters and own positions */
+ 	for (i = 0;; i++) {
+@@ -731,7 +731,7 @@ static void input_tab(int *lastWasTab)
+ 	if (!*lastWasTab) {
+ 		char *tmp, *tmp1;
+ 		int len_found;
+-		char matchBuf[BUFSIZ];
++		char matchBuf[MAX_LINELEN];
+ 		int find_type;
+ 		int recalc_pos;
+ 
+@@ -781,6 +781,7 @@ static void input_tab(int *lastWasTab)
+ 			if (!matches)
+ 				return;         /* not found */
+ 			/* find minimal match */
++		// ash: yet another failure in trying to achieve "we don't die on OOM"
+ 			tmp1 = xstrdup(matches[0]);
+ 			for (tmp = tmp1; *tmp; tmp++)
+ 				for (len_found = 1; len_found < num_matches; len_found++)
+@@ -807,7 +808,7 @@ static void input_tab(int *lastWasTab)
+ 		}
+ 		len_found = strlen(tmp);
+ 		/* have space to placed match? */
+-		if ((len_found - strlen(matchBuf) + command_len) < BUFSIZ) {
++		if ((len_found - strlen(matchBuf) + command_len) < MAX_LINELEN) {
+ 			/* before word for match   */
+ 			command_ps[cursor - recalc_pos] = 0;
+ 			/* save   tail line        */
+@@ -888,14 +889,14 @@ static void load_history(const char *fromfile)
+ 	fp = fopen(fromfile, "r");
+ 	if (fp) {
+ 		for (hi = 0; hi < MAX_HISTORY;) {
+-			char * hl = xmalloc_getline(fp);
++			char *hl = xmalloc_getline(fp);
+ 			int l;
+ 
+ 			if (!hl)
+ 				break;
+ 			l = strlen(hl);
+-			if (l >= BUFSIZ)
+-				hl[BUFSIZ-1] = 0;
++			if (l >= MAX_LINELEN)
++				hl[MAX_LINELEN-1] = '\0';
+ 			if (l == 0 || hl[0] == ' ') {
+ 				free(hl);
+ 				continue;
+@@ -1264,8 +1265,8 @@ int read_line_input(const char* prompt, char* command, int maxsize, line_input_t
+ #endif
+ 
+ // FIXME: audit & improve this
+-	if (maxsize > BUFSIZ)
+-		maxsize = BUFSIZ;
++	if (maxsize > MAX_LINELEN)
++		maxsize = MAX_LINELEN;
+ 
+ 	/* With null flags, no other fields are ever used */
+ 	state = st ? st : (line_input_t*) &const_int_0;
+@@ -1646,14 +1647,14 @@ int read_line_input(const char* prompt, char* command, int maxsize, line_input_t
+ 				/* Delete */
+ 				input_delete(0);
+ 				break;
+-			case '1':
+-			case 'H':
+-				/* <Home> */
++			case '1': // vt100? linux vt? or what?
++			case '7': // vt100? linux vt? or what?
++			case 'H': /* xterm's <Home> */
+ 				input_backward(cursor);
+ 				break;
+-			case '4':
+-			case 'F':
+-				/* <End> */
++			case '4': // vt100? linux vt? or what?
++			case '8': // vt100? linux vt? or what?
++			case 'F': /* xterm's <End> */
+ 				input_end();
+ 				break;
+ 			default:
+@@ -1766,7 +1767,7 @@ const char *applet_name = "debug stuff usage";
+ 
+ int main(int argc, char **argv)
+ {
+-	char buff[BUFSIZ];
++	char buff[MAX_LINELEN];
+ 	char *prompt =
+ #if ENABLE_FEATURE_EDITING_FANCY_PROMPT
+ 		"\\[\\033[32;1m\\]\\u@\\[\\x1b[33;1m\\]\\h:"
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index ce8dc83..5d39ae3 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -371,6 +371,8 @@ struct globals {
+ static int
+ ifaddrlist(struct IFADDRLIST **ipaddrp)
+ {
++	enum { IFREQ_BUFSIZE = (32 * 1024) / sizeof(struct ifreq) };
++
+ 	int fd, nipaddr;
+ #ifdef HAVE_SOCKADDR_SA_LEN
+ 	int n;
+@@ -379,22 +381,24 @@ ifaddrlist(struct IFADDRLIST **ipaddrp)
+ 	struct sockaddr_in *addr_sin;
+ 	struct IFADDRLIST *al;
+ 	struct ifconf ifc;
+-	struct ifreq ibuf[(32 * 1024) / sizeof(struct ifreq)], ifr;
++	struct ifreq ifr;
++	/* Was on stack, but 32k is a bit too much: */
++	struct ifreq *ibuf = xmalloc(IFREQ_BUFSIZE * sizeof(ibuf[0]));
+ 	struct IFADDRLIST *st_ifaddrlist;
+ 
+ 	fd = xsocket(AF_INET, SOCK_DGRAM, 0);
+ 
+-	ifc.ifc_len = sizeof(ibuf);
++	ifc.ifc_len = IFREQ_BUFSIZE * sizeof(ibuf[0]);
+ 	ifc.ifc_buf = (caddr_t)ibuf;
+ 
+-	if (ioctl(fd, SIOCGIFCONF, (char *)&ifc) < 0 ||
+-	    ifc.ifc_len < sizeof(struct ifreq)) {
++	if (ioctl(fd, SIOCGIFCONF, (char *)&ifc) < 0
++	 || ifc.ifc_len < sizeof(struct ifreq)
++	) {
+ 		if (errno == EINVAL)
+ 			bb_error_msg_and_die(
+ 			    "SIOCGIFCONF: ifreq struct too small (%d bytes)",
+-			    (int)sizeof(ibuf));
+-		else
+-			bb_perror_msg_and_die("SIOCGIFCONF");
++			    IFREQ_BUFSIZE * sizeof(ibuf[0]));
++		bb_perror_msg_and_die("SIOCGIFCONF");
+ 	}
+ 	ifrp = ibuf;
+ 	ifend = (struct ifreq *)((char *)ibuf + ifc.ifc_len);
+@@ -449,9 +453,10 @@ ifaddrlist(struct IFADDRLIST **ipaddrp)
+ 		++nipaddr;
+ 	}
+ 	if (nipaddr == 0)
+-		bb_error_msg_and_die ("can't find any network interfaces");
+-	(void)close(fd);
++		bb_error_msg_and_die("can't find any network interfaces");
+ 
++	free(ibuf);
++	close(fd);
+ 	*ipaddrp = st_ifaddrlist;
+ 	return nipaddr;
+ }
+@@ -492,11 +497,13 @@ findsaddr(const struct sockaddr_in *to, struct sockaddr_in *from)
+ 		++n;
+ 		if (n == 1 && strncmp(buf, "Iface", 5) == 0)
+ 			continue;
+-		if ((i = sscanf(buf, "%255s %x %*s %*s %*s %*s %*s %x",
+-		    tdevice, &dest, &tmask)) != 3)
+-			bb_error_msg_and_die ("junk in buffer");
+-		if ((to->sin_addr.s_addr & tmask) == dest &&
+-		    (tmask > mask || mask == 0)) {
++		i = sscanf(buf, "%255s %x %*s %*s %*s %*s %*s %x",
++					tdevice, &dest, &tmask);
++		if (i != 3)
++			bb_error_msg_and_die("junk in buffer");
++		if ((to->sin_addr.s_addr & tmask) == dest
++		 && (tmask > mask || mask == 0)
++		) {
+ 			mask = tmask;
+ 			strcpy(device, tdevice);
+ 		}
+@@ -504,7 +511,7 @@ findsaddr(const struct sockaddr_in *to, struct sockaddr_in *from)
+ 	fclose(f);
+ 
+ 	if (device[0] == '\0')
+-		bb_error_msg_and_die ("can't find interface");
++		bb_error_msg_and_die("can't find interface");
+ 
+ 	/* Get the interface address list */
+ 	n = ifaddrlist(&al);
+@@ -808,7 +815,7 @@ packet_ok(unsigned char *buf, int cc, struct sockaddr_in *from, int seq)
+ 		       "%s: icmp type %d (%s) code %d\n",
+ 		    cc, inet_ntoa(from->sin_addr),
+ 		    inet_ntoa(ip->ip_dst), type, pr_type(type), icp->icmp_code);
+-		for (i = 4; i < cc ; i += sizeof(*lp))
++		for (i = 4; i < cc; i += sizeof(*lp))
+ 			printf("%2d: x%8.8x\n", i, *lp++);
+ 	}
+ #endif

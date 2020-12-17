@@ -1,0 +1,257 @@
+2010-04-03 17:34:52 +0200
+diff --git a/networking/udhcp/Config.in b/networking/udhcp/Config.in
+index fd2a61c..34adf35 100644
+--- a/networking/udhcp/Config.in
++++ b/networking/udhcp/Config.in
+@@ -92,7 +92,8 @@ config FEATURE_UDHCP_RFC3397
+ 	depends on UDHCPD || UDHCPC
+ 	help
+ 	  If selected, both client and server will support passing of domain
+-	  search lists via option 119, specified in RFC3397.
++	  search lists via option 119, specified in RFC 3397,
++	  and SIP servers option 120, specified in RFC 3361.
+ 
+ config UDHCPC_DEFAULT_SCRIPT
+ 	string "Absolute path to config script"
+diff --git a/networking/udhcp/common.c b/networking/udhcp/common.c
+index adbcd77..77d7fd5 100644
+--- a/networking/udhcp/common.c
++++ b/networking/udhcp/common.c
+@@ -50,7 +50,8 @@ const struct dhcp_option dhcp_options[] = {
+ //TODO: not a string, but a set of LASCII strings:
+ //	{ OPTION_STRING                           , 0x4D }, /* DHCP_USER_CLASS    */
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+-	{ OPTION_STR1035 | OPTION_LIST            , 0x77 }, /* DHCP_DOMAIN_SEARCH */
++	{ OPTION_DNS_STRING | OPTION_LIST         , 0x77 }, /* DHCP_DOMAIN_SEARCH */
++	{ OPTION_SIP_SERVERS                      , 0x78 }, /* DHCP_SIP_SERVERS   */
+ #endif
+ 	{ OPTION_STATIC_ROUTES                    , 0x79 }, /* DHCP_STATIC_ROUTES */
+ 	{ OPTION_STRING                           , 0xfc }, /* DHCP_WPAD          */
+@@ -106,22 +107,32 @@ const char dhcp_option_strings[] ALIGN1 =
+ //	"userclass" "\0"   /* DHCP_USER_CLASS     */
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+ 	"search" "\0"      /* DHCP_DOMAIN_SEARCH  */
++// doesn't work in udhcpd.conf since OPTION_SIP_SERVERS
++// is not handled yet by "string->option" conversion code:
++	"sipservers" "\0"  /* DHCP_SIP_SERVERS    */
+ #endif
+-// "staticroutes" is only used to set udhcpc environment, it doesn't work
+-// in udhcpd.conf since OPTION_STATIC_ROUTES is not handled yet
+-// by "string->option" conversion code:
+-	"staticroutes" "\0"/* DHCP_STATIC_ROUTES */
+-	"wpad" "\0"        /* DHCP_WPAD          */
++// doesn't work in udhcpd.conf since OPTION_STATIC_ROUTES
++// is not handled yet by "string->option" conversion code:
++	"staticroutes" "\0"/* DHCP_STATIC_ROUTES  */
++	"wpad" "\0"        /* DHCP_WPAD           */
+ 	;
+ 
+-/* Lengths of the different option types */
++/* Lengths of the option types in binary form.
++ * Used by:
++ * udhcp_str2optset: to determine how many bytes to allocate.
++ * xmalloc_optname_optval: to estimate string length
++ * from binary option length: (option[LEN] / dhcp_option_lengths[opt_type])
++ * is the number of elements, multiply in by one element's string width
++ * (len_of_option_as_string[opt_type]) and you know how wide string you need.
++ */
+ const uint8_t dhcp_option_lengths[] ALIGN1 = {
+ 	[OPTION_IP] =      4,
+ 	[OPTION_IP_PAIR] = 8,
+ //	[OPTION_BOOLEAN] = 1,
+-	[OPTION_STRING] =  1,
++	[OPTION_STRING] =  1,  /* ignored by udhcp_str2optset */
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+-	[OPTION_STR1035] = 1,
++	[OPTION_DNS_STRING] = 1,  /* ignored by both udhcp_str2optset and xmalloc_optname_optval */
++	[OPTION_SIP_SERVERS] = 1,
+ #endif
+ 	[OPTION_U8] =      1,
+ 	[OPTION_U16] =     2,
+@@ -332,7 +343,7 @@ static NOINLINE void attach_option(
+ 	if (!existing) {
+ 		log2("Attaching option %02x to list", option->code);
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+-		if ((option->flags & OPTION_TYPE_MASK) == OPTION_STR1035) {
++		if ((option->flags & OPTION_TYPE_MASK) == OPTION_DNS_STRING) {
+ 			/* reuse buffer and length for RFC1035-formatted string */
+ 			allocated = buffer = (char *)dname_enc(NULL, 0, buffer, &length);
+ 		}
+@@ -360,7 +371,7 @@ static NOINLINE void attach_option(
+ 		log1("Attaching option %02x to existing member of list", option->code);
+ 		old_len = existing->data[OPT_LEN];
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+-		if ((option->flags & OPTION_TYPE_MASK) == OPTION_STR1035) {
++		if ((option->flags & OPTION_TYPE_MASK) == OPTION_DNS_STRING) {
+ 			/* reuse buffer and length for RFC1035-formatted string */
+ 			allocated = buffer = (char *)dname_enc(existing->data + OPT_DATA, old_len, buffer, &length);
+ 		}
+@@ -426,7 +437,7 @@ int FAST_FUNC udhcp_str2optset(const char *const_str, void *arg)
+ 			break;
+ 		case OPTION_STRING:
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+-		case OPTION_STR1035:
++		case OPTION_DNS_STRING:
+ #endif
+ 			length = strnlen(val, 254);
+ 			if (length > 0) {
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 1c5afa6..28e3471 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -71,7 +71,8 @@ enum {
+ 	OPTION_IP_PAIR,
+ 	OPTION_STRING,
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+-	OPTION_STR1035,	/* RFC1035 compressed domain name list */
++	OPTION_DNS_STRING,  /* RFC1035 compressed domain name list */
++	OPTION_SIP_SERVERS,
+ #endif
+ //	OPTION_BOOLEAN,
+ 	OPTION_U8,
+@@ -130,6 +131,7 @@ enum {
+ //#define DHCP_USER_CLASS       0x4d /* RFC 3004. set of LASCII strings. "I am a printer" etc */
+ #define DHCP_FQDN               0x51 /* client asks to update DNS to map its FQDN to its new IP */
+ //#define DHCP_DOMAIN_SEARCH    0x77 /* RFC 3397. set of ASCIZ string, DNS-style compressed */
++//#define DHCP_SIP_SERVERS      0x78 /* RFC 3361. flag byte, then: 0: domain names, 1: IP addrs */
+ //#define DHCP_STATIC_ROUTES    0x79 /* RFC 3442. (mask,ip,router) tuples */
+ //#define DHCP_WPAD             0xfc /* MSIE's Web Proxy Autodiscovery Protocol */
+ #define DHCP_END                0xff
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index c36d418..53e10d0 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -42,19 +42,24 @@
+ 
+ /* get a rough idea of how long an option will be (rounding up...) */
+ static const uint8_t len_of_option_as_string[] = {
+-	[OPTION_IP] =		sizeof("255.255.255.255 "),
+-	[OPTION_IP_PAIR] =	sizeof("255.255.255.255 ") * 2,
+-	[OPTION_STATIC_ROUTES]= sizeof("255.255.255.255/32 255.255.255.255 "),
+-	[OPTION_STRING] =	1,
++	[OPTION_IP              ] = sizeof("255.255.255.255 "),
++	[OPTION_IP_PAIR         ] = sizeof("255.255.255.255 ") * 2,
++	[OPTION_STATIC_ROUTES   ] = sizeof("255.255.255.255/32 255.255.255.255 "),
++	[OPTION_STRING          ] = 1,
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+-	[OPTION_STR1035] =	1,
++	[OPTION_DNS_STRING      ] = 1, /* unused */
++	/* Hmmm, this severely overestimates size if SIP_SERVERS option
++	 * is in domain name form: N-byte option in binary form
++	 * mallocs ~16*N bytes. But it is freed almost at once.
++	 */
++	[OPTION_SIP_SERVERS     ] = sizeof("255.255.255.255 "),
+ #endif
+-//	[OPTION_BOOLEAN] =	sizeof("yes "),
+-	[OPTION_U8] =		sizeof("255 "),
+-	[OPTION_U16] =		sizeof("65535 "),
+-//	[OPTION_S16] =		sizeof("-32768 "),
+-	[OPTION_U32] =		sizeof("4294967295 "),
+-	[OPTION_S32] =		sizeof("-2147483684 "),
++//	[OPTION_BOOLEAN         ] = sizeof("yes "),
++	[OPTION_U8              ] = sizeof("255 "),
++	[OPTION_U16             ] = sizeof("65535 "),
++//	[OPTION_S16             ] = sizeof("-32768 "),
++	[OPTION_U32             ] = sizeof("4294967295 "),
++	[OPTION_S32             ] = sizeof("-2147483684 "),
+ };
+ 
+ /* note: ip is a pointer to an IP in network order, possibly misaliged */
+@@ -80,16 +85,13 @@ static NOINLINE char *xmalloc_optname_optval(uint8_t *option, const struct dhcp_
+ {
+ 	unsigned upper_length;
+ 	int len, type, optlen;
+-	uint16_t val_u16;
+-	uint32_t val_u32;
+-	int32_t val_s32;
+ 	char *dest, *ret;
+ 
+ 	/* option points to OPT_DATA, need to go back and get OPT_LEN */
+ 	len = option[OPT_LEN - OPT_DATA];
+ 	type = type_p->flags & OPTION_TYPE_MASK;
+ 	optlen = dhcp_option_lengths[type];
+-	upper_length = len_of_option_as_string[type] * (len / optlen);
++	upper_length = len_of_option_as_string[type] * ((unsigned)len / (unsigned)optlen);
+ 
+ 	dest = ret = xmalloc(upper_length + strlen(opt_name) + 2);
+ 	dest += sprintf(ret, "%s=", opt_name);
+@@ -113,24 +115,20 @@ static NOINLINE char *xmalloc_optname_optval(uint8_t *option, const struct dhcp_
+ 		case OPTION_U8:
+ 			dest += sprintf(dest, "%u", *option);
+ 			break;
+-		case OPTION_U16:
++//		case OPTION_S16:
++		case OPTION_U16: {
++			uint16_t val_u16;
+ 			move_from_unaligned16(val_u16, option);
+ 			dest += sprintf(dest, "%u", ntohs(val_u16));
+ 			break;
+-//		case OPTION_S16: {
+-//			int16_t val_s16;
+-//			move_from_unaligned16(val_s16, option);
+-//			dest += sprintf(dest, "%d", ntohs(val_s16));
+-//			break;
+-//		}
+-		case OPTION_U32:
+-			move_from_unaligned32(val_u32, option);
+-			dest += sprintf(dest, "%lu", (unsigned long) ntohl(val_u32));
+-			break;
++		}
+ 		case OPTION_S32:
+-			move_from_unaligned32(val_s32, option);
+-			dest += sprintf(dest, "%ld", (long) ntohl(val_s32));
++		case OPTION_U32: {
++			uint32_t val_u32;
++			move_from_unaligned32(val_u32, option);
++			dest += sprintf(dest, type == OPTION_U32 ? "%lu" : "%ld", (unsigned long) ntohl(val_u32));
+ 			break;
++		}
+ 		case OPTION_STRING:
+ 			memcpy(dest, option, len);
+ 			dest[len] = '\0';
+@@ -180,7 +178,7 @@ static NOINLINE char *xmalloc_optname_optval(uint8_t *option, const struct dhcp_
+ 			return ret;
+ 		}
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+-		case OPTION_STR1035:
++		case OPTION_DNS_STRING:
+ 			/* unpack option into dest; use ret for prefix (i.e., "optname=") */
+ 			dest = dname_dec(option, len, ret);
+ 			if (dest) {
+@@ -189,8 +187,35 @@ static NOINLINE char *xmalloc_optname_optval(uint8_t *option, const struct dhcp_
+ 			}
+ 			/* error. return "optname=" string */
+ 			return ret;
++		case OPTION_SIP_SERVERS:
++			/* Option binary format:
++			 * type: byte
++			 * type=0: domain names, dns-compressed
++			 * type=1: IP addrs
++			 */
++			option++;
++			len--;
++			if (option[-1] == 0) {
++				dest = dname_dec(option, len, ret);
++				if (dest) {
++					free(ret);
++					return dest;
++				}
++			} else
++			if (option[-1] == 1) {
++				const char *pfx = "";
++				while (1) {
++					len -= 4;
++					if (len < 0)
++						break;
++					dest += sprint_nip(dest, pfx, option);
++					pfx = " ";
++					option += 4;
++				}
++			}
++			return ret;
+ #endif
+-		}
++		} /* switch */
+ 		option += optlen;
+ 		len -= optlen;
+ 		if (len <= 0)

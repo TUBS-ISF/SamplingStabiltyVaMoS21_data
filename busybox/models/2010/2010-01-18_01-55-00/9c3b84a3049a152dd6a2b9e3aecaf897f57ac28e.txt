@@ -1,0 +1,186 @@
+2010-01-18 01:55:00 +0100
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 5ea3a0b..153977f 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -761,10 +761,6 @@ static NOINLINE unsigned list_single(const struct dnode *dn)
+ {
+ 	unsigned column = 0;
+ 	char *lpath = lpath; /* for compiler */
+-#if ENABLE_FEATURE_LS_TIMESTAMPS
+-	char *filetime;
+-	time_t ttime, age;
+-#endif
+ #if ENABLE_FEATURE_LS_FILETYPES || ENABLE_FEATURE_LS_COLOR
+ 	struct stat info;
+ 	char append;
+@@ -775,28 +771,20 @@ static NOINLINE unsigned list_single(const struct dnode *dn)
+ 		return 0;
+ 	*/
+ 
+-#if ENABLE_FEATURE_LS_TIMESTAMPS
+-	ttime = dn->dstat.st_mtime;	/* the default time */
+-	if (all_fmt & TIME_ACCESS)
+-		ttime = dn->dstat.st_atime;
+-	if (all_fmt & TIME_CHANGE)
+-		ttime = dn->dstat.st_ctime;
+-	filetime = ctime(&ttime);
+-#endif
+ #if ENABLE_FEATURE_LS_FILETYPES
+ 	append = append_char(dn->dstat.st_mode);
+ #endif
+ 
+ 	/* Do readlink early, so that if it fails, error message
+-	 * does not appear *inside* of the "ls -l" line */
++	 * does not appear *inside* the "ls -l" line */
+ 	if (all_fmt & LIST_SYMLINK)
+ 		if (S_ISLNK(dn->dstat.st_mode))
+ 			lpath = xmalloc_readlink_or_warn(dn->fullname);
+ 
+ 	if (all_fmt & LIST_INO)
+-		column += printf("%7lu ", (long) dn->dstat.st_ino);
++		column += printf("%7llu ", (long long) dn->dstat.st_ino);
+ 	if (all_fmt & LIST_BLOCKS)
+-		column += printf("%4"OFF_FMT"u ", (off_t) dn->dstat.st_blocks >> 1);
++		column += printf("%4"OFF_FMT"u ", (off_t) (dn->dstat.st_blocks >> 1));
+ 	if (all_fmt & LIST_MODEBITS)
+ 		column += printf("%-10s ", (char *) bb_mode_string(dn->dstat.st_mode));
+ 	if (all_fmt & LIST_NLINKS)
+@@ -804,10 +792,10 @@ static NOINLINE unsigned list_single(const struct dnode *dn)
+ #if ENABLE_FEATURE_LS_USERNAME
+ 	if (all_fmt & LIST_ID_NAME) {
+ 		if (option_mask32 & OPT_g) {
+-			column += printf("%-8.8s",
++			column += printf("%-8.8s ",
+ 				get_cached_username(dn->dstat.st_uid));
+ 		} else {
+-			column += printf("%-8.8s %-8.8s",
++			column += printf("%-8.8s %-8.8s ",
+ 				get_cached_username(dn->dstat.st_uid),
+ 				get_cached_groupname(dn->dstat.st_gid));
+ 		}
+@@ -815,9 +803,9 @@ static NOINLINE unsigned list_single(const struct dnode *dn)
+ #endif
+ 	if (all_fmt & LIST_ID_NUMERIC) {
+ 		if (option_mask32 & OPT_g)
+-			column += printf("%-8u", (int) dn->dstat.st_uid);
++			column += printf("%-8u ", (int) dn->dstat.st_uid);
+ 		else
+-			column += printf("%-8u %-8u",
++			column += printf("%-8u %-8u ",
+ 					(int) dn->dstat.st_uid,
+ 					(int) dn->dstat.st_gid);
+ 	}
+@@ -828,7 +816,7 @@ static NOINLINE unsigned list_single(const struct dnode *dn)
+ 					(int) minor(dn->dstat.st_rdev));
+ 		} else {
+ 			if (all_fmt & LS_DISP_HR) {
+-				column += printf("%9s ",
++				column += printf("%"HUMAN_READABLE_MAX_WIDTH_STR"s ",
+ 					/* print st_size, show one fractional, use suffixes */
+ 					make_human_readable_str(dn->dstat.st_size, 1, 0)
+ 				);
+@@ -838,21 +826,30 @@ static NOINLINE unsigned list_single(const struct dnode *dn)
+ 		}
+ 	}
+ #if ENABLE_FEATURE_LS_TIMESTAMPS
+-	if (all_fmt & LIST_FULLTIME)
+-		column += printf("%24.24s ", filetime);
+-	if (all_fmt & LIST_DATE_TIME)
+-		if ((all_fmt & LIST_FULLTIME) == 0) {
++	if (all_fmt & (LIST_FULLTIME|LIST_DATE_TIME)) {
++		char *filetime;
++		time_t ttime = dn->dstat.st_mtime;
++		if (all_fmt & TIME_ACCESS)
++			ttime = dn->dstat.st_atime;
++		if (all_fmt & TIME_CHANGE)
++			ttime = dn->dstat.st_ctime;
++		filetime = ctime(&ttime);
++		/* filetime's format: "Wed Jun 30 21:49:08 1993\n" */
++		if (all_fmt & LIST_FULLTIME)
++			column += printf("%.24s ", filetime);
++		else { /* LIST_DATE_TIME */
+ 			/* current_time_t ~== time(NULL) */
+-			age = current_time_t - ttime;
+-			printf("%6.6s ", filetime + 4);
++			time_t age = current_time_t - ttime;
++			printf("%.6s ", filetime + 4); /* "Jun 30" */
+ 			if (age < 3600L * 24 * 365 / 2 && age > -15 * 60) {
+ 				/* hh:mm if less than 6 months old */
+-				printf("%5.5s ", filetime + 11);
+-			} else {
+-				printf(" %4.4s ", filetime + 20);
++				printf("%.5s ", filetime + 11);
++			} else { /* year. buggy if year > 9999 ;) */
++				printf(" %.4s ", filetime + 20);
+ 			}
+ 			column += 13;
+ 		}
++	}
+ #endif
+ #if ENABLE_SELINUX
+ 	if (all_fmt & LIST_CONTEXT) {
+diff --git a/include/libbb.h b/include/libbb.h
+index 9e6ee84..73aea40 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -704,8 +704,10 @@ void smart_ulltoa4(unsigned long long ul, char buf[5], const char *scale) FAST_F
+ void smart_ulltoa5(unsigned long long ul, char buf[5], const char *scale) FAST_FUNC;
+ /* If block_size == 0, display size without fractional part,
+  * else display (size * block_size) with one decimal digit.
+- * If display_unit == 0, add suffix (K,M,G...),
++ * If display_unit == 0, show value no bigger than 1024 with suffix (K,M,G...),
+  * else divide by display_unit and do not use suffix. */
++#define HUMAN_READABLE_MAX_WIDTH      7  /* "1024.0G" */
++#define HUMAN_READABLE_MAX_WIDTH_STR "7"
+ //TODO: provide pointer to buf (avoid statics)?
+ const char *make_human_readable_str(unsigned long long size,
+ 		unsigned long block_size, unsigned long display_unit) FAST_FUNC;
+diff --git a/include/unicode.h b/include/unicode.h
+index 9f27657..e11f2f9 100644
+--- a/include/unicode.h
++++ b/include/unicode.h
+@@ -65,8 +65,30 @@ int iswspace(wint_t wc) FAST_FUNC;
+ int iswalnum(wint_t wc) FAST_FUNC;
+ int iswpunct(wint_t wc) FAST_FUNC;
+ 
++
+ # endif /* !LOCALE_SUPPORT */
+ 
++
++# if 0 /* TODO: better support for printfing Unicode fields: */
++
++/* equivalent to printf("%-20.20s", str) */
++char unicode_buffer[20 * MB_CUR_MAX];
++printf("%s", unicode_exact(20, str, unicode_buffer);
++/* no need to free() anything */
++
++/* equivalent to printf("%-20s", str) */
++char *malloced = unicode_minimum(20, str);
++printf("%s", malloced);
++free(malloced); /* ugh */
++
++/* equivalent to printf("%-20s", str), better one */
++printf("%s%*s", str, unicode_pad_to_width(str, 20), "");
++/* equivalent to printf("%20s", str) */
++printf("%*s%s", unicode_pad_to_width(str, 20), "", str);
++
++# endif
++
++
+ #endif /* FEATURE_ASSUME_UNICODE */
+ 
+ #endif
+diff --git a/libbb/human_readable.c b/libbb/human_readable.c
+index 3050d7d..4228aaf 100644
+--- a/libbb/human_readable.c
++++ b/libbb/human_readable.c
+@@ -58,7 +58,7 @@ const char* FAST_FUNC make_human_readable_str(unsigned long long val,
+ 		/* will just print it as ulonglong (below) */
+ 	} else {
+ 		while ((val >= 1024)
+-		 /* && (u < unit_chars + sizeof(unit_chars) - 1) - never happens */
++		 /* && (u < unit_chars + sizeof(unit_chars) - 1) - always true */
+ 		) {
+ 			fmt = "%llu.%u%c";
+ 			u++;

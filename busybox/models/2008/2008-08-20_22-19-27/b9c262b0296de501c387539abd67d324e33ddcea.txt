@@ -1,0 +1,23 @@
+2008-08-20 22:19:27 +0000
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 43e8d5f..82a81f5 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -213,6 +213,8 @@ int chpst_main(int argc UNUSED_PARAM, char **argv)
+ 	} else {
+ 		option_mask32 = opt = 0;
+ 		argv++;
++		if (!*argv)
++			bb_show_usage();
+ 	}
+ 
+ 	// envdir?
+@@ -222,7 +224,7 @@ int chpst_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	// setuidgid?
+-	if (ENABLE_SETUIDGID && applet_name[0] == 's') {
++	if (ENABLE_SETUIDGID && applet_name[1] == 'e') {
+ 		set_user = *argv++;
+ 		opt |= OPT_u;
+ 	}

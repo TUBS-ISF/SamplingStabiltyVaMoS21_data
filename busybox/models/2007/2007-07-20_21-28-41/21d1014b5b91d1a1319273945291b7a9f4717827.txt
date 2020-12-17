@@ -1,0 +1,583 @@
+2007-07-20 21:28:41 +0000
+diff --git a/include/applets.h b/include/applets.h
+index 90af4f4..a05f74a 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -89,6 +89,7 @@ USE_CHCON(APPLET(chcon, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_CHGRP(APPLET_NOEXEC(chgrp, chgrp, _BB_DIR_BIN, _BB_SUID_NEVER, chgrp))
+ USE_CHMOD(APPLET_NOEXEC(chmod, chmod, _BB_DIR_BIN, _BB_SUID_NEVER, chmod))
+ USE_CHOWN(APPLET_NOEXEC(chown, chown, _BB_DIR_BIN, _BB_SUID_NEVER, chown))
++USE_CHPASSWD(APPLET(chpasswd, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_CHPST(APPLET(chpst, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_CHROOT(APPLET(chroot, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_CHRT(APPLET(chrt, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+diff --git a/include/libbb.h b/include/libbb.h
+index 46860c6..a8b9b5b 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -769,6 +769,7 @@ extern void selinux_or_die(void);
+ extern int restricted_shell(const char *shell);
+ extern void setup_environment(const char *shell, int loginshell, int changeenv, const struct passwd *pw);
+ extern int correct_password(const struct passwd *pw);
++/* Returns a ptr to static storage */
+ extern char *pw_encrypt(const char *clear, const char *salt);
+ extern int obscure(const char *old, const char *newval, const struct passwd *pwdp);
+ extern int index_in_str_array(const char * const string_array[], const char *key);
+@@ -776,7 +777,18 @@ extern int index_in_substr_array(const char * const string_array[], const char *
+ extern void print_login_issue(const char *issue_file, const char *tty);
+ extern void print_login_prompt(void);
+ 
+-extern void crypt_make_salt(char *p, int cnt);
++/* rnd is additional random input. New one is returned.
++ * Useful if you call crypt_make_salt many times in a row:
++ * rnd = crypt_make_salt(buf1, 4, 0);
++ * rnd = crypt_make_salt(buf2, 4, rnd);
++ * rnd = crypt_make_salt(buf3, 4, rnd);
++ * (otherwise we risk having same salt generated)
++ */
++extern int crypt_make_salt(char *p, int cnt, int rnd);
++
++/* Returns number of lines changed, or -1 on error */
++extern int update_passwd(const char *filename, const char *username,
++			const char *new_pw);
+ 
+ int get_terminal_width_height(const int fd, int *width, int *height);
+ 
+diff --git a/include/usage.h b/include/usage.h
+index 29a4991..9c77c70 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -452,7 +452,7 @@
+        "	F	Input from file"
+ 
+ #define crond_trivial_usage \
+-       "-d[#] -c <crondir> -f -b"
++       "-d[#] -c crondir -f -b"
+ #define crond_full_usage \
+        "	-d [#] -l [#] -S -L logfile -f -b -c dir\n" \
+        "	-d num	Debug level\n" \
+@@ -466,8 +466,8 @@
+ #define crontab_trivial_usage \
+        "[-c dir] {file|-}|[-u|-l|-e|-d user]"
+ #define crontab_full_usage \
+-       "	file <opts>	Replace crontab from file\n" \
+-       "	- <opts>	Replace crontab from stdin\n" \
++       "	file [opts]	Replace crontab from file\n" \
++       "	- [opts]	Replace crontab from stdin\n" \
+        "	-u user		Specify user\n" \
+        "	-l [user]	List crontab for user\n" \
+        "	-e [user]	Edit crontab for user\n" \
+@@ -1216,7 +1216,7 @@
+        "-rw-rw-r--    1 andersen andersen   554058 Apr 14 17:49 /tmp/busybox.tar.gz\n"
+ 
+ #define halt_trivial_usage \
+-       "[-d<delay>] [-n<nosync>] [-f<force>]"
++       "[-d delay] [-n] [-f]"
+ #define halt_full_usage \
+        "Halt the system" \
+        "\n\nOptions:\n" \
+@@ -1332,14 +1332,14 @@
+        "sage\n"
+ 
+ #define httpd_trivial_usage \
+-       "[-c <conf file>]" \
+-       " [-p <port>]" \
++       "[-c conffile]" \
++       " [-p port]" \
+        " [-i] [-f]" \
+ 	USE_FEATURE_HTTPD_SETUID(" [-u user[:grp]]") \
+-	USE_FEATURE_HTTPD_BASIC_AUTH(" [-r <realm>]") \
++	USE_FEATURE_HTTPD_BASIC_AUTH(" [-r realm]") \
+ 	USE_FEATURE_HTTPD_AUTH_MD5(" [-m pass]") \
+        " [-h home]" \
+-       " [-d/-e <string>]"
++       " [-d/-e string]"
+ #define httpd_full_usage \
+        "Listen for incoming http server requests" \
+        "\n\nOptions:\n" \
+@@ -1388,27 +1388,27 @@
+        "uid=1000(andersen) gid=1000(andersen)\n"
+ 
+ #define ifconfig_trivial_usage \
+-	USE_FEATURE_IFCONFIG_STATUS("[-a]") " <interface> [<address>]"
++	USE_FEATURE_IFCONFIG_STATUS("[-a]") " interface [address]"
+ #define ifconfig_full_usage \
+        "Configure a network interface" \
+        "\n\nOptions:\n" \
+ 	USE_FEATURE_IPV6( \
+-       "	[add <address>[/<prefixlen>]]\n") \
++       "	[add ADDRESS[/PREFIXLEN]]\n") \
+ 	USE_FEATURE_IPV6( \
+-       "	[del <address>[/<prefixlen>]]\n") \
+-       "	[[-]broadcast [<address>]] [[-]pointopoint [<address>]]\n" \
+-       "	[netmask <address>] [dstaddr <address>]\n" \
++       "	[del ADDRESS[/PREFIXLEN]]\n") \
++       "	[[-]broadcast [ADDRESS]] [[-]pointopoint [ADDRESS]]\n" \
++       "	[netmask ADDRESS] [dstaddr ADDRESS]\n" \
+ 	USE_FEATURE_IFCONFIG_SLIP( \
+-       "	[outfill <NN>] [keepalive <NN>]\n") \
+-       "	" USE_FEATURE_IFCONFIG_HW("[hw ether <address>] ") "[metric <NN>] [mtu <NN>]\n" \
++       "	[outfill NN] [keepalive NN]\n") \
++       "	" USE_FEATURE_IFCONFIG_HW("[hw ether ADDRESS] ") "[metric NN] [mtu NN]\n" \
+        "	[[-]trailers] [[-]arp] [[-]allmulti]\n" \
+-       "	[multicast] [[-]promisc] [txqueuelen <NN>] [[-]dynamic]\n" \
++       "	[multicast] [[-]promisc] [txqueuelen NN] [[-]dynamic]\n" \
+ 	USE_FEATURE_IFCONFIG_MEMSTART_IOADDR_IRQ( \
+-       "	[mem_start <NN>] [io_addr <NN>] [irq <NN>]\n") \
++       "	[mem_start NN] [io_addr NN] [irq NN]\n") \
+        "	[up|down] ..."
+ 
+ #define ifup_trivial_usage \
+-       "<-ahinv> <ifaces...>"
++       "[-ahinv] ifaces..."
+ #define ifup_full_usage \
+        "Options:\n" \
+        "	-a	De/configure all interfaces automatically\n" \
+@@ -1420,7 +1420,7 @@
+        "	-f	Force de/configuration"
+ 
+ #define ifdown_trivial_usage \
+-       "<-ahinv> <ifaces...>"
++       "[-ahinv] ifaces..."
+ #define ifdown_full_usage \
+        "Options:\n" \
+        "	-a	De/configure all interfaces automatically\n" \
+@@ -1587,7 +1587,7 @@
+        "	-x	Do not export externs"
+ 
+ #define install_trivial_usage \
+-       "[-cgmops] [sources] <dest|directory>"
++       "[-cgmops] [sources] dest|directory"
+ #define install_full_usage \
+        "Copy files and set attributes" \
+        "\n\nOptions:\n" \
+@@ -1634,7 +1634,7 @@
+        "	SCOPE-ID := [host | link | global | NUMBER]"
+ 
+ #define ipcalc_trivial_usage \
+-       "[OPTION]... <ADDRESS>[[/]<NETMASK>] [NETMASK]"
++       "[OPTION]... ADDRESS[[/]NETMASK] [NETMASK]"
+ #define ipcalc_full_usage \
+        "Calculate IP network settings from a IP address" \
+        "\n\nOptions:" \
+@@ -1778,7 +1778,7 @@
+        "		reached"
+ 
+ #define setarch_trivial_usage \
+-       "<personality> <program> [args ...]"
++       "personality program [args ...]"
+ #define setarch_full_usage \
+        "Personality may be:\n" \
+        "	linux32		Set 32bit uname emulation\n" \
+@@ -2502,7 +2502,7 @@
+        "to standard output. With no FILE, or when FILE is -, read standard input."
+ 
+ #define openvt_trivial_usage \
+-       "<vtnum> <COMMAND> [ARGS...]"
++       "VTNUM COMMAND [ARGS...]"
+ #define openvt_full_usage \
+        "Start a command on a new virtual terminal"
+ #define openvt_example_usage \
+@@ -2520,8 +2520,17 @@
+        "	-l	Locks (disables) the specified user account\n" \
+        "	-u	Unlocks (re-enables) the specified user account"
+ 
++#define chpasswd_trivial_usage \
++       "[--md5|--encrypt]"
++#define chpasswd_full_usage \
++       "Read user:password information from stdin\n" \
++       "and update /etc/passwd accordingly." \
++       "\n\nOptions:" \
++       "\n	-e, --encrypt	Supplied passwords are in encrypted form" \
++       "\n	-m, --md5	Use MD5 encryption instead of DES"
++
+ #define patch_trivial_usage \
+-       "[-p<num>] [-i <diff>]"
++       "[-p num] [-i diff]"
+ #define patch_full_usage \
+        "	-p NUM	Strip NUM leading components from file names\n" \
+        "	-i DIFF	Read DIFF instead of stdin"
+@@ -2612,7 +2621,7 @@
+        "the new root file system"
+ 
+ #define poweroff_trivial_usage \
+-       "[-d<delay>] [-n<nosync>] [-f<force>]"
++       "[-d delay] [-n] [-f]"
+ #define poweroff_full_usage \
+        "Halt and shut off power" \
+        "\n\nOptions:\n" \
+@@ -2729,9 +2738,9 @@
+        "[OPTIONS]..."
+ #define readprofile_full_usage \
+        "Options:\n" \
+-       "	-m <mapfile>	(Default: /boot/System.map)\n" \
+-       "	-p <profile>	(Default: /proc/profile)\n" \
+-       "	-M <mult>	Set the profiling multiplier to <mult>\n" \
++       "	-m mapfile	(Default: /boot/System.map)\n" \
++       "	-p profile	(Default: /proc/profile)\n" \
++       "	-M mult		Set the profiling multiplier to mult\n" \
+        "	-i		Print only info about the sampling step\n" \
+        "	-v		Verbose\n" \
+        "	-a		Print all symbols, even if count is 0\n" \
+@@ -2746,7 +2755,7 @@
+        "Return the absolute pathnames of given argument"
+ 
+ #define reboot_trivial_usage \
+-       "[-d<delay>] [-n<nosync>] [-f<force>]"
++       "[-d delay] [-n] [-f]"
+ #define reboot_full_usage \
+        "Reboot the system" \
+        "\n\nOptions:\n" \
+@@ -3083,21 +3092,21 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "\n\nOptions:" \
+        "\n	-S|--start			Start" \
+        "\n	-K|--stop			Stop" \
+-       "\n	-a|--startas <pathname>		Starts process specified by pathname" \
++       "\n	-a|--startas pathname		Starts process specified by pathname" \
+        "\n	-b|--background			Force process into background" \
+-       "\n	-u|--user <username>|<uid>	Stop this user's processes" \
+-       "\n	-x|--exec <executable>		Program to either start or check" \
++       "\n	-u|--user username|uid		Stop this user's processes" \
++       "\n	-x|--exec executable		Program to either start or check" \
+        "\n	-m|--make-pidfile		Create the -p file and enter pid in it" \
+-       "\n	-n|--name <process-name>	Stop processes with this name" \
+-       "\n	-p|--pidfile <pid-file>		Save or load pid using a pid-file" \
++       "\n	-n|--name process-name		Stop processes with this name" \
++       "\n	-p|--pidfile pid-file		Save or load pid using a pid-file" \
+        "\n	-q|--quiet			Quiet" \
+ 	USE_FEATURE_START_STOP_DAEMON_FANCY( \
+        "\n	-o|--oknodo			Exit status 0 if nothing done" \
+        "\n	-v|--verbose			Verbose" \
+-       "\n	-N|--nicelevel <N>		Add N to process's nice level" \
++       "\n	-N|--nicelevel N		Add N to process's nice level" \
+ 	) \
+-       "\n	-s|--signal <signal>		Signal to send (default TERM)" \
+-       "\n	-c|--chuid <user>[:[<group>]]	Change to specified user/group"
++       "\n	-s|--signal signal		Signal to send (default TERM)" \
++       "\n	-c|--chuid user[:[group]]	Change to specified user/group"
+ 
+ #define stat_trivial_usage \
+        "[OPTION] FILE..."
+@@ -3257,7 +3266,7 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "sysctl [-n] variable ...\n" \
+        "sysctl [-n] -w variable=value ...\n" \
+        "sysctl [-n] -a\n" \
+-       "sysctl [-n] -p <file>	(default /etc/sysctl.conf)\n" \
++       "sysctl [-n] -p file	(default /etc/sysctl.conf)\n" \
+        "sysctl [-n] -A\n"
+ 
+ #define syslogd_trivial_usage \
+@@ -3747,7 +3756,7 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "	-a	Lock all VTs"
+ 
+ #define watch_trivial_usage \
+-       "[-n <seconds>] [-t] COMMAND..."
++       "[-n seconds] [-t] COMMAND..."
+ #define watch_full_usage \
+        "Execute a program periodically" \
+        "\n\nOptions:\n" \
+@@ -3760,7 +3769,7 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "Mon Dec 17 10:31:44 GMT 2000"
+ 
+ #define watchdog_trivial_usage \
+-       "[-t <seconds>] [-F] DEV"
++       "[-t seconds] [-F] DEV"
+ #define watchdog_full_usage \
+        "Periodically write to watchdog device DEV" \
+        "\n\nOptions:\n" \
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 6595867..c0cbe1a 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -104,7 +104,8 @@ lib-y += xreadlink.o
+ lib-$(CONFIG_FEATURE_MOUNT_LOOP) += loop.o
+ lib-$(CONFIG_LOSETUP) += loop.o
+ lib-$(CONFIG_FEATURE_MTAB_SUPPORT) += mtab.o
+-lib-$(CONFIG_PASSWD) += pw_encrypt.o crypt_make_salt.o
++lib-$(CONFIG_PASSWD) += pw_encrypt.o crypt_make_salt.o update_passwd.o
++lib-$(CONFIG_CHPASSWD) += pw_encrypt.o crypt_make_salt.o update_passwd.o
+ lib-$(CONFIG_CRYPTPW) += pw_encrypt.o crypt_make_salt.o
+ lib-$(CONFIG_SULOGIN) += pw_encrypt.o
+ lib-$(CONFIG_FEATURE_HTTPD_AUTH_MD5) += pw_encrypt.o
+diff --git a/libbb/crypt_make_salt.c b/libbb/crypt_make_salt.c
+index 12e9632..ebdf024 100644
+--- a/libbb/crypt_make_salt.c
++++ b/libbb/crypt_make_salt.c
+@@ -24,12 +24,9 @@ static int i64c(int i)
+ 	return ('a' - 38 + i);
+ }
+ 
+-
+-void crypt_make_salt(char *p, int cnt)
++int crypt_make_salt(char *p, int cnt, int x)
+ {
+-	unsigned x = x; /* it's pointless to initialize it anyway :) */
+-
+-	x += getpid() + time(NULL) + clock();
++	x += getpid() + time(NULL);
+ 	do {
+ 		/* x = (x*1664525 + 1013904223) % 2^32 generator is lame
+ 		 * (low-order bit is not "random", etc...),
+@@ -44,5 +41,5 @@ void crypt_make_salt(char *p, int cnt)
+ 		*p++ = i64c(x >> 22);
+ 	} while (--cnt);
+ 	*p = '\0';
++	return x;
+ }
+-
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index f9ae122..63ae9b4 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -180,6 +180,14 @@ config CRYPTPW
+ 	help
+ 	  Applet for crypting a string.
+ 
++config CHPASSWD
++       bool "chpasswd"
++       default n
++       help
++         chpasswd  reads  a  file  of user name and password pairs from
++         standard input and uses this information to update a group of
++         existing users.
++
+ config SU
+ 	bool "su"
+ 	default n
+diff --git a/loginutils/Kbuild b/loginutils/Kbuild
+index 1b1165a..3d0d777 100644
+--- a/loginutils/Kbuild
++++ b/loginutils/Kbuild
+@@ -8,6 +8,7 @@ lib-y:=
+ lib-$(CONFIG_ADDGROUP)	+= addgroup.o
+ lib-$(CONFIG_ADDUSER)	+= adduser.o
+ lib-$(CONFIG_CRYPTPW)	+= cryptpw.o
++lib-$(CONFIG_CHPASSWD)	+= chpasswd.o
+ lib-$(CONFIG_GETTY)	+= getty.o
+ lib-$(CONFIG_LOGIN)	+= login.o
+ lib-$(CONFIG_PASSWD)	+= passwd.o
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index dd73046..1c30591 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -17,9 +17,9 @@ int cryptpw_main(int argc, char **argv)
+ 		/* Too ugly, and needs even more magic to handle endianness: */
+ 		//((uint32_t*)&salt)[0] = '$' + '1'*0x100 + '$'*0x10000;
+ 		/* Hope one day gcc will do it itself (inlining strcpy) */
+-		crypt_make_salt(salt + 3, 4); /* md5 */
++		crypt_make_salt(salt + 3, 4, 0); /* md5 */
+ 	} else {
+-		crypt_make_salt(salt, 1);     /* des */
++		crypt_make_salt(salt, 1, 0);     /* des */
+ 	}
+ 
+ 	puts(pw_encrypt(argv[optind] ? argv[optind] : xmalloc_getline(stdin), salt));
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index 8f65c3d..cd98d41 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -52,10 +52,10 @@ static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
+ 	}
+ 
+ 	/*memset(salt, 0, sizeof(salt)); - why?*/
+-	crypt_make_salt(salt, 1); /* des */
++	crypt_make_salt(salt, 1, 0); /* des */
+ 	if (algo) { /* MD5 */
+ 		strcpy(salt, "$1$");
+-		crypt_make_salt(salt + 3, 4);
++		crypt_make_salt(salt + 3, 4, 0);
+ 	}
+ 	ret = xstrdup(pw_encrypt(newp, salt)); /* returns ptr to static */
+ 	/* whee, success! */
+@@ -70,115 +70,6 @@ static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
+ 	return ret;
+ }
+ 
+-
+-static int update_passwd(const char *filename, const char *username,
+-			const char *new_pw)
+-{
+-	struct stat sb;
+-	struct flock lock;
+-	FILE *old_fp;
+-	FILE *new_fp;
+-	char *new_name;
+-	char *last_char;
+-	unsigned user_len;
+-	int old_fd;
+-	int new_fd;
+-	int i;
+-	int ret = 1; /* failure */
+-
+-	logmode = LOGMODE_STDIO;
+-	/* New passwd file, "/etc/passwd+" for now */
+-	new_name = xasprintf("%s+", filename);
+-	last_char = &new_name[strlen(new_name)-1];
+-	username = xasprintf("%s:", username);
+-	user_len = strlen(username);
+-
+-	old_fp = fopen(filename, "r+");
+-	if (!old_fp)
+-		goto free_mem;
+-	old_fd = fileno(old_fp);
+-
+-	/* Try to create "/etc/passwd+". Wait if it exists. */
+-	i = 30;
+-	do {
+-		// FIXME: on last iteration try w/o O_EXCL but with O_TRUNC?
+-		new_fd = open(new_name, O_WRONLY|O_CREAT|O_EXCL,0600);
+-		if (new_fd >= 0) goto created;
+-		if (errno != EEXIST) break;
+-		usleep(100000); /* 0.1 sec */
+-	} while (--i);
+-	bb_perror_msg("cannot create '%s'", new_name);
+-	goto close_old_fp;
+- created:
+-	if (!fstat(old_fd, &sb)) {
+-		fchmod(new_fd, sb.st_mode & 0777); /* ignore errors */
+-		fchown(new_fd, sb.st_uid, sb.st_gid);
+-	}
+-	new_fp = fdopen(new_fd, "w");
+-	if (!new_fp) {
+-		close(new_fd);
+-		goto unlink_new;
+-	}
+-
+-	/* Backup file is "/etc/passwd-" */
+-	last_char[0] = '-';
+-	/* Delete old one, create new as a hardlink to current */
+-	i = (unlink(new_name) && errno != ENOENT);
+-	if (i || link(filename, new_name))
+-		bb_perror_msg("warning: cannot create backup copy '%s'", new_name);
+-	last_char[0] = '+';
+-
+-	/* Lock the password file before updating */
+-	lock.l_type = F_WRLCK;
+-	lock.l_whence = SEEK_SET;
+-	lock.l_start = 0;
+-	lock.l_len = 0;
+-	if (fcntl(old_fd, F_SETLK, &lock) < 0)
+-		bb_perror_msg("warning: cannot lock '%s'", filename);
+-	lock.l_type = F_UNLCK;
+-
+-	/* Read current password file, write updated one */
+-	while (1) {
+-		char *line = xmalloc_fgets(old_fp);
+-		if (!line) break; /* EOF/error */
+-		if (strncmp(username, line, user_len) == 0) {
+-			/* we have a match with "username:"... */
+-			const char *cp = line + user_len;
+-			/* now cp -> old passwd, skip it: */
+-			cp = strchr(cp, ':');
+-			if (!cp) cp = "";
+-			/* now cp -> ':' after old passwd or -> "" */
+-			fprintf(new_fp, "%s%s%s", username, new_pw, cp);
+-			/* Erase password in memory */
+-		} else
+-			fputs(line, new_fp);
+-		free(line);
+-	}
+-	fcntl(old_fd, F_SETLK, &lock);
+-
+-	/* We do want all of them to execute, thus | instead of || */
+-	if ((ferror(old_fp) | fflush(new_fp) | fsync(new_fd) | fclose(new_fp))
+-	 || rename(new_name, filename)
+-	) {
+-		/* At least one of those failed */
+-		goto unlink_new;
+-	}
+-	ret = 0; /* whee, success! */
+-
+- unlink_new:
+-	if (ret) unlink(new_name);
+-
+- close_old_fp:
+-	fclose(old_fp);
+-
+- free_mem:
+-	if (ENABLE_FEATURE_CLEAN_UP) free(new_name);
+-	if (ENABLE_FEATURE_CLEAN_UP) free((char*)username);
+-	logmode = LOGMODE_BOTH;
+-	return ret;
+-}
+-
+-
+ int passwd_main(int argc, char **argv);
+ int passwd_main(int argc, char **argv)
+ {
+@@ -192,6 +83,7 @@ int passwd_main(int argc, char **argv)
+ 		/*STATE_ALGO_des = 0x20, not needed yet */
+ 	};
+ 	unsigned opt;
++	int rc;
+ 	const char *opt_a = "";
+ 	const char *filename;
+ 	char *myname;
+@@ -278,12 +170,11 @@ int passwd_main(int argc, char **argv)
+ 	signal(SIGQUIT, SIG_IGN);
+ 	umask(077);
+ 	xsetuid(0);
+-	if (update_passwd(filename, name, newp) != 0) {
+-		/* LOGMODE_BOTH */
++	rc = update_passwd(filename, name, newp);
++	logmode = LOGMODE_BOTH;
++	if (rc < 0)
+ 		bb_error_msg_and_die("cannot update password file %s",
+ 				filename);
+-	}
+-	/* LOGMODE_BOTH */
+ 	bb_info_msg("Password for %s changed by %s", name, myname);
+ 
+ 	if (ENABLE_FEATURE_CLEAN_UP) free(newp);
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 088ff79..4709b22 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -376,6 +376,7 @@ CONFIG_FEATURE_SECURETTY=y
+ CONFIG_PASSWD=y
+ CONFIG_FEATURE_PASSWD_WEAK_CHECK=y
+ CONFIG_CRYPTPW=y
++CONFIG_CHPASSWD=y
+ CONFIG_SU=y
+ CONFIG_FEATURE_SU_SYSLOG=y
+ CONFIG_FEATURE_SU_CHECKS_SHELLS=y
+diff --git a/scripts/trylink b/scripts/trylink
+index ddd7fb1..cbd7023 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -22,9 +22,11 @@ try "-Wl,--start-group $l_list -Wl,--end-group" "$@" \
+     cat busybox_ld.err
+     exit 1
+ }
++mv busybox_unstripped busybox_unstripped.tmp
+ 
+ # Now try to remove each lib and build without.
+ # Stop when no lib can be removed.
++ever_discarded=false
+ while test "$BBOX_LIB_LIST"; do
+     $debug && echo "Trying libraries: $BBOX_LIB_LIST"
+     all_needed=true
+@@ -36,6 +38,7 @@ while test "$BBOX_LIB_LIST"; do
+ 		echo "Library $one is not needed"
+ 		BBOX_LIB_LIST="$without_one"
+ 		all_needed=false
++		ever_discarded=true
+ 	else
+ 		echo "Library $one is needed"
+ 	fi
+@@ -48,7 +51,11 @@ while test "$BBOX_LIB_LIST"; do
+     #echo "$BBOX_LIB_LIST" | grep -q ' ' || break
+ done
+ 
+-# Ok, make the binary
+-echo "Final link with: $BBOX_LIB_LIST"
+-l_list=`echo "$BBOX_LIB_LIST" | sed -e 's/ / -l/g' -e 's/^/-l/'`
+-try "-Wl,--start-group $l_list -Wl,--end-group" "$@"
++mv busybox_unstripped.tmp busybox_unstripped
++$ever_discarded && {
++    # Ok, make the binary
++    echo "Final link with: $BBOX_LIB_LIST"
++    l_list=`echo "$BBOX_LIB_LIST" | sed -e 's/ / -l/g' -e 's/^/-l/'`
++    try "-Wl,--start-group $l_list -Wl,--end-group" "$@"
++}
++exit 0  # Ensure "success" exit code

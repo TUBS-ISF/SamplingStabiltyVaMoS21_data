@@ -1,0 +1,10 @@
+2008-10-15 09:44:37 +0000
+diff --git a/procps/sysctl.c b/procps/sysctl.c
+index 0876a73..60d9c0a 100644
+--- a/procps/sysctl.c
++++ b/procps/sysctl.c
+@@ -1,3 +1,4 @@
++/* vi: set sw=4 ts=4: */
+ /*
+  * Sysctl 1.01 - A utility to read and manipulate the sysctl parameters
+  *

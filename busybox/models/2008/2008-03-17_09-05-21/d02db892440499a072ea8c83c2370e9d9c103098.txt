@@ -1,0 +1,146 @@
+2008-03-17 09:05:21 +0000
+diff --git a/TODO b/TODO
+index f68c9de..fa9a207 100644
+--- a/TODO
++++ b/TODO
+@@ -7,19 +7,16 @@ have any suggestions how they plan to go about it, and to minimize conflicts
+ between your work and theirs.  But otherwise, all of these are fair game.
+ 
+ Rob Landley <rob@landley.net>:
+-  Add BB_NOMMU to platform.h and migrate __uClinux__ tests to that.
+-    #if defined __UCLIBC__ && !defined __ARCH_USE_MMU__
+   Add a libbb/platform.c
+     Implement fdprintf() for platforms that haven't got one.
+     Implement bb_realpath() that can handle NULL on non-glibc.
+     Cleanup bb_asprintf()
+ 
+-  Migrate calloc() and bb_calloc() occurrences to bb_xzalloc().
+   Remove obsolete _() wrapper crud for internationalization we don't do.
+   Figure out where we need utf8 support, and add it.
+ 
+   sh
+-    The command shell situation is a big mess.  We have three or four different
++    The command shell situation is a big mess.  We have three different
+     shells that don't really share any code, and the "standalone shell" doesn't
+     work all that well (especially not in a chroot environment), due to apps not
+     being reentrant.
+@@ -124,9 +121,6 @@ Bernhard Fischer <busybox@busybox.net> suggests to look at these:
+ As yet unclaimed:
+ 
+ ----
+-find
+-  doesn't understand (), lots of susv3 stuff.
+-----
+ diff
+   Make sure we handle empty files properly:
+     From the patch man page:
+@@ -143,10 +137,6 @@ patch
+   And while we're at it, a new patch filename quoting format is apparently
+   coming soon:  http://marc.theaimsgroup.com/?l=git&m=112927316408690&w=2
+ ---
+-ps / top
+-  Add support for both RSS and VSIZE rather than just one or the other.
+-  Or make it a build option.
+----
+ man
+   It would be nice to have a man command.  Not one that handles troff or
+   anything, just one that can handle preformatted ascii man pages, possibly
+@@ -310,9 +300,6 @@ Code cleanup:
+ 
+ Replace deprecated functions.
+ 
+-bzero() -> memset()
+----
+-sigblock(), siggetmask(), sigsetmask(), sigmask() -> sigprocmask et al
+ ---
+ vdprintf() -> similar sized functionality
+ ---
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/cache.c b/e2fsprogs/old_e2fsprogs/blkid/cache.c
+index 9bae6fb..d1d2914 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/cache.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/cache.c
+@@ -35,8 +35,7 @@ int blkid_get_cache(blkid_cache *ret_cache, const char *filename)
+ 	DBG(DEBUG_CACHE, printf("creating blkid cache (using %s)\n",
+ 				filename ? filename : "default cache"));
+ 
+-	if (!(cache = (blkid_cache) calloc(1, sizeof(struct blkid_struct_cache))))
+-		return -BLKID_ERR_MEM;
++	cache = xzalloc(sizeof(struct blkid_struct_cache));
+ 
+ 	INIT_LIST_HEAD(&cache->bic_devs);
+ 	INIT_LIST_HEAD(&cache->bic_tags);
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/dev.c b/e2fsprogs/old_e2fsprogs/blkid/dev.c
+index f6503f1..bb0cc91 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/dev.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/dev.c
+@@ -20,8 +20,7 @@ blkid_dev blkid_new_dev(void)
+ {
+ 	blkid_dev dev;
+ 
+-	if (!(dev = (blkid_dev) calloc(1, sizeof(struct blkid_struct_dev))))
+-		return NULL;
++	dev = xzalloc(sizeof(struct blkid_struct_dev));
+ 
+ 	INIT_LIST_HEAD(&dev->bid_devs);
+ 	INIT_LIST_HEAD(&dev->bid_tags);
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/tag.c b/e2fsprogs/old_e2fsprogs/blkid/tag.c
+index 006a393..c0a93df 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/tag.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/tag.c
+@@ -21,8 +21,7 @@ static blkid_tag blkid_new_tag(void)
+ {
+ 	blkid_tag tag;
+ 
+-	if (!(tag = (blkid_tag) calloc(1, sizeof(struct blkid_struct_tag))))
+-		return NULL;
++	tag = xzalloc(sizeof(struct blkid_struct_tag));
+ 
+ 	INIT_LIST_HEAD(&tag->bit_tags);
+ 	INIT_LIST_HEAD(&tag->bit_names);
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index aade904..e2bb378 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -264,6 +264,7 @@ static void parse_config_file(void)
+ 		s = buffer;
+ 
+ 		if (!fgets(s, sizeof(buffer), f)) { /* Are we done? */
++// why?
+ 			if (ferror(f)) {   /* Make sure it wasn't a read error. */
+ 				parse_error("reading");
+ 			}
+diff --git a/libbb/dump.c b/libbb/dump.c
+index 5e43d42..4d6472e 100644
+--- a/libbb/dump.c
++++ b/libbb/dump.c
+@@ -95,7 +95,7 @@ static void rewrite(FS * fs)
+ 		 */
+ 		for (nconv = 0, fmtp = fu->fmt; *fmtp; nextpr = &pr->nextpr) {
+ 			/* NOSTRICT */
+-			/* DBU:[dvae@cray.com] calloc so that forward ptrs start out NULL*/
++			/* DBU:[dvae@cray.com] zalloc so that forward ptrs start out NULL*/
+ 			pr = xzalloc(sizeof(PR));
+ 			if (!fu->nextpr)
+ 				fu->nextpr = pr;
+@@ -704,7 +704,7 @@ void bb_dump_add(const char *fmt)
+ 
+ 		/* allocate a new format unit and link it in */
+ 		/* NOSTRICT */
+-		/* DBU:[dave@cray.com] calloc so that forward pointers start out NULL */
++		/* DBU:[dave@cray.com] zalloc so that forward pointers start out NULL */
+ 		tfu = xzalloc(sizeof(FU));
+ 		*nextfu = tfu;
+ 		nextfu = &tfu->nextfu;
+diff --git a/testsuite/all_sourcecode.tests b/testsuite/all_sourcecode.tests
+index 86f61b7..45f4011 100755
+--- a/testsuite/all_sourcecode.tests
++++ b/testsuite/all_sourcecode.tests
+@@ -73,7 +73,7 @@ rm -f src.typos
+ # don't allow obsolete functions
+ #
+ find $srcdir/.. '(' -name '*.c' -o -name '*.h' ')' -print0 | xargs -0 \
+-	grep -E -e '\<(bcmp|bcopy|bzero|getwd|index|mktemp|rindex|utimes)\>[[:space:]]*\(' \
++	grep -E -e '\<(bcmp|bcopy|bzero|getwd|index|mktemp|rindex|utimes|sigblock|siggetmask|sigsetmask)\>[[:space:]]*\(' \
+ 	| sed -e "s:^$srcdir/\.\./::g" > src.obsolete.funcs
+ testing "Obsolete function usage" "cat src.obsolete.funcs" "" "" ""
+ rm -f src.obsolete.funcs

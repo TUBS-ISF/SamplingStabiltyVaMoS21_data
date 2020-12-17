@@ -1,0 +1,35 @@
+2009-03-27 17:22:00 +0000
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 85c6729..61baa9a 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -742,7 +742,7 @@ static int print_name(const char *name)
+ static int list_single(const struct dnode *dn)
+ {
+ 	int column = 0;
+-	char *lpath;
++	char *lpath = lpath; /* for compiler */
+ #if ENABLE_FEATURE_LS_TIMESTAMPS
+ 	char *filetime;
+ 	time_t ttime, age;
+diff --git a/coreutils/rm.c b/coreutils/rm.c
+index 975f226..6b3fbcf 100644
+--- a/coreutils/rm.c
++++ b/coreutils/rm.c
+@@ -27,13 +27,14 @@ int rm_main(int argc UNUSED_PARAM, char **argv)
+ 	unsigned opt;
+ 
+ 	opt_complementary = "f-i:i-f";
+-	opt = getopt32(argv, "fiRr");
++	/* -v (verbose) is ignored */
++	opt = getopt32(argv, "fiRrv");
+ 	argv += optind;
+ 	if (opt & 1)
+ 		flags |= FILEUTILS_FORCE;
+ 	if (opt & 2)
+ 		flags |= FILEUTILS_INTERACTIVE;
+-	if (opt & 12)
++	if (opt & (8|4))
+ 		flags |= FILEUTILS_RECUR;
+ 
+ 	if (*argv != NULL) {

@@ -1,0 +1,14 @@
+2008-10-14 12:50:34 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 6efc307..1e6df62 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3134,6 +3134,8 @@ static int reserved_word(o_string *word, struct parse_context *ctx)
+ }
+ #endif
+ 
++//TODO: many, many callers don't check error from done_word()
++
+ /* Word is complete, look at it and update parsing context.
+  * Normal return is 0. Syntax errors return 1. */
+ static int done_word(o_string *word, struct parse_context *ctx)

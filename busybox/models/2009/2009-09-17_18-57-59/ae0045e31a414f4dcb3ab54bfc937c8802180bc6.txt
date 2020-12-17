@@ -1,0 +1,15 @@
+2009-09-17 18:57:59 +0200
+diff --git a/TODO b/TODO
+index 136aeb7..493932a 100644
+--- a/TODO
++++ b/TODO
+@@ -271,7 +271,8 @@ Minor stuff:
+   in_ether duplicated in network/{interface,ifconfig}.c
+ ---
+   unify progress_meter. wget, flash_eraseall, pipe_progress, fbsplash, setfiles.
+-
++---
++   support start-stop-daemon -d <chdir-path>
+ 
+ Code cleanup:
+ 

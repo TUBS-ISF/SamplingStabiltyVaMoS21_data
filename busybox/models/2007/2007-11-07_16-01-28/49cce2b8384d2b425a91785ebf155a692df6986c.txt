@@ -1,0 +1,91 @@
+2007-11-07 16:01:28 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 5307d98..e609cbc 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3835,6 +3835,8 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "\n	-r,--request=IP		IP address to request" \
+        "\n	-s,--script=file	Run file at dhcp events (default: /usr/share/udhcpc/default.script)" \
+        "\n	-t,--retries=N		Send up to N request packets"\
++       "\n	-T,--timeout=N		Try to get a lease for N seconds (default: 3)"\
++       "\n	-A,--tryagain=N		Wait N seconds (default: 60) after failure"\
+        "\n	-f,--foreground	Run in foreground" \
+        "\n	-b,--background	Background if lease cannot be immediately negotiated" \
+        "\n	-S,--syslog	Log to syslog too" \
+@@ -3853,6 +3855,8 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "\n	-r IP		IP address to request" \
+        "\n	-s file		Run file at dhcp events (default: /usr/share/udhcpc/default.script)" \
+        "\n	-t N		Send up to N request packets"\
++       "\n	-T N		Try to get a lease for N seconds (default: 3)"\
++       "\n	-A N		Wait N seconds (default: 60) after failure"\
+        "\n	-f		Run in foreground" \
+        "\n	-b		Background if lease cannot be immediately negotiated" \
+        "\n	-S		Log to syslog too" \
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index e00379b..c6f9fe4 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -144,7 +144,7 @@ int udhcpc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int udhcpc_main(int argc, char **argv)
+ {
+ 	uint8_t *temp, *message;
+-	char *str_c, *str_V, *str_h, *str_F, *str_r, *str_T, *str_t;
++	char *str_c, *str_V, *str_h, *str_F, *str_r, *str_T, *str_A, *str_t;
+ 	uint32_t xid = 0;
+ 	uint32_t lease = 0; /* can be given as 32-bit quantity */
+ 	unsigned t1 = 0, t2 = 0; /* what a wonderful names */
+@@ -179,6 +179,7 @@ int udhcpc_main(int argc, char **argv)
+ 		OPT_t = 1 << 16,
+ 		OPT_v = 1 << 17,
+ 		OPT_S = 1 << 18,
++		OPT_A = 1 << 19,
+ 	};
+ #if ENABLE_GETOPT_LONG
+ 	static const char udhcpc_longopts[] ALIGN1 =
+@@ -200,6 +201,7 @@ int udhcpc_main(int argc, char **argv)
+ 		"timeout\0"       Required_argument "T"
+ 		"version\0"       No_argument       "v"
+ 		"retries\0"       Required_argument "t"
++		"tryagain\0"      Required_argument "A"
+ 		"syslog\0"        No_argument       "S"
+ 		;
+ #endif
+@@ -208,6 +210,7 @@ int udhcpc_main(int argc, char **argv)
+ 	client_config.script = DEFAULT_SCRIPT;
+ 	client_config.retries = 3;
+ 	client_config.timeout = 3;
++	client_config.tryagain = 60;
+ 
+ 	/* Parse command line */
+ 	opt_complementary = "c--C:C--c" // mutually exclusive
+@@ -215,10 +218,10 @@ int udhcpc_main(int argc, char **argv)
+ #if ENABLE_GETOPT_LONG
+ 	applet_long_options = udhcpc_longopts;
+ #endif
+-	opt = getopt32(argv, "c:CV:fbH:h:F:i:np:qRr:s:T:t:vS",
++	opt = getopt32(argv, "c:CV:fbH:h:F:i:np:qRr:s:T:t:vSA:",
+ 		&str_c, &str_V, &str_h, &str_h, &str_F,
+ 		&client_config.interface, &client_config.pidfile, &str_r,
+-		&client_config.script, &str_T, &str_t
++		&client_config.script, &str_T, &str_t, &str_A
+ 		);
+ 
+ 	if (opt & OPT_c)
+@@ -259,6 +262,8 @@ int udhcpc_main(int argc, char **argv)
+ 		client_config.timeout = xatoi_u(str_T);
+ 	if (opt & OPT_t)
+ 		client_config.retries = xatoi_u(str_t);
++	if (opt & OPT_A)
++		client_config.tryagain = xatoi_u(str_A);
+ 	if (opt & OPT_v) {
+ 		puts("version "BB_VER);
+ 		return 0;
+@@ -355,7 +360,7 @@ int udhcpc_main(int argc, char **argv)
+ 					}
+ 					/* wait to try again */
+ 					packet_num = 0;
+-					timeout = now + 60;
++					timeout = now + client_config.tryagain;
+ 				}
+ 				break;
+ 			case RENEW_REQUESTED:

@@ -1,0 +1,35 @@
+2009-11-26 05:43:16 +0100
+diff --git a/coreutils/cksum.c b/coreutils/cksum.c
+index 3a77c75..8e65b1c 100644
+--- a/coreutils/cksum.c
++++ b/coreutils/cksum.c
+@@ -4,8 +4,8 @@
+  *
+  * Copyright (C) 2006 by Rob Sullivan, with ideas from code by Walter Harms
+  *
+- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details. */
+-
++ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
++ */
+ #include "libbb.h"
+ 
+ int cksum_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+diff --git a/coreutils/split.c b/coreutils/split.c
+index 2191f30..c2f3885 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -79,9 +79,13 @@ int split_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	argv += optind;
+ 	if (argv[0]) {
++		int fd;
+ 		if (argv[1])
+ 			sfx = argv[1];
+-		xmove_fd(xopen(argv[0], O_RDONLY), 0);
++		fd = open_or_warn_stdin(argv[0]);
++		if (fd == -1)
++			return EXIT_FAILURE;
++		xmove_fd(fd, STDIN_FILENO);
+ 	} else {
+ 		argv[0] = (char *) bb_msg_standard_input;
+ 	}

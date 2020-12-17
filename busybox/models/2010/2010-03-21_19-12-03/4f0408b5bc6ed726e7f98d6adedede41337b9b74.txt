@@ -1,0 +1,14 @@
+2010-03-21 19:12:03 +0100
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index d0d8df3..6999b28 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -193,7 +193,7 @@ config FINDFS
+ 
+ config FLOCK
+ 	bool "flock"
+-	default y
++	default n
+ 	help
+ 	  Manage locks from shell scripts
+ 

@@ -1,0 +1,498 @@
+2007-06-19 11:12:46 +0000
+diff --git a/include/inet_common.h b/include/inet_common.h
+index fa48fdf..eb4cb73 100644
+--- a/include/inet_common.h
++++ b/include/inet_common.h
+@@ -18,9 +18,9 @@ int INET_resolve(const char *name, struct sockaddr_in *s_in, int hostfirst);
+  *          & 0x4000: host instead of net,
+  *          & 0x0fff: don't resolve
+  */
+-int INET_rresolve(char *name, size_t len, struct sockaddr_in *s_in,
+-	int numeric, unsigned int netmask);
+-
+ 
+ int INET6_resolve(const char *name, struct sockaddr_in6 *sin6);
+-int INET6_rresolve(char *name, size_t len, struct sockaddr_in6 *sin6, int numeric);
++
++/* These return malloced string */
++char *INET_rresolve(struct sockaddr_in *s_in, int numeric, uint32_t netmask);
++char *INET6_rresolve(struct sockaddr_in6 *sin6, int numeric);
+diff --git a/libbb/inet_common.c b/libbb/inet_common.c
+index 44b44a4..8449201 100644
+--- a/libbb/inet_common.c
++++ b/libbb/inet_common.c
+@@ -72,26 +72,24 @@ int INET_resolve(const char *name, struct sockaddr_in *s_in, int hostfirst)
+ 	return 0;
+ }
+ 
+-/* cache */
+-struct addr {
+-	struct sockaddr_in addr;
+-	char *name;
+-	int host;
+-	struct addr *next;
+-};
+-
+-static struct addr *INET_nn = NULL;	/* addr-to-name cache */
+ 
+ /* numeric: & 0x8000: default instead of *,
+  *          & 0x4000: host instead of net,
+  *          & 0x0fff: don't resolve
+  */
+-int INET_rresolve(char *name, size_t len, struct sockaddr_in *s_in,
+-				  int numeric, unsigned int netmask)
++char *INET_rresolve(struct sockaddr_in *s_in, int numeric, uint32_t netmask)
+ {
+-	struct hostent *ent;
+-	struct netent *np;
++	/* addr-to-name cache */
++	struct addr {
++		struct addr *next;
++		struct sockaddr_in addr;
++		int host;
++		char name[1];
++	};
++	static struct addr *cache = NULL;
++
+ 	struct addr *pn;
++	char *name;
+ 	uint32_t ad, host_ad;
+ 	int host = 0;
+ 
+@@ -102,7 +100,7 @@ int INET_rresolve(char *name, size_t len, struct sockaddr_in *s_in,
+ 				  s_in->sin_family);
+ #endif
+ 		errno = EAFNOSUPPORT;
+-		return -1;
++		return NULL;
+ 	}
+ 	ad = s_in->sin_addr.s_addr;
+ #ifdef DEBUG
+@@ -111,62 +109,58 @@ int INET_rresolve(char *name, size_t len, struct sockaddr_in *s_in,
+ 	if (ad == INADDR_ANY) {
+ 		if ((numeric & 0x0FFF) == 0) {
+ 			if (numeric & 0x8000)
+-				safe_strncpy(name, bb_str_default, len);
+-			else
+-				safe_strncpy(name, "*", len);
+-			return 0;
++				return xstrdup(bb_str_default);
++			return xstrdup("*");
+ 		}
+ 	}
+-	if (numeric & 0x0FFF) {
+-		safe_strncpy(name, inet_ntoa(s_in->sin_addr), len);
+-		return 0;
+-	}
++	if (numeric & 0x0FFF)
++		return xstrdup(inet_ntoa(s_in->sin_addr));
+ 
+ 	if ((ad & (~netmask)) != 0 || (numeric & 0x4000))
+ 		host = 1;
+-	pn = INET_nn;
+-	while (pn != NULL) {
++	pn = cache;
++	while (pn) {
+ 		if (pn->addr.sin_addr.s_addr == ad && pn->host == host) {
+-			safe_strncpy(name, pn->name, len);
+ #ifdef DEBUG
+ 			bb_error_msg("rresolve: found %s %08x in cache",
+ 					  (host ? "host" : "net"), (unsigned)ad);
+ #endif
+-			return 0;
++			return xstrdup(pn->name);
+ 		}
+ 		pn = pn->next;
+ 	}
+ 
+ 	host_ad = ntohl(ad);
+-	np = NULL;
+-	ent = NULL;
++	name = NULL;
+ 	if (host) {
++		struct hostent *ent;
+ #ifdef DEBUG
+ 		bb_error_msg("gethostbyaddr (%08x)", (unsigned)ad);
+ #endif
+ 		ent = gethostbyaddr((char *) &ad, 4, AF_INET);
+-		if (ent != NULL) {
+-			safe_strncpy(name, ent->h_name, len);
+-		}
++		if (ent)
++			name = xstrdup(ent->h_name);
+ 	} else {
++		/* Hmmm... this is very rare to have named nets,
++		 * and this getnetbyaddr() call is the only one in bbox.
++		 * Maybe get rid of or make configurable? */
++		struct netent *np;
+ #ifdef DEBUG
+ 		bb_error_msg("getnetbyaddr (%08x)", (unsigned)host_ad);
+ #endif
+ 		np = getnetbyaddr(host_ad, AF_INET);
+-		if (np != NULL) {
+-			safe_strncpy(name, np->n_name, len);
+-		}
+-	}
+-	if (!ent && !np) {
+-		safe_strncpy(name, inet_ntoa(s_in->sin_addr), len);
++		if (np)
++			name = xstrdup(np->n_name);
+ 	}
+-	pn = xmalloc(sizeof(struct addr));
++	if (!name)
++		name = xstrdup(inet_ntoa(s_in->sin_addr));
++	pn = xmalloc(sizeof(*pn) + strlen(name)); /* no '+ 1', it's already accounted for */
++	pn->next = cache;
+ 	pn->addr = *s_in;
+-	pn->next = INET_nn;
+ 	pn->host = host;
+-	pn->name = xstrdup(name);
+-	INET_nn = pn;
+-	return 0;
++	strcpy(pn->name, name);
++	cache = pn;
++	return name;
+ }
+ 
+ #ifdef CONFIG_FEATURE_IPV6
+@@ -195,9 +189,9 @@ int INET6_resolve(const char *name, struct sockaddr_in6 *sin6)
+ #endif
+ 
+ 
+-int INET6_rresolve(char *name, size_t len, struct sockaddr_in6 *sin6,
+-				   int numeric)
++char *INET6_rresolve(struct sockaddr_in6 *sin6, int numeric)
+ {
++	char name[128];
+ 	int s;
+ 
+ 	/* Grmpf. -FvK */
+@@ -207,29 +201,25 @@ int INET6_rresolve(char *name, size_t len, struct sockaddr_in6 *sin6,
+ 				  sin6->sin6_family);
+ #endif
+ 		errno = EAFNOSUPPORT;
+-		return -1;
++		return NULL;
+ 	}
+ 	if (numeric & 0x7FFF) {
+-		inet_ntop(AF_INET6, &sin6->sin6_addr, name, len);
+-		return 0;
++		inet_ntop(AF_INET6, &sin6->sin6_addr, name, sizeof(name));
++		return xstrdup(name);
+ 	}
+ 	if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+-		if (numeric & 0x8000) {
+-			strcpy(name, bb_str_default);
+-		} else {
+-			name[0] = '*';
+-			name[1] = '\0';
+-		}
+-		return 0;
++		if (numeric & 0x8000)
++			return xstrdup(bb_str_default);
++		return xstrdup("*");
+ 	}
+ 
+ 	s = getnameinfo((struct sockaddr *) sin6, sizeof(struct sockaddr_in6),
+-				name, len, NULL, 0, 0);
++				name, sizeof(name), NULL, 0, 0);
+ 	if (s) {
+ 		bb_error_msg("getnameinfo failed");
+-		return -1;
++		return NULL;
+ 	}
+-	return 0;
++	return xstrdup(name);
+ }
+ 
+ #endif							/* CONFIG_FEATURE_IPV6 */
+diff --git a/networking/interface.c b/networking/interface.c
+index f8721f4..204febf 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -84,13 +84,12 @@ struct in6_ifreq {
+ /* Display an Internet socket address. */
+ static const char *INET_sprint(struct sockaddr *sap, int numeric)
+ {
+-	static char buff[128];
++	static char *buff;
+ 
++	free(buff);
+ 	if (sap->sa_family == 0xFFFF || sap->sa_family == 0)
+ 		return "[NONE SET]";
+-	if (INET_rresolve(buff, sizeof(buff), (struct sockaddr_in *) sap,
+-					  numeric, 0xffffff00) != 0)
+-		return NULL;
++	buff = INET_rresolve((struct sockaddr_in *) sap, numeric, 0xffffff00);
+ 	return buff;
+ }
+ 
+@@ -167,12 +166,12 @@ static const struct aftype inet_aftype = {
+ /* dirty! struct sockaddr usually doesn't suffer for inet6 addresses, fst. */
+ static const char *INET6_sprint(struct sockaddr *sap, int numeric)
+ {
+-	static char buff[128];
++	static char *buff;
+ 
++	free(buff);
+ 	if (sap->sa_family == 0xFFFF || sap->sa_family == 0)
+ 		return "[NONE SET]";
+-	if (INET6_rresolve(buff, sizeof(buff), (struct sockaddr_in6 *) sap, numeric))
+-		return "[UNKNOWN]";
++	buff = INET6_rresolve((struct sockaddr_in6 *) sap, numeric);
+ 	return buff;
+ }
+ 
+diff --git a/networking/netstat.c b/networking/netstat.c
+index d6c10b0..746e250 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -120,50 +120,33 @@ static void build_ipv4_addr(char* local_addr, struct sockaddr_in* localaddr)
+ 	((struct sockaddr *) localaddr)->sa_family = AF_INET;
+ }
+ 
+-static const char *get_sname(int port, const char *proto, int num)
++static const char *get_sname(int port, const char *proto, int numeric)
+ {
+-	/* hummm, we return static buffer here!! */
+-	const char *str = itoa(ntohs(port));
+-	if (!num) {
++	if (!port)
++		return "*";
++	if (!numeric) {
+ 		struct servent *se = getservbyport(port, proto);
+ 		if (se)
+-			str = se->s_name;
++			return se->s_name;
+ 	}
+-	if (!port) {
+-		str = "*";
+-	}
+-	return str;
++	/* hummm, we may return static buffer here!! */
++	return itoa(ntohs(port));
+ }
+ 
+-static void snprint_ip_port(char *ip_port, int size, struct sockaddr *addr, int port, const char *proto, int numeric)
++static char *ip_port_str(struct sockaddr *addr, int port, const char *proto, int numeric)
+ {
+-	const char *port_name;
+-	int max_len;
+-	int port_name_len;
++	enum { salen = USE_FEATURE_IPV6(sizeof(struct sockaddr_in6)) SKIP_FEATURE_IPV6(sizeof(struct sockaddr_in)) };
++	char *host, *host_port;
+ 
+-// TODO: replace by xmalloc_sockaddr2host?
+-#if ENABLE_FEATURE_IPV6
+-	if (addr->sa_family == AF_INET6) {
+-		INET6_rresolve(ip_port, size, (struct sockaddr_in6 *)addr,
+-			(numeric & NETSTAT_NUMERIC) ? 0x0fff : 0);
+-	} else
+-#endif
+-	{
+-		INET_rresolve(ip_port, size, (struct sockaddr_in *)addr,
+-			0x4000 | ((numeric & NETSTAT_NUMERIC) ? 0x0fff : 0),
+-			0xffffffff);
+-	}
+-	port_name = get_sname(htons(port), proto, numeric);
+-
+-	max_len = (option_mask32 & OPT_widedisplay)
+-			? (PRINT_IP_MAX_SIZE_WIDE - 1)
+-			: (PRINT_IP_MAX_SIZE - 1);
+-	port_name_len = strlen(port_name);
+-	if ((strlen(ip_port) + port_name_len) > max_len)
+-		ip_port[max_len - port_name_len] = '\0';
+-	ip_port += strlen(ip_port);
+-	*ip_port++ = ':';
+-	strcpy(ip_port, port_name);
++	/* Code which used "*" for INADDR_ANY is removed: it's ambiguous in IPv6,
++	 * while "0.0.0.0" is not. */
++
++	host = numeric ? xmalloc_sockaddr2dotted_noport(addr, salen)
++	               : xmalloc_sockaddr2host_noport(addr, salen);
++
++	host_port = xasprintf("%s:%s", host, get_sname(htons(port), proto, numeric));
++	free(host);
++	return host_port;
+ }
+ 
+ static void tcp_do_one(int lnr, const char *line)
+@@ -206,14 +189,16 @@ static void tcp_do_one(int lnr, const char *line)
+ 	if ((rem_port && (flags & NETSTAT_CONNECTED))
+ 	 || (!rem_port && (flags & NETSTAT_LISTENING))
+ 	) {
+-		snprint_ip_port(local_addr, sizeof(local_addr),
++		char *l = ip_port_str(
+ 				(struct sockaddr *) &localaddr, local_port,
+ 				"tcp", flags & NETSTAT_NUMERIC);
+-		snprint_ip_port(rem_addr, sizeof(rem_addr),
++		char *r = ip_port_str(
+ 				(struct sockaddr *) &remaddr, rem_port,
+ 				"tcp", flags & NETSTAT_NUMERIC);
+ 		printf(net_conn_line,
+-			"tcp", rxq, txq, local_addr, rem_addr, tcp_state[state]);
++			"tcp", rxq, txq, l, r, tcp_state[state]);
++		free(l);
++		free(r);
+ 	}
+ }
+ 
+@@ -285,14 +270,16 @@ static void udp_do_one(int lnr, const char *line)
+ 		if ((have_remaddr && (flags & NETSTAT_CONNECTED))
+ 		 || (!have_remaddr && (flags & NETSTAT_LISTENING))
+ 		) {
+-			snprint_ip_port(local_addr, sizeof(local_addr),
++			char *l = ip_port_str(
+ 				(struct sockaddr *) &localaddr, local_port,
+ 				"udp", flags & NETSTAT_NUMERIC);
+-			snprint_ip_port(rem_addr, sizeof(rem_addr),
++			char *r = ip_port_str(
+ 				(struct sockaddr *) &remaddr, rem_port,
+ 				"udp", flags & NETSTAT_NUMERIC);
+ 			printf(net_conn_line,
+-				"udp", rxq, txq, local_addr, rem_addr, state_str);
++				"udp", rxq, txq, l, r, state_str);
++			free(l);
++			free(r);
+ 		}
+ 	}
+ }
+@@ -339,14 +326,16 @@ static void raw_do_one(int lnr, const char *line)
+ 		if ((have_remaddr && (flags & NETSTAT_CONNECTED))
+ 		 || (!have_remaddr && (flags & NETSTAT_LISTENING))
+ 		) {
+-			snprint_ip_port(local_addr, sizeof(local_addr),
++			char *l = ip_port_str(
+ 				(struct sockaddr *) &localaddr, local_port,
+ 				"raw", flags & NETSTAT_NUMERIC);
+-			snprint_ip_port(rem_addr, sizeof(rem_addr),
++			char *r = ip_port_str(
+ 				(struct sockaddr *) &remaddr, rem_port,
+ 				"raw", flags & NETSTAT_NUMERIC);
+ 			printf(net_conn_line,
+-				"raw", rxq, txq, local_addr, rem_addr, itoa(state));
++				"raw", rxq, txq, l, r, itoa(state));
++			free(l);
++			free(r);
+ 		}
+ 	}
+ }
+diff --git a/networking/route.c b/networking/route.c
+index 881332b..b5490dd 100644
+--- a/networking/route.c
++++ b/networking/route.c
+@@ -478,7 +478,7 @@ static void set_flags(char *flagstr, int flags)
+ /* also used in netstat */
+ void bb_displayroutes(int noresolve, int netstatfmt)
+ {
+-	char devname[64], flags[16], sdest[16], sgw[16];
++	char devname[64], flags[16], *sdest, *sgw;
+ 	unsigned long d, g, m;
+ 	int flgs, ref, use, metric, mtu, win, ir;
+ 	struct sockaddr_in s_addr;
+@@ -520,15 +520,14 @@ void bb_displayroutes(int noresolve, int netstatfmt)
+ 		memset(&s_addr, 0, sizeof(struct sockaddr_in));
+ 		s_addr.sin_family = AF_INET;
+ 		s_addr.sin_addr.s_addr = d;
+-		INET_rresolve(sdest, sizeof(sdest), &s_addr,
+-					  (noresolve | 0x8000), m);	/* Default instead of *. */
+-
++		sdest = INET_rresolve(&s_addr, (noresolve | 0x8000), m); /* 'default' instead of '*' */
+ 		s_addr.sin_addr.s_addr = g;
+-		INET_rresolve(sgw, sizeof(sgw), &s_addr,
+-					  (noresolve | 0x4000), m);	/* Host instead of net. */
+-
++		sgw = INET_rresolve(&s_addr, (noresolve | 0x4000), m); /* Host instead of net */
+ 		mask.s_addr = m;
+-		printf("%-16s%-16s%-16s%-6s", sdest, sgw, inet_ntoa(mask), flags);
++		/* "%15.15s" truncates hostnames, do we really want that? */
++		printf("%-15.15s %-15.15s %-16s%-6s", sdest, sgw, inet_ntoa(mask), flags);
++		free(sdest);
++		free(sgw);
+ 		if (netstatfmt) {
+ 			printf("%5d %-5d %6d %s\n", mtu, win, ir, devname);
+ 		} else {
+@@ -541,7 +540,7 @@ void bb_displayroutes(int noresolve, int netstatfmt)
+ 
+ static void INET6_displayroutes(int noresolve)
+ {
+-	char addr6[128], naddr6[128];
++	char addr6[128], *naddr6;
+ 	/* In addr6x, we store both 40-byte ':'-delimited ipv6 addresses.
+ 	 * We read the non-delimited strings into the tail of the buffer
+ 	 * using fscanf and then modify the buffer by shifting forward
+@@ -581,7 +580,7 @@ static void INET6_displayroutes(int noresolve)
+ 
+ 			do {
+ 				if (!*p) {
+-					if (i==40) { /* nul terminator for 1st address? */
++					if (i == 40) { /* nul terminator for 1st address? */
+ 						addr6x[39] = 0;	/* Fixup... need 0 instead of ':'. */
+ 						++p;	/* Skip and continue. */
+ 						continue;
+@@ -606,18 +605,19 @@ static void INET6_displayroutes(int noresolve)
+ 			inet_pton(AF_INET6, addr6x + r,
+ 					  (struct sockaddr *) &snaddr6.sin6_addr);
+ 			snaddr6.sin6_family = AF_INET6;
+-			INET6_rresolve(naddr6, sizeof(naddr6),
+-						   (struct sockaddr_in6 *) &snaddr6,
++			naddr6 = INET6_rresolve((struct sockaddr_in6 *) &snaddr6,
+ 						   0x0fff /* Apparently, upstream never resolves. */
+ 						   );
+ 
+ 			if (!r) {			/* 1st pass */
+ 				snprintf(addr6, sizeof(addr6), "%s/%d", naddr6, prefix_len);
+ 				r += 40;
++				free(naddr6);
+ 			} else {			/* 2nd pass */
+ 				/* Print the info. */
+ 				printf("%-43s %-39s %-5s %-6d %-2d %7d %-8s\n",
+-						  addr6, naddr6, flags, metric, refcnt, use, iface);
++						addr6, naddr6, flags, metric, refcnt, use, iface);
++				free(naddr6);
+ 				break;
+ 			}
+ 		} while (1);
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 9fc15d3..577738a 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -802,22 +802,20 @@ packet_ok(unsigned char *buf, int cc, struct sockaddr_in *from, int seq)
+  * numeric value, otherwise try for symbolic name.
+  */
+ static inline void
+-inetname(struct sockaddr_in *from)
++print_inetname(struct sockaddr_in *from)
+ {
+-	const char *n = NULL;
+ 	const char *ina;
+-	char name[257];
+ 
+-	if (!nflag && from->sin_addr.s_addr != INADDR_ANY) {
+-		if (INET_rresolve(name, sizeof(name), from, 0x4000,
+-						0xffffffff) >= 0)
+-			n = name;
+-	}
+ 	ina = inet_ntoa(from->sin_addr);
+ 	if (nflag)
+ 		printf(" %s", ina);
+-	else
++	else {
++		char *n = NULL;
++		if (from->sin_addr.s_addr != INADDR_ANY)
++			n = xmalloc_sockaddr2host_noport((struct sockaddr*)from, sizeof(*from));
+ 		printf(" %s (%s)", (n ? n : ina), ina);
++		free(n);
++	}
+ }
+ 
+ static inline void
+@@ -830,7 +828,7 @@ print(unsigned char *buf, int cc, struct sockaddr_in *from)
+ 	hlen = ip->ip_hl << 2;
+ 	cc -= hlen;
+ 
+-	inetname(from);
++	print_inetname(from);
+ #if ENABLE_FEATURE_TRACEROUTE_VERBOSE
+ 	if (verbose)
+ 		printf(" %d bytes to %s", cc, inet_ntoa(ip->ip_dst));

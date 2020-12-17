@@ -1,0 +1,63 @@
+2010-04-03 15:39:47 +0200
+diff --git a/libbb/print_flags.c b/libbb/print_flags.c
+index afa7550..9639dc6 100644
+--- a/libbb/print_flags.c
++++ b/libbb/print_flags.c
+@@ -5,8 +5,7 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+-#include <libbb.h>
++#include "libbb.h"
+ 
+ /* returns a set with the flags not printed */
+ int FAST_FUNC print_flags_separated(const int *masks, const char *labels, int flags, const char *separator)
+diff --git a/util-linux/lspci.c b/util-linux/lspci.c
+index 752d4f5..514c3a4 100644
+--- a/util-linux/lspci.c
++++ b/util-linux/lspci.c
+@@ -1,12 +1,12 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+-* lspci implementation for busybox
+-*
+-* Copyright (C) 2009  Malek Degachi <malek-degachi@laposte.net>
+-*
+-* Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+-*/
+-#include <libbb.h>
++ * lspci implementation for busybox
++ *
++ * Copyright (C) 2009  Malek Degachi <malek-degachi@laposte.net>
++ *
++ * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
++ */
++#include "libbb.h"
+ 
+ enum {
+ 	OPT_m = (1 << 0),
+diff --git a/util-linux/lsusb.c b/util-linux/lsusb.c
+index c15b8ca..23b0349 100644
+--- a/util-linux/lsusb.c
++++ b/util-linux/lsusb.c
+@@ -1,12 +1,12 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+-* lspci implementation for busybox
+-*
+-* Copyright (C) 2009  Malek Degachi <malek-degachi@laposte.net>
+-*
+-* Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+-*/
+-#include <libbb.h>
++ * lsusb implementation for busybox
++ *
++ * Copyright (C) 2009  Malek Degachi <malek-degachi@laposte.net>
++ *
++ * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
++ */
++#include "libbb.h"
+ 
+ static int FAST_FUNC fileAction(
+ 		const char *fileName,

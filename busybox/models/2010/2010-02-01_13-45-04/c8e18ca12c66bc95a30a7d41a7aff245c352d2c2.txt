@@ -1,0 +1,27 @@
+2010-02-01 13:45:04 +0100
+diff --git a/libbb/bb_askpass.c b/libbb/bb_askpass.c
+index bdb7566..bf45780 100644
+--- a/libbb/bb_askpass.c
++++ b/libbb/bb_askpass.c
+@@ -55,7 +55,6 @@ char* FAST_FUNC bb_ask(const int fd, int timeout, const char *prompt)
+ 
+ 	if (!passwd)
+ 		passwd = xmalloc(sizeof_passwd);
+-	memset(passwd, 0, sizeof_passwd);
+ 	ret = passwd;
+ 	i = 0;
+ 	while (1) {
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index 77eff9f..6e3d3b0 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -51,9 +51,6 @@ int sulogin_main(int argc UNUSED_PARAM, char **argv)
+ 	/* Clear dangerous stuff, set PATH */
+ 	sanitize_env_if_suid();
+ 
+-// bb_ask() already handles this
+-//	signal(SIGALRM, catchalarm);
+-
+ 	pwd = getpwuid(0);
+ 	if (!pwd) {
+ 		goto auth_error;

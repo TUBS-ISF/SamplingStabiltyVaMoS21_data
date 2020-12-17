@@ -1,0 +1,212 @@
+2008-05-16 16:10:31 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 216b3ec..6f41184 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -924,6 +924,9 @@ struct hwtype {
+ };
+ extern smallint interface_opt_a;
+ int display_interfaces(char *ifname);
++#if ENABLE_FEATURE_HWIB
++int in_ib(const char *bufp, struct sockaddr *sap);
++#endif
+ const struct aftype *get_aftype(const char *name);
+ const struct hwtype *get_hwtype(const char *name);
+ const struct hwtype *get_hwntype(int type);
+diff --git a/include/usage.h b/include/usage.h
+index efba092..f912d7b 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1628,7 +1628,7 @@
+        "	[netmask ADDRESS] [dstaddr ADDRESS]\n" \
+ 	USE_FEATURE_IFCONFIG_SLIP( \
+        "	[outfill NN] [keepalive NN]\n") \
+-       "	" USE_FEATURE_IFCONFIG_HW("[hw ether ADDRESS] ") "[metric NN] [mtu NN]\n" \
++       "	" USE_FEATURE_IFCONFIG_HW("[hw ether" USE_FEATURE_HWIB("|infiniband")" ADDRESS] ") "[metric NN] [mtu NN]\n" \
+        "	[[-]trailers] [[-]arp] [[-]allmulti]\n" \
+        "	[multicast] [[-]promisc] [txqueuelen NN] [[-]dynamic]\n" \
+ 	USE_FEATURE_IFCONFIG_MEMSTART_IOADDR_IRQ( \
+diff --git a/libbb/Config.in b/libbb/Config.in
+index 842dd1f..5bf0d2e 100644
+--- a/libbb/Config.in
++++ b/libbb/Config.in
+@@ -144,4 +144,11 @@ config IOCTL_HEX2STR_ERROR
+ 	  Use ioctl names rather than hex values in error messages
+ 	  (e.g. VT_DISALLOCATE rather than 0x5608). If disabled this
+ 	  saves about 1400 bytes.
++
++config FEATURE_HWIB
++	bool "Support infiniband HW"
++	default y
++	help
++	  Support for printing infiniband addresses in
++	  network applets.
+ endmenu
+diff --git a/networking/ifconfig.c b/networking/ifconfig.c
+index 9e95533..d021757 100644
+--- a/networking/ifconfig.c
++++ b/networking/ifconfig.c
+@@ -220,7 +220,7 @@ static const struct options OptArray[] = {
+ 	{ "netmask",     N_ARG,         ARG_NETMASK,     0 },
+ 	{ "broadcast",   N_ARG | M_CLR, ARG_BROADCAST,   IFF_BROADCAST },
+ #if ENABLE_FEATURE_IFCONFIG_HW
+-	{ "hw",          N_ARG, ARG_HW,                  0 },
++	{ "hw",          N_ARG,         ARG_HW,          0 },
+ #endif
+ 	{ "pointopoint", N_ARG | M_CLR, ARG_POINTOPOINT, IFF_POINTOPOINT },
+ #ifdef SIOCSKEEPALIVE
+@@ -255,6 +255,11 @@ static const struct options OptArray[] = {
+ 
+ #if ENABLE_FEATURE_IFCONFIG_HW
+ static int in_ether(const char *bufp, struct sockaddr *sap);
++# if ENABLE_FEATURE_HWIB
++extern int in_ib(const char *bufp, struct sockaddr *sap);
++# else
++#  define in_ib(a, b) 1 /* fail */
++# endif
+ #endif
+ 
+ /*
+@@ -425,11 +430,14 @@ int ifconfig_main(int argc, char **argv)
+ #if ENABLE_FEATURE_IFCONFIG_HW
+ 					} else {	/* A_CAST_HOST_COPY_IN_ETHER */
+ 						/* This is the "hw" arg case. */
+-						if (strcmp("ether", *argv) || !*++argv)
++						smalluint hw_class= index_in_substrings("ether\0"
++								USE_FEATURE_HWIB("infiniband\0"), *argv) + 1;
++						if (!hw_class || !*++argv)
+ 							bb_show_usage();
+ 						/*safe_strncpy(host, *argv, sizeof(host));*/
+ 						host = *argv;
+-						if (in_ether(host, &sa))
++						if (hw_class == 1 ? in_ether(host, &sa)
++							: in_ib(host, &sa))
+ 							bb_error_msg_and_die("invalid hw-addr %s", host);
+ 						p = (char *) &sa;
+ 					}
+diff --git a/networking/interface.c b/networking/interface.c
+index a24ab01..dff6add 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -36,6 +36,13 @@
+ #include "inet_common.h"
+ #include "libbb.h"
+ 
++
++#if ENABLE_FEATURE_HWIB
++/* #include <linux/if_infiniband.h> */
++#undef INFINIBAND_ALEN
++#define INFINIBAND_ALEN 20
++#endif
++
+ #if ENABLE_FEATURE_IPV6
+ # define HAVE_AFINET6 1
+ #else
+@@ -805,6 +812,17 @@ static const struct hwtype sit_hwtype = {
+ 	.suppress_null_addr =	1
+ };
+ #endif
++#if ENABLE_FEATURE_HWIB
++static const struct hwtype ib_hwtype = {
++	.name =			"infiniband",
++	.title =		"InfiniBand",
++	.type =			ARPHRD_INFINIBAND,
++	.alen =			INFINIBAND_ALEN,
++	.print =		UNSPEC_print,
++	.input =		in_ib,
++};
++#endif
++
+ 
+ static const struct hwtype *const hwtypes[] = {
+ 	&loop_hwtype,
+@@ -814,6 +832,9 @@ static const struct hwtype *const hwtypes[] = {
+ #if ENABLE_FEATURE_IPV6
+ 	&sit_hwtype,
+ #endif
++#if ENABLE_FEATURE_HWIB
++	&ib_hwtype,
++#endif
+ 	NULL
+ };
+ 
+@@ -1192,6 +1213,67 @@ static int if_print(char *ifname)
+ 	return res;
+ }
+ 
++#if ENABLE_FEATURE_HWIB
++/* Input an Infiniband address and convert to binary. */
++int in_ib(const char *bufp, struct sockaddr *sap)
++{
++    unsigned char *ptr;
++    char c;
++    const char *orig;
++    int i;
++    unsigned val;
++
++    sap->sa_family = ib_hwtype.type;
++    ptr = sap->sa_data;
++
++    i = 0;
++    orig = bufp;
++    while ((*bufp != '\0') && (i < INFINIBAND_ALEN)) {
++	val = 0;
++	c = *bufp++;
++	if (isdigit(c))
++	    val = c - '0';
++	else if (c >= 'a' && c <= 'f')
++	    val = c - 'a' + 10;
++	else if (c >= 'A' && c <= 'F')
++	    val = c - 'A' + 10;
++	else {
++	    errno = EINVAL;
++	    return (-1);
++	}
++	val <<= 4;
++	c = *bufp;
++	if (isdigit(c))
++	    val |= c - '0';
++	else if (c >= 'a' && c <= 'f')
++	    val |= c - 'a' + 10;
++	else if (c >= 'A' && c <= 'F')
++	    val |= c - 'A' + 10;
++	else if (c == ':' || c == 0)
++	    val >>= 4;
++	else {
++	    errno = EINVAL;
++	    return (-1);
++	}
++	if (c != 0)
++	    bufp++;
++	*ptr++ = (unsigned char) (val & 0377);
++	i++;
++
++	/* We might get a semicolon here - not required. */
++	if (*bufp == ':') {
++	    bufp++;
++	}
++    }
++#ifdef DEBUG
++fprintf(stderr, "in_ib(%s): %s\n", orig, UNSPEC_print(sap->sa_data));
++#endif
++    return (0);
++}
++#endif
++
++
++
+ int display_interfaces(char *ifname)
+ {
+ 	int status;
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 007c760..93b7166 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -86,6 +86,7 @@ CONFIG_FEATURE_TAB_COMPLETION=y
+ CONFIG_FEATURE_COPYBUF_KB=4
+ # CONFIG_MONOTONIC_SYSCALL is not set
+ CONFIG_IOCTL_HEX2STR_ERROR=y
++CONFIG_FEATURE_HWIB=y
+ 
+ #
+ # Applets

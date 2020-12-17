@@ -1,0 +1,14 @@
+2009-01-08 17:19:01 +0000
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 956de15..9ad1a6f 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -421,7 +421,7 @@ int mdev_main(int argc UNUSED_PARAM, char **argv)
+ 		 * (kernel's CONFIG_SYSFS_DEPRECATED makes them real dirs,
+ 		 * but we can't enforce that on users) */
+ 		recursive_action("/sys/block",
+-			ACTION_RECURSE | ACTION_FOLLOWLINKS,
++			ACTION_RECURSE | ACTION_FOLLOWLINKS | ACTION_QUIET,
+ 			fileAction, dirAction, temp, 0);
+ 		recursive_action("/sys/class",
+ 			ACTION_RECURSE | ACTION_FOLLOWLINKS,

@@ -1,0 +1,194 @@
+2009-01-31 01:02:07 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index e1a6d12..0403281 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -353,8 +353,8 @@ enum {
+ void bb_signals(int sigs, void (*f)(int)) FAST_FUNC;
+ /* Unlike signal() and bb_signals, sets handler with sigaction()
+  * and in a way that while signal handler is run, no other signals
+- * will be blocked: */
+-void bb_signals_recursive(int sigs, void (*f)(int)) FAST_FUNC;
++ * will be blocked; syscalls will not be restarted: */
++void bb_signals_recursive_norestart(int sigs, void (*f)(int)) FAST_FUNC;
+ /* syscalls like read() will be interrupted with EINTR: */
+ void signal_no_SA_RESTART_empty_mask(int sig, void (*handler)(int)) FAST_FUNC;
+ /* syscalls like read() won't be interrupted (though select/poll will be): */
+diff --git a/init/init.c b/init/init.c
+index cea30c9..6af6830 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -65,18 +65,6 @@ enum {
+ 
+ static void halt_reboot_pwoff(int sig) NORETURN;
+ 
+-static void waitfor(pid_t pid)
+-{
+-	/* waitfor(run(x)): protect against failed fork inside run() */
+-	if (pid <= 0)
+-		return;
+-
+-	/* Wait for any child (prevent zombies from exiting orphaned processes)
+-	 * but exit the loop only when specified one has exited. */
+-	while (wait(NULL) != pid)
+-		continue;
+-}
+-
+ static void loop_forever(void) NORETURN;
+ static void loop_forever(void)
+ {
+@@ -476,6 +464,18 @@ static void delete_init_action(struct init_action *action)
+ 	}
+ }
+ 
++static void waitfor(pid_t pid)
++{
++	/* waitfor(run(x)): protect against failed fork inside run() */
++	if (pid <= 0)
++		return;
++
++	/* Wait for any child (prevent zombies from exiting orphaned processes)
++	 * but exit the loop only when specified one has exited. */
++	while (wait(NULL) != pid)
++		continue;
++}
++
+ /* Run all commands of a particular type */
+ static void run_actions(int action_type)
+ {
+@@ -507,7 +507,7 @@ static void run_actions(int action_type)
+ 	}
+ }
+ 
+-static void init_reboot(unsigned long magic)
++static void low_level_reboot(unsigned long magic)
+ {
+ 	pid_t pid;
+ 	/* We have to fork here, since the kernel calls do_exit(EXIT_SUCCESS) in
+@@ -534,7 +534,7 @@ static void kill_all_processes(void)
+ 	message(L_CONSOLE | L_LOG, "The system is going down NOW!");
+ 
+ 	/* Allow Ctrl-Alt-Del to reboot system. */
+-	init_reboot(RB_ENABLE_CAD);
++	low_level_reboot(RB_ENABLE_CAD);
+ 
+ 	/* Send signals to every process _except_ pid 1 */
+ 	message(L_CONSOLE | L_LOG, "Sending SIG%s to all processes", "TERM");
+@@ -566,13 +566,13 @@ static void halt_reboot_pwoff(int sig)
+ 	message(L_CONSOLE | L_LOG, "Requesting system %s", m);
+ 	/* allow time for last message to reach serial console */
+ 	sleep(2);
+-	init_reboot(rb);
++	low_level_reboot(rb);
+ 	loop_forever();
+ }
+ 
+ /* Handler for QUIT - exec "restart" action,
+  * else (no such action defined) do nothing */
+-static void exec_restart_action(int sig UNUSED_PARAM)
++static void restart_handler(int sig UNUSED_PARAM)
+ {
+ 	struct init_action *a;
+ 
+@@ -589,7 +589,7 @@ static void exec_restart_action(int sig UNUSED_PARAM)
+ 			messageD(L_CONSOLE | L_LOG, "Trying to re-exec %s", a->command);
+ 			init_exec(a->command);
+ 			sleep(2);
+-			init_reboot(RB_HALT_SYSTEM);
++			low_level_reboot(RB_HALT_SYSTEM);
+ 			loop_forever();
+ 		}
+ 	}
+@@ -723,7 +723,7 @@ static void parse_inittab(void)
+ }
+ 
+ #if ENABLE_FEATURE_USE_INITTAB
+-static void reload_signal(int sig UNUSED_PARAM)
++static void reload_inittab(int sig UNUSED_PARAM)
+ {
+ 	struct init_action *a, *tmp;
+ 
+@@ -769,7 +769,7 @@ static void reload_signal(int sig UNUSED_PARAM)
+ 	run_actions(RESPAWN | ASKFIRST);
+ }
+ #else
+-void reload_signal(int sig);
++void reload_inittab(int sig);
+ #endif
+ 
+ int init_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+@@ -797,7 +797,7 @@ int init_main(int argc UNUSED_PARAM, char **argv)
+ // Move signal handling from handlers to main loop -
+ // we have bad races otherwise.
+ // E.g. parse_inittab() vs. delete_init_action()...
+-		signal(SIGQUIT, exec_restart_action);
++		signal(SIGQUIT, restart_handler);
+ 		bb_signals(0
+ 			+ (1 << SIGUSR1)  /* halt */
+ 			+ (1 << SIGUSR2)  /* poweroff */
+@@ -812,7 +812,7 @@ int init_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 		/* Turn off rebooting via CTL-ALT-DEL -- we get a
+ 		 * SIGINT on CAD so we can shut things down gracefully... */
+-		init_reboot(RB_DISABLE_CAD);
++		low_level_reboot(RB_DISABLE_CAD);
+ 	}
+ 
+ 	/* Figure out where the default console should be */
+@@ -900,7 +900,7 @@ int init_main(int argc UNUSED_PARAM, char **argv)
+ 	run_actions(ONCE);
+ 
+ 	/* Redefine SIGHUP to reread /etc/inittab */
+-	signal(SIGHUP, ENABLE_FEATURE_USE_INITTAB ? reload_signal : SIG_IGN);
++	signal(SIGHUP, ENABLE_FEATURE_USE_INITTAB ? reload_inittab : SIG_IGN);
+ 
+ 	/* Now run the looping stuff for the rest of forever */
+ 	while (1) {
+diff --git a/libbb/signals.c b/libbb/signals.c
+index f56ce65..a528756 100644
+--- a/libbb/signals.c
++++ b/libbb/signals.c
+@@ -47,7 +47,7 @@ void FAST_FUNC bb_signals(int sigs, void (*f)(int))
+ 	}
+ }
+ 
+-void FAST_FUNC bb_signals_recursive(int sigs, void (*f)(int))
++void FAST_FUNC bb_signals_recursive_norestart(int sigs, void (*f)(int))
+ {
+ 	int sig_no = 0;
+ 	int bit = 1;
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 1237208..f83d582 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -455,9 +455,9 @@ int runsv_main(int argc UNUSED_PARAM, char **argv)
+ 	ndelay_on(selfpipe.wr);
+ 
+ 	sig_block(SIGCHLD);
+-	bb_signals_recursive(1 << SIGCHLD, s_child);
++	bb_signals_recursive_norestart(1 << SIGCHLD, s_child);
+ 	sig_block(SIGTERM);
+-	bb_signals_recursive(1 << SIGTERM, s_term);
++	bb_signals_recursive_norestart(1 << SIGTERM, s_term);
+ 
+ 	xchdir(dir);
+ 	/* bss: svd[0].pid = 0; */
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 9beb9f5..9609fa3 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -912,10 +912,10 @@ int svlogd_main(int argc, char **argv)
+ 	sigaddset(&blocked_sigset, SIGALRM);
+ 	sigaddset(&blocked_sigset, SIGHUP);
+ 	sigprocmask(SIG_BLOCK, &blocked_sigset, NULL);
+-	bb_signals_recursive(1 << SIGTERM, sig_term_handler);
+-	bb_signals_recursive(1 << SIGCHLD, sig_child_handler);
+-	bb_signals_recursive(1 << SIGALRM, sig_alarm_handler);
+-	bb_signals_recursive(1 << SIGHUP, sig_hangup_handler);
++	bb_signals_recursive_norestart(1 << SIGTERM, sig_term_handler);
++	bb_signals_recursive_norestart(1 << SIGCHLD, sig_child_handler);
++	bb_signals_recursive_norestart(1 << SIGALRM, sig_alarm_handler);
++	bb_signals_recursive_norestart(1 << SIGHUP, sig_hangup_handler);
+ 
+ 	logdirs_reopen();
+ 

@@ -1,0 +1,12 @@
+2009-06-03 20:35:26 +0200
+diff --git a/testsuite/tar/tar-handles-cz-options b/testsuite/tar/tar-handles-cz-options
+index 5b55e46..95c628d 100644
+--- a/testsuite/tar/tar-handles-cz-options
++++ b/testsuite/tar/tar-handles-cz-options
+@@ -1,5 +1,5 @@
+ # FEATURE: CONFIG_FEATURE_TAR_CREATE
+-# FEATURE: CONFIG_FEATURE_TAR_GZIP
++# FEATURE: CONFIG_FEATURE_SEAMLESS_GZ
+ touch foo
+ busybox tar czf foo.tar.gz foo
+ gzip -d foo.tar.gz

@@ -1,0 +1,119 @@
+2008-07-01 11:11:24 +0000
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index 16ca6a5..0738e3d 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -20,14 +20,7 @@ int FAST_FUNC open_transformer(int src_fd,
+ 
+ 	xpiped_pair(fd_pipe);
+ 
+-#if BB_MMU
+-	pid = fork();
+-	if (pid == -1)
+-		bb_perror_msg_and_die("can't fork");
+-#else
+-	pid = xvfork();
+-#endif
+-
++	pid = BB_MMU ? xfork() : xvfork();
+ 	if (pid == 0) {
+ 		/* child process */
+ 		close(fd_pipe.rd); /* We don't want to read from the parent */
+diff --git a/include/libbb.h b/include/libbb.h
+index 33e465c..67eef6d 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -719,6 +719,9 @@ int bb_execvp(const char *file, char *const argv[]) FAST_FUNC;
+ #define BB_EXECLP(prog,cmd,...) execlp(prog,cmd, __VA_ARGS__)
+ #endif
+ 
++#if BB_MMU
++pid_t xfork(void) FAST_FUNC;
++#endif
+ pid_t xvfork(void) FAST_FUNC;
+ 
+ /* NOMMU friendy fork+exec */
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 9baa813..989e9b8 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -238,9 +238,7 @@ void FAST_FUNC forkexit_or_rexec(char **argv)
+ void FAST_FUNC forkexit_or_rexec(void)
+ {
+ 	pid_t pid;
+-	pid = fork();
+-	if (pid < 0) /* wtf? */
+-		bb_perror_msg_and_die("fork");
++	pid = xfork();
+ 	if (pid) /* parent */
+ 		exit(EXIT_SUCCESS);
+ 	/* child */
+diff --git a/libbb/xvfork.c b/libbb/xvfork.c
+index a74b49f..3fbd0c1 100644
+--- a/libbb/xvfork.c
++++ b/libbb/xvfork.c
+@@ -16,3 +16,13 @@ pid_t FAST_FUNC xvfork(void)
+ 		bb_perror_msg_and_die("vfork");
+ 	return pid;
+ }
++
++#if BB_MMU
++pid_t FAST_FUNC xfork(void)
++{
++	pid_t pid = fork();
++	if (pid < 0)
++		bb_perror_msg_and_die("vfork" + 1);
++	return pid;
++}
++#endif
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 08c0995..0028078 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1303,7 +1303,7 @@ int inetd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					pid = vfork();
+ 
+ 				if (pid < 0) { /* fork error */
+-					bb_perror_msg("fork");
++					bb_perror_msg(BB_MMU ? "vfork" + 1 : "vfork");
+ 					sleep(1);
+ 					restore_sigmask(&omask);
+ 					maybe_close(accepted_fd);
+diff --git a/shell/hush.c b/shell/hush.c
+index 59d8f3f..27fab0d 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1902,7 +1902,7 @@ static int run_pipe(struct pipe *pi)
+ #endif
+ 		if (child->pid < 0) { /* [v]fork failed */
+ 			/* Clearly indicate, was it fork or vfork */
+-			bb_perror_msg(BB_MMU ? "fork" : "vfork");
++			bb_perror_msg(BB_MMU ? "vfork" + 1 : "vfork");
+ 		} else {
+ 			pi->alive_progs++;
+ #if ENABLE_HUSH_JOB
+@@ -3096,11 +3096,7 @@ static FILE *generate_stream_from_list(struct pipe *head)
+  * huge=`cat TESTFILE` # will block here forever
+  * echo OK
+  */
+-	pid = BB_MMU ? fork() : xvfork();
+-#if BB_MMU
+-	if (pid < 0)
+-		bb_perror_msg_and_die("fork");
+-#endif
++	pid = BB_MMU ? xfork() : xvfork();
+ 	if (pid == 0) { /* child */
+ 		if (ENABLE_HUSH_JOB)
+ 			die_sleep = 0; /* let nofork's xfuncs die */
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 3b77af7..664d24f 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -890,6 +890,7 @@ get_mountport(struct pmap *pm_mnt,
+ }
+ 
+ #if BB_MMU
++/* Unlike bb_daemonize(), parent does NOT exit here, but returns 0 */
+ static int daemonize(void)
+ {
+ 	int fd;

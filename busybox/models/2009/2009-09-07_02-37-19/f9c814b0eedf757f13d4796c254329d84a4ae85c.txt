@@ -1,0 +1,13 @@
+2009-09-07 02:37:19 +0200
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index 02d8fbd..bc80723 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -218,6 +218,7 @@ static void parse_module(module_info *info, const char *pathname)
+ 	bksp(); /* remove last ' ' */
+ 	appendc('\0');
+ 	info->aliases = copy_stringbuf();
++	replace(info->aliases, '-', '_');
+ 
+ 	/* "dependency1 depandency2" */
+ 	reset_stringbuf();

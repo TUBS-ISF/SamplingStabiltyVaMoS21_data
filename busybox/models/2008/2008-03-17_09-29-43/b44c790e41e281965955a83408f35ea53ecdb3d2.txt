@@ -1,0 +1,1104 @@
+2008-03-17 09:29:43 +0000
+diff --git a/docs/ctty.htm b/docs/ctty.htm
+index b8bce00..8f466cd 100644
+--- a/docs/ctty.htm
++++ b/docs/ctty.htm
+@@ -145,7 +145,7 @@ PID (process ID), PGID (process group ID) and SID (session ID)
+ of processes. With a shell that does not know about job control,
+ like <code>ash</code>, each of its children will be in the same session
+ and have the same process group as the shell. With a shell that knows
+-about job control, like <code>bash</code>, the processes of one pipeline. like
++about job control, like <code>bash</code>, the processes of one pipeline, like
+ </p><blockquote>
+ <pre>% cat paper | ideal | pic | tbl | eqn | ditroff &gt; out
+ </pre>
+@@ -227,7 +227,7 @@ controlling tty. If there is none, this returns a random value
+ larger than 1 that is not a process group ID.
+ </p><p>A process can set the foreground process group in its session
+ using <code>tcsetpgrp(fd,pgrp)</code>, where <code>fd</code> refers to its
+-controlling tty, and <code>pgrp</code> is a process group in the
++controlling tty, and <code>pgrp</code> is a process group in
+ its session, and this session still is associated to the controlling
+ tty of the calling process.
+ </p><p>How does one get <code>fd</code>? By definition, <code>/dev/tty</code>
+diff --git a/include/libbb.h b/include/libbb.h
+index 99d681d..6546437 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -707,7 +707,7 @@ int run_nofork_applet_prime(struct nofork_save_area *old, int applet_no, char **
+  *
+  * forkexit_or_rexec(argv) = bare-bones "fork + parent exits" on MMU,
+  *      "vfork + re-exec ourself" on NOMMU. No fd redirection, no setsid().
+- *      Currently used for openvt. On MMU ignores argv.
++ *      Currently used for openvt and setsid. On MMU ignores argv.
+  *
+  * Helper for network daemons in foreground mode:
+  *
+@@ -728,7 +728,7 @@ enum {
+ # define bb_daemonize(flags)                bb_daemonize_or_rexec(flags, bogus)
+ #else
+   void re_exec(char **argv) ATTRIBUTE_NORETURN;
+-  void forkexit_or_rexec(char **argv);
++  void forkexit_or_rexec(char **argv) ATTRIBUTE_NORETURN;
+   extern bool re_execed;
+   int  BUG_fork_is_unavailable_on_nommu(void);
+   int  BUG_daemon_is_unavailable_on_nommu(void);
+diff --git a/include/usage.h b/include/usage.h
+index 8f563f5..fe98398 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3839,7 +3839,7 @@
+        "$ tar -cf /tmp/tarball.tar /usr/local\n"
+ 
+ #define taskset_trivial_usage \
+-       "[OPTIONS] [mask] [pid | command [arg]...]"
++       "[-p] [mask] [pid | command [arg]...]"
+ #define taskset_full_usage \
+        "Set or get CPU affinity\n" \
+      "\nOptions:" \
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index c8c54e3..da0dce3 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -6,14 +6,13 @@
+  *
+  * option added by Eric Rasmussen <ear@usfirst.org> - 12/28/95
+  *
+- * 1999-02-22 Arkadiusz Mi턪iewicz <misiek@misiek.eu.org>
++ * 1999-02-22 Arkadiusz Mickiewicz <misiek@misiek.eu.org>
+  * - added Native Language Support
+-
++ *
+  * 1999-05-05 Thorsten Kranzkowski <dl8bcu@gmx.net>
+  * - enable hardware flow control before displaying /etc/issue
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+- *
+  */
+ 
+ #include "libbb.h"
+diff --git a/miscutils/chrt.c b/miscutils/chrt.c
+index 418e7ae..0d55e32 100644
+--- a/miscutils/chrt.c
++++ b/miscutils/chrt.c
+@@ -13,8 +13,8 @@
+ #warning your system may be foobared
+ #endif
+ static const struct {
+-	const int policy;
+-	const char const name[12];
++	int policy;
++	char name[12];
+ } policies[] = {
+ 	{SCHED_OTHER, "SCHED_OTHER"},
+ 	{SCHED_FIFO, "SCHED_FIFO"},
+@@ -42,83 +42,83 @@ static void show_min_max(int pol)
+ #define OPT_o (1<<4)
+ 
+ int chrt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int chrt_main(int argc, char **argv)
++int chrt_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	pid_t pid = 0;
+ 	unsigned opt;
+ 	struct sched_param sp;
+-	char *p_opt = NULL, *priority = NULL;
+-	const char *state = "current\0new";
+-	int prio = 0, policy = SCHED_RR;
++	char *pid_str;
++	char *priority = priority; /* for compiler */
++	const char *current_new;
++	int policy = SCHED_RR;
+ 
+-	opt_complementary = "r--fo:f--ro:r--fo"; /* only one policy accepted */
+-	opt = getopt32(argv, "+mp:rfo", &p_opt);
++	/* at least 1 arg; only one policy accepted */
++	opt_complementary = "-1:r--fo:f--ro:r--fo";
++	opt = getopt32(argv, "+mprfo");
+ 	if (opt & OPT_r)
+ 		policy = SCHED_RR;
+ 	if (opt & OPT_f)
+ 		policy = SCHED_FIFO;
+ 	if (opt & OPT_o)
+ 		policy = SCHED_OTHER;
+-
+ 	if (opt & OPT_m) { /* print min/max */
+ 		show_min_max(SCHED_FIFO);
+ 		show_min_max(SCHED_RR);
+ 		show_min_max(SCHED_OTHER);
+ 		fflush_stdout_and_exit(EXIT_SUCCESS);
+ 	}
++
++	argv += optind; 
+ 	if (opt & OPT_p) {
+-		if (argc == optind+1) { /* -p <priority> <pid> */
+-			priority = p_opt;
+-			p_opt = argv[optind];
++		pid_str = *argv++;
++		if (*argv) { /* "-p <priority> <pid> [...]" */
++			priority = pid_str;
++			pid_str = *argv;
+ 		}
+-		argv += optind; /* me -p <arg> */
+-		pid = xatoul_range(p_opt, 1, ULONG_MAX); /* -p <pid> */
++		/* else "-p <pid>", and *argv == NULL */
++		pid = xatoul_range(pid_str, 1, ((unsigned)(pid_t)ULONG_MAX) >> 1);
+ 	} else {
+-		argv += optind; /* me -p <arg> */
+-		priority = *argv;
+-	}
+-	if (priority) {
+-		/* from the manpage of sched_getscheduler:
+-		   [...] sched_priority can have a value
+-		   in the range 0 to 99.
+-		   [...] SCHED_OTHER or SCHED_BATCH  must  be  assigned
+-		   the  static  priority  0. [...] SCHED_FIFO  or
+-		   SCHED_RR can have a static priority in the range 1 to 99.
+-		 */
+-		prio = xstrtol_range(priority, 0, policy == SCHED_OTHER
+-													 ? 0 : 1, 99);
++		priority = *argv++;
++		if (!*argv)
++			bb_show_usage();
+ 	}
+ 
++	current_new = "current\0new";
+ 	if (opt & OPT_p) {
+-		int pol = 0;
+-print_rt_info:
++		int pol;
++ print_rt_info:
+ 		pol = sched_getscheduler(pid);
+ 		if (pol < 0)
+-			bb_perror_msg_and_die("failed to %cet pid %d's policy", 'g', pid);
++			bb_perror_msg_and_die("can't %cet pid %d's policy", 'g', pid);
+ 		printf("pid %d's %s scheduling policy: %s\n",
+-				pid, state, policies[pol].name);
++				pid, current_new, policies[pol].name);
+ 		if (sched_getparam(pid, &sp))
+-			bb_perror_msg_and_die("failed to get pid %d's attributes", pid);
++			bb_perror_msg_and_die("can't get pid %d's attributes", pid);
+ 		printf("pid %d's %s scheduling priority: %d\n",
+-				pid, state, sp.sched_priority);
+-		if (!*argv) /* no new prio given or we did print already, done. */
++				pid, current_new, sp.sched_priority);
++		if (!*argv) {
++			/* Either it was just "-p <pid>",
++			 * or it was "-p <priority> <pid>" and we came here
++			 * for the second time (see goto below) */
+ 			return EXIT_SUCCESS;
++		}
++		*argv = NULL;
++		current_new += 8;
+ 	}
+ 
+-	sp.sched_priority = prio;
++	/* from the manpage of sched_getscheduler:
++	[...] sched_priority can have a value in the range 0 to 99.
++	[...] SCHED_OTHER or SCHED_BATCH must be assigned static priority 0.
++	[...] SCHED_FIFO or SCHED_RR can have static priority in 1..99 range.
++	*/
++	sp.sched_priority = xstrtou_range(priority, 0, policy != SCHED_OTHER ? 1 : 0, 99);
++
+ 	if (sched_setscheduler(pid, policy, &sp) < 0)
+-		bb_perror_msg_and_die("failed to %cet pid %d's policy", 's', pid);
+-	if (opt & OPT_p) {
+-		state += 8;
+-		++argv;
++		bb_perror_msg_and_die("can't %cet pid %d's policy", 's', pid);
++
++	if (!*argv) /* "-p <priority> <pid> [...]" */
+ 		goto print_rt_info;
+-	}
+-	++argv;
++
+ 	BB_EXECVP(*argv, argv);
+ 	bb_simple_perror_msg_and_die(*argv);
+ }
+-#undef OPT_p
+-#undef OPT_r
+-#undef OPT_f
+-#undef OPT_o
+-#undef OPT_m
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 75555c8..fcfc120 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -158,7 +158,7 @@ static void crondlog(const char *ctl, ...)
+ }
+ 
+ int crond_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int crond_main(int ac ATTRIBUTE_UNUSED, char **av)
++int crond_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned opt;
+ 
+@@ -167,7 +167,7 @@ int crond_main(int ac ATTRIBUTE_UNUSED, char **av)
+ 	/* "-b after -f is ignored", and so on for every pair a-b */
+ 	opt_complementary = "f-b:b-f:S-L:L-S" USE_DEBUG_CROND_OPTION(":d-l")
+ 			":l+:d+"; /* -l and -d have numeric param */
+-	opt = getopt32(av, "l:L:fbSc:" USE_DEBUG_CROND_OPTION("d:"),
++	opt = getopt32(argv, "l:L:fbSc:" USE_DEBUG_CROND_OPTION("d:"),
+ 			&LogLevel, &LogFile, &CDir
+ 			USE_DEBUG_CROND_OPTION(,&LogLevel));
+ 	/* both -d N and -l N set the same variable: LogLevel */
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 94d69f0..dc3179d 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -18,9 +18,6 @@
+ #ifndef CRONUPDATE
+ #define CRONUPDATE      "cron.update"
+ #endif
+-#ifndef PATH_VI
+-#define PATH_VI         "/bin/vi"   /* location of vi */
+-#endif
+ 
+ static void change_user(const struct passwd *pas)
+ {
+@@ -56,7 +53,7 @@ static void edit_file(const struct passwd *pas, const char *file)
+ 	if (!ptr) {
+ 		ptr = getenv("EDITOR");
+ 		if (!ptr)
+-			ptr = PATH_VI;
++			ptr = "vi";
+ 	}
+ 
+ 	BB_EXECLP(ptr, ptr, file, NULL);
+@@ -181,14 +178,16 @@ int crontab_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	case OPT_e: /* Edit */
+ 		tmp_fname = xasprintf("%s.%u", crontab_dir, (unsigned)getpid());
+-		fd = xopen3(tmp_fname, O_RDWR|O_CREAT|O_TRUNC|O_EXCL, 0600);
++		/* No O_EXCL: we don't want to be stuck if earlier crontabs
++		 * were killed, leaving stale temp file behind */
++		fd = xopen3(tmp_fname, O_RDWR|O_CREAT|O_TRUNC, 0600);
+ 		xmove_fd(fd, STDIN_FILENO);
++		fchown(STDIN_FILENO, pas->pw_uid, pas->pw_gid);
+ 		fd = open(pas->pw_name, O_RDONLY);
+ 		if (fd >= 0) {
+ 			bb_copyfd_eof(fd, STDIN_FILENO);
+ 			close(fd);
+ 		}
+-		fchown(STDIN_FILENO, pas->pw_uid, pas->pw_gid);
+ 		edit_file(pas, tmp_fname);
+ 		xlseek(STDIN_FILENO, 0, SEEK_SET);
+ 		/* fall through */
+diff --git a/miscutils/dc.c b/miscutils/dc.c
+index ffc3f8d..68ecd8a 100644
+--- a/miscutils/dc.c
++++ b/miscutils/dc.c
+@@ -8,11 +8,18 @@
+ 
+ /* Tiny RPN calculator, because "expr" didn't give me bitwise operations. */
+ 
+-enum { STACK_SIZE = COMMON_BUFSIZE / sizeof(double) };
+ 
+-#define stack ((double*)&bb_common_bufsiz1)
+-static unsigned int pointer;
+-static unsigned char base;
++struct globals {
++	unsigned pointer;
++	unsigned base;
++	double stack[1];
++};
++enum { STACK_SIZE = (COMMON_BUFSIZE - offsetof(struct globals, stack)) / sizeof(double) };
++#define G (*(struct globals*)&bb_common_bufsiz1)
++#define pointer   (G.pointer   )
++#define base      (G.base      )
++#define stack     (G.stack     )
++
+ 
+ static void push(double a)
+ {
+@@ -61,34 +68,34 @@ static void divide(void)
+ 
+ static void mod(void)
+ {
+-	unsigned int d = pop();
++	unsigned d = pop();
+ 
+-	push((unsigned int) pop() % d);
++	push((unsigned) pop() % d);
+ }
+ 
+ static void and(void)
+ {
+-	push((unsigned int) pop() & (unsigned int) pop());
++	push((unsigned) pop() & (unsigned) pop());
+ }
+ 
+ static void or(void)
+ {
+-	push((unsigned int) pop() | (unsigned int) pop());
++	push((unsigned) pop() | (unsigned) pop());
+ }
+ 
+ static void eor(void)
+ {
+-	push((unsigned int) pop() ^ (unsigned int) pop());
++	push((unsigned) pop() ^ (unsigned) pop());
+ }
+ 
+ static void not(void)
+ {
+-	push(~(unsigned int) pop());
++	push(~(unsigned) pop());
+ }
+ 
+ static void set_output_base(void)
+ {
+-	base = (unsigned char)pop();
++	base = (unsigned)pop();
+ 	if ((base != 10) && (base != 16)) {
+ 		bb_error_msg("error, base %d is not supported", base);
+ 		base = 10;
+@@ -98,14 +105,14 @@ static void set_output_base(void)
+ static void print_base(double print)
+ {
+ 	if (base == 16)
+-		printf("%x\n", (unsigned int)print);
++		printf("%x\n", (unsigned)print);
+ 	else
+ 		printf("%g\n", print);
+ }
+ 
+ static void print_stack_no_pop(void)
+ {
+-	unsigned int i = pointer;
++	unsigned i = pointer;
+ 	while (i)
+ 		print_base(stack[--i]);
+ }
+@@ -142,12 +149,12 @@ static const struct op operators[] = {
+ 	{"p", print_no_pop},
+ 	{"f", print_stack_no_pop},
+ 	{"o", set_output_base},
+-	{"", 0}
++	{ /* zero filled */ }
+ };
+ 
+ static void stack_machine(const char *argument)
+ {
+-	char *endPointer = 0;
++	char *endPointer;
+ 	double d;
+ 	const struct op *o = operators;
+ 
+@@ -176,54 +183,39 @@ static void stack_machine(const char *argument)
+  */
+ static char *get_token(char **buffer)
+ {
+-	char *start = NULL;
+-	char *current;
+-
+-	current = skip_whitespace(*buffer);
+-	if (*current != 0) {
+-		start = current;
+-		current = skip_non_whitespace(current);
+-		*buffer = current;
++	char *current = skip_whitespace(*buffer);
++	if (*current != '\0') {
++		*buffer = skip_non_whitespace(current);
++		return current;
+ 	}
+-	return start;
+-}
+-
+-/* In Perl one might say, scalar m|\s*(\S+)\s*|g */
+-static int number_of_tokens(char *buffer)
+-{
+-	int   i = 0;
+-	char *b = buffer;
+-	while (get_token(&b)) { i++; }
+-	return i;
++	return NULL;
+ }
+ 
+ int dc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int dc_main(int argc, char **argv)
+-{
+-	/* take stuff from stdin if no args are given */
+-	if (argc <= 1) {
+-		int i, len;
+-		char *line   = NULL;
+-		char *cursor = NULL;
+-		char *token  = NULL;
+-		while ((line = xmalloc_getline(stdin))) {
++int dc_main(int argc ATTRIBUTE_UNUSED, char **argv)
++{
++	argv++;
++	if (!argv[0]) {
++		/* take stuff from stdin if no args are given */
++		char *line;
++		char *cursor;
++		char *token;
++		while ((line = xmalloc_getline(stdin)) != NULL) {
+ 			cursor = line;
+-			len = number_of_tokens(line);
+-			for (i = 0; i < len; i++) {
++			while (1) {
+ 				token = get_token(&cursor);
+-				*cursor++ = 0;
++				if (!token) break;
++				*cursor++ = '\0';
+ 				stack_machine(token);
+ 			}
+ 			free(line);
+ 		}
+ 	} else {
+-		if (*argv[1] == '-')
++		if (argv[0][0] == '-')
+ 			bb_show_usage();
+-		while (argc >= 2) {
+-			stack_machine(argv[1]);
+-			argv++;
+-			argc--;
+-		}
++		do {
++			stack_machine(*argv);
++		} while (*++argv);
+ 	}
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/miscutils/eject.c b/miscutils/eject.c
+index 3d27ce5..42e0719 100644
+--- a/miscutils/eject.c
++++ b/miscutils/eject.c
+@@ -22,68 +22,71 @@
+ /* drive status possibilities returned by CDROM_DRIVE_STATUS ioctl */
+ #define CDS_TRAY_OPEN        2
+ 
+-#define FLAG_CLOSE  1
+-#define FLAG_SMART  2
+-
++#define dev_fd 3
+ 
+ /* Code taken from the original eject (http://eject.sourceforge.net/),
+  * refactored it a bit for busybox (ne-bb@nicoerfurth.de) */
+-#define FLAG_SCSI   4
+ 
+ #include <scsi/sg.h>
+ #include <scsi/scsi.h>
+-static void eject_scsi(const int fd, const char * const dev)
++
++static void eject_scsi(const char *dev)
+ {
+-  int i;
+-  unsigned char sense_buffer[32];
+-  unsigned char inqBuff[2];
+-  sg_io_hdr_t io_hdr;
+-  char sg_commands[3][6] = {
+-    {ALLOW_MEDIUM_REMOVAL, 0, 0, 0, 0, 0},
+-    {START_STOP, 0, 0, 0, 1, 0},
+-    {START_STOP, 0, 0, 0, 2, 0}
+-  };
+-
+-  if ((ioctl(fd, SG_GET_VERSION_NUM, &i) < 0) || (i < 30000))
+-    bb_error_msg_and_die("not an sg device or old sg driver");
+-
+-  memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
+-  io_hdr.interface_id = 'S';
+-  io_hdr.cmd_len = 6;
+-  io_hdr.mx_sb_len = sizeof(sense_buffer);
+-  io_hdr.dxfer_direction = SG_DXFER_NONE;
+-  /* io_hdr.dxfer_len = 0; */
+-  io_hdr.dxferp = inqBuff;
+-  io_hdr.sbp = sense_buffer;
+-  io_hdr.timeout = 2000;
+-
+-  for (i=0; i < 3; i++) {
+-    io_hdr.cmdp = sg_commands[i];
+-    ioctl_or_perror_and_die(fd, SG_IO, (void *)&io_hdr, "%s", dev);
+-  }
+-
+-  /* force kernel to reread partition table when new disc inserted */
+-  ioctl(fd, BLKRRPART);
++	static const char sg_commands[3][6] = {
++		{ ALLOW_MEDIUM_REMOVAL, 0, 0, 0, 0, 0 },
++		{ START_STOP, 0, 0, 0, 1, 0 },
++		{ START_STOP, 0, 0, 0, 2, 0 }
++	};
++
++	int i;
++	unsigned char sense_buffer[32];
++	unsigned char inqBuff[2];
++	sg_io_hdr_t io_hdr;
++
++	if ((ioctl(dev_fd, SG_GET_VERSION_NUM, &i) < 0) || (i < 30000))
++		bb_error_msg_and_die("not a sg device or old sg driver");
++
++	memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
++	io_hdr.interface_id = 'S';
++	io_hdr.cmd_len = 6;
++	io_hdr.mx_sb_len = sizeof(sense_buffer);
++	io_hdr.dxfer_direction = SG_DXFER_NONE;
++	/* io_hdr.dxfer_len = 0; */
++	io_hdr.dxferp = inqBuff;
++	io_hdr.sbp = sense_buffer;
++	io_hdr.timeout = 2000;
++
++	for (i = 0; i < 3; i++) {
++		io_hdr.cmdp = (char*)sg_commands[i];
++		ioctl_or_perror_and_die(dev_fd, SG_IO, (void *)&io_hdr, "%s", dev);
++	}
++
++	/* force kernel to reread partition table when new disc is inserted */
++	ioctl(dev_fd, BLKRRPART);
+ }
+ 
+-static void eject_cdrom(const int fd, const unsigned long flags,
+-						const char * const dev)
++#define FLAG_CLOSE  1
++#define FLAG_SMART  2
++#define FLAG_SCSI   4
++
++static void eject_cdrom(unsigned flags, const char *dev)
+ {
+ 	int cmd = CDROMEJECT;
+ 
+ 	if (flags & FLAG_CLOSE
+-	 || (flags & FLAG_SMART && ioctl(fd, CDROM_DRIVE_STATUS) == CDS_TRAY_OPEN))
++	 || (flags & FLAG_SMART && ioctl(dev_fd, CDROM_DRIVE_STATUS) == CDS_TRAY_OPEN)
++	) {
+ 		cmd = CDROMCLOSETRAY;
++	}
+ 
+-	return ioctl_or_perror_and_die(fd, cmd, NULL, "%s", dev);
++	ioctl_or_perror_and_die(dev_fd, cmd, NULL, "%s", dev);
+ }
+ 
+ int eject_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int eject_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	unsigned long flags;
++	unsigned flags;
+ 	const char *device;
+-	int dev;
+ 
+ 	opt_complementary = "?1:t--T:T--t";
+ 	flags = getopt32(argv, "tT" USE_FEATURE_EJECT_SCSI("s"));
+@@ -96,18 +99,18 @@ int eject_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	   This works equally well (or better):
+ 	   #!/bin/sh
+ 	   umount /dev/cdrom
+-	   eject
++	   eject /dev/cdrom
+ 	*/
+ 
+-	dev = xopen(device, O_RDONLY|O_NONBLOCK);
++	xmove_fd(xopen(device, O_RDONLY|O_NONBLOCK), dev_fd);
+ 
+ 	if (ENABLE_FEATURE_EJECT_SCSI && (flags & FLAG_SCSI))
+-		eject_scsi(dev, device);
++		eject_scsi(device);
+ 	else
+-		eject_cdrom(dev, flags, device);
++		eject_cdrom(flags, device);
+ 
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+-		close(dev);
++		close(dev_fd);
+ 
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/miscutils/last.c b/miscutils/last.c
+index f4d9a81..f46d4ca 100644
+--- a/miscutils/last.c
++++ b/miscutils/last.c
+@@ -14,7 +14,7 @@
+ #  define SHUTDOWN_TIME 254
+ #endif
+ 
+-/* Grr... utmp char[] members  do not have to be nul-terminated.
++/* Grr... utmp char[] members do not have to be nul-terminated.
+  * Do what we can while still keeping this reasonably small.
+  * Note: We are assuming the ut_id[] size is fixed at 4. */
+ 
+diff --git a/miscutils/setsid.c b/miscutils/setsid.c
+index 110bb6b..014de51 100644
+--- a/miscutils/setsid.c
++++ b/miscutils/setsid.c
+@@ -4,7 +4,7 @@
+  * Rick Sladkey <jrs@world.std.com>
+  * In the public domain.
+  *
+- * 1999-02-22 Arkadiusz Mi턪iewicz <misiek@pld.ORG.PL>
++ * 1999-02-22 Arkadiusz Mickiewicz <misiek@pld.ORG.PL>
+  * - added Native Language Support
+  *
+  * 2001-01-18 John Fremlin <vii@penguinpowered.com>
+@@ -17,12 +17,14 @@
+ #include "libbb.h"
+ 
+ int setsid_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int setsid_main(int argc, char **argv)
++int setsid_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	if (argc < 2)
++	if (!argv[1])
+ 		bb_show_usage();
+ 
+-	/* Comment why is this necessary? */
++	/* setsid() is allowed only when we are not a process group leader.
++	 * Otherwise our PID serves as PGID of some existing process group
++	 * and cannot be used as PGID of a new process group. */
+ 	if (getpgrp() == getpid())
+ 		forkexit_or_rexec(argv);
+ 
+diff --git a/miscutils/taskset.c b/miscutils/taskset.c
+index e64fd65..6247aa8 100644
+--- a/miscutils/taskset.c
++++ b/miscutils/taskset.c
+@@ -39,61 +39,71 @@ static char *__from_cpuset(cpu_set_t *mask)
+ #define from_cpuset(mask) (*(unsigned*)(void*)&(mask))
+ #endif
+ 
+-#define OPT_p 1
+ 
+ int taskset_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int taskset_main(int argc, char **argv)
++int taskset_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	cpu_set_t mask, new_mask;
++	cpu_set_t mask;
+ 	pid_t pid = 0;
+-	unsigned opt;
+-	const char *state = "current\0new";
+-	char *p_opt = NULL, *aff = NULL;
++	unsigned opt_p;
++	const char *current_new;
++	char *pid_str;
++	char *aff = aff; /* for compiler */
+ 
+-	opt = getopt32(argv, "+p:", &p_opt);
++	opt_complementary = "-1"; /* at least 1 arg */
++	opt_p = getopt32(argv, "+p");
++	argv += optind;
+ 
+-	if (opt & OPT_p) {
+-		if (argc == optind+1) { /* -p <aff> <pid> */
+-			aff = p_opt;
+-			p_opt = argv[optind];
+-		}
+-		argv += optind; /* me -p <arg> */
+-		pid = xatoul_range(p_opt, 1, ULONG_MAX); /* -p <pid> */
+-	} else
+-		aff = *++argv; /* <aff> <cmd...> */
+-	if (aff) {
+-		unsigned i = 0;
+-		unsigned long l = xstrtol_range(aff, 0, 1, LONG_MAX);
+-
+-		CPU_ZERO(&new_mask);
+-		while (i < CPU_SETSIZE && l >= (1<<i)) {
+-			if ((1<<i) & l)
+-				CPU_SET(i, &new_mask);
+-			++i;
++	if (opt_p) {
++		pid_str = *argv++;
++		if (*argv) { /* "-p <aff> <pid> ...rest.is.ignored..." */
++			aff = pid_str;
++			pid_str = *argv; /* NB: *argv != NULL in this case */
+ 		}
++		/* else it was just "-p <pid>", and *argv == NULL */
++		pid = xatoul_range(pid_str, 1, ((unsigned)(pid_t)ULONG_MAX) >> 1);
++	} else {
++		aff = *argv++; /* <aff> <cmd...> */
++		if (!*argv)
++			bb_show_usage();
+ 	}
+ 
+-	if (opt & OPT_p) {
++	current_new = "current\0new";
++	if (opt_p) {
+  print_aff:
+ 		if (sched_getaffinity(pid, sizeof(mask), &mask) < 0)
+-			bb_perror_msg_and_die("failed to %cet pid %d's affinity", 'g', pid);
++			bb_perror_msg_and_die("can't %cet pid %d's affinity", 'g', pid);
+ 		printf("pid %d's %s affinity mask: "TASKSET_PRINTF_MASK"\n",
+-				pid, state, from_cpuset(mask));
+-		if (!*argv) /* no new affinity given or we did print already, done. */
++				pid, current_new, from_cpuset(mask));
++		if (!*argv) {
++			/* Either it was just "-p <pid>",
++			 * or it was "-p <aff> <pid>" and we came here
++			 * for the second time (see goto below) */
+ 			return EXIT_SUCCESS;
++		}
++		*argv = NULL;
++		current_new += 8; /* "new" */
+ 	}
+ 
+-	if (sched_setaffinity(pid, sizeof(new_mask), &new_mask))
+-		bb_perror_msg_and_die("failed to %cet pid %d's affinity", 's', pid);
+-	if (opt & OPT_p) {
+-		state += 8;
+-		++argv;
+-		goto print_aff;
++	{ /* Affinity was specified, translate it into cpu_set_t */
++		unsigned i;
++		/* Do not allow zero mask: */
++		unsigned long long m = xstrtoull_range(aff, 0, 1, ULLONG_MAX);
++		CPU_ZERO(&mask);
++		for (i = 0; i < CPU_SETSIZE; i++) {
++			unsigned long long bit = (1ULL << i);
++			if (bit & m)
++				CPU_SET(i, &mask);
++		}
+ 	}
+-	++argv;
++
++	/* Set pid's or our own (pid==0) affinity */
++	if (sched_setaffinity(pid, sizeof(mask), &mask))
++		bb_perror_msg_and_die("can't %cet pid %d's affinity", 's', pid);
++
++	if (!*argv) /* "-p <aff> <pid> [...ignored...]" */
++		goto print_aff; /* print new affinity and exit */
++
+ 	BB_EXECVP(*argv, argv);
+ 	bb_simple_perror_msg_and_die(*argv);
+ }
+-#undef OPT_p
+-#undef TASKSET_PRINTF_MASK
+-#undef from_cpuset
+diff --git a/miscutils/time.c b/miscutils/time.c
+index 677ca6d..ed43859 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -1,5 +1,5 @@
+ /* vi: set sw=4 ts=4: */
+-/* `time' utility to display resource usage of processes.
++/* 'time' utility to display resource usage of processes.
+    Copyright (C) 1990, 91, 92, 93, 96 Free Software Foundation, Inc.
+ 
+    Licensed under GPL version 2, see file LICENSE in this tarball for details.
+@@ -28,7 +28,6 @@ static const char default_format[] ALIGN1 = "real\t%E\nuser\t%u\nsys\t%T";
+ /* The output format for the -p option .*/
+ static const char posix_format[] ALIGN1 = "real %e\nuser %U\nsys %S";
+ 
+-
+ /* Format string for printing all statistics verbosely.
+    Keep this output to 24 lines so users on terminals can see it all.*/
+ static const char long_format[] ALIGN1 =
+@@ -56,35 +55,31 @@ static const char long_format[] ALIGN1 =
+ 	"\tPage size (bytes): %Z\n"
+ 	"\tExit status: %x";
+ 
+-
+ /* Wait for and fill in data on child process PID.
+    Return 0 on error, 1 if ok.  */
+-
+ /* pid_t is short on BSDI, so don't try to promote it.  */
+-static int resuse_end(pid_t pid, resource_t *resp)
++static void resuse_end(pid_t pid, resource_t *resp)
+ {
+-	int status;
+ 	pid_t caught;
+ 
+ 	/* Ignore signals, but don't ignore the children.  When wait3
+ 	   returns the child process, set the time the command finished. */
+-	while ((caught = wait3(&status, 0, &resp->ru)) != pid) {
+-		if (caught == -1 && errno != EINTR)
+-			return 0;
++	while ((caught = wait3(&resp->waitstatus, 0, &resp->ru)) != pid) {
++		if (caught == -1 && errno != EINTR) {
++			bb_perror_msg("wait");
++			return;
++		}
+ 	}
+ 	resp->elapsed_ms = (monotonic_us() / 1000) - resp->elapsed_ms;
+-	resp->waitstatus = status;
+-	return 1;
+ }
+ 
+-/* Print ARGV, with each entry in ARGV separated by FILLER.  */
+-static void printargv(char *const *argv, const char *filler)
++static void printargv(char *const *argv)
+ {
+-	fputs(*argv, stdout);
+-	while (*++argv) {
+-		fputs(filler, stdout);
+-		fputs(*argv, stdout);
+-	}
++	const char *fmt = " %s" + 1;
++	do {
++		printf(fmt, *argv);
++		fmt = " %s";
++	} while (*++argv);
+ }
+ 
+ /* Return the number of kilobytes corresponding to a number of pages PAGES.
+@@ -94,24 +89,18 @@ static void printargv(char *const *argv, const char *filler)
+    This is funky since the pagesize could be less than 1K.
+    Note: Some machines express getrusage statistics in terms of K,
+    others in terms of pages.  */
+-
+-static unsigned long ptok(unsigned long pages)
++static unsigned long ptok(unsigned pagesize, unsigned long pages)
+ {
+-	static unsigned long ps;
+ 	unsigned long tmp;
+ 
+-	/* Initialization.  */
+-	if (ps == 0)
+-		ps = getpagesize();
+-
+ 	/* Conversion.  */
+-	if (pages > (LONG_MAX / ps)) {	/* Could overflow.  */
+-		tmp = pages / 1024;	/* Smaller first, */
+-		return tmp * ps;	/* then larger.  */
++	if (pages > (LONG_MAX / pagesize)) { /* Could overflow.  */
++		tmp = pages / 1024;     /* Smaller first, */
++		return tmp * pagesize;  /* then larger.  */
+ 	}
+ 	/* Could underflow.  */
+-	tmp = pages * ps;	/* Larger first, */
+-	return tmp / 1024;	/* then smaller.  */
++	tmp = pages * pagesize; /* Larger first, */
++	return tmp / 1024;      /* then smaller.  */
+ }
+ 
+ /* summarize: Report on the system use of a command.
+@@ -162,15 +151,18 @@ static unsigned long ptok(unsigned long pages)
+ #define TICKS_PER_SEC 100
+ #endif
+ 
+-static void summarize(const char *fmt, char **command, resource_t * resp)
++static void summarize(const char *fmt, char **command, resource_t *resp)
+ {
+ 	unsigned vv_ms;     /* Elapsed virtual (CPU) milliseconds */
+ 	unsigned cpu_ticks; /* Same, in "CPU ticks" */
++	unsigned pagesize = getpagesize();
+ 
++	/* Impossible: we do not use WUNTRACED flag in wait()...
+ 	if (WIFSTOPPED(resp->waitstatus))
+ 		printf("Command stopped by signal %u\n",
+ 				WSTOPSIG(resp->waitstatus));
+-	else if (WIFSIGNALED(resp->waitstatus))
++	else */
++	if (WIFSIGNALED(resp->waitstatus))
+ 		printf("Command terminated by signal %u\n",
+ 				WTERMSIG(resp->waitstatus));
+ 	else if (WIFEXITED(resp->waitstatus) && WEXITSTATUS(resp->waitstatus))
+@@ -181,7 +173,7 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 	      + (resp->ru.ru_utime.tv_usec + resp->ru.ru_stime.tv_usec) / 1000;
+ 
+ #if (1000 / TICKS_PER_SEC) * TICKS_PER_SEC == 1000
+-	/* 1000 is exactly divisible by TICKS_PER_SEC */
++	/* 1000 is exactly divisible by TICKS_PER_SEC (typical) */
+ 	cpu_ticks = vv_ms / (1000 / TICKS_PER_SEC);
+ #else
+ 	cpu_ticks = vv_ms * (unsigned long long)TICKS_PER_SEC / 1000;
+@@ -221,12 +213,12 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 				break;
+ #endif
+ 			case 'C':	/* The command that got timed.  */
+-				printargv(command, " ");
++				printargv(command);
+ 				break;
+ 			case 'D':	/* Average unshared data size.  */
+ 				printf("%lu",
+-						ptok((UL) resp->ru.ru_idrss) / cpu_ticks +
+-						ptok((UL) resp->ru.ru_isrss) / cpu_ticks);
++					(ptok(pagesize, (UL) resp->ru.ru_idrss) +
++					 ptok(pagesize, (UL) resp->ru.ru_isrss)) / cpu_ticks);
+ 				break;
+ 			case 'E': {	/* Elapsed real (wall clock) time.  */
+ 				unsigned seconds = resp->elapsed_ms / 1000;
+@@ -250,12 +242,12 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 				break;
+ 			case 'K':	/* Average mem usage == data+stack+text.  */
+ 				printf("%lu",
+-						ptok((UL) resp->ru.ru_idrss) / cpu_ticks +
+-						ptok((UL) resp->ru.ru_isrss) / cpu_ticks +
+-						ptok((UL) resp->ru.ru_ixrss) / cpu_ticks);
++					(ptok(pagesize, (UL) resp->ru.ru_idrss) +
++					 ptok(pagesize, (UL) resp->ru.ru_isrss) +
++					 ptok(pagesize, (UL) resp->ru.ru_ixrss)) / cpu_ticks);
+ 				break;
+ 			case 'M':	/* Maximum resident set size.  */
+-				printf("%lu", ptok((UL) resp->ru.ru_maxrss));
++				printf("%lu", ptok(pagesize, (UL) resp->ru.ru_maxrss));
+ 				break;
+ 			case 'O':	/* Outputs.  */
+ 				printf("%lu", resp->ru.ru_oublock);
+@@ -308,7 +300,7 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 				printf("%lu", resp->ru.ru_nswap);
+ 				break;
+ 			case 'X':	/* Average shared text size.  */
+-				printf("%lu", ptok((UL) resp->ru.ru_ixrss) / cpu_ticks);
++				printf("%lu", ptok(pagesize, (UL) resp->ru.ru_ixrss) / cpu_ticks);
+ 				break;
+ 			case 'Z':	/* Page size.  */
+ 				printf("%u", getpagesize());
+@@ -325,7 +317,7 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 				printf("%lu", resp->ru.ru_nsignals);
+ 				break;
+ 			case 'p':	/* Average stack segment.  */
+-				printf("%lu", ptok((UL) resp->ru.ru_isrss) / cpu_ticks);
++				printf("%lu", ptok(pagesize, (UL) resp->ru.ru_isrss) / cpu_ticks);
+ 				break;
+ 			case 'r':	/* Incoming socket messages received.  */
+ 				printf("%lu", resp->ru.ru_msgrcv);
+@@ -334,7 +326,7 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 				printf("%lu", resp->ru.ru_msgsnd);
+ 				break;
+ 			case 't':	/* Average resident set size.  */
+-				printf("%lu", ptok((UL) resp->ru.ru_idrss) / cpu_ticks);
++				printf("%lu", ptok(pagesize, (UL) resp->ru.ru_idrss) / cpu_ticks);
+ 				break;
+ 			case 'w':	/* Voluntary context switches.  */
+ 				printf("%lu", resp->ru.ru_nvcsw);
+@@ -396,8 +388,7 @@ static void run_command(char *const *cmd, resource_t *resp)
+ 	interrupt_signal = signal(SIGINT, SIG_IGN);
+ 	quit_signal = signal(SIGQUIT, SIG_IGN);
+ 
+-	if (resuse_end(pid, resp) == 0)
+-		bb_error_msg("error waiting for child process");
++	resuse_end(pid, resp);
+ 
+ 	/* Re-enable signals.  */
+ 	signal(SIGINT, interrupt_signal);
+@@ -405,41 +396,26 @@ static void run_command(char *const *cmd, resource_t *resp)
+ }
+ 
+ int time_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int time_main(int argc, char **argv)
++int time_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	resource_t res;
+ 	const char *output_format = default_format;
+-	char c;
+-
+-	goto next;
+-	/* Parse any options  -- don't use getopt() here so we don't
+-	 * consume the args of our client application... */
+-	while (argc > 0 && argv[0][0] == '-') {
+-		while ((c = *++*argv)) {
+-			switch (c) {
+-			case 'v':
+-				output_format = long_format;
+-				break;
+-			case 'p':
+-				output_format = posix_format;
+-				break;
+-			default:
+-				bb_show_usage();
+-			}
+-		}
+- next:
+-		argv++;
+-		argc--;
+-		if (!argc)
+-			bb_show_usage();
+-	}
++	int opt;
++
++	/* "+": stop on first non-option */
++	opt = getopt32(argv, "+vp");
++	argv += optind;
++	if (opt & 1)
++		output_format = long_format;
++	if (opt & 2)
++		output_format = posix_format;
+ 
+ 	run_command(argv, &res);
+ 
+ 	/* Cheat. printf's are shorter :) */
+ 	/* (but see bb_putchar() body for additional wrinkle!) */
++	xdup2(2, 1); /* just in case libc does something silly :( */
+ 	stdout = stderr;
+-	dup2(2, 1); /* just in case libc does something silly :( */
+ 	summarize(output_format, argv, &res);
+ 
+ 	if (WIFSTOPPED(res.waitstatus))
+diff --git a/miscutils/ttysize.c b/miscutils/ttysize.c
+index f51b328..0545554 100644
+--- a/miscutils/ttysize.c
++++ b/miscutils/ttysize.c
+@@ -14,7 +14,7 @@
+ int ttysize_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ttysize_main(int argc, char **argv)
+ {
+-	unsigned w,h;
++	unsigned w, h;
+ 	struct winsize wsz;
+ 
+ 	w = 80;
+diff --git a/miscutils/watchdog.c b/miscutils/watchdog.c
+index 28bd358..7fb16b8 100644
+--- a/miscutils/watchdog.c
++++ b/miscutils/watchdog.c
+@@ -13,8 +13,7 @@
+ #define OPT_FOREGROUND 0x01
+ #define OPT_TIMER      0x02
+ 
+-static void watchdog_shutdown(int ATTRIBUTE_UNUSED sig) ATTRIBUTE_NORETURN;
+-static void watchdog_shutdown(int ATTRIBUTE_UNUSED sig)
++static void watchdog_shutdown(int sig ATTRIBUTE_UNUSED)
+ {
+ 	static const char V = 'V';
+ 
+@@ -47,14 +46,19 @@ int watchdog_main(int argc, char **argv)
+ 		bb_daemonize_or_rexec(DAEMON_CHDIR_ROOT, argv);
+ 	}
+ 
+-	bb_signals(0
+-		+ (1 << SIGHUP)
+-		+ (1 << SIGINT)
+-		, watchdog_shutdown);
++	bb_signals(BB_SIGS_FATAL, watchdog_shutdown);
+ 
+ 	/* Use known fd # - avoid needing global 'int fd' */
+ 	xmove_fd(xopen(argv[argc - 1], O_WRONLY), 3);
+ 
++// TODO?
++//	if (!(opts & OPT_TIMER)) {
++//		if (ioctl(fd, WDIOC_GETTIMEOUT, &timer_duration) == 0)
++//			timer_duration *= 500;
++//		else
++//			timer_duration = 30000;
++//	}
++
+ 	while (1) {
+ 		/*
+ 		 * Make sure we clear the counter before sleeping, as the counter value
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index 058e8be..7ef5449 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -64,7 +64,7 @@
+  * 06.11.96  - Added v2 code submitted by Joerg Dorchain, but written by
+  *             Andreas Schwab.
+  *
+- * 1999-02-22 Arkadiusz Mi턪iewicz <misiek@misiek.eu.org>
++ * 1999-02-22 Arkadiusz Mickiewicz <misiek@misiek.eu.org>
+  * - added Native Language Support
+  *
+  *
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index ee6c143..6ec5cb0 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -22,7 +22,7 @@
+  * Version 1.0.6: Tue Jun 27 2000
+  *   No important changes
+  * Version 1.1.0: Tue Jun 30 2000
+- *   Added NLS support (partly written by Arkadiusz Mi<B6>kiewicz
++ *   Added NLS support (partly written by Arkadiusz Mickiewicz
+  *     <misiek@misiek.eu.org>)
+  * Ported to Busybox - Alfred M. Szmidt <ams@trillian.itslinux.org>
+  *  Removed --version/-V and --help/-h in
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 6e63a01..a0e6cda 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -502,7 +502,7 @@ static int mount_it_now(struct mntent *mp, long vfsflags, char *filteropts)
+  * Wed Oct  1 23:55:28 1997: Dick Streefland <dick_streefland@tasking.com>
+  * Implemented the "bg", "fg" and "retry" mount options for NFS.
+  *
+- * 1999-02-22 Arkadiusz Mi턪iewicz <misiek@misiek.eu.org>
++ * 1999-02-22 Arkadiusz Mickiewicz <misiek@misiek.eu.org>
+  * - added Native Language Support
+  *
+  * Modified by Olaf Kirch and Trond Myklebust for new NFS code,

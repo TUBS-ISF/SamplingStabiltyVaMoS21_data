@@ -1,0 +1,36 @@
+2008-03-19 23:25:00 +0000
+diff --git a/libbb/die_if_bad_username.c b/libbb/die_if_bad_username.c
+index 251b1f0..337ac60 100644
+--- a/libbb/die_if_bad_username.c
++++ b/libbb/die_if_bad_username.c
+@@ -18,17 +18,19 @@
+ 
+ void die_if_bad_username(const char *name)
+ {
+-	int i = 0;
+-
++	goto skip; /* 1st char being dash isn't valid */
+ 	do {
+-		if (!isalnum(*name)
+-		 && !(*name == '_')
+-		 && !(*name == '.')
+-		 && !(*name == '@')
+-		 && !(*name == '-' && i)
+-		 && !(*name == '$' && !*(name + 1))
+-		)
+-			bb_error_msg_and_die("illegal character '%c'", *name);
+-		i++;
++		if (*name == '-')
++			continue;
++ skip:
++		if (isalnum(*name)
++		 || *name == '_'
++		 || *name == '.'
++		 || *name == '@'
++		 || (*name == '$' && !*(name + 1))
++		) {
++			continue;
++		}
++		bb_error_msg_and_die("illegal character '%c'", *name);
+ 	} while (*++name);
+ }

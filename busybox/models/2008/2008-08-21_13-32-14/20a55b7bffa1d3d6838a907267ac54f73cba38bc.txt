@@ -1,0 +1,15 @@
+2008-08-21 13:32:14 +0000
+diff --git a/docs/busybox.net/FAQ.html b/docs/busybox.net/FAQ.html
+index ac4e90a..41efaa1 100644
+--- a/docs/busybox.net/FAQ.html
++++ b/docs/busybox.net/FAQ.html
+@@ -59,8 +59,7 @@ have additions to this FAQ document, we would love to add them,
+     <li><a href="#tips_kernel_headers">Including Linux kernel headers.</a></li>
+     </ul>
+   </li>
+-    <li><a href="#who">Who are the BusyBox developers?</a></li>
+-  </ul>
++  <li><a href="#who">Who are the BusyBox developers?</a></li>
+ </ol>
+ 
+ 

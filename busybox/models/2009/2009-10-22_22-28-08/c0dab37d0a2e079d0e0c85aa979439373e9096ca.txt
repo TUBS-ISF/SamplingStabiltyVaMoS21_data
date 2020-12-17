@@ -1,0 +1,186 @@
+2009-10-22 22:28:08 +0200
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index ef70b0e..7973b82 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -262,7 +262,7 @@ static void trim_trailing_spaces_and_print(char *s)
+ 	}
+ 	while (p != s) {
+ 		--p;
+-		if (!(isspace)(*p)) {	/* We want the function... not the inline. */
++		if (!isspace(*p)) {
+ 			p[1] = '\0';
+ 			break;
+ 		}
+diff --git a/coreutils/wc.c b/coreutils/wc.c
+index d0e5482..3e32e3d 100644
+--- a/coreutils/wc.c
++++ b/coreutils/wc.c
+@@ -43,22 +43,19 @@
+ 
+ #include "libbb.h"
+ 
+-#if ENABLE_LOCALE_SUPPORT
+-#define isspace_given_isprint(c) isspace(c)
+-#else
+-#undef isspace
+-#undef isprint
+-#define isspace(c) ((((c) == ' ') || (((unsigned int)((c) - 9)) <= (13 - 9))))
+-#define isprint(c) (((unsigned int)((c) - 0x20)) <= (0x7e - 0x20))
+-#define isspace_given_isprint(c) ((c) == ' ')
++#if !ENABLE_LOCALE_SUPPORT
++# undef isprint
++# undef isspace
++# define isprint(c) ((unsigned)((c) - 0x20) <= (0x7e - 0x20))
++# define isspace(c) ((c) == ' ')
+ #endif
+ 
+ #if ENABLE_FEATURE_WC_LARGE
+-#define COUNT_T unsigned long long
+-#define COUNT_FMT "llu"
++# define COUNT_T unsigned long long
++# define COUNT_FMT "llu"
+ #else
+-#define COUNT_T unsigned
+-#define COUNT_FMT "u"
++# define COUNT_T unsigned
++# define COUNT_FMT "u"
+ #endif
+ 
+ enum {
+@@ -123,11 +120,11 @@ int wc_main(int argc UNUSED_PARAM, char **argv)
+ 			c = getc(fp);
+ 			if (isprint(c)) {
+ 				++linepos;
+-				if (!isspace_given_isprint(c)) {
++				if (!isspace(c)) {
+ 					in_word = 1;
+ 					continue;
+ 				}
+-			} else if (((unsigned int)(c - 9)) <= 4) {
++			} else if ((unsigned)(c - 9) <= 4) {
+ 				/* \t  9
+ 				 * \n 10
+ 				 * \v 11
+diff --git a/editors/sed.c b/editors/sed.c
+index 9b360b6..27c3459 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -423,10 +423,10 @@ static const char *parse_cmd_args(sed_cmd_t *sed_cmd, const char *cmdstr)
+ 			if (*cmdstr == '\n' || *cmdstr == '\\') {
+ 				cmdstr++;
+ 				break;
+-			} else if (isspace(*cmdstr))
+-				cmdstr++;
+-			else
++			}
++			if (!isspace(*cmdstr))
+ 				break;
++			cmdstr++;
+ 		}
+ 		sed_cmd->string = xstrdup(cmdstr);
+ 		/* "\anychar" -> "anychar" */
+diff --git a/editors/vi.c b/editors/vi.c
+index a24b723..82f302d 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -1783,23 +1783,23 @@ static int st_test(char *p, int type, int dir, char *tested)
+ 
+ 	if (type == S_BEFORE_WS) {
+ 		c = ci;
+-		test = ((!isspace(c)) || c == '\n');
++		test = (!isspace(c) || c == '\n');
+ 	}
+ 	if (type == S_TO_WS) {
+ 		c = c0;
+-		test = ((!isspace(c)) || c == '\n');
++		test = (!isspace(c) || c == '\n');
+ 	}
+ 	if (type == S_OVER_WS) {
+ 		c = c0;
+-		test = ((isspace(c)));
++		test = isspace(c);
+ 	}
+ 	if (type == S_END_PUNCT) {
+ 		c = ci;
+-		test = ((ispunct(c)));
++		test = ispunct(c);
+ 	}
+ 	if (type == S_END_ALNUM) {
+ 		c = ci;
+-		test = ((isalnum(c)) || c == '_');
++		test = (isalnum(c) || c == '_');
+ 	}
+ 	*tested = c;
+ 	return test;
+diff --git a/libbb/ask_confirmation.c b/libbb/ask_confirmation.c
+index d08bc51..9dfbd15 100644
+--- a/libbb/ask_confirmation.c
++++ b/libbb/ask_confirmation.c
+@@ -20,9 +20,7 @@ int FAST_FUNC bb_ask_confirmation(void)
+ 	int c;
+ 
+ 	while (((c = getchar()) != EOF) && (c != '\n')) {
+-		/* Make sure we get the actual function call for isspace,
+-		 * as speed is not critical here. */
+-		if (first && !(isspace)(c)) {
++		if (first && !isspace(c)) {
+ 			--first;
+ 			if ((c == 'y') || (c == 'Y')) {
+ 				++retval;
+diff --git a/libbb/trim.c b/libbb/trim.c
+index ea20ff3..df00b84 100644
+--- a/libbb/trim.c
++++ b/libbb/trim.c
+@@ -13,7 +13,6 @@
+ void FAST_FUNC trim(char *s)
+ {
+ 	size_t len = strlen(s);
+-	size_t lws;
+ 
+ 	/* trim trailing whitespace */
+ 	while (len && isspace(s[len-1]))
+@@ -21,10 +20,10 @@ void FAST_FUNC trim(char *s)
+ 
+ 	/* trim leading whitespace */
+ 	if (len) {
+-		lws = strspn(s, " \n\r\t\v");
+-		if (lws) {
+-			len -= lws;
+-			memmove(s, s + lws, len);
++		char *nws = skip_whitespace(s);
++		if ((nws - s) != 0) {
++			len -= (nws - s);
++			memmove(s, nws, len);
+ 		}
+ 	}
+ 	s[len] = '\0';
+diff --git a/libbb/xatonum_template.c b/libbb/xatonum_template.c
+index 339a7d3..c97a4b7 100644
+--- a/libbb/xatonum_template.c
++++ b/libbb/xatonum_template.c
+@@ -25,9 +25,8 @@ unsigned type FAST_FUNC xstrtou(_range_sfx)(const char *numstr, int base,
+ 	int old_errno;
+ 	char *e;
+ 
+-	/* Disallow '-' and any leading whitespace. Make sure we get the
+-	 * actual isspace function rather than a macro implementaion. */
+-	if (*numstr == '-' || *numstr == '+' || (isspace)(*numstr))
++	/* Disallow '-' and any leading whitespace. */
++	if (*numstr == '-' || *numstr == '+' || isspace(*numstr))
+ 		goto inval;
+ 
+ 	/* Since this is a lib function, we're not allowed to reset errno to 0.
+diff --git a/shell/lash_unused.c b/shell/lash_unused.c
+index 2574987..f71daf2 100644
+--- a/shell/lash_unused.c
++++ b/shell/lash_unused.c
+@@ -697,7 +697,7 @@ static char * strsep_space(char *string, int * ix)
+ 
+ 	/* Find the end of any whitespace trailing behind
+ 	 * the token and let that be part of the token */
+-	while (string[*ix] && (isspace)(string[*ix]) ) {
++	while (string[*ix] && isspace(string[*ix])) {
+ 		(*ix)++;
+ 	}
+ 

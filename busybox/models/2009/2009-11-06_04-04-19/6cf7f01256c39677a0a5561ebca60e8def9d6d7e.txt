@@ -1,0 +1,734 @@
+2009-11-06 04:04:19 +0100
+diff --git a/examples/var_service/dhcp_if/convert2ipconf b/examples/var_service/dhcp_if/convert2ipconf
+new file mode 100755
+index 0000000..cee0854
+--- /dev/null
++++ b/examples/var_service/dhcp_if/convert2ipconf
+@@ -0,0 +1,53 @@
++#!/bin/sh
++# convert:
++
++# dhcptype=5
++# serverid=172.16.42.102
++# lease=97200
++# interface=eth0
++# ip=172.16.42.177
++# subnet=255.255.255.0
++# mask=24
++# broadcast=172.16.22.255
++# router=172.16.42.98
++# dns=10.34.32.125 10.32.63.5 10.34.255.7 10.11.255.27
++# domain=lab.example.com example.com
++# ntpsrv=10.34.32.125 10.34.255.7
++
++# into:
++
++#let cfg=cfg+1
++#if[$cfg]=...; ip[$cfg]=...; ipmask[$cfg]=.../...; gw[$cfg]=...; net[$cfg]=... dns[$cfg]=...
++
++exec >"$0.out" 2>&1
++
++test "$interface" || exit 1
++test -f "$1" || exit 1
++
++# Unsafe, and does not handle values with spaces:
++#. "./$1" || exit 1
++# Safe(r) parsing:
++sq="'"
++while read line; do
++	#echo "line: $line"
++	# Skip empty lines and lines with single quotes
++	test "${line##*$sq*}" || continue
++	var="${line%%=*}"
++	val="${line#*=}"
++	#echo "var:$var val:'$val'"
++	eval "$var='$val'"
++done <"$1"
++
++{
++echo "let cfg=cfg+1"
++test "$interface" 	&& echo "if[\$cfg]='$interface'"
++test "$ip"		&& echo "ip[\$cfg]='$ip'"
++test "$ip" && test "$mask" \
++			&& echo "ipmask[\$cfg]='$ip/$mask'"
++test "$router"		&& echo "gw[\$cfg]='$router'"
++test "$dns"		&& echo "dns[\$cfg]='$dns'"
++# TODO: I never saw a dhcp server which correctly announces
++# which subnet(s) is/are available thru advertised router
++# Assume 0/0
++echo "net[\$cfg]='0/0'"
++} >"$2"
+diff --git a/examples/var_service/dhcp_if/dhcp_handler b/examples/var_service/dhcp_if/dhcp_handler
+new file mode 100755
+index 0000000..9ed3e7a
+--- /dev/null
++++ b/examples/var_service/dhcp_if/dhcp_handler
+@@ -0,0 +1,82 @@
++#!/bin/sh
++# executed by udhcpc
++# parameters: $1 and environment
++#
++# $1 is:
++#
++# deconfig: This argument is used when udhcpc starts, and
++# when a lease is lost. The script should put the interface in an
++# up, but deconfigured state, ie: ifconfig $interface 0.0.0.0.
++# Environment: interface=ethN
++#
++# bound: This argument is used when udhcpc moves from an
++# unbound, to a bound state. All of the paramaters are set in
++# enviromental variables, The script should configure the interface,
++# and set any other relavent parameters (default gateway, dns server, etc).
++# Environment:
++# dhcptype=5
++# serverid=172.16.42.102
++# lease=97200
++# interface=eth0
++# ip=172.16.42.177
++# subnet=255.255.255.0
++# mask=24
++# broadcast=172.16.22.255
++# router=172.16.42.98
++# dns=10.34.32.125 10.32.63.5 10.34.255.7 10.11.255.27
++# domain=lab.example.com example.com
++# ntpsrv=10.34.32.125 10.34.255.7
++#
++# renew: This argument is used when a DHCP lease is renewed. All of
++# the paramaters are set in enviromental variables. This argument is
++# used when the interface is already configured, so the IP address,
++# will not change, however, the other DHCP paramaters, such as the
++# default gateway, subnet mask, and dns server may change.
++# Environment: same as for "bound".
++#
++# nak: This argument is used with udhcpc receives a NAK message.
++# The script with the deconfig argument will be called directly
++# afterwards, so no changes to the network interface are neccessary.
++# This hook is provided for purely informational purposes (the
++# message option may contain a reason for the NAK).
++# Environment: interface=ethN, serverid=IP_ADDR
++#
++# leasefail: called when lease cannot be obtained
++# (for example, when DHCP server is down).
++# Environment: interface=ethN
++
++# TODO: put domain into /etc/resolv.conf (thru /var/service/fw)
++# TODO: feed ntp IPs to /var/service/ntp
++
++service=`basename $PWD`
++outfile="$service.ipconf"
++dir="/var/run/service/fw"
++
++exec >>"$0.out" 2>&1
++
++echo "`date`: Params: $*"
++
++if test x"$1" != x"bound" && test x"$1" != x"renew" ; then
++	# Reconfigure network with this interface disabled
++	echo "Deconfiguring"
++	rm "$service.out"
++	rm "$outfile"
++	rm "$dir/$outfile"
++	sv u /var/service/fw
++	exit
++fi
++
++# Bound: we've got the lease
++
++# Process params
++env >"$service.out"
++./convert2ipconf "$service.out" "$outfile"
++
++# Reconfigure routing and firewall if needed
++diff --brief "$outfile" "$dir/$outfile" >/dev/null 2>&1
++if test "$?" != "0"; then
++	echo "Reconfiguring"
++	mkdir -p "$dir" 2>/dev/null
++	cp "$outfile" "$dir/$outfile"
++	sv u /var/service/fw
++fi
+diff --git a/examples/var_service/dhcp_if/log/run b/examples/var_service/dhcp_if/log/run
+new file mode 100755
+index 0000000..560d1b1
+--- /dev/null
++++ b/examples/var_service/dhcp_if/log/run
+@@ -0,0 +1,21 @@
++#!/bin/sh
++
++user=logger
++
++logdir="/var/log/service/`(cd ..;basename $PWD)`"
++mkdir -p "$logdir" 2>/dev/null
++chown -R "$user": "$logdir"
++chmod -R go-rwxst,u+rwX "$logdir"
++rm logdir
++ln -s "$logdir" logdir
++
++# make this dir accessible to logger
++chmod a+rX .
++
++exec >/dev/null
++exec 2>&1
++exec \
++env - PATH="$PATH" \
++softlimit \
++setuidgid "$user" \
++svlogd -tt "$logdir"
+diff --git a/examples/var_service/dhcp_if/p_log b/examples/var_service/dhcp_if/p_log
+new file mode 100755
+index 0000000..a2521be
+--- /dev/null
++++ b/examples/var_service/dhcp_if/p_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++cat @* current | $PAGER
+diff --git a/examples/var_service/dhcp_if/run b/examples/var_service/dhcp_if/run
+new file mode 100755
+index 0000000..aec79e0
+--- /dev/null
++++ b/examples/var_service/dhcp_if/run
+@@ -0,0 +1,23 @@
++#!/bin/sh
++
++exec 2>&1
++exec </dev/null
++
++pwd="$PWD"
++
++if="${PWD##*/dhcp_}"
++
++echo "* Upping iface $if"
++ip link set dev "$if" up
++
++echo "* Starting udhcpc"
++exec \
++env - PATH="$PATH" \
++softlimit \
++setuidgid root \
++udhcpc -vv \
++--hostname=null \
++--foreground \
++--interface="$if" \
++--pidfile="$pwd/udhcpc.pid" \
++--script="$pwd/dhcp_handler"
+diff --git a/examples/var_service/dhcp_if/w_log b/examples/var_service/dhcp_if/w_log
+new file mode 100755
+index 0000000..34b19b3
+--- /dev/null
++++ b/examples/var_service/dhcp_if/w_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++watch -n2 'w=`ttysize w`; h=`ttysize h`; tail -$((h-3)) current 2>&1 | cut -b0-$((w-2))'
+diff --git a/examples/var_service/dhcp_if_pinger/run b/examples/var_service/dhcp_if_pinger/run
+new file mode 100755
+index 0000000..20b2fc5
+--- /dev/null
++++ b/examples/var_service/dhcp_if_pinger/run
+@@ -0,0 +1,23 @@
++#!/bin/sh
++
++delay=67
++
++if=${PWD##*/dhcp_}
++if=${if%%_pinger}
++
++if test -f "$0.log"; then
++	tail -999 "$0.log" >"$0.log.new"
++	mv "$0.log.new" "$0.log"
++fi
++
++test -f "/var/service/dhcp_$if/dhcp_$if.out" || exec env - sleep "$delay"
++. "/var/service/dhcp_$if/dhcp_$if.out"
++test x"$router" != x"" || exec env - sleep "$delay"
++
++#echo "`date '+%Y-%m-%d %H:%M:%S'` Testing ping -c3 $router" >>"$0.log"
++ping -c3 "$router" && exec env - sleep "$delay"
++
++echo "`date '+%Y-%m-%d %H:%M:%S'` Restarting /var/service/dhcp_$if" >>"$0.log"
++sv t "/var/service/dhcp_$if"
++
++exec env - sleep "$delay"
+diff --git a/examples/var_service/fw/conf/11.22.33.44.ipconf-- b/examples/var_service/fw/conf/11.22.33.44.ipconf--
+new file mode 100644
+index 0000000..9b44e90
+--- /dev/null
++++ b/examples/var_service/fw/conf/11.22.33.44.ipconf--
+@@ -0,0 +1,10 @@
++#!/bin/sh
++# If we have simple static address...
++#
++let cfg=cfg+1
++if[$cfg]=if
++ip[$cfg]=11.22.33.44
++ipmask[$cfg]=11.22.33.44/24
++gw[$cfg]=11.22.33.1
++net[$cfg]=0/0
++dns[$cfg]='11.22.33.2 11.22.33.3'
+diff --git a/examples/var_service/fw/conf/192.168.0.1.ipconf b/examples/var_service/fw/conf/192.168.0.1.ipconf
+new file mode 100644
+index 0000000..5cf55db
+--- /dev/null
++++ b/examples/var_service/fw/conf/192.168.0.1.ipconf
+@@ -0,0 +1,11 @@
++#!/bin/sh
++# A small network with no routers
++# (maybe *we* are their router)
++#
++let cfg=cfg+1
++if[$cfg]=if
++ip[$cfg]=192.168.0.1
++ipmask[$cfg]=192.168.0.1/24
++### gw[$cfg]=
++### net[$cfg]=0/0
++### dns[$cfg]=''
+diff --git a/examples/var_service/fw/conf/lo.ipconf b/examples/var_service/fw/conf/lo.ipconf
+new file mode 100644
+index 0000000..e6be5f0
+--- /dev/null
++++ b/examples/var_service/fw/conf/lo.ipconf
+@@ -0,0 +1,10 @@
++#!/bin/bash
++# Mostly redundant except when you need dns[]=your_static_dns_srv
++#
++let cfg=cfg+1
++if[$cfg]=lo
++ip[$cfg]=127.0.0.1
++ipmask[$cfg]=127.0.0.1/8
++gw[$cfg]=''
++net[$cfg]=''
++#dns[$cfg]=127.0.0.1
+diff --git a/examples/var_service/fw/etc/hosts b/examples/var_service/fw/etc/hosts
+new file mode 100644
+index 0000000..f7ee533
+--- /dev/null
++++ b/examples/var_service/fw/etc/hosts
+@@ -0,0 +1,21 @@
++#!/bin/sh
++echo "\
++# This file is automagically regenerated
++# Note! /etc/nsswitch.conf may override this!
++
++# For loopbacking
++127.0.0.1 localhost
++
++# Our local IPs"
++
++hostname=`hostname`
++test "$hostname" || hostname=localhost
++domain=`(. /boot.conf; echo "$DNSDOMAINNAME")`
++test "$domain" && hostname="$hostname $hostname.$domain"
++
++ip -o a l \
++| grep -F 'inet ' \
++| sed -e 's/^.*inet //' -e 's:[ /].*$: '"$hostname"':'
++
++echo
++echo "# End of /etc/hosts"
+diff --git a/examples/var_service/fw/etc/resolv.conf b/examples/var_service/fw/etc/resolv.conf
+new file mode 100644
+index 0000000..3f37b86
+--- /dev/null
++++ b/examples/var_service/fw/etc/resolv.conf
+@@ -0,0 +1,31 @@
++#!/bin/bash
++
++domain=`(. /boot.conf; echo "$DNSDOMAINNAME") 2>/dev/null`
++
++echo "# This file is automagically regenerated with each boot"
++echo
++test "$domain" && echo "domain $domain"
++test "$domain" && echo "search $domain"
++echo
++echo "# Note that nslookup can choke on DNS server which itself"
++echo "# does NOT have domain name. Other things can work fine."
++echo
++# # If we run DNS cache:
++# echo "nameserver 127.0.0.1"
++# exit
++
++prio=0
++i=0; while test "${if[$i]}"; do
++    test x"${dns_prio[$i]}" != x"" \
++    && test "${dns_prio[$i]}" -gt "$prio" \
++    && prio="${dns_prio[$i]}"
++let i++; done
++
++i=0; while test "${if[$i]}"; do
++    for d in ${dns[$i]}; do
++	p="${dns_prio[$i]}"
++	test x"$p" == x"" && p=0
++	test x"$p" == x"$prio" || continue
++	echo "nameserver $d"
++    done
++let i++; done
+diff --git a/examples/var_service/fw/run b/examples/var_service/fw/run
+new file mode 100755
+index 0000000..f02f53d
+--- /dev/null
++++ b/examples/var_service/fw/run
+@@ -0,0 +1,211 @@
++#!/bin/bash
++# (using bashisms: "function", arrays)
++
++user=root
++extif=if
++ext_open_tcp="21 22 80" # space-separated
++
++# Make ourself one-shot
++sv o .
++# Debug
++#date '+%Y-%m-%d %H:%M:%S' >>"$0.log"
++
++service=`basename "$PWD"`
++rundir="/var/run/service/$service"
++
++### filter This is the default table (if no -t option is passed).  It contains
++###        the  built-in chains INPUT (for packets coming into the box itself),
++###        FORWARD (for packets being routed through the box), and OUTPUT (for
++###        locally-generated packets).
++###
++### nat    This table is consulted when a packet that creates a new connection
++###        is encountered.  It consists of three built-ins: PREROUTING (for
++###        altering packets as soon as they come in), OUTPUT (for altering
++###        locally-generated packets before routing), and POSTROUTING (for
++###        altering packets as they are about to go out).
++###
++### mangle It had two built-in chains: PREROUTING (for altering incoming
++###        packets before routing) and OUTPUT (for altering locally-generated
++###        packets before routing).  Recently three other built-in
++###        chains are added: INPUT (for packets coming into the box
++###        itself), FORWARD (for altering packets being routed through the
++###        box), and POSTROUTING (for altering packets as they are about to go
++###        out).
++###
++###       ...iface...                              ...iface...
++###          |                                        ^
++###          v                                        |
++### -mangle,NAT-               -mangle,filter-   -mangle,NAT--
++### |PREROUTING|-->[Routing]-->|FORWARD      |-->|POSTROUTING|
++### ------------    |    ^     ---------------   -------------
++###                 |    |                           ^
++###                 |    +--if NATed------------+    |
++###                 v                           |    |
++###      -mangle,filter-                -mangle,NAT,filter-
++###      |INPUT        |  +->[Routing]->|OUTPUT           |
++###      ---------------  |             -------------------
++###                 |     |
++###                 v     |
++###         ... Local Process...
++
++doit() {
++    echo "# $*"
++    "$@"
++}
++
++#exec >/dev/null
++exec >"$0.out"
++exec 2>&1
++exec </dev/null
++
++umask 077
++
++# Make sure rundir/ exists
++mkdir -p "$rundir" 2>/dev/null
++chown -R "$user:" "$rundir"
++chmod -R a=rX "$rundir"
++rm -rf rundir 2>/dev/null
++ln -s "$rundir" rundir
++
++# Timestamping
++date '+%Y-%m-%d %H:%M:%S'
++
++
++echo; echo "* Reading IP config"
++cfg=-1
++#             static cfg    dhcp,zeroconf etc
++for ipconf in conf/*.ipconf "$rundir"/*.ipconf; do
++	if test -f "$ipconf"; then
++		echo "+ $ipconf"
++		. "$ipconf"
++	fi
++done
++
++echo; echo "* Configuring hardware"
++#doit ethtool -s if autoneg off speed 100 duplex full
++#doit ethtool -K if rx off tx off sg off tso off
++
++echo; echo "* Resetting address and routing info"
++doit ip a f dev lo
++i=0; while test "${if[$i]}"; do
++    doit ip a f dev "${if[$i]}"
++    doit ip r f dev "${if[$i]}" root 0/0
++let i++; done
++
++echo; echo "* Configuring addresses"
++doit ip a a dev lo 127.0.0.1/8 scope host
++doit ip a a dev lo ::1/128 scope host
++i=0; while test "${if[$i]}"; do
++    if test "${ipmask[$i]}"; then
++        doit ip a a dev "${if[$i]}" "${ipmask[$i]}" brd +
++        doit ip l set dev "${if[$i]}" up
++    fi
++let i++; done
++
++echo; echo "* Configuring routes"
++i=0; while test "${if[$i]}"; do
++    if test "${net[$i]}" && test "${gw[$i]}"; then
++        doit ip r a "${net[$i]}" via "${gw[$i]}"
++    fi
++let i++; done
++
++echo; echo "* Recreating /etc/* files reflecting new network configuration:"
++for i in etc/*; do
++	n=`basename "$i"`
++	echo "+ $n"
++	(. "$i") >"/etc/$n"
++	chmod 644 "/etc/$n"
++done
++
++
++# Usage: new_chain <chain> [<table>]
++new_chain() {
++	local t=""
++	test x"$2" != x"" && t="-t $2"
++	doit iptables $t -N $1
++	ipt="iptables $t -A $1"
++}
++
++echo; echo "* Reset iptables"
++doit iptables           --flush
++doit iptables           --delete-chain
++doit iptables           --zero
++doit iptables -t nat    --flush
++doit iptables -t nat    --delete-chain
++doit iptables -t nat    --zero
++doit iptables -t mangle --flush
++doit iptables -t mangle --delete-chain
++doit iptables -t mangle --zero
++
++echo; echo "* Configure iptables"
++doit modprobe nf_nat_ftp
++doit modprobe nf_nat_tftp
++doit modprobe nf_conntrack_ftp
++doit modprobe nf_conntrack_tftp
++
++#       *** nat ***
++#       INCOMING TRAFFIC
++ipt="iptables -t nat -A PREROUTING"
++# nothing here
++
++#       LOCALLY ORIGINATED TRAFFIC
++ipt="iptables -t nat -A OUTPUT"
++# nothing here
++
++#       OUTGOING TRAFFIC
++ipt="iptables -t nat -A POSTROUTING"
++# Masquerade boxes on my private net
++doit $ipt -s 192.168.0.0/24 -o $extif -j MASQUERADE
++
++#       *** mangle ***
++### DEBUG
++### ipt="iptables -t mangle -A PREROUTING"
++### doit $ipt -s 192.168.0.0/24 -j RETURN
++### ipt="iptables -t mangle -A FORWARD"
++### doit $ipt -s 192.168.0.0/24 -j RETURN
++### ipt="iptables -t mangle -A POSTROUTING"
++### doit $ipt -s 192.168.0.0/24 -j RETURN
++# nothing here
++
++#       *** filter ***
++#
++new_chain iext filter
++#doit $ipt -s 203.177.104.72 -j DROP	# Some idiot probes my ssh
++#doit $ipt -d 203.177.104.72 -j DROP	# Some idiot probes my ssh
++doit $ipt -m state --state ESTABLISHED,RELATED -j RETURN  # FTP data etc is ok
++if test "$ext_open_tcp"; then
++	portlist="${ext_open_tcp// /,}"
++	doit $ipt -p tcp -m multiport --dports $portlist -j RETURN
++fi
++doit $ipt -p tcp -j REJECT	# Anything else isn't ok. REJECT = irc opens faster
++				# (it probes proxy ports, DROP will incur timeout delays)
++ipt="iptables -t filter -A INPUT"
++doit $ipt -i $extif -j iext
++
++
++echo; echo "* Enabling forwarding"
++echo 1 >/proc/sys/net/ipv4/ip_forward
++echo "/proc/sys/net/ipv4/ip_forward: `cat /proc/sys/net/ipv4/ip_forward`"
++
++
++# Signal everybody that firewall is up
++date '+%Y-%m-%d %H:%M:%S' >"$rundir/up"
++
++# Ok, spew out gobs of info and disable ourself
++echo; echo "* IP:"
++ip a l
++echo; echo "* Routing:"
++ip r l
++echo; echo "* Firewall:"
++{
++echo '---FILTER--';
++iptables -v -L -x -n;
++echo '---NAT-----';
++iptables -t nat -v -L -x -n;
++echo '---MANGLE--';
++iptables -t mangle -v -L -x -n;
++} \
++| grep -v '^$' | grep -Fv 'bytes target'
++echo
++
++echo "* End of firewall configuration"
+diff --git a/examples/var_service/fw/stat b/examples/var_service/fw/stat
+new file mode 100755
+index 0000000..08736ad
+--- /dev/null
++++ b/examples/var_service/fw/stat
+@@ -0,0 +1,12 @@
++#!/bin/sh
++
++echo; echo "* Firewall:"
++{
++echo '---FILTER--';
++iptables -v -L -x -n;
++echo '---NAT-----';
++iptables -t nat -v -L -x -n;
++echo '---MANGLE--';
++iptables -t mangle -v -L -x -n;
++} \
++| grep -v '^$' | grep -Fv 'bytes target' | $PAGER
+diff --git a/examples/var_service/ifplugd_if/ifplugd_handler b/examples/var_service/ifplugd_if/ifplugd_handler
+new file mode 100755
+index 0000000..4962fcf
+--- /dev/null
++++ b/examples/var_service/ifplugd_if/ifplugd_handler
+@@ -0,0 +1,15 @@
++#!/bin/sh
++# parameters:
++# $1: interface
++# $2: state
++
++if test -d "/var/service/dhcp_$1"; then
++	if test x"$2" = x"down"; then
++		echo "Downing /var/service/dhcp_$1"
++		sv d "/var/service/dhcp_$1"
++	fi
++	if test x"$2" = x"up"; then
++		echo "Upping /var/service/dhcp_$1"
++		sv u "/var/service/dhcp_$1"
++	fi
++fi
+diff --git a/examples/var_service/ifplugd_if/log/run b/examples/var_service/ifplugd_if/log/run
+new file mode 100755
+index 0000000..560d1b1
+--- /dev/null
++++ b/examples/var_service/ifplugd_if/log/run
+@@ -0,0 +1,21 @@
++#!/bin/sh
++
++user=logger
++
++logdir="/var/log/service/`(cd ..;basename $PWD)`"
++mkdir -p "$logdir" 2>/dev/null
++chown -R "$user": "$logdir"
++chmod -R go-rwxst,u+rwX "$logdir"
++rm logdir
++ln -s "$logdir" logdir
++
++# make this dir accessible to logger
++chmod a+rX .
++
++exec >/dev/null
++exec 2>&1
++exec \
++env - PATH="$PATH" \
++softlimit \
++setuidgid "$user" \
++svlogd -tt "$logdir"
+diff --git a/examples/var_service/ifplugd_if/p_log b/examples/var_service/ifplugd_if/p_log
+new file mode 100755
+index 0000000..a2521be
+--- /dev/null
++++ b/examples/var_service/ifplugd_if/p_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++cat @* current | $PAGER
+diff --git a/examples/var_service/ifplugd_if/run b/examples/var_service/ifplugd_if/run
+new file mode 100755
+index 0000000..44ddbc4
+--- /dev/null
++++ b/examples/var_service/ifplugd_if/run
+@@ -0,0 +1,32 @@
++#!/bin/sh
++
++exec 2>&1
++exec </dev/null
++
++pwd="$PWD"
++
++if="${PWD##*/ifplugd_}"
++
++echo "* Starting ifplugd [$$]"
++exec \
++env - PATH="$PATH" \
++softlimit \
++setuidgid root \
++ifplugd -apq -n -s -i "$if" -r "$pwd/ifplugd_handler"
++
++#-n       Do not daemonize
++#-s       Do not log to syslog
++#-i IFACE Interface
++#-f/-F    Treat link detection error as link down/link up (otherwise exit on error)
++#-a       Do not up interface automatically
++#-M       Monitor creation/destruction of interface (otherwise it must exist)
++#-r PROG  Script to run
++#-x ARG   Extra argument for script
++#-I       Dont exit on nonzero exit code from script
++#-p       Dont run script on daemon startup
++#-q       Dont run script on daemon quit
++#-l       Run script on startup even if no cable is detected
++#-t SECS  Poll time in seconds
++#-u SECS  Delay before running script after link up
++#-d SECS  Delay after link down
++#-m MODE  API mode (mii, priv, ethtool, wlan, auto)
+diff --git a/examples/var_service/ifplugd_if/w_log b/examples/var_service/ifplugd_if/w_log
+new file mode 100755
+index 0000000..34b19b3
+--- /dev/null
++++ b/examples/var_service/ifplugd_if/w_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++watch -n2 'w=`ttysize w`; h=`ttysize h`; tail -$((h-3)) current 2>&1 | cut -b0-$((w-2))'
+diff --git a/examples/var_service/nmeter/run b/examples/var_service/nmeter/run
+new file mode 100755
+index 0000000..fa0837b
+--- /dev/null
++++ b/examples/var_service/nmeter/run
+@@ -0,0 +1,21 @@
++#!/bin/sh
++
++# Since per-process /proc/net/ (-> /proc/self/net/) appeared,
++# we need to be root
++user=root
++tty="/dev/tty9"
++
++chmod -R a+X . # or else env will moan
++chown $user: $tty # devfs made happy
++
++cmd="nmeter '%t %c x %x p%p f %f b %b m %m if%[nif]'"
++
++exec >/dev/null
++exec 2>&1
++exec </dev/null
++
++eval exec \
++setuidgid "$user" \
++env - PATH="$PATH" \
++<"$tty" >"$tty" 2>&1 \
++$cmd

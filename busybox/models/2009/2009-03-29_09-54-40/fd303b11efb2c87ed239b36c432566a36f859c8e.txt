@@ -1,0 +1,121 @@
+2009-03-29 09:54:40 +0000
+diff --git a/shell/hush_test/hush-trap/catch.right b/shell/hush_test/hush-trap/catch.right
+new file mode 100644
+index 0000000..9e34c4c
+--- /dev/null
++++ b/shell/hush_test/hush-trap/catch.right
+@@ -0,0 +1,4 @@
++sending USR2
++caught
++sending USR2
++sending USR2
+diff --git a/shell/hush_test/hush-trap/catch.tests b/shell/hush_test/hush-trap/catch.tests
+new file mode 100644
+index 0000000..b1a4ed9
+--- /dev/null
++++ b/shell/hush_test/hush-trap/catch.tests
+@@ -0,0 +1,20 @@
++# avoid ugly warnings about signals not being caught
++trap ":" USR1 USR2
++
++hush -c '
++trap "echo caught" USR2
++echo "sending USR2"
++kill -USR2 $$
++
++trap "" USR2
++echo "sending USR2"
++kill -USR2 $$
++
++trap "-" USR2
++echo "sending USR2"
++kill -USR2 $$
++
++echo "not reached"
++'
++
++trap "-" USR1 USR2
+diff --git a/shell/hush_test/hush-trap/exit.right b/shell/hush_test/hush-trap/exit.right
+new file mode 100644
+index 0000000..b4932fb
+--- /dev/null
++++ b/shell/hush_test/hush-trap/exit.right
+@@ -0,0 +1,2 @@
++cow
++moo
+diff --git a/shell/hush_test/hush-trap/exit.tests b/shell/hush_test/hush-trap/exit.tests
+new file mode 100644
+index 0000000..174e74f
+--- /dev/null
++++ b/shell/hush_test/hush-trap/exit.tests
+@@ -0,0 +1,3 @@
++hush -c 'trap "echo cow" 0'
++hush -c 'trap "echo moo" EXIT'
++hush -c 'trap "echo no" 0; trap 0'
+diff --git a/shell/hush_test/hush-trap/save-ret.right b/shell/hush_test/hush-trap/save-ret.right
+new file mode 100644
+index 0000000..a3e12ce
+--- /dev/null
++++ b/shell/hush_test/hush-trap/save-ret.right
+@@ -0,0 +1,2 @@
++YEAH
++0
+diff --git a/shell/hush_test/hush-trap/save-ret.tests b/shell/hush_test/hush-trap/save-ret.tests
+new file mode 100644
+index 0000000..0786b6d
+--- /dev/null
++++ b/shell/hush_test/hush-trap/save-ret.tests
+@@ -0,0 +1,4 @@
++# make sure we do not corrupt $? across traps
++trap "echo YEAH; false" USR1
++kill -USR1 $$
++echo $?
+diff --git a/shell/hush_test/hush-trap/usage.right b/shell/hush_test/hush-trap/usage.right
+new file mode 100644
+index 0000000..c0dbd6c
+--- /dev/null
++++ b/shell/hush_test/hush-trap/usage.right
+@@ -0,0 +1,14 @@
++___
++___
++___
++trap -- 'a' EXIT
++trap -- 'a' INT
++trap -- 'a' USR1
++trap -- 'a' USR2
++___
++___
++trap -- 'a' USR1
++trap -- 'a' USR2
++___
++___
++trap -- 'a' USR2
+diff --git a/shell/hush_test/hush-trap/usage.tests b/shell/hush_test/hush-trap/usage.tests
+new file mode 100644
+index 0000000..d29c6e7
+--- /dev/null
++++ b/shell/hush_test/hush-trap/usage.tests
+@@ -0,0 +1,23 @@
++# no output -- default state
++echo ___
++trap
++
++# assign some traps
++echo ___
++trap "a" EXIT INT USR1 USR2
++
++# show them all
++echo ___
++trap
++
++# clear one
++echo ___
++trap 0 INT
++echo ___
++trap
++
++# clear another
++echo ___
++trap "-" USR1
++echo ___
++trap

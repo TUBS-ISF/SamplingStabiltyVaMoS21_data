@@ -1,0 +1,14 @@
+2009-03-28 19:31:34 +0000
+diff --git a/shell/hush_test/run-all b/shell/hush_test/run-all
+index b5db79f..d7602c8 100755
+--- a/shell/hush_test/run-all
++++ b/shell/hush_test/run-all
+@@ -49,7 +49,7 @@ do_test()
+ 	{
+ 	    "$THIS_SH" "./$x" >"$name.xx" 2>&1
+ 	    diff -u "$name.xx" "$name.right" >"../$1-$x.fail" && rm -f "$name.xx" "../$1-$x.fail"
+-	} && echo "$1/$x: ok" || { echo "$1/$x: fail"; ((tret+=1)); }
++	} && echo "$1/$x: ok" || { echo "$1/$x: fail"; tret=1; }
+     done
+     exit ${tret}
+     )

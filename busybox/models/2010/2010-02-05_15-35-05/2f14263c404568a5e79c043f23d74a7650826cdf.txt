@@ -1,0 +1,27 @@
+2010-02-05 15:35:05 +0100
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index 9bb1ac2..dfab236 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -19,7 +19,7 @@ struct client_config_t {
+ 	uint8_t *vendorclass;           /* Optional vendor class-id to use */
+ 	uint8_t *hostname;              /* Optional hostname to use */
+ 	uint8_t *fqdn;                  /* Optional fully qualified domain name to use */
+-};
++} FIX_ALIASING;
+ 
+ /* server_config sits in 1st half of bb_common_bufsiz1 */
+ #define client_config (*(struct client_config_t*)(&bb_common_bufsiz1[COMMON_BUFSIZE / 2]))
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 4f6b73e..db2d1c7 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -59,7 +59,7 @@ struct server_config_t {
+ 	char *sname;                    /* bootp server name */
+ 	char *boot_file;                /* bootp boot file option */
+ 	struct static_lease *static_leases; /* List of ip/mac pairs to assign static leases */
+-};
++} FIX_ALIASING;
+ 
+ #define server_config (*(struct server_config_t*)&bb_common_bufsiz1)
+ /* client_config sits in 2nd half of bb_common_bufsiz1 */

@@ -1,0 +1,114 @@
+2010-01-13 18:22:35 +0100
+diff --git a/shell/ash.c b/shell/ash.c
+index 31dc592..798d15a 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -1768,11 +1768,7 @@ static const struct {
+ 	const char *text;
+ 	void (*func)(const char *) FAST_FUNC;
+ } varinit_data[] = {
+-#if IFS_BROKEN
+ 	{ VSTRFIXED|VTEXTFIXED       , defifsvar   , NULL            },
+-#else
+-	{ VSTRFIXED|VTEXTFIXED|VUNSET, "IFS\0"     , NULL            },
+-#endif
+ #if ENABLE_ASH_MAIL
+ 	{ VSTRFIXED|VTEXTFIXED|VUNSET, "MAIL\0"    , changemail      },
+ 	{ VSTRFIXED|VTEXTFIXED|VUNSET, "MAILPATH\0", changemail      },
+diff --git a/shell/builtin_read.c b/shell/builtin_read.c
+index 73b0949..954e4cd 100644
+--- a/shell/builtin_read.c
++++ b/shell/builtin_read.c
+@@ -39,6 +39,7 @@ shell_builtin_read(void FAST_FUNC (*setvar)(const char *name, const char *val),
+ 	unsigned end_ms; /* -t TIMEOUT */
+ 	int fd; /* -u FD */
+ 	int nchars; /* -n NUM */
++	char **pp;
+ 	char *buffer;
+ 	struct termios tty, old_tty;
+ 	const char *retval;
+@@ -46,6 +47,16 @@ shell_builtin_read(void FAST_FUNC (*setvar)(const char *name, const char *val),
+ 	int startword;
+ 	smallint backslash;
+ 
++	pp = argv;
++	while (*pp) {
++		if (!is_well_formed_var_name(*pp, '\0')) {
++			/* Mimic bash message */
++			bb_error_msg("read: '%s': not a valid identifier", *pp);
++			return (const char *)(uintptr_t)1;
++		}
++		pp++;
++	}
++
+ 	nchars = 0; /* if != 0, -n is in effect */
+ 	if (opt_n) {
+ 		nchars = bb_strtou(opt_n, NULL, 10);
+diff --git a/shell/hush.c b/shell/hush.c
+index bb0ab84..810009a 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -893,16 +893,6 @@ static void cmdedit_update_prompt(void);
+ 
+ /* Utility functions
+  */
+-static int is_well_formed_var_name(const char *s, char terminator)
+-{
+-	if (!s || !(isalpha(*s) || *s == '_'))
+-		return 0;
+-	s++;
+-	while (isalnum(*s) || *s == '_')
+-		s++;
+-	return *s == terminator;
+-}
+-
+ /* Replace each \x with x in place, return ptr past NUL. */
+ static char *unbackslash(char *src)
+ {
+diff --git a/shell/shell_common.c b/shell/shell_common.c
+index 99bb91c..669a18d 100644
+--- a/shell/shell_common.c
++++ b/shell/shell_common.c
+@@ -19,8 +19,17 @@
+ #include "libbb.h"
+ #include "shell_common.h"
+ 
+-#if IFS_BROKEN
+ const char defifsvar[] ALIGN1 = "IFS= \t\n";
+-#else
+-const char defifs[] ALIGN1 = " \t\n";
+-#endif
++
++
++int FAST_FUNC is_well_formed_var_name(const char *s, char terminator)
++{
++	if (!s || !(isalpha(*s) || *s == '_'))
++		return 0;
++
++	do
++		s++;
++	while (isalnum(*s) || *s == '_');
++
++	return *s == terminator;
++}
+diff --git a/shell/shell_common.h b/shell/shell_common.h
+index a9e9a22..7c8e8c3 100644
+--- a/shell/shell_common.h
++++ b/shell/shell_common.h
+@@ -21,14 +21,10 @@
+ 
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+-#define IFS_BROKEN 1
+-
+-#if IFS_BROKEN
+ extern const char defifsvar[]; /* "IFS= \t\n" */
+ #define defifs (defifsvar + 4)
+-#else
+-extern const char defifs[]; /* " \t\n" */
+-#endif
++
++int FAST_FUNC is_well_formed_var_name(const char *s, char terminator);
+ 
+ POP_SAVED_FUNCTION_VISIBILITY
+ 

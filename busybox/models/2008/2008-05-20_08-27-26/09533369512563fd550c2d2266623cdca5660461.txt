@@ -1,0 +1,14 @@
+2008-05-20 08:27:26 +0000
+diff --git a/util-linux/dmesg.c b/util-linux/dmesg.c
+index b399ab2..73b2595 100644
+--- a/util-linux/dmesg.c
++++ b/util-linux/dmesg.c
+@@ -6,7 +6,7 @@
+  * Copyright 2006 Rob Landley <rob@landley.net>
+  * Copyright 2006 Bernhard Fischer <rep.nop@aon.at>
+  *
+- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include <sys/klog.h>

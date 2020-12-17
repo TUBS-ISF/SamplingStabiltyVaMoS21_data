@@ -1,0 +1,101 @@
+2007-12-24 12:16:24 +0000
+diff --git a/Makefile.flags b/Makefile.flags
+index c023299..2655222 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -97,4 +97,5 @@ endif
+ # Busybox is a stack-fatty so make sure we increase default size
+ # TODO: use "make stksizes" to find & fix big stack users
+ # (we stole scripts/checkstack.pl from the kernel... thanks guys!)
+-FLTFLAGS += -s 20000
++# Reduced from 20k to 16k in 1.9.0.
++FLTFLAGS += -s 16000
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index d5a2d06..80adff5 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -575,17 +575,19 @@ static int busybox_main(char **argv)
+ 		output_width -= sizeof("start-stop-daemon, ") + 8;
+ 
+ 		printf("%s multi-call binary\n", bb_banner); /* reuse const string... */
+-		printf("Copyright (C) 1998-2006 Erik Andersen, Rob Landley, and others.\n"
+-		       "Licensed under GPLv2. See source distribution for full notice.\n"
++		printf("Copyright (C) 1998-2007 Erik Andersen, Rob Landley, Denys Vlasenko\n"
++		       "and others. Licensed under GPLv2.\n"
++		       "See source distribution for full notice.\n"
+ 		       "\n"
+ 		       "Usage: busybox [function] [arguments]...\n"
+-		       "   or: [function] [arguments]...\n"
++		       "   or: function [arguments]...\n"
+ 		       "\n"
+ 		       "\tBusyBox is a multi-call binary that combines many common Unix\n"
+ 		       "\tutilities into a single executable.  Most people will create a\n"
+ 		       "\tlink to busybox for each function they wish to use and BusyBox\n"
+ 		       "\twill act like whatever it was invoked as!\n"
+-		       "\nCurrently defined functions:\n");
++		       "\n"
++		       "Currently defined functions:\n");
+ 		col = 0;
+ 		a = applet_names;
+ 		while (*a) {
+diff --git a/procps/top.c b/procps/top.c
+index 0da742f..2005191 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -636,7 +636,7 @@ static void display_topmem_header(int scr_width)
+ 	}
+ 	fclose(fp);
+ 
+-#define S(s) (s ? s : "0")
++#define S(s) (s ? s : "0 ")
+ 	snprintf(linebuf, sizeof(linebuf),
+ 		"Mem %stotal %sanon %smap %sfree",
+ 		S(total), S(anon), S(map), S(mfree));
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 3aacaac..0b9d5a5 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -80,6 +80,7 @@ CONFIG_FEATURE_EDITING_HISTORY=15
+ CONFIG_FEATURE_TAB_COMPLETION=y
+ # CONFIG_FEATURE_USERNAME_COMPLETION is not set
+ # CONFIG_FEATURE_EDITING_FANCY_PROMPT is not set
++CONFIG_FEATURE_COPYBUF_KB=4
+ # CONFIG_MONOTONIC_SYSCALL is not set
+ CONFIG_IOCTL_HEX2STR_ERROR=y
+ 
+@@ -306,6 +307,7 @@ CONFIG_PATCH=y
+ CONFIG_SED=y
+ CONFIG_VI=y
+ CONFIG_FEATURE_VI_MAX_LEN=4096
++# CONFIG_FEATURE_VI_8BIT is not set
+ CONFIG_FEATURE_VI_COLON=y
+ CONFIG_FEATURE_VI_YANKMARK=y
+ CONFIG_FEATURE_VI_SEARCH=y
+@@ -537,8 +539,8 @@ CONFIG_RUNLEVEL=y
+ CONFIG_RX=y
+ CONFIG_STRINGS=y
+ CONFIG_SETSID=y
+-CONFIG_TASKSET=y
+-CONFIG_FEATURE_TASKSET_FANCY=y
++# CONFIG_TASKSET is not set
++# CONFIG_FEATURE_TASKSET_FANCY is not set
+ CONFIG_TIME=y
+ CONFIG_TTYSIZE=y
+ CONFIG_WATCHDOG=y
+@@ -552,7 +554,7 @@ CONFIG_FEATURE_PREFER_IPV4_ADDRESS=y
+ CONFIG_ARP=y
+ CONFIG_ARPING=y
+ CONFIG_DNSD=y
+-CONFIG_ETHER_WAKE=y
++# CONFIG_ETHER_WAKE is not set
+ CONFIG_FAKEIDENTD=y
+ CONFIG_FTPGET=y
+ CONFIG_FTPPUT=y
+@@ -645,6 +647,7 @@ CONFIG_APP_UDHCPC=y
+ CONFIG_FEATURE_UDHCPC_ARPING=y
+ # CONFIG_FEATURE_UDHCP_DEBUG is not set
+ CONFIG_FEATURE_RFC3397=y
++CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS=80
+ CONFIG_VCONFIG=y
+ CONFIG_WGET=y
+ CONFIG_FEATURE_WGET_STATUSBAR=y

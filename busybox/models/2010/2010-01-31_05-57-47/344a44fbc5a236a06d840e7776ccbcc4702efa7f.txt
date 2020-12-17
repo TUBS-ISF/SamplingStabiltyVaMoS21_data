@@ -1,0 +1,14 @@
+2010-01-31 05:57:47 +0100
+diff --git a/testsuite/ls.tests b/testsuite/ls.tests
+index 8d0f2c2..60f3eb5 100755
+--- a/testsuite/ls.tests
++++ b/testsuite/ls.tests
+@@ -13,7 +13,7 @@ mkdir ls.testdir || exit 1
+ 
+ # With Unicode provided by libc locale, I'm not sure this test can pass.
+ # I suspect we might fail to skip exactly correct number of bytes
+-# over broked unicode sequences.
++# over broken unicode sequences.
+ test x"$CONFIG_FEATURE_ASSUME_UNICODE" = x"y" \
+ && test x"$CONFIG_LOCALE_SUPPORT" != x"y" \
+ && test x"$CONFIG_SUBST_WCHAR" = x"63" \

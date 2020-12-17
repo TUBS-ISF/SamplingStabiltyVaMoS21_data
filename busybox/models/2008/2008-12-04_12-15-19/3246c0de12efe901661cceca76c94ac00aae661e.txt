@@ -1,0 +1,14 @@
+2008-12-04 12:15:19 +0000
+diff --git a/networking/ip.c b/networking/ip.c
+index 10059c5..9903c68 100644
+--- a/networking/ip.c
++++ b/networking/ip.c
+@@ -31,7 +31,7 @@ static int NORETURN ip_print_help(char **argv UNUSED_PARAM)
+ 
+ static int ip_do(int (*ip_func)(char **argv), char **argv)
+ {
+-	argv = ip_parse_common_args(argv);
++	argv = ip_parse_common_args(argv + 1);
+ 	return ip_func(argv);
+ }
+ 

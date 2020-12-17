@@ -1,0 +1,187 @@
+2008-04-07 21:02:35 +0000
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index ba9cf35..98dd22d 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -33,7 +33,11 @@
+ #define SENDMAIL        "sendmail"
+ #endif
+ #ifndef SENDMAIL_ARGS
+-#define SENDMAIL_ARGS   "-ti", "oem"
++#	if ENABLE_SENDMAIL
++#		define SENDMAIL_ARGS   "localhost", line->cl_MailTo
++#	else
++#		define SENDMAIL_ARGS   "-ti", "oem"
++#	endif
+ #endif
+ #ifndef CRONUPDATE
+ #define CRONUPDATE      "cron.update"
+@@ -59,6 +63,7 @@ typedef struct CronLine {
+ #if ENABLE_FEATURE_CROND_CALL_SENDMAIL
+ 	int cl_MailPos;         /* 'empty file' size                    */
+ 	smallint cl_MailFlag;   /* running pid is for mail              */
++	char *cl_MailTo;	/* whom to mail results			*/
+ #endif
+ 	/* ordered by size, not in natural order. makes code smaller: */
+ 	char cl_Dow[7];         /* 0-6, beginning sunday                */
+@@ -449,6 +454,9 @@ static void SynchronizeFile(const char *fileName)
+ 	int maxEntries;
+ 	int maxLines;
+ 	char buf[1024];
++#if ENABLE_FEATURE_CROND_CALL_SENDMAIL
++	char *mailTo = NULL;
++#endif
+ 
+ 	if (!fileName)
+ 		return;
+@@ -485,6 +493,14 @@ static void SynchronizeFile(const char *fileName)
+ 			if (DebugOpt) {
+ 				crondlog(LVL5 "user:%s entry:%s", fileName, buf);
+ 			}
++			/* check if line is setting MAILTO= */
++			if (0 == strncmp("MAILTO=", buf, 7)) {
++#if ENABLE_FEATURE_CROND_CALL_SENDMAIL
++				free(mailTo);
++				mailTo = (buf[7]) ? xstrdup(buf+7) : NULL;
++#endif /* otherwise just ignore such lines */
++				continue;
++			}
+ 			*pline = line = xzalloc(sizeof(CronLine));
+ 			/* parse date ranges */
+ 			ptr = ParseField(file->cf_User, line->cl_Mins, 60, 0, NULL, buf);
+@@ -498,10 +514,14 @@ static void SynchronizeFile(const char *fileName)
+ 				continue;
+ 			}
+ 			/*
+-			 * fix days and dow - if one is not * and the other
+-			 * is *, the other is set to 0, and vise-versa
++			 * fix days and dow - if one is not "*" and the other
++			 * is "*", the other is set to 0, and vise-versa
+ 			 */
+ 			FixDayDow(line);
++#if ENABLE_FEATURE_CROND_CALL_SENDMAIL
++			/* copy mailto (can be NULL) */
++			line->cl_MailTo = xstrdup(mailTo);
++#endif
+ 			/* copy command */
+ 			line->cl_Shell = xstrdup(ptr);
+ 			if (DebugOpt) {
+@@ -515,7 +535,7 @@ static void SynchronizeFile(const char *fileName)
+ 		FileBase = file;
+ 
+ 		if (maxLines == 0 || maxEntries == 0) {
+-			crondlog(WARN9 "maximum number of lines reached for user %s", fileName);
++			crondlog(WARN9 "user %s: too many lines", fileName);
+ 		}
+ 	}
+ 	fclose(fi);
+@@ -567,7 +587,7 @@ static void SynchronizeDir(void)
+ 
+ 		if (!dir)
+ 			crondlog(DIE9 "can't chdir(%s)", "."); /* exits */
+-		while ((den = readdir(dir))) {
++		while ((den = readdir(dir)) != NULL) {
+ 			if (strchr(den->d_name, '.') != NULL) {
+ 				continue;
+ 			}
+@@ -811,23 +831,25 @@ ForkJob(const char *user, CronLine *line, int mailFd,
+ static void RunJob(const char *user, CronLine *line)
+ {
+ 	char mailFile[128];
+-	int mailFd;
++	int mailFd = -1;
+ 
+ 	line->cl_Pid = 0;
+ 	line->cl_MailFlag = 0;
+ 
+-	/* open mail file - owner root so nobody can screw with it. */
+-	snprintf(mailFile, sizeof(mailFile), "%s/cron.%s.%d", TMPDIR, user, getpid());
+-	mailFd = open(mailFile, O_CREAT | O_TRUNC | O_WRONLY | O_EXCL | O_APPEND, 0600);
++	if (line->cl_MailTo) {
++		/* open mail file - owner root so nobody can screw with it. */
++		snprintf(mailFile, sizeof(mailFile), "%s/cron.%s.%d", TMPDIR, user, getpid());
++		mailFd = open(mailFile, O_CREAT | O_TRUNC | O_WRONLY | O_EXCL | O_APPEND, 0600);
+ 
+-	if (mailFd >= 0) {
+-		line->cl_MailFlag = 1;
+-		fdprintf(mailFd, "To: %s\nSubject: cron: %s\n\n", user,
+-			line->cl_Shell);
+-		line->cl_MailPos = lseek(mailFd, 0, SEEK_CUR);
+-	} else {
+-		crondlog(ERR20 "cannot create mail file %s for user %s, "
+-				"discarding output", mailFile, user);
++		if (mailFd >= 0) {
++			line->cl_MailFlag = 1;
++			fdprintf(mailFd, "To: %s\nSubject: cron: %s\n\n", user,
++				line->cl_Shell);
++			line->cl_MailPos = lseek(mailFd, 0, SEEK_CUR);
++		} else {
++			crondlog(ERR20 "cannot create mail file %s for user %s, "
++					"discarding output", mailFile, user);
++		}
+ 	}
+ 
+ 	ForkJob(user, line, mailFd, DEFAULT_SHELL, "-c", line->cl_Shell, mailFile);
+@@ -877,7 +899,8 @@ static void EndJob(const char *user, CronLine *line)
+ 		close(mailFd);
+ 		return;
+ 	}
+-	ForkJob(user, line, mailFd, SENDMAIL, SENDMAIL_ARGS, NULL);
++	if (line->cl_MailTo)
++		ForkJob(user, line, mailFd, SENDMAIL, SENDMAIL_ARGS, NULL);
+ }
+ 
+ #else /* crond without sendmail */
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index 973d712..242bb0e 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -273,6 +273,7 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 		OPTS_c = 1 << 6,        // sendmail: assumed charset
+ 		OPTS_t = 1 << 7,        // sendmail: recipient(s)
++		OPTS_i = 1 << 8,        // sendmail: ignore lone dots in message body (implied)
+ 	};
+ 
+ 	const char *options;
+@@ -288,8 +289,8 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		// SENDMAIL
+ 		// save initial stdin (body or attachements can be piped!)
+ 		xdup2(STDIN_FILENO, INITIAL_STDIN_FILENO);
+-		opt_complementary = "-2:w+:t:t::"; // count(-t) > 0
+-		options = "w:U:P:X" "ns:c:t:";
++		opt_complementary = "-2:w+:t::";
++		options = "w:U:P:X" "ns:c:t:i";
+ 	} else {
+ 		// FETCHMAIL
+ 		opt_after_connect = NULL;
+@@ -346,6 +347,29 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		// get the sender
+ 		opt_from = sane(*argv++);
+ 
++		// if no recipients _and_ no body files specified -> enter all-included mode
++		// i.e. scan stdin for To: and Subject: lines ...
++		// ... and then use the rest of stdin as message body
++		if (!opt_recipients && !*argv) {
++			// fetch recipients and (optionally) subject
++			char *s;
++			while ((s = xmalloc_reads(INITIAL_STDIN_FILENO, NULL, NULL)) != NULL) {
++				if (0 == strncmp("To: ", s, 4)) {
++					llist_add_to_end(&opt_recipients, s+4);
++				} else if (0 == strncmp("Subject: ", s, 9)) {
++					opt_subject = s+9;
++					opts |= OPTS_s;
++				} else {
++					char first = s[0];
++					free(s);
++					if (!first)
++						break; // empty line
++				}
++			}
++			// order to read body from stdin
++			*--argv = (char *)"-";
++		}
++
+ 		// introduce to server
+ 		// we should start with modern EHLO
+ 		if (250 != smtp_checkp("EHLO %s", opt_from, -1)) {

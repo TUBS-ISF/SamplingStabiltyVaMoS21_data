@@ -1,0 +1,27 @@
+2008-08-21 11:34:46 +0000
+diff --git a/docs/busybox.net/header.html b/docs/busybox.net/header.html
+index d74e439..1ca8350 100644
+--- a/docs/busybox.net/header.html
++++ b/docs/busybox.net/header.html
+@@ -36,7 +36,7 @@
+       </table>
+     </div>
+ 
+-  <a href="/"><IMG SRC="images/busybox1.png" alt="BusyBox" border="0"></a><BR>
++  <a href="/"><img src="images/busybox1.png" alt="BusyBox" border="0"></a><br>
+ </td>
+ </tr>
+ 
+diff --git a/docs/busybox.net/oldnews.html b/docs/busybox.net/oldnews.html
+index 01e608d..ee51143 100644
+--- a/docs/busybox.net/oldnews.html
++++ b/docs/busybox.net/oldnews.html
+@@ -1260,7 +1260,7 @@ Same .config built against static uclibc:
+     If you have submitted patches, and they are not in this release
+     and I have not emailed you explaining why your patch was
+     rejected, it is safe to say that I have lost your patch.  That
+-    happens sometimes.  Please do <B>NOT</b> send all your patches,
++    happens sometimes.  Please do <b>NOT</b> send all your patches,
+     support questions, etc, directly to Erik.  I get hundreds of
+     emails every day (which is why I end up losing patches
+     sometimes in the flood)...  The busybox mailing list is the

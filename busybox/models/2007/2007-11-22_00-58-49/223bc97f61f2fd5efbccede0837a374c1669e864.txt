@@ -1,0 +1,437 @@
+2007-11-22 00:58:49 +0000
+diff --git a/include/usage.h b/include/usage.h
+index d0eecdb..3c8762e 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2183,8 +2183,8 @@
+        "and * (run both after creating and before deleting). The commands run in\n" \
+        "the /dev directory, and use system() which calls /bin/sh.\n\n" \
+ 	) \
+-       "Config file parsing stops on the first matching line. If no config\n"\
+-       "entry is matched, devices are created with default 0:0 660. (Make\n"\
++       "Config file parsing stops on the first matching line. If no config\n" \
++       "entry is matched, devices are created with default 0:0 660. (Make\n" \
+        "the last line match .* to override this.)\n\n" \
+ 	)
+ 
+@@ -3843,44 +3843,50 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "	[-p pidfile] [-r IP] [-s script]"
+ #define udhcpc_full_usage \
+ 	USE_GETOPT_LONG( \
+-       "	-V,--vendorclass=CLASSID	Set vendor class identifier" \
+-       "\n	-i,--interface=INTERFACE	Interface to use (default: eth0)" \
++       "	-V,--vendorclass=CLASSID	Vendor class identifier" \
++       "\n	-i,--interface=INTERFACE	Interface to use (default eth0)" \
+        "\n	-H,-h,--hostname=HOSTNAME	Client hostname" \
+-       "\n	-c,--clientid=CLIENTID	Set client identifier" \
++       "\n	-c,--clientid=CLIENTID	Client identifier" \
+        "\n	-C,--clientid-none	Suppress default client identifier" \
+-       "\n	-p,--pidfile=file	Store process ID of daemon in file" \
++       "\n	-p,--pidfile=file	Create pidfile" \
+        "\n	-r,--request=IP		IP address to request" \
+        "\n	-s,--script=file	Run file at dhcp events (default: /usr/share/udhcpc/default.script)" \
+-       "\n	-t,--retries=N		Send up to N request packets"\
+-       "\n	-T,--timeout=N		Try to get a lease for N seconds (default: 3)"\
+-       "\n	-A,--tryagain=N		Wait N seconds (default: 60) after failure"\
++       "\n	-t,--retries=N		Send up to N request packets" \
++       "\n	-T,--timeout=N		Try to get a lease for N seconds (default 3)" \
++       "\n	-A,--tryagain=N		Wait N seconds (default 60) after failure" \
+        "\n	-f,--foreground	Run in foreground" \
+-       "\n	-b,--background	Background if lease cannot be immediately negotiated" \
++       "\n	-b,--background	Background if lease is not immediately obtained" \
+        "\n	-S,--syslog	Log to syslog too" \
+-       "\n	-n,--now	Exit with failure if lease cannot be immediately negotiated" \
++       "\n	-n,--now	Exit with failure if lease is not immediately obtained" \
+        "\n	-q,--quit	Quit after obtaining lease" \
+        "\n	-R,--release	Release IP on quit" \
+-       "\n	-v,--version	Display version" \
++	USE_FEATURE_UDHCPC_ARPING( \
++       "\n	-a,--arping	Use arping to validate offered address" \
++       "\n	-W,--wait=N	Wait N seconds after declining (default 10)" \
++	) \
+ 	) \
+ 	SKIP_GETOPT_LONG( \
+-       "	-V CLASSID	Set vendor class identifier" \
++       "	-V CLASSID	Vendor class identifier" \
+        "\n	-i INTERFACE	Interface to use (default: eth0)" \
+        "\n	-H,-h HOSTNAME	Client hostname" \
+-       "\n	-c CLIENTID	Set client identifier" \
++       "\n	-c CLIENTID	Client identifier" \
+        "\n	-C		Suppress default client identifier" \
+-       "\n	-p file		Store process ID of daemon in file" \
++       "\n	-p file		Create pidfile" \
+        "\n	-r IP		IP address to request" \
+        "\n	-s file		Run file at dhcp events (default: /usr/share/udhcpc/default.script)" \
+-       "\n	-t N		Send up to N request packets"\
+-       "\n	-T N		Try to get a lease for N seconds (default: 3)"\
+-       "\n	-A N		Wait N seconds (default: 60) after failure"\
++       "\n	-t N		Send up to N request packets" \
++       "\n	-T N		Try to get a lease for N seconds (default 3)" \
++       "\n	-A N		Wait N seconds (default 60) after failure" \
+        "\n	-f		Run in foreground" \
+-       "\n	-b		Background if lease cannot be immediately negotiated" \
++       "\n	-b		Background if lease is not immediately obtained" \
+        "\n	-S		Log to syslog too" \
+-       "\n	-n		Exit with failure if lease cannot be immediately negotiated" \
++       "\n	-n		Exit with failure if lease is not immediately obtained" \
+        "\n	-q		Quit after obtaining lease" \
+        "\n	-R		Release IP on quit" \
+-       "\n	-v		Display version" \
++	USE_FEATURE_UDHCPC_ARPING( \
++       "\n	-a		Use arping to validate offered address" \
++       "\n	-W N		Wait N seconds after declining (default 10)" \
++	) \
+ 	)
+ 
+ #define udhcpd_trivial_usage \
+diff --git a/networking/udhcp/Config.in b/networking/udhcp/Config.in
+index 76b0780..734db65 100644
+--- a/networking/udhcp/Config.in
++++ b/networking/udhcp/Config.in
+@@ -54,6 +54,16 @@ config APP_UDHCPC
+ 
+ 	  See http://udhcp.busybox.net for further details.
+ 
++config FEATURE_UDHCPC_ARPING
++	bool "Ask udhcpc to verify that the offered address is free, using arpping"
++	default y
++	depends on APP_UDHCPC
++	help
++	  If selected, udhcpc will use arpping to make sure the offered address
++	  is really available. The client will DHCPDECLINE the offer if the
++	  address is in use, and restart the discover process.
++
++
+ config FEATURE_UDHCP_DEBUG
+ 	bool "Compile udhcp with noisy debugging messages"
+ 	default n
+diff --git a/networking/udhcp/Kbuild b/networking/udhcp/Kbuild
+index aed40b9..7d47470 100644
+--- a/networking/udhcp/Kbuild
++++ b/networking/udhcp/Kbuild
+@@ -10,10 +10,16 @@ lib-$(CONFIG_APP_UDHCPC)        += common.o options.o packet.o \
+                                    signalpipe.o socket.o
+ lib-$(CONFIG_APP_UDHCPD)        += common.o options.o packet.o \
+                                    signalpipe.o socket.o
++
+ lib-$(CONFIG_APP_UDHCPC)        += dhcpc.o clientpacket.o clientsocket.o \
+                                    script.o
++
++UDHCPC_NEEDS_ARPING-$(CONFIG_FEATURE_UDHCPC_ARPING) = y
++lib-$(UDHCPC_NEEDS_ARPING)      += arpping.o
++
+ lib-$(CONFIG_APP_UDHCPD)        += dhcpd.o arpping.o files.o leases.o \
+                                    serverpacket.o static_leases.o
++
+ lib-$(CONFIG_APP_DUMPLEASES)    += dumpleases.o
+ lib-$(CONFIG_APP_DHCPRELAY)     += dhcprelay.o
+ lib-$(CONFIG_FEATURE_RFC3397)   += domain_codec.o
+diff --git a/networking/udhcp/arpping.c b/networking/udhcp/arpping.c
+index 7b702d8..45597c0 100644
+--- a/networking/udhcp/arpping.c
++++ b/networking/udhcp/arpping.c
+@@ -32,12 +32,16 @@ struct arpMsg {
+ 	uint8_t  pad[18];       /* 2a pad for min. ethernet payload (60 bytes) */
+ } ATTRIBUTE_PACKED;
+ 
++enum {
++	ARP_MSG_SIZE = 0x2a
++};
++
+ 
+ /* Returns 1 if no reply received */
+ 
+ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *interface)
+ {
+-	int timeout_ms = 2000;
++	int timeout_ms;
+ 	struct pollfd pfd[1];
+ #define s (pfd[0].fd)           /* socket */
+ 	int rv = 1;             /* "no reply received" yet */
+@@ -51,7 +55,7 @@ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *i
+ 	}
+ 
+ 	if (setsockopt_broadcast(s) == -1) {
+-		bb_perror_msg("cannot setsocketopt on raw socket");
++		bb_perror_msg("cannot enable bcast on raw socket");
+ 		goto ret;
+ 	}
+ 
+@@ -67,28 +71,35 @@ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *i
+ 	arp.operation = htons(ARPOP_REQUEST);           /* ARP op code */
+ 	memcpy(arp.sHaddr, from_mac, 6);                /* source hardware address */
+ 	memcpy(arp.sInaddr, &from_ip, sizeof(from_ip)); /* source IP address */
+-	/* tHaddr */                                    /* target hardware address */
++	/* tHaddr is zero-fiiled */                     /* target hardware address */
+ 	memcpy(arp.tInaddr, &test_ip, sizeof(test_ip)); /* target IP address */
+ 
+ 	memset(&addr, 0, sizeof(addr));
+ 	safe_strncpy(addr.sa_data, interface, sizeof(addr.sa_data));
+-	if (sendto(s, &arp, sizeof(arp), 0, &addr, sizeof(addr)) < 0)
++	if (sendto(s, &arp, sizeof(arp), 0, &addr, sizeof(addr)) < 0) {
++		// TODO: error message? caller didn't expect us to fail,
++		// just returning 1 "no reply received" misleads it.
+ 		goto ret;
++	}
+ 
+ 	/* wait for arp reply, and check it */
++	timeout_ms = 2000;
+ 	do {
+ 		int r;
+ 		unsigned prevTime = monotonic_us();
+ 
+ 		pfd[0].events = POLLIN;
+ 		r = safe_poll(pfd, 1, timeout_ms);
+-		if (r < 0) {
++		if (r < 0)
+ 			break;
+-		} else if (r) {
+-			if (read(s, &arp, sizeof(arp)) < 0)
++		if (r) {
++			r = read(s, &arp, sizeof(arp));
++			if (r < 0)
+ 				break;
+-			if (arp.operation == htons(ARPOP_REPLY)
+-			 && memcmp(arp.tHaddr, from_mac, 6) == 0
++			if (r >= ARP_MSG_SIZE
++			 && arp.operation == htons(ARPOP_REPLY)
++			 /* don't check it: Linux doesn't return proper tHaddr (fixed in 2.6.24?) */
++			 /* && memcmp(arp.tHaddr, from_mac, 6) == 0 */
+ 			 && *((uint32_t *) arp.sInaddr) == test_ip
+ 			) {
+ 				rv = 0;
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 42b4895..e7eeb58 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -69,6 +69,22 @@ static void add_requests(struct dhcpMessage *packet)
+ 
+ }
+ 
++#if ENABLE_FEATURE_UDHCPC_ARPING
++/* Unicast a DHCP decline message */
++int send_decline(uint32_t xid, uint32_t server)
++{
++	struct dhcpMessage packet;
++
++	init_packet(&packet, DHCPDECLINE);
++	packet.xid = xid;
++	add_requests(&packet);
++
++	bb_info_msg("Sending decline...");
++
++	return udhcp_raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST,
++		SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
++}
++#endif
+ 
+ /* Broadcast a DHCP discover packet to the network, with an optionally requested IP */
+ int send_discover(uint32_t xid, uint32_t requested)
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 4864c85..179c21f 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -76,7 +76,7 @@ void udhcp_run_script(struct dhcpMessage *packet, const char *name);
+ 
+ void udhcp_sp_setup(void);
+ int udhcp_sp_fd_set(fd_set *rfds, int extra_fd);
+-int udhcp_sp_read(fd_set *rfds);
++int udhcp_sp_read(const fd_set *rfds);
+ int raw_socket(int ifindex);
+ int read_interface(const char *interface, int *ifindex, uint32_t *addr, uint8_t *arp);
+ int listen_socket(/*uint32_t ip,*/ int port, const char *inf);
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index c6f9fe4..b3b8945 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -145,6 +145,13 @@ int udhcpc_main(int argc, char **argv)
+ {
+ 	uint8_t *temp, *message;
+ 	char *str_c, *str_V, *str_h, *str_F, *str_r, *str_T, *str_A, *str_t;
++	int tryagain_timeout = 60;
++	int discover_timeout = 3;
++	int discover_retries = 3;
++#if ENABLE_FEATURE_UDHCPC_ARPING
++	int decline_wait = 10;
++	char *str_W;
++#endif
+ 	uint32_t xid = 0;
+ 	uint32_t lease = 0; /* can be given as 32-bit quantity */
+ 	unsigned t1 = 0, t2 = 0; /* what a wonderful names */
+@@ -180,6 +187,10 @@ int udhcpc_main(int argc, char **argv)
+ 		OPT_v = 1 << 17,
+ 		OPT_S = 1 << 18,
+ 		OPT_A = 1 << 19,
++#if ENABLE_FEATURE_UDHCPC_ARPING
++		OPT_a = 1 << 20,
++		OPT_W = 1 << 21,
++#endif
+ 	};
+ #if ENABLE_GETOPT_LONG
+ 	static const char udhcpc_longopts[] ALIGN1 =
+@@ -203,14 +214,15 @@ int udhcpc_main(int argc, char **argv)
+ 		"retries\0"       Required_argument "t"
+ 		"tryagain\0"      Required_argument "A"
+ 		"syslog\0"        No_argument       "S"
++#if ENABLE_FEATURE_UDHCPC_ARPING
++		"arping\0"        No_argument       "a"
++		"wait\0"          Required_argument "W"
++#endif
+ 		;
+ #endif
+ 	/* Default options. */
+ 	client_config.interface = "eth0";
+ 	client_config.script = DEFAULT_SCRIPT;
+-	client_config.retries = 3;
+-	client_config.timeout = 3;
+-	client_config.tryagain = 60;
+ 
+ 	/* Parse command line */
+ 	opt_complementary = "c--C:C--c" // mutually exclusive
+@@ -218,10 +230,12 @@ int udhcpc_main(int argc, char **argv)
+ #if ENABLE_GETOPT_LONG
+ 	applet_long_options = udhcpc_longopts;
+ #endif
+-	opt = getopt32(argv, "c:CV:fbH:h:F:i:np:qRr:s:T:t:vSA:",
+-		&str_c, &str_V, &str_h, &str_h, &str_F,
++	opt = getopt32(argv, "c:CV:fbH:h:F:i:np:qRr:s:T:t:vSA:"
++		USE_FEATURE_UDHCPC_ARPING("aW:")
++		, &str_c, &str_V, &str_h, &str_h, &str_F,
+ 		&client_config.interface, &client_config.pidfile, &str_r,
+ 		&client_config.script, &str_T, &str_t, &str_A
++		USE_FEATURE_UDHCPC_ARPING(, &str_W)
+ 		);
+ 
+ 	if (opt & OPT_c)
+@@ -259,11 +273,11 @@ int udhcpc_main(int argc, char **argv)
+ 		requested_ip = inet_addr(str_r);
+ 	// if (opt & OPT_s) client_config.script = ...
+ 	if (opt & OPT_T)
+-		client_config.timeout = xatoi_u(str_T);
++		discover_timeout = xatoi_u(str_T);
+ 	if (opt & OPT_t)
+-		client_config.retries = xatoi_u(str_t);
++		discover_retries = xatoi_u(str_t);
+ 	if (opt & OPT_A)
+-		client_config.tryagain = xatoi_u(str_A);
++		tryagain_timeout = xatoi_u(str_A);
+ 	if (opt & OPT_v) {
+ 		puts("version "BB_VER);
+ 		return 0;
+@@ -274,6 +288,11 @@ int udhcpc_main(int argc, char **argv)
+ 		logmode |= LOGMODE_SYSLOG;
+ 	}
+ 
++#if ENABLE_FEATURE_UDHCPC_ARPING
++	if (opt & OPT_W)
++		decline_wait = xatou_range(str_W, 10, INT_MAX);
++#endif
++
+ 	if (read_interface(client_config.interface, &client_config.ifindex,
+ 			   NULL, client_config.arp))
+ 		return 1;
+@@ -339,14 +358,14 @@ int udhcpc_main(int argc, char **argv)
+ 			/* timeout dropped to zero */
+ 			switch (state) {
+ 			case INIT_SELECTING:
+-				if (packet_num < client_config.retries) {
++				if (packet_num < discover_retries) {
+ 					if (packet_num == 0)
+ 						xid = random_xid();
+ 
+ 					/* send discover packet */
+ 					send_discover(xid, requested_ip); /* broadcast */
+ 
+-					timeout = now + client_config.timeout;
++					timeout = now + discover_timeout;
+ 					packet_num++;
+ 				} else {
+ 					udhcp_run_script(NULL, "leasefail");
+@@ -360,12 +379,12 @@ int udhcpc_main(int argc, char **argv)
+ 					}
+ 					/* wait to try again */
+ 					packet_num = 0;
+-					timeout = now + client_config.tryagain;
++					timeout = now + tryagain_timeout;
+ 				}
+ 				break;
+ 			case RENEW_REQUESTED:
+ 			case REQUESTING:
+-				if (packet_num < client_config.retries) {
++				if (packet_num < discover_retries) {
+ 					/* send request packet */
+ 					if (state == RENEW_REQUESTED)
+ 						send_renew(xid, server_addr, requested_ip); /* unicast */
+@@ -491,6 +510,28 @@ int udhcpc_main(int argc, char **argv)
+ 						lease = ntohl(lease);
+ 					}
+ 
++#if ENABLE_FEATURE_UDHCPC_ARPING
++					if (opt & OPT_a) {
++						if (!arpping(packet.yiaddr,
++							    (uint32_t) 0,
++							    client_config.arp,
++							    client_config.interface)
++						) {
++							bb_info_msg("offered address is in use,"
++								" declining");
++							send_decline(xid, server_addr);
++
++							if (state != REQUESTING)
++								udhcp_run_script(NULL, "deconfig");
++							state = INIT_SELECTING;
++							requested_ip = 0;
++							packet_num = 0;
++							change_mode(LISTEN_RAW);
++							timeout = now + decline_wait;
++							break;
++						}
++					}
++#endif
+ 					/* enter bound state */
+ 					t1 = lease / 2;
+ 
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index 72a8bd9..c0172a8 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -1,5 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ /* dhcpc.h */
++
+ #ifndef _DHCPC_H
+ #define _DHCPC_H
+ 
+@@ -28,9 +29,6 @@ struct client_config_t {
+ 	uint8_t *hostname;              /* Optional hostname to use */
+ 	uint8_t *fqdn;                  /* Optional fully qualified domain name to use */
+ 	int ifindex;                    /* Index number of the interface to use */
+-	int retries;                    /* Max number of request packets */
+-	int timeout;                    /* Number of seconds to try to get a lease */
+-	int tryagain;                   /* Number of seconds to try to get a lease */
+ 	uint8_t arp[6];                 /* Our arp address */
+ };
+ 
+@@ -42,6 +40,9 @@ struct client_config_t {
+ uint32_t random_xid(void);
+ int send_discover(uint32_t xid, uint32_t requested);
+ int send_selecting(uint32_t xid, uint32_t server, uint32_t requested);
++#if ENABLE_FEATURE_UDHCPC_ARPING
++int send_decline(uint32_t xid, uint32_t server);
++#endif
+ int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr);
+ int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr);
+ int send_release(uint32_t server, uint32_t ciaddr);
+diff --git a/networking/udhcp/signalpipe.c b/networking/udhcp/signalpipe.c
+index fafd208..845aa3a 100644
+--- a/networking/udhcp/signalpipe.c
++++ b/networking/udhcp/signalpipe.c
+@@ -66,7 +66,7 @@ int udhcp_sp_fd_set(fd_set *rfds, int extra_fd)
+ /* Read a signal from the signal pipe. Returns 0 if there is
+  * no signal, -1 on error (and sets errno appropriately), and
+  * your signal on success */
+-int udhcp_sp_read(fd_set *rfds)
++int udhcp_sp_read(const fd_set *rfds)
+ {
+ 	unsigned char sig;
+ 

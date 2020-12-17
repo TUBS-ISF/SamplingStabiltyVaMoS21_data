@@ -1,0 +1,35 @@
+2007-08-06 13:34:10 +0000
+diff --git a/editors/patch.c b/editors/patch.c
+index 5f7f7d0..f071a08 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -55,10 +55,12 @@ static char *extract_filename(char *line, int patch_level)
+ 	int i;
+ 
+ 	/* Terminate string at end of source filename */
+-	temp = strchr(filename_start_ptr, '\t');
+-	if (temp) *temp = 0;
++	temp = strchrnul(filename_start_ptr, '\t');
++	*temp = '\0';
+ 
+-	/* skip over (patch_level) number of leading directories */
++	/* Skip over (patch_level) number of leading directories */
++	if (patch_level == -1)
++		patch_level = INT_MAX;
+ 	for (i = 0; i < patch_level; i++) {
+ 		temp = strchr(filename_start_ptr, '/');
+ 		if (!temp)
+diff --git a/scripts/checkstack.pl b/scripts/checkstack.pl
+index 41454ce..6f45524 100755
+--- a/scripts/checkstack.pl
++++ b/scripts/checkstack.pl
+@@ -39,6 +39,9 @@ my (@stack, $re, $x, $xs);
+ 	if ($arch eq 'arm') {
+ 		#c0008ffc:	e24dd064	sub	sp, sp, #100	; 0x64
+ 		$re = qr/.*sub.*sp, sp, #(([0-9]{2}|[3-9])[0-9]{2})/o;
++	} elsif ($arch eq 'blackfin') {
++		#      52:       00 e8 03 00     LINK 0xc;
++		$re = qr/.*LINK (0x$x{1,5});$/o;
+ 	} elsif ($arch =~ /^i[3456]86$/) {
+ 		#c0105234:       81 ec ac 05 00 00       sub    $0x5ac,%esp
+ 		$re = qr/^.*[as][du][db]    \$(0x$x{1,8}),\%esp$/o;

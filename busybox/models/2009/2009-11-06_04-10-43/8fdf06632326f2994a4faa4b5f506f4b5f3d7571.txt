@@ -1,0 +1,81 @@
+2009-11-06 04:10:43 +0100
+diff --git a/examples/var_service/fw/etc/resolv.conf b/examples/var_service/fw/etc/resolv.conf
+index 3f37b86..6561987 100644
+--- a/examples/var_service/fw/etc/resolv.conf
++++ b/examples/var_service/fw/etc/resolv.conf
+@@ -16,16 +16,16 @@ echo
+ 
+ prio=0
+ i=0; while test "${if[$i]}"; do
+-    test x"${dns_prio[$i]}" != x"" \
+-    && test "${dns_prio[$i]}" -gt "$prio" \
+-    && prio="${dns_prio[$i]}"
++	test x"${dns_prio[$i]}" != x"" \
++	&& test "${dns_prio[$i]}" -gt "$prio" \
++	&& prio="${dns_prio[$i]}"
+ let i++; done
+ 
+ i=0; while test "${if[$i]}"; do
+-    for d in ${dns[$i]}; do
+-	p="${dns_prio[$i]}"
+-	test x"$p" == x"" && p=0
+-	test x"$p" == x"$prio" || continue
+-	echo "nameserver $d"
+-    done
++	for d in ${dns[$i]}; do
++		p="${dns_prio[$i]}"
++		test x"$p" == x"" && p=0
++		test x"$p" == x"$prio" || continue
++		echo "nameserver $d"
++	done
+ let i++; done
+diff --git a/examples/var_service/fw/run b/examples/var_service/fw/run
+index f02f53d..b8c028a 100755
+--- a/examples/var_service/fw/run
++++ b/examples/var_service/fw/run
+@@ -49,8 +49,8 @@ rundir="/var/run/service/$service"
+ ###         ... Local Process...
+ 
+ doit() {
+-    echo "# $*"
+-    "$@"
++	echo "# $*"
++	"$@"
+ }
+ 
+ #exec >/dev/null
+@@ -88,25 +88,25 @@ echo; echo "* Configuring hardware"
+ echo; echo "* Resetting address and routing info"
+ doit ip a f dev lo
+ i=0; while test "${if[$i]}"; do
+-    doit ip a f dev "${if[$i]}"
+-    doit ip r f dev "${if[$i]}" root 0/0
++	doit ip a f dev "${if[$i]}"
++	doit ip r f dev "${if[$i]}" root 0/0
+ let i++; done
+ 
+ echo; echo "* Configuring addresses"
+ doit ip a a dev lo 127.0.0.1/8 scope host
+ doit ip a a dev lo ::1/128 scope host
+ i=0; while test "${if[$i]}"; do
+-    if test "${ipmask[$i]}"; then
+-        doit ip a a dev "${if[$i]}" "${ipmask[$i]}" brd +
+-        doit ip l set dev "${if[$i]}" up
+-    fi
++	if test "${ipmask[$i]}"; then
++		doit ip a a dev "${if[$i]}" "${ipmask[$i]}" brd +
++		doit ip l set dev "${if[$i]}" up
++	fi
+ let i++; done
+ 
+ echo; echo "* Configuring routes"
+ i=0; while test "${if[$i]}"; do
+-    if test "${net[$i]}" && test "${gw[$i]}"; then
+-        doit ip r a "${net[$i]}" via "${gw[$i]}"
+-    fi
++	if test "${net[$i]}" && test "${gw[$i]}"; then
++		doit ip r a "${net[$i]}" via "${gw[$i]}"
++	fi
+ let i++; done
+ 
+ echo; echo "* Recreating /etc/* files reflecting new network configuration:"

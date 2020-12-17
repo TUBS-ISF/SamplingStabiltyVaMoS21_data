@@ -1,0 +1,18 @@
+2008-06-07 23:43:43 +0000
+diff --git a/libbb/time.c b/libbb/time.c
+index 3aa0ee3..07c0094 100644
+--- a/libbb/time.c
++++ b/libbb/time.c
+@@ -12,6 +12,12 @@
+ #if ENABLE_MONOTONIC_SYSCALL
+ #include <sys/syscall.h>
+ 
++/* Old glibc (< 2.3.4) does not provide this constant. We use syscall
++ * directly so this definition is safe. */
++#ifndef CLOCK_MONOTONIC
++#define CLOCK_MONOTONIC 1
++#endif
++
+ /* libc has incredibly messy way of doing this,
+  * typically requiring -lrt. We just skip all this mess */
+ unsigned long long monotonic_us(void)

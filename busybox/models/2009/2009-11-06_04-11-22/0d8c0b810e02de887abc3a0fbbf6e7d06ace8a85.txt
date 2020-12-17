@@ -1,0 +1,5 @@
+2009-11-06 04:11:22 +0100
+diff --git a/shell/susv3_doc.tar.bz2 b/shell/susv3_doc.tar.bz2
+deleted file mode 100644
+index 443a283..0000000
+Binary files a/shell/susv3_doc.tar.bz2 and /dev/null differ

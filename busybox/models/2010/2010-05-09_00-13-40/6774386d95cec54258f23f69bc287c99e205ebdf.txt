@@ -1,0 +1,306 @@
+2010-05-09 00:13:40 +0200
+diff --git a/e2fsprogs/Config.in b/e2fsprogs/Config.in
+index 9a0088a..964d08e 100644
+--- a/e2fsprogs/Config.in
++++ b/e2fsprogs/Config.in
+@@ -41,12 +41,12 @@ config LSATTR
+ ###	  mke2fs is used to create an ext2/ext3 filesystem. The normal compat
+ ###	  symlinks 'mkfs.ext2' and 'mkfs.ext3' are also provided.
+ 
+-### config TUNE2FS
+-###	bool "tune2fs"
+-###	default n
+-###	help
+-###	  tune2fs allows the system administrator to adjust various tunable
+-###	  filesystem parameters on Linux ext2/ext3 filesystems.
++config TUNE2FS
++	bool "tune2fs"
++	default n
++	help
++	  tune2fs allows the system administrator to adjust various tunable
++	  filesystem parameters on Linux ext2/ext3 filesystems.
+ 
+ ### config E2LABEL
+ ###	bool "e2label"
+diff --git a/e2fsprogs/Kbuild b/e2fsprogs/Kbuild
+index 9f58ce0..0fdc9d2 100644
+--- a/e2fsprogs/Kbuild
++++ b/e2fsprogs/Kbuild
+@@ -9,4 +9,5 @@ lib-y:=
+ lib-$(CONFIG_CHATTR) += chattr.o e2fs_lib.o
+ lib-$(CONFIG_LSATTR) += lsattr.o e2fs_lib.o
+ 
+-lib-$(CONFIG_FSCK) += fsck.o
++lib-$(CONFIG_FSCK)    += fsck.o
++lib-$(CONFIG_TUNE2FS) += tune2fs.o
+diff --git a/e2fsprogs/tune2fs.c b/e2fsprogs/tune2fs.c
+new file mode 100644
+index 0000000..00ede4f
+--- /dev/null
++++ b/e2fsprogs/tune2fs.c
+@@ -0,0 +1,70 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * tune2fs: utility to modify EXT2 filesystem
++ *
++ * Busybox'ed (2009) by Vladimir Dronnikov <dronnikov@gmail.com>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
++#include "libbb.h"
++#include <linux/fs.h>
++#include <linux/ext2_fs.h>
++
++// storage helpers
++char BUG_wrong_field_size(void);
++#define STORE_LE(field, value) \
++do { \
++	if (sizeof(field) == 4) \
++		field = SWAP_LE32(value); \
++	else if (sizeof(field) == 2) \
++		field = SWAP_LE16(value); \
++	else if (sizeof(field) == 1) \
++		field = (value); \
++	else \
++		BUG_wrong_field_size(); \
++} while (0)
++
++#define FETCH_LE32(field) \
++	(sizeof(field) == 4 ? SWAP_LE32(field) : BUG_wrong_field_size())
++
++enum {
++	OPT_L = 1 << 0,	// label
++};
++
++int tune2fs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int tune2fs_main(int argc UNUSED_PARAM, char **argv)
++{
++	unsigned opts;
++	const char *label;
++	struct ext2_super_block *sb;
++	int fd;
++
++	opt_complementary = "=1";
++	opts = getopt32(argv, "L:", &label);
++	argv += optind; // argv[0] -- device
++
++	if (!opts)
++		bb_show_usage();
++
++	// read superblock
++	fd = xopen(argv[0], O_RDWR);
++	xlseek(fd, 1024, SEEK_SET);
++	sb = xzalloc(1024);
++	xread(fd, sb, 1024);
++
++	// mangle superblock
++	//STORE_LE(sb->s_wtime, time(NULL)); - why bother?
++	// set the label
++	if (1 /*opts & OPT_L*/)
++		safe_strncpy((char *)sb->s_volume_name, label, sizeof(sb->s_volume_name));
++	// write superblock
++	xlseek(fd, 1024, SEEK_SET);
++	xwrite(fd, sb, 1024);
++
++	if (ENABLE_FEATURE_CLEAN_UP) {
++		free(sb);
++	}
++
++	xclose(fd);
++	return EXIT_SUCCESS;
++}
+diff --git a/include/applets.h b/include/applets.h
+index 6d7af52..36b2485 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -405,7 +405,7 @@ IF_TRUE(APPLET_NOFORK(true, true, _BB_DIR_BIN, _BB_SUID_DROP, true))
+ IF_TTY(APPLET(tty, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_TTYSIZE(APPLET(ttysize, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_TUNCTL(APPLET(tunctl, _BB_DIR_SBIN, _BB_SUID_DROP))
+-IF_MKFS_EXT2(APPLET(tune2fs, _BB_DIR_SBIN, _BB_SUID_DROP))
++IF_TUNE2FS(APPLET(tune2fs, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_UDHCPC(APPLET(udhcpc, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_UDHCPD(APPLET(udhcpd, _BB_DIR_USR_SBIN, _BB_SUID_DROP))
+ IF_UDPSVD(APPLET_ODDNAME(udpsvd, tcpudpsvd, _BB_DIR_USR_BIN, _BB_SUID_DROP, udpsvd))
+diff --git a/util-linux/Kbuild b/util-linux/Kbuild
+index 99e3efe..4fa3923 100644
+--- a/util-linux/Kbuild
++++ b/util-linux/Kbuild
+@@ -42,5 +42,4 @@ lib-$(CONFIG_SCRIPTREPLAY)      += scriptreplay.o
+ lib-$(CONFIG_SETARCH)           += setarch.o
+ lib-$(CONFIG_SWAPONOFF)         += swaponoff.o
+ lib-$(CONFIG_SWITCH_ROOT)       += switch_root.o
+-lib-$(CONFIG_MKFS_EXT2)         += tune2fs.o
+ lib-$(CONFIG_UMOUNT)            += umount.o
+diff --git a/util-linux/mkfs_ext2.c b/util-linux/mkfs_ext2.c
+index cf40c20..fd54734 100644
+--- a/util-linux/mkfs_ext2.c
++++ b/util-linux/mkfs_ext2.c
+@@ -10,7 +10,6 @@
+ #include "libbb.h"
+ #include <linux/fs.h>
+ #include <linux/ext2_fs.h>
+-#include "volume_id/volume_id_internal.h"
+ 
+ #define	ENABLE_FEATURE_MKFS_EXT2_RESERVED_GDT 0
+ #define	ENABLE_FEATURE_MKFS_EXT2_DIR_INDEX    1
+@@ -29,9 +28,9 @@ char BUG_wrong_field_size(void);
+ #define STORE_LE(field, value) \
+ do { \
+ 	if (sizeof(field) == 4) \
+-		field = cpu_to_le32(value); \
++		field = SWAP_LE32(value); \
+ 	else if (sizeof(field) == 2) \
+-		field = cpu_to_le16(value); \
++		field = SWAP_LE16(value); \
+ 	else if (sizeof(field) == 1) \
+ 		field = (value); \
+ 	else \
+@@ -39,7 +38,7 @@ do { \
+ } while (0)
+ 
+ #define FETCH_LE32(field) \
+-	(sizeof(field) == 4 ? cpu_to_le32(field) : BUG_wrong_field_size())
++	(sizeof(field) == 4 ? SWAP_LE32(field) : BUG_wrong_field_size())
+ 
+ // All fields are little-endian
+ struct ext2_dir {
+diff --git a/util-linux/mkfs_reiser.c b/util-linux/mkfs_reiser.c
+index eb2c94d..f9a0ca8 100644
+--- a/util-linux/mkfs_reiser.c
++++ b/util-linux/mkfs_reiser.c
+@@ -8,15 +8,14 @@
+  */
+ #include "libbb.h"
+ #include <linux/fs.h>
+-#include "volume_id/volume_id_internal.h"
+ 
+ char BUG_wrong_field_size(void);
+ #define STORE_LE(field, value) \
+ do { \
+ 	if (sizeof(field) == 4) \
+-		field = cpu_to_le32(value); \
++		field = SWAP_LE32(value); \
+ 	else if (sizeof(field) == 2) \
+-		field = cpu_to_le16(value); \
++		field = SWAP_LE16(value); \
+ 	else if (sizeof(field) == 1) \
+ 		field = (value); \
+ 	else \
+@@ -24,7 +23,7 @@ do { \
+ } while (0)
+ 
+ #define FETCH_LE32(field) \
+-	(sizeof(field) == 4 ? cpu_to_le32(field) : BUG_wrong_field_size())
++	(sizeof(field) == 4 ? SWAP_LE32(field) : BUG_wrong_field_size())
+ 
+ struct journal_params {
+ 	uint32_t jp_journal_1st_block;      /* where does journal start from on its device */
+diff --git a/util-linux/mkfs_vfat.c b/util-linux/mkfs_vfat.c
+index 1363612..ff3e416 100644
+--- a/util-linux/mkfs_vfat.c
++++ b/util-linux/mkfs_vfat.c
+@@ -16,7 +16,6 @@
+ # define BLKSSZGET _IO(0x12, 104)
+ #endif
+ //#include <linux/msdos_fs.h>
+-#include "volume_id/volume_id_internal.h"
+ 
+ #define SECTOR_SIZE             512
+ 
+@@ -168,15 +167,15 @@ static const char boot_code[] ALIGN1 =
+ 
+ 
+ #define MARK_CLUSTER(cluster, value) \
+-	((uint32_t *)fat)[cluster] = cpu_to_le32(value)
++	((uint32_t *)fat)[cluster] = SWAP_LE32(value)
+ 
+ void BUG_unsupported_field_size(void);
+ #define STORE_LE(field, value) \
+ do { \
+ 	if (sizeof(field) == 4) \
+-		field = cpu_to_le32(value); \
++		field = SWAP_LE32(value); \
+ 	else if (sizeof(field) == 2) \
+-		field = cpu_to_le16(value); \
++		field = SWAP_LE16(value); \
+ 	else if (sizeof(field) == 1) \
+ 		field = (value); \
+ 	else \
+diff --git a/util-linux/tune2fs.c b/util-linux/tune2fs.c
+deleted file mode 100644
+index 3b8f3d8..0000000
+--- a/util-linux/tune2fs.c
++++ /dev/null
+@@ -1,71 +0,0 @@
+-/* vi: set sw=4 ts=4: */
+-/*
+- * tune2fs: utility to modify EXT2 filesystem
+- *
+- * Busybox'ed (2009) by Vladimir Dronnikov <dronnikov@gmail.com>
+- *
+- * Licensed under GPLv2, see file LICENSE in this tarball for details.
+- */
+-#include "libbb.h"
+-#include <linux/fs.h>
+-#include <linux/ext2_fs.h>
+-#include "volume_id/volume_id_internal.h"
+-
+-// storage helpers
+-char BUG_wrong_field_size(void);
+-#define STORE_LE(field, value) \
+-do { \
+-	if (sizeof(field) == 4) \
+-		field = cpu_to_le32(value); \
+-	else if (sizeof(field) == 2) \
+-		field = cpu_to_le16(value); \
+-	else if (sizeof(field) == 1) \
+-		field = (value); \
+-	else \
+-		BUG_wrong_field_size(); \
+-} while (0)
+-
+-#define FETCH_LE32(field) \
+-	(sizeof(field) == 4 ? cpu_to_le32(field) : BUG_wrong_field_size())
+-
+-enum {
+-	OPT_L = 1 << 0,	// label
+-};
+-
+-int tune2fs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int tune2fs_main(int argc UNUSED_PARAM, char **argv)
+-{
+-	unsigned opts;
+-	const char *label;
+-	struct ext2_super_block *sb;
+-	int fd;
+-
+-	opt_complementary = "=1";
+-	opts = getopt32(argv, "L:", &label);
+-	argv += optind; // argv[0] -- device
+-
+-	if (!opts)
+-		bb_show_usage();
+-
+-	// read superblock
+-	fd = xopen(argv[0], O_RDWR);
+-	xlseek(fd, 1024, SEEK_SET);
+-	sb = xzalloc(1024);
+-	xread(fd, sb, 1024);
+-
+-	// mangle superblock
+-	//STORE_LE(sb->s_wtime, time(NULL)); - why bother?
+-	// set the label
+-	if (1 /*opts & OPT_L*/)
+-		safe_strncpy((char *)sb->s_volume_name, label, sizeof(sb->s_volume_name));
+-	// write superblock
+-	xlseek(fd, 1024, SEEK_SET);
+-	xwrite(fd, sb, 1024);
+-
+-	if (ENABLE_FEATURE_CLEAN_UP) {
+-		free(sb);
+-	}
+-
+-	xclose(fd);
+-	return EXIT_SUCCESS;
+-}

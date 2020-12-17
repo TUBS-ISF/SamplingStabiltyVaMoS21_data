@@ -1,0 +1,291 @@
+2007-06-20 14:49:47 +0000
+diff --git a/archival/libunarchive/data_extract_all.c b/archival/libunarchive/data_extract_all.c
+index 0bb5bfe..76e7edf 100644
+--- a/archival/libunarchive/data_extract_all.c
++++ b/archival/libunarchive/data_extract_all.c
+@@ -25,7 +25,8 @@ void data_extract_all(archive_handle_t *archive_handle)
+ 		 && (unlink(file_header->name) == -1)
+ 		 && (errno != ENOENT)
+ 		) {
+-			bb_perror_msg_and_die("cannot remove old file");
++			bb_perror_msg_and_die("cannot remove old file %s",
++					file_header->name);
+ 		}
+ 	}
+ 	else if (archive_handle->flags & ARCHIVE_EXTRACT_NEWER) {
+@@ -52,13 +53,16 @@ void data_extract_all(archive_handle_t *archive_handle)
+ 
+ 	/* Handle hard links separately
+ 	 * We identified hard links as regular files of size 0 with a symlink */
+-	if (S_ISREG(file_header->mode) && (file_header->link_name)
++	if (S_ISREG(file_header->mode) && (file_header->link_target)
+ 	 && (file_header->size == 0)
+ 	) {
+ 		/* hard link */
+-		res = link(file_header->link_name, file_header->name);
++		res = link(file_header->link_target, file_header->name);
+ 		if ((res == -1) && !(archive_handle->flags & ARCHIVE_EXTRACT_QUIET)) {
+-			bb_perror_msg("cannot create hard link");
++			bb_perror_msg("cannot create %slink "
++					"from %s to %s", "hard",
++					file_header->name,
++					file_header->link_target);
+ 		}
+ 	} else {
+ 		/* Create the filesystem entry */
+@@ -73,22 +77,22 @@ void data_extract_all(archive_handle_t *archive_handle)
+ 		}
+ 		case S_IFDIR:
+ 			res = mkdir(file_header->name, file_header->mode);
+-			if ((errno != EISDIR) && (res == -1)
++			if ((res == -1) && (errno != EISDIR)
+ 			 && !(archive_handle->flags & ARCHIVE_EXTRACT_QUIET)
+ 			) {
+-				bb_perror_msg("extract_archive: %s", file_header->name);
++				bb_perror_msg("cannot make dir %s", file_header->name);
+ 			}
+ 			break;
+ 		case S_IFLNK:
+ 			/* Symlink */
+-			res = symlink(file_header->link_name, file_header->name);
++			res = symlink(file_header->link_target, file_header->name);
+ 			if ((res == -1)
+ 			 && !(archive_handle->flags & ARCHIVE_EXTRACT_QUIET)
+ 			) {
+-				bb_perror_msg("cannot create symlink "
+-					"from %s to '%s'",
++				bb_perror_msg("cannot create %slink "
++					"from %s to %s", "sym",
+ 					file_header->name,
+-					file_header->link_name);
++					file_header->link_target);
+ 			}
+ 			break;
+ 		case S_IFSOCK:
+@@ -110,18 +114,18 @@ void data_extract_all(archive_handle_t *archive_handle)
+ 	if (!(archive_handle->flags & ARCHIVE_NOPRESERVE_OWN)) {
+ 		lchown(file_header->name, file_header->uid, file_header->gid);
+ 	}
+-	/* uclibc has no lchmod, glibc is even stranger -
+-	 * it has lchmod which seems to do nothing!
+-	 * so we use chmod... */
+-	if (!(archive_handle->flags & ARCHIVE_NOPRESERVE_PERM)
+-	 && (file_header->mode & S_IFMT) != S_IFLNK
+-	) {
+-		chmod(file_header->name, file_header->mode);
+-	}
+-
+-	if (archive_handle->flags & ARCHIVE_PRESERVE_DATE) {
+-		struct utimbuf t;
+-		t.actime = t.modtime = file_header->mtime;
+-		utime(file_header->name, &t);
++	if ((file_header->mode & S_IFMT) != S_IFLNK) {
++		/* uclibc has no lchmod, glibc is even stranger -
++		 * it has lchmod which seems to do nothing!
++		 * so we use chmod... */
++		if (!(archive_handle->flags & ARCHIVE_NOPRESERVE_PERM)) {
++			chmod(file_header->name, file_header->mode);
++		}
++		/* same for utime */
++		if (archive_handle->flags & ARCHIVE_PRESERVE_DATE) {
++			struct utimbuf t;
++			t.actime = t.modtime = file_header->mtime;
++			utime(file_header->name, &t);
++		}
+ 	}
+ }
+diff --git a/archival/libunarchive/get_header_cpio.c b/archival/libunarchive/get_header_cpio.c
+index 6fd1340..724368b 100644
+--- a/archival/libunarchive/get_header_cpio.c
++++ b/archival/libunarchive/get_header_cpio.c
+@@ -30,7 +30,7 @@ char get_header_cpio(archive_handle_t *archive_handle)
+ 		tmp = saved_hardlinks;
+ 		oldtmp = NULL;
+ 
+-		file_header->link_name = file_header->name;
++		file_header->link_target = file_header->name;
+ 		file_header->size = 0;
+ 
+ 		while (tmp) {
+@@ -56,7 +56,7 @@ char get_header_cpio(archive_handle_t *archive_handle)
+ 				saved_hardlinks = tmp;
+ 		}
+ 
+-		file_header->name = file_header->link_name;
++		file_header->name = file_header->link_target;
+ 
+ 		if (pending_hardlinks > 1) {
+ 			bb_error_msg("error resolving hardlink: archive made by GNU cpio 2.0-2.2?");
+@@ -122,12 +122,12 @@ char get_header_cpio(archive_handle_t *archive_handle)
+ 	}
+ 
+ 	if (S_ISLNK(file_header->mode)) {
+-		file_header->link_name = xzalloc(file_header->size + 1);
+-		xread(archive_handle->src_fd, file_header->link_name, file_header->size);
++		file_header->link_target = xzalloc(file_header->size + 1);
++		xread(archive_handle->src_fd, file_header->link_target, file_header->size);
+ 		archive_handle->offset += file_header->size;
+ 		file_header->size = 0; /* Stop possible seeks in future */
+ 	} else {
+-		file_header->link_name = NULL;
++		file_header->link_target = NULL;
+ 	}
+ 	if (nlink > 1 && !S_ISDIR(file_header->mode)) {
+ 		if (file_header->size == 0) { /* Put file on a linked list for later */
+@@ -154,7 +154,7 @@ char get_header_cpio(archive_handle_t *archive_handle)
+ 
+ 	archive_handle->offset += file_header->size;
+ 
+-	free(file_header->link_name);
++	free(file_header->link_target);
+ 
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index b3efdec..d42f4c2 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -141,13 +141,13 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 		unsigned major = GET_OCTAL(tar.devmajor);
+ 		file_header->device = makedev(major, minor);
+ 	}
+-	file_header->link_name = NULL;
++	file_header->link_target = NULL;
+ 	if (!linkname && parse_names && tar.linkname[0]) {
+ 		/* we trash magic[0] here, it's ok */
+ 		tar.linkname[sizeof(tar.linkname)] = '\0';
+-		file_header->link_name = xstrdup(tar.linkname);
+-		/* FIXME: what if we have non-link object with link_name? */
+-		/* Will link_name be free()ed? */
++		file_header->link_target = xstrdup(tar.linkname);
++		/* FIXME: what if we have non-link object with link_target? */
++		/* Will link_target be free()ed? */
+ 	}
+ 	file_header->mtime = GET_OCTAL(tar.mtime);
+ 	file_header->size = GET_OCTAL(tar.size);
+@@ -248,7 +248,7 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 		longname = NULL;
+ 	}
+ 	if (linkname) {
+-		file_header->link_name = linkname;
++		file_header->link_target = linkname;
+ 		linkname = NULL;
+ 	}
+ #endif
+@@ -277,7 +277,7 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 	}
+ 	archive_handle->offset += file_header->size;
+ 
+-	free(file_header->link_name);
++	free(file_header->link_target);
+ 	/* Do not free(file_header->name)! */
+ 
+ 	return EXIT_SUCCESS;
+diff --git a/archival/libunarchive/header_verbose_list.c b/archival/libunarchive/header_verbose_list.c
+index 7b97e52..f3b0d8c 100644
+--- a/archival/libunarchive/header_verbose_list.c
++++ b/archival/libunarchive/header_verbose_list.c
+@@ -23,8 +23,8 @@ void header_verbose_list(const file_header_t *file_header)
+ 		mtime->tm_sec,
+ 		file_header->name);
+ 
+-	if (file_header->link_name) {
+-		printf(" -> %s", file_header->link_name);
++	if (file_header->link_target) {
++		printf(" -> %s", file_header->link_target);
+ 	}
+ 	/* putchar isnt used anywhere else i dont think */
+ 	puts("");
+diff --git a/include/unarchive.h b/include/unarchive.h
+index c4e875f..bea0558 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -10,11 +10,9 @@
+ #define ARCHIVE_NOPRESERVE_OWN          32
+ #define ARCHIVE_NOPRESERVE_PERM         64
+ 
+-//#include "libbb.h"
+-
+-typedef struct file_headers_s {
++typedef struct file_header_t {
+ 	char *name;
+-	char *link_name;
++	char *link_target;
+ 	off_t size;
+ 	uid_t uid;
+ 	gid_t gid;
+@@ -23,9 +21,9 @@ typedef struct file_headers_s {
+ 	dev_t device;
+ } file_header_t;
+ 
+-typedef struct archive_handle_s {
++typedef struct archive_handle_t {
+ 	/* define if the header and data component should be processed */
+-	char (*filter)(struct archive_handle_s *);
++	char (*filter)(struct archive_handle_t *);
+ 	llist_t *accept;
+ 	/* List of files that have been rejected */
+ 	llist_t *reject;
+@@ -39,13 +37,13 @@ typedef struct archive_handle_s {
+ 	void (*action_header)(const file_header_t *);
+ 
+ 	/* process the data component, e.g. extract to filesystem */
+-	void (*action_data)(struct archive_handle_s *);
++	void (*action_data)(struct archive_handle_t *);
+ 
+ 	/* How to process any sub archive, e.g. get_header_tar_gz */
+-	char (*action_data_subarchive)(struct archive_handle_s *);
++	char (*action_data_subarchive)(struct archive_handle_t *);
+ 
+ 	/* Contains the handle to a sub archive */
+-	struct archive_handle_s *sub_archive;
++	struct archive_handle_t *sub_archive;
+ 
+ 	/* The raw stream as read from disk or stdin */
+ 	int src_fd;
+@@ -54,7 +52,7 @@ typedef struct archive_handle_s {
+ 	off_t offset;
+ 
+ 	/* Function that skips data: read_by_char or read_by_skip */
+-	void (*seek)(const struct archive_handle_s *archive_handle, const unsigned int amount);
++	void (*seek)(const struct archive_handle_t *archive_handle, const unsigned amount);
+ 
+ 	/* Temporary storage */
+ 	char *buffer;
+@@ -92,8 +90,8 @@ extern char get_header_tar_bz2(archive_handle_t *archive_handle);
+ extern char get_header_tar_lzma(archive_handle_t *archive_handle);
+ extern char get_header_tar_gz(archive_handle_t *archive_handle);
+ 
+-extern void seek_by_jump(const archive_handle_t *archive_handle, const unsigned int amount);
+-extern void seek_by_read(const archive_handle_t *archive_handle, const unsigned int amount);
++extern void seek_by_jump(const archive_handle_t *archive_handle, const unsigned amount);
++extern void seek_by_read(const archive_handle_t *archive_handle, const unsigned amount);
+ 
+ extern ssize_t archive_xread_all_eof(archive_handle_t *archive_handle, unsigned char *buf, size_t count);
+ 
+diff --git a/libbb/copy_file.c b/libbb/copy_file.c
+index a6cfe12..b68a257 100644
+--- a/libbb/copy_file.c
++++ b/libbb/copy_file.c
+@@ -197,16 +197,16 @@ int copy_file(const char *source, const char *dest, int flags)
+ 		int src_fd;
+ 		int dst_fd;
+ 		if (ENABLE_FEATURE_PRESERVE_HARDLINKS) {
+-			char *link_name;
++			char *link_target;
+ 
+ 			if (!FLAGS_DEREF) {
+-				link_name = is_in_ino_dev_hashtable(&source_stat);
+-				if (link_name) {
+-					if (link(link_name, dest) < 0) {
++				link_target = is_in_ino_dev_hashtable(&source_stat);
++				if (link_target) {
++					if (link(link_target, dest) < 0) {
+ 						ovr = ask_and_unlink(dest, flags);
+ 						if (ovr <= 0)
+ 							return ovr;
+-						if (link(link_name, dest) < 0) {
++						if (link(link_target, dest) < 0) {
+ 							bb_perror_msg("cannot create link '%s'", dest);
+ 							return -1;
+ 						}

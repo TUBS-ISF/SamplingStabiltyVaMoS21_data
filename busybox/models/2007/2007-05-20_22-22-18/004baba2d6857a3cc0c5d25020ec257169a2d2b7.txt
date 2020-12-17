@@ -1,0 +1,34 @@
+2007-05-20 22:22:18 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 0d260a7..107b821 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -952,7 +952,7 @@ static int builtin_shift(char **argv)
+ 		n = atoi(argv[1]);
+ 	}
+ 	if (n >= 0 && n < global_argc) {
+-		/* XXX This probably breaks $0 */
++		global_argv[n] = global_argv[0];
+ 		global_argc -= n;
+ 		global_argv += n;
+ 		return EXIT_SUCCESS;
+diff --git a/shell/hush_test/hush-misc/shift.right b/shell/hush_test/hush-misc/shift.right
+new file mode 100644
+index 0000000..afb90be
+--- /dev/null
++++ b/shell/hush_test/hush-misc/shift.right
+@@ -0,0 +1,2 @@
++./shift.tests abc d e
++./shift.tests d e
+diff --git a/shell/hush_test/hush-misc/shift.tests b/shell/hush_test/hush-misc/shift.tests
+new file mode 100644
+index 0000000..17f2c9f
+--- /dev/null
++++ b/shell/hush_test/hush-misc/shift.tests
+@@ -0,0 +1,6 @@
++if test $# = 0; then
++    exec "$THIS_SH" $0 abc "d e"
++fi
++echo $0 $1 $2
++shift
++echo $0 $1 $2

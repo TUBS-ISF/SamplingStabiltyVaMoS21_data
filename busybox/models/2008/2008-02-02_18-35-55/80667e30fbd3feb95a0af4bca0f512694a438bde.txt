@@ -1,0 +1,48 @@
+2008-02-02 18:35:55 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 525162d..028116f 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -963,10 +963,9 @@ enum {
+ };
+ line_input_t *new_line_input_t(int flags);
+ /* Returns:
+- * -1 on read errors or EOF, or on bare Ctrl-D.
+- * 0  on ctrl-C,
++ * -1 on read errors or EOF, or on bare Ctrl-D,
++ * 0  on ctrl-C (the line entered is still returned in 'command'),
+  * >0 length of input string, including terminating '\n'
+- * [is this true? stores "" in 'command' if return value is 0 or -1]
+  */
+ int read_line_input(const char* prompt, char* command, int maxsize, line_input_t *state);
+ #else
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index d3ee738..c191b05 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1315,8 +1315,8 @@ static void win_changed(int nsig)
+ #define CTRL(a) ((a) & ~0x40)
+ 
+ /* Returns:
+- * -1 on read errors or EOF, or on bare Ctrl-D.
+- * 0  on ctrl-C,
++ * -1 on read errors or EOF, or on bare Ctrl-D,
++ * 0  on ctrl-C (the line entered is still returned in 'command'),
+  * >0 length of input string, including terminating '\n'
+  */
+ int read_line_input(const char *prompt, char *command, int maxsize, line_input_t *st)
+diff --git a/shell/msh.c b/shell/msh.c
+index 7371120..9a1be36 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -4836,7 +4836,9 @@ static int filechar(struct ioarg *ap)
+ 		static int position = 0, size = 0;
+ 
+ 		while (size == 0 || position >= size) {
+-			read_line_input(current_prompt, filechar_cmdbuf, BUFSIZ, line_input_state);
++			/* Repeat if Ctrl-C is pressed. TODO: exit on -1 (error/EOF)? */
++			while (read_line_input(current_prompt, filechar_cmdbuf, BUFSIZ, line_input_state) == 0)
++				continue;
+ 			size = strlen(filechar_cmdbuf);
+ 			position = 0;
+ 		}

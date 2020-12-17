@@ -1,0 +1,27 @@
+2010-02-19 09:16:33 +0100
+diff --git a/docs/style-guide.txt b/docs/style-guide.txt
+index a58931a..fdf6cfe 100644
+--- a/docs/style-guide.txt
++++ b/docs/style-guide.txt
+@@ -422,7 +422,7 @@ called 'strings.c' - instead of two, food for thought).
+ Testing String Equivalence
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+-There's a right way and a wrong way to test for sting equivalence with
++There's a right way and a wrong way to test for string equivalence with
+ strcmp():
+ 
+ 	The wrong way:
+diff --git a/scripts/kconfig/util.c b/scripts/kconfig/util.c
+index 0461a5f..ef4c832 100644
+--- a/scripts/kconfig/util.c
++++ b/scripts/kconfig/util.c
+@@ -57,7 +57,7 @@ int file_write_dep(const char *name)
+ }
+ 
+ 
+-/* Allocate initial growable sting */
++/* Allocate initial growable string */
+ struct gstr str_new(void)
+ {
+ 	struct gstr gs;

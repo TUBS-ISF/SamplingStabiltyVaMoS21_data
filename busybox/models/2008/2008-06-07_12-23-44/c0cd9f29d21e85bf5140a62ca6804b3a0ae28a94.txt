@@ -1,0 +1,26 @@
+2008-06-07 12:23:44 +0000
+diff --git a/Makefile b/Makefile
+index 308ea42..37b6d9b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -931,7 +931,7 @@ endif # CONFIG_MODULES
+ 
+ # Directories & files removed with 'make clean'
+ CLEAN_DIRS  += $(MODVERDIR)
+-CLEAN_FILES +=	busybox* System.map .kernelrelease \
++CLEAN_FILES +=	busybox busybox_unstripped* System.map .kernelrelease \
+                 .tmp_kallsyms* .tmp_version .tmp_busybox* .tmp_System.map
+ 
+ # Directories & files removed with 'make mrproper'
+diff --git a/networking/tcpudp.c b/networking/tcpudp.c
+index 0b604af..07a87b8 100644
+--- a/networking/tcpudp.c
++++ b/networking/tcpudp.c
+@@ -31,6 +31,7 @@
+ 
+ #include "libbb.h"
+ /* Wants <limits.h> etc, thus included after libbb.h: */
++#include <linux/types.h> /* for __be32 etc */
+ #include <linux/netfilter_ipv4.h>
+ 
+ // TODO: move into this file:

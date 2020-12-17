@@ -1,0 +1,14 @@
+2010-01-17 19:08:39 +0100
+diff --git a/testsuite/bunzip2.tests b/testsuite/bunzip2.tests
+index 7875cd1..734acbb 100755
+--- a/testsuite/bunzip2.tests
++++ b/testsuite/bunzip2.tests
+@@ -504,7 +504,7 @@ prep; >t1; check "$unpack: already exists" "${bb}$unpack t1.$ext t2.$ext; echo \
+ 
+ # From old testsuite
+ expected="HELLO\n0\n"
+-prep; check "$unpack: stream unpack" "cat t1.$ext | ${bb}$unpack; echo $?"
++prep; check "$unpack: stream unpack" "cat t1.$ext | ${bb}$unpack; echo \$?"
+ 
+ expected="ok\n"
+ prep; check "$unpack: delete src" "${bb}$unpack t2.$ext; test ! -f t2.$ext && echo ok"

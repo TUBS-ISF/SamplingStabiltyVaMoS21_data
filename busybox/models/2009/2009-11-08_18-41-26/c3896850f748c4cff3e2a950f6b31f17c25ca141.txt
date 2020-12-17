@@ -1,0 +1,69 @@
+2009-11-08 18:41:26 +0100
+diff --git a/examples/var_service/tftpd/log/run b/examples/var_service/tftpd/log/run
+new file mode 100755
+index 0000000..560d1b1
+--- /dev/null
++++ b/examples/var_service/tftpd/log/run
+@@ -0,0 +1,21 @@
++#!/bin/sh
++
++user=logger
++
++logdir="/var/log/service/`(cd ..;basename $PWD)`"
++mkdir -p "$logdir" 2>/dev/null
++chown -R "$user": "$logdir"
++chmod -R go-rwxst,u+rwX "$logdir"
++rm logdir
++ln -s "$logdir" logdir
++
++# make this dir accessible to logger
++chmod a+rX .
++
++exec >/dev/null
++exec 2>&1
++exec \
++env - PATH="$PATH" \
++softlimit \
++setuidgid "$user" \
++svlogd -tt "$logdir"
+diff --git a/examples/var_service/tftpd/p_log b/examples/var_service/tftpd/p_log
+new file mode 100755
+index 0000000..a2521be
+--- /dev/null
++++ b/examples/var_service/tftpd/p_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++cat @* current | $PAGER
+diff --git a/examples/var_service/tftpd/run b/examples/var_service/tftpd/run
+new file mode 100755
+index 0000000..e492d84
+--- /dev/null
++++ b/examples/var_service/tftpd/run
+@@ -0,0 +1,15 @@
++#!/bin/sh
++
++#exec >/dev/null
++exec 2>&1
++exec </dev/null
++
++user=root # for bind to port 69
++
++exec \
++env - \
++softlimit \
++setuidgid "$user" \
++udpsvd -v -c 10 -l localhost \
++  0 69 \
++tftpd /pub/tftpd_root
+diff --git a/examples/var_service/tftpd/w_log b/examples/var_service/tftpd/w_log
+new file mode 100755
+index 0000000..34b19b3
+--- /dev/null
++++ b/examples/var_service/tftpd/w_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++watch -n2 'w=`ttysize w`; h=`ttysize h`; tail -$((h-3)) current 2>&1 | cut -b0-$((w-2))'

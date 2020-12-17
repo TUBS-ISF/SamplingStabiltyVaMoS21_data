@@ -1,0 +1,14 @@
+2009-04-16 23:05:59 +0000
+diff --git a/scripts/defconfig b/scripts/defconfig
+index a3ab588..a863eca 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -579,7 +579,7 @@ CONFIG_DEVMEM=y
+ CONFIG_EJECT=y
+ CONFIG_FEATURE_EJECT_SCSI=y
+ CONFIG_FBSPLASH=y
+-CONFIG_FLASH_ERASEALL=y
++# CONFIG_FLASH_ERASEALL is not set
+ CONFIG_IONICE=y
+ # CONFIG_INOTIFYD is not set
+ CONFIG_LAST=y

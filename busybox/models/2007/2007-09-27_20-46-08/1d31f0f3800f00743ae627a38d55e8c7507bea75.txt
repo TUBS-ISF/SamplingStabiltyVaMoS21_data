@@ -1,0 +1,17 @@
+2007-09-27 20:46:08 +0000
+diff --git a/libbb/messages.c b/libbb/messages.c
+index 0e43ab6..a64aa40 100644
+--- a/libbb/messages.c
++++ b/libbb/messages.c
+@@ -65,7 +65,10 @@ const char bb_path_wtmp_file[] ALIGN1 =
+ #error unknown path to wtmp file
+ #endif
+ 
+-char bb_common_bufsiz1[COMMON_BUFSIZE];
++/* We use it for "global" data via *(struct global*)&bb_common_bufsiz1.
++ * Since gcc insists on aligning struct global's members, it would be a pity
++ * (and an alignment fault on some CPUs) to mess it up. */
++char bb_common_bufsiz1[COMMON_BUFSIZE] __attribute__(( aligned(sizeof(long long)) ));
+ 
+ struct globals;
+ /* Make it reside in R/W memory: */

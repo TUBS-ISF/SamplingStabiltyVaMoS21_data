@@ -1,0 +1,144 @@
+2008-10-20 07:52:33 +0000
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 43fb6eb..49fb533 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -515,28 +515,6 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 		}
+ 	}
+ 
+-	/* In case getopt32 was already called:
+-	 * reset the libc getopt() function, which keeps internal state.
+-	 *
+-	 * BSD-derived getopt() functions require that optind be set to 1 in
+-	 * order to reset getopt() state.  This used to be generally accepted
+-	 * way of resetting getopt().  However, glibc's getopt()
+-	 * has additional getopt() state beyond optind, and requires that
+-	 * optind be set to zero to reset its state.  So the unfortunate state of
+-	 * affairs is that BSD-derived versions of getopt() misbehave if
+-	 * optind is set to 0 in order to reset getopt(), and glibc's getopt()
+-	 * will core dump if optind is set 1 in order to reset getopt().
+-	 *
+-	 * More modern versions of BSD require that optreset be set to 1 in
+-	 * order to reset getopt().   Sigh.  Standards, anyone?
+-	 */
+-#ifdef __GLIBC__
+-	optind = 0;
+-#else /* BSD style */
+-	optind = 1;
+-	/* optreset = 1; */
+-#endif
+-	/* optarg = NULL; opterr = 0; optopt = 0; - do we need this?? */
+ 	pargv = NULL;
+ 
+ 	/* Note: just "getopt() <= 0" will not work well for
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index da0dc03..17b373c 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -125,6 +125,7 @@ int FAST_FUNC run_nofork_applet_prime(struct nofork_save_area *old, int applet_n
+ 	int rc, argc;
+ 
+ 	applet_name = APPLET_NAME(applet_no);
++
+ 	xfunc_error_retval = EXIT_FAILURE;
+ 
+ 	/* Special flag for xfunc_die(). If xfunc will "die"
+@@ -132,7 +133,30 @@ int FAST_FUNC run_nofork_applet_prime(struct nofork_save_area *old, int applet_n
+ 	 * die_sleep and longjmp here instead. */
+ 	die_sleep = -1;
+ 
+-	/* option_mask32 = 0; - not needed */
++	/* In case getopt() or getopt32() was already called:
++	 * reset the libc getopt() function, which keeps internal state.
++	 *
++	 * BSD-derived getopt() functions require that optind be set to 1 in
++	 * order to reset getopt() state.  This used to be generally accepted
++	 * way of resetting getopt().  However, glibc's getopt()
++	 * has additional getopt() state beyond optind, and requires that
++	 * optind be set to zero to reset its state.  So the unfortunate state of
++	 * affairs is that BSD-derived versions of getopt() misbehave if
++	 * optind is set to 0 in order to reset getopt(), and glibc's getopt()
++	 * will core dump if optind is set 1 in order to reset getopt().
++	 *
++	 * More modern versions of BSD require that optreset be set to 1 in
++	 * order to reset getopt().  Sigh.  Standards, anyone?
++	 */
++#ifdef __GLIBC__
++	optind = 0;
++#else /* BSD style */
++	optind = 1;
++	/* optreset = 1; */
++#endif
++	/* optarg = NULL; opterr = 1; optopt = 63; - do we need this too? */
++	/* (values above are what they initialized to in glibc and uclibc) */
++	/* option_mask32 = 0; - not needed, no applet depends on it being 0 */
+ 
+ 	argc = 1;
+ 	while (argv[argc])
+@@ -161,8 +185,16 @@ int FAST_FUNC run_nofork_applet_prime(struct nofork_save_area *old, int applet_n
+ 			rc = 0;
+ 	}
+ 
+-	/* Restoring globals */
++	/* Restoring some globals */
+ 	restore_nofork_data(old);
++
++	/* Other globals can be simply reset to defaults */
++#ifdef __GLIBC__
++	optind = 0;
++#else /* BSD style */
++	optind = 1;
++#endif
++
+ 	return rc & 0xff; /* don't confuse people with "exitcodes" >255 */
+ }
+ 
+diff --git a/shell/ash_test/ash-standalone/nofork_trashes_getopt.right b/shell/ash_test/ash-standalone/nofork_trashes_getopt.right
+new file mode 100644
+index 0000000..573541a
+--- /dev/null
++++ b/shell/ash_test/ash-standalone/nofork_trashes_getopt.right
+@@ -0,0 +1 @@
++0
+diff --git a/shell/ash_test/ash-standalone/nofork_trashes_getopt.tests b/shell/ash_test/ash-standalone/nofork_trashes_getopt.tests
+new file mode 100755
+index 0000000..f42c507
+--- /dev/null
++++ b/shell/ash_test/ash-standalone/nofork_trashes_getopt.tests
+@@ -0,0 +1,6 @@
++# In this test, rm is NOFORK and it modifies getopt internal state
++rm -f non_existent_file
++# Subsequent hexdump is run as NOEXEC, and thus still uses this state
++hexdump </dev/null
++# Did hexdump segfault etc?
++echo $?
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 4026303..8b5e46c 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -142,7 +142,8 @@ static const char *normalize(const char *arg)
+  * Other settings are found in global variables.
+  */
+ #if !ENABLE_GETOPT_LONG
+-#define generate_output(argv,argc,optstr,longopts) generate_output(argv,argc,optstr)
++#define generate_output(argv,argc,optstr,longopts) \
++	generate_output(argv,argc,optstr)
+ #endif
+ static int generate_output(char **argv, int argc, const char *optstr, const struct option *longopts)
+ {
+@@ -156,14 +157,6 @@ static int generate_output(char **argv, int argc, const char *optstr, const stru
+ 	if (quiet_errors) /* No error reporting from getopt(3) */
+ 		opterr = 0;
+ 
+-	/* Reset getopt(3) (see libbb/getopt32.c for long rant) */
+-#ifdef __GLIBC__
+-	optind = 0;
+-#else /* BSD style */
+-	optind = 1;
+-	/* optreset = 1; */
+-#endif
+-
+ 	while (1) {
+ 		opt =
+ #if ENABLE_GETOPT_LONG

@@ -1,0 +1,14 @@
+2008-10-29 01:20:13 +0000
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index 9aa0abb..bb1369c 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -236,7 +236,7 @@ config CHPASSWD
+ 	bool "chpasswd"
+ 	default n
+ 	help
+-	  chpasswd  reads  a  file  of user name and password pairs from
++	  chpasswd reads a file of user name and password pairs from
+ 	  standard input and uses this information to update a group of
+ 	  existing users.
+ 

@@ -1,0 +1,247 @@
+2008-02-25 23:23:58 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 1ea2e35..978cd2d 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -550,6 +550,8 @@ extern FILE *fopen_or_warn_stdin(const char *filename);
+  * If this is a problem, use bare poll and open-code EINTR/ENOMEM handling */
+ int safe_poll(struct pollfd *ufds, nfds_t nfds, int timeout_ms);
+ 
++char *safe_gethostname(void);
++
+ /* Convert each alpha char in str to lower-case */
+ char* str_tolower(char *str);
+ 
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 515368d..aab016e 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -73,6 +73,7 @@ lib-y += recursive_action.o
+ lib-y += remove_file.o
+ lib-y += restricted_shell.o
+ lib-y += run_shell.o
++lib-y += safe_gethostname.o
+ lib-y += safe_poll.o
+ lib-y += safe_strncpy.o
+ lib-y += safe_write.o
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 9aab637..c6aa45c 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1203,11 +1203,7 @@ static void parse_and_put_prompt(const char *prmt_ptr)
+ 					break;
+ #endif
+ 				case 'h':
+-					pbuf = free_me = xzalloc(256);
+-					if (gethostname(pbuf, 255) < 0) {
+-						pbuf[0] = '?';
+-						pbuf[1] = '\0';
+-					}
++					pbuf = free_me = safe_gethostname();
+ 					*strchrnul(pbuf, '.') = '\0';
+ 					break;
+ 				case '$':
+diff --git a/libbb/login.c b/libbb/login.c
+index d1f5d64..a711a54 100644
+--- a/libbb/login.c
++++ b/libbb/login.c
+@@ -50,6 +50,7 @@ void print_login_issue(const char *issue_file, const char *tty)
+ 				outbuf = uts.sysname;
+ 				break;
+ 			case 'n':
++			case 'h':
+ 				outbuf = uts.nodename;
+ 				break;
+ 			case 'r':
+@@ -72,10 +73,6 @@ void print_login_issue(const char *issue_file, const char *tty)
+ 			case 't':
+ 				strftime(buf, sizeof(buf), fmtstr_t, localtime(&t));
+ 				break;
+-			case 'h':
+-				gethostname(buf, sizeof(buf) - 1);
+-				buf[sizeof(buf) - 1] = '\0';
+-				break;
+ 			case 'l':
+ 				outbuf = tty;
+ 				break;
+@@ -91,13 +88,12 @@ void print_login_issue(const char *issue_file, const char *tty)
+ 
+ void print_login_prompt(void)
+ {
+-	char buf[MAXHOSTNAMELEN+1];
+-
+-	if (gethostname(buf, MAXHOSTNAMELEN) == 0)
+-		fputs(buf, stdout);
+-
++	char *hostname = safe_gethostname();
++	
++	fputs(hostname, stdout);
+ 	fputs(LOGIN, stdout);
+ 	fflush(stdout);
++	free(hostname);
+ }
+ 
+ /* Clear dangerous stuff, set PATH */
+diff --git a/libbb/obscure.c b/libbb/obscure.c
+index 5cc9062..1841b27 100644
+--- a/libbb/obscure.c
++++ b/libbb/obscure.c
+@@ -93,7 +93,7 @@ static const char *obscure_msg(const char *old_p, const char *new_p, const struc
+ 	/* Add 2 for each type of characters to the minlen of password */
+ 	int size = CONFIG_PASSWORD_MINLEN + 8;
+ 	const char *p;
+-	char hostname[255];
++	char *hostname;
+ 
+ 	/* size */
+ 	if (!new_p || (length = strlen(new_p)) < CONFIG_PASSWORD_MINLEN)
+@@ -108,12 +108,11 @@ static const char *obscure_msg(const char *old_p, const char *new_p, const struc
+ 		return "similar to gecos";
+ 	}
+ 	/* hostname as-is, as sub-string, reversed, capitalized, doubled */
+-	if (gethostname(hostname, 255) == 0) {
+-		hostname[254] = '\0';
+-		if (string_checker(new_p, hostname)) {
+-			return "similar to hostname";
+-		}
+-	}
++	hostname = safe_gethostname();
++	i = string_checker(new_p, hostname);
++	free(hostname);
++	if (i)
++		return "similar to hostname";
+ 
+ 	/* Should / Must contain a mix of: */
+ 	for (i = 0; i < length; i++) {
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 52a65bc..286f00f 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -1133,8 +1133,8 @@ static void signal_handler(int sig)
+ static const char *get_variable(const char *variable, void *info)
+ {
+ 	static char sbuf[sizeof(int)*3 + 2]; /* sign and NUL */
++	static char *hostname;
+ 
+-	char hostname[STRING_LENGTH];
+ 	struct get_variable_info *gv_info = info;
+ 	const char *field_names[] = {
+ 			"hostname", "mntpt", "devpath", "devname",
+@@ -1143,12 +1143,8 @@ static const char *get_variable(const char *variable, void *info)
+ 	};
+ 	int i;
+ 
+-	if (gethostname(hostname, STRING_LENGTH - 1) != 0)
+-		/* Here on error we should do exit(RV_SYS_ERROR), instead we do exit(EXIT_FAILURE) */
+-		error_logger_and_die(LOG_ERR, "gethostname");
+-
+-	hostname[STRING_LENGTH - 1] = '\0';
+-
++	if (!hostname)
++		hostname = safe_gethostname();
+ 	/* index_in_str_array returns i>=0  */
+ 	i = index_in_str_array(field_names, variable);
+ 
+diff --git a/networking/hostname.c b/networking/hostname.c
+index 2c224be..93cbc96 100644
+--- a/networking/hostname.c
++++ b/networking/hostname.c
+@@ -24,8 +24,7 @@ static void do_sethostname(char *s, int isfile)
+ 		if (sethostname(s, strlen(s)) < 0) {
+ 			if (errno == EPERM)
+ 				bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+-			else
+-				bb_perror_msg_and_die("sethostname");
++			bb_perror_msg_and_die("sethostname");
+ 		}
+ 	} else {
+ 		f = xfopen(s, "r");
+@@ -54,27 +53,27 @@ int hostname_main(int argc, char **argv)
+ 		OPT_dfis = 0xf,
+ 	};
+ 
+-	char buf[256];
++	char *buf;
+ 	char *hostname_str;
+ 
+ 	if (argc < 1)
+ 		bb_show_usage();
+ 
+ 	getopt32(argv, "dfisF:", &hostname_str);
++	argv += optind;
++	buf = safe_gethostname();
+ 
+ 	/* Output in desired format */
+ 	if (option_mask32 & OPT_dfis) {
+ 		struct hostent *hp;
+ 		char *p;
+-		gethostname(buf, sizeof(buf));
+ 		hp = xgethostbyname(buf);
+ 		p = strchr(hp->h_name, '.');
+ 		if (option_mask32 & OPT_f) {
+ 			puts(hp->h_name);
+ 		} else if (option_mask32 & OPT_s) {
+-			if (p != NULL) {
++			if (p)
+ 				*p = '\0';
+-			}
+ 			puts(hp->h_name);
+ 		} else if (option_mask32 & OPT_d) {
+ 			if (p)
+@@ -89,14 +88,15 @@ int hostname_main(int argc, char **argv)
+ 	/* Set the hostname */
+ 	else if (option_mask32 & OPT_F) {
+ 		do_sethostname(hostname_str, 1);
+-	} else if (optind < argc) {
+-		do_sethostname(argv[optind], 0);
++	} else if (argv[0]) {
++		do_sethostname(argv[0], 0);
+ 	}
+ 	/* Or if all else fails,
+ 	 * just print the current hostname */
+ 	else {
+-		gethostname(buf, sizeof(buf));
+ 		puts(buf);
+ 	}
++	if (ENABLE_FEATURE_CLEAN_UP)
++		free(buf);
+ 	return 0;
+ }
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 0dc69d8..0d004bc 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -97,8 +97,8 @@ struct globals {
+ 	struct shbuf_ds *shbuf;
+ #endif
+ 	time_t last_log_time;
+-	/* localhost's name */
+-	char localHostName[64];
++	/* localhost's name. We print only first 64 chars */
++	char *hostname;
+ 
+ 	/* We recv into recvbuf... */
+ 	char recvbuf[MAX_READ];
+@@ -416,7 +416,7 @@ static void timestamp_and_log(int pri, char *msg, int len)
+ 	else {
+ 		char res[20];
+ 		parse_fac_prio_20(pri, res);
+-		sprintf(G.printbuf, "%s %s %s %s\n", timestamp, G.localHostName, res, msg);
++		sprintf(G.printbuf, "%s %.64s %s %s\n", timestamp, G.hostname, res, msg);
+ 	}
+ 
+ 	/* Log message locally (to file or shared mem) */
+@@ -647,11 +647,8 @@ int syslogd_main(int argc, char **argv)
+ 		option_mask32 |= OPT_locallog;
+ 
+ 	/* Store away localhost's name before the fork */
+-	/* "It is unspecified whether the truncated hostname
+-	 * will be null-terminated". We give it (size - 1),
+-	 * thus last byte will be NUL no matter what. */
+-	gethostname(G.localHostName, sizeof(G.localHostName) - 1);
+-	*strchrnul(G.localHostName, '.') = '\0';
++	G.hostname = safe_gethostname();
++	*strchrnul(G.hostname, '.') = '\0';
+ 
+ 	if (!(option_mask32 & OPT_nofork)) {
+ 		bb_daemonize_or_rexec(DAEMON_CHDIR_ROOT, argv);

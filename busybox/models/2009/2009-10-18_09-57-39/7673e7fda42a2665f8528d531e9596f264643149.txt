@@ -1,0 +1,21 @@
+2009-10-18 09:57:39 +0200
+diff --git a/util-linux/mkfs_ext2.c b/util-linux/mkfs_ext2.c
+index 6b059d9..8df9f1a 100644
+--- a/util-linux/mkfs_ext2.c
++++ b/util-linux/mkfs_ext2.c
+@@ -283,7 +283,6 @@ int mkfs_ext2_main(int argc UNUSED_PARAM, char **argv)
+ 		nblocks = xatou(argv[1]);
+ 	} else {
+ 		nblocks = ((uoff_t)xlseek(fd, 0, SEEK_END)) / blocksize;
+-		xlseek(fd, 0, SEEK_SET);
+ 	}
+ 	sb->s_blocks_count = nblocks;
+ 
+@@ -414,7 +413,6 @@ int mkfs_ext2_main(int argc UNUSED_PARAM, char **argv)
+ 		);
+ 		// dump inode bitmap
+ 		PUT((pos + overhead + 1) * blocksize, buf, blocksize);
+-
+ 	}
+ 
+ 	// zero boot sectors

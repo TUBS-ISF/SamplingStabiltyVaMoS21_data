@@ -1,0 +1,15 @@
+2007-07-17 23:22:49 +0000
+diff --git a/editors/vi.c b/editors/vi.c
+index 67606f9..594edfd 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -1134,7 +1134,8 @@ static void Hit_Return(void)
+ 	redraw(TRUE);		// force redraw all
+ }
+ 
+-static int next_tabstop(int col) { //vda
++static int next_tabstop(int col)
++{
+ 	return col + ((tabstop - 1) - (col % tabstop));
+ }
+ 

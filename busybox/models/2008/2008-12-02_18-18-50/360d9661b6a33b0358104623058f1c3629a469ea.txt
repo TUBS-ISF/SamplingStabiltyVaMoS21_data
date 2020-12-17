@@ -1,0 +1,472 @@
+2008-12-02 18:18:50 +0000
+diff --git a/e2fsprogs/old_e2fsprogs/uuid/gen_uuid.c b/e2fsprogs/old_e2fsprogs/uuid/gen_uuid.c
+index 03a9f37..4310c17 100644
+--- a/e2fsprogs/old_e2fsprogs/uuid/gen_uuid.c
++++ b/e2fsprogs/old_e2fsprogs/uuid/gen_uuid.c
+@@ -165,7 +165,7 @@ static int get_node_id(unsigned char *node_id)
+ 	n = ifc.ifc_len;
+ 	for (i = 0; i < n; i+= ifreq_size(*ifrp) ) {
+ 		ifrp = (struct ifreq *)((char *) ifc.ifc_buf+i);
+-		strncpy(ifr.ifr_name, ifrp->ifr_name, IFNAMSIZ);
++		strncpy_IFNAMSIZ(ifr.ifr_name, ifrp->ifr_name);
+ #ifdef SIOCGIFHWADDR
+ 		if (ioctl(sd, SIOCGIFHWADDR, &ifr) < 0)
+ 			continue;
+diff --git a/include/libbb.h b/include/libbb.h
+index 77c4c60..e4ccc75 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -540,6 +540,7 @@ char *xstrdup(const char *s) FAST_FUNC;
+ char *xstrndup(const char *s, int n) FAST_FUNC;
+ void overlapping_strcpy(char *dst, const char *src) FAST_FUNC;
+ char *safe_strncpy(char *dst, const char *src, size_t size) FAST_FUNC;
++char *strncpy_IFNAMSIZ(char *dst, const char *src) FAST_FUNC;
+ /* Guaranteed to NOT be a macro (smallest code). Saves nearly 2k on uclibc.
+  * But potentially slow, don't use in one-billion-times loops */
+ int bb_putchar(int ch) FAST_FUNC;
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index e2aee13..f3c3c53 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -40,6 +40,14 @@ int FAST_FUNC close_on_exec_on(int fd)
+ 	return fcntl(fd, F_SETFD, FD_CLOEXEC);
+ }
+ 
++char* FAST_FUNC strncpy_IFNAMSIZ(char *dst, const char *src)
++{
++#ifndef IFNAMSIZ
++	enum { IFNAMSIZ = 16 };
++#endif
++	return strncpy(dst, src, IFNAMSIZ);
++}
++
+ /* Convert unsigned long long value into compact 4-char
+  * representation. Examples: "1234", "1.2k", " 27M", "123T"
+  * String is not terminated (buf[4] is untouched) */
+diff --git a/networking/arping.c b/networking/arping.c
+index aba32b8..e442997 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -286,7 +286,7 @@ int arping_main(int argc UNUSED_PARAM, char **argv)
+ 		struct ifreq ifr;
+ 
+ 		memset(&ifr, 0, sizeof(ifr));
+-		strncpy(ifr.ifr_name, device, sizeof(ifr.ifr_name) - 1);
++		strncpy_IFNAMSIZ(ifr.ifr_name, device);
+ 		/* We use ifr.ifr_name in error msg so that problem
+ 		 * with truncated name will be visible */
+ 		ioctl_or_perror_and_die(sock_fd, SIOCGIFINDEX, &ifr, err_str, "not found");
+diff --git a/networking/brctl.c b/networking/brctl.c
+index 8475179..69e3c86 100644
+--- a/networking/brctl.c
++++ b/networking/brctl.c
+@@ -137,7 +137,7 @@ int brctl_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 				if (!if_indextoname(bridx[i], brname))
+ 					bb_perror_msg_and_die("can't get bridge name for index %d", i);
+-				strncpy(ifr.ifr_name, brname, IFNAMSIZ);
++				strncpy_IFNAMSIZ(ifr.ifr_name, brname);
+ 
+ 				arm_ioctl(args, BRCTL_GET_BRIDGE_INFO,
+ 							(unsigned long) &bi, 0);
+@@ -191,7 +191,7 @@ int brctl_main(int argc UNUSED_PARAM, char **argv)
+ 		if (!*argv) /* all but 'addif/delif' need at least two arguments */
+ 			bb_show_usage();
+ 
+-		strncpy(ifr.ifr_name, br, IFNAMSIZ);
++		strncpy_IFNAMSIZ(ifr.ifr_name, br);
+ 		if (key == ARG_addif || key == ARG_delif) { /* addif or delif */
+ 			brif = *argv;
+ 			ifr.ifr_ifindex = if_nametoindex(brif);
+diff --git a/networking/ether-wake.c b/networking/ether-wake.c
+index a37b6eb..882429d 100644
+--- a/networking/ether-wake.c
++++ b/networking/ether-wake.c
+@@ -219,7 +219,7 @@ int ether_wake_main(int argc UNUSED_PARAM, char **argv)
+ 	{
+ 		struct ifreq if_hwaddr;
+ 
+-		strncpy(if_hwaddr.ifr_name, ifname, sizeof(if_hwaddr.ifr_name));
++		strncpy_IFNAMSIZ(if_hwaddr.ifr_name, ifname);
+ 		ioctl_or_perror_and_die(s, SIOCGIFHWADDR, &if_hwaddr, "SIOCGIFHWADDR on %s failed", ifname);
+ 
+ 		memcpy(outpack+6, if_hwaddr.ifr_hwaddr.sa_data, 6);
+@@ -255,7 +255,7 @@ int ether_wake_main(int argc UNUSED_PARAM, char **argv)
+ #if defined(PF_PACKET)
+ 	{
+ 		struct ifreq ifr;
+-		strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 		xioctl(s, SIOCGIFINDEX, &ifr);
+ 		memset(&whereto, 0, sizeof(whereto));
+ 		whereto.sll_family = AF_PACKET;
+diff --git a/networking/ifconfig.c b/networking/ifconfig.c
+index e999741..22b1682 100644
+--- a/networking/ifconfig.c
++++ b/networking/ifconfig.c
+@@ -313,7 +313,7 @@ int ifconfig_main(int argc, char **argv)
+ 	sockfd = xsocket(AF_INET, SOCK_DGRAM, 0);
+ 
+ 	/* get interface name */
+-	strncpy(ifr.ifr_name, *argv, IFNAMSIZ);
++	strncpy_IFNAMSIZ(ifr.ifr_name, *argv);
+ 
+ 	/* Process the remaining arguments. */
+ 	while (*++argv != (char *) NULL) {
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index ae97457..fa22642 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -140,11 +140,6 @@ struct globals {
+ 
+ /* NOINLINEs are placed where it results in smaller code (gcc 4.3.1) */
+ 
+-static void strncpy_IFNAMSIZ(char *dst, const char *src)
+-{
+-	strncpy(dst, src, IFNAMSIZ);
+-}
+-
+ static int ioctl_on_skfd(unsigned request, struct ifreq *ifr)
+ {
+ 	return ioctl(skfd, request, ifr);
+diff --git a/networking/interface.c b/networking/interface.c
+index 00174d4..ef187be 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -395,7 +395,7 @@ static struct interface *add_interface(char *name)
+ 	}
+ 
+ 	new = xzalloc(sizeof(*new));
+-	strncpy(new->name, name, IFNAMSIZ);
++	strncpy_IFNAMSIZ(new->name, name);
+ 	nextp = ife ? &ife->next : &int_list;
+ 	new->prev = ife;
+ 	new->next = *nextp;
+@@ -614,39 +614,39 @@ static int if_fetch(struct interface *ife)
+ 
+ 	skfd = xsocket(AF_INET, SOCK_DGRAM, 0);
+ 
+-	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 	if (ioctl(skfd, SIOCGIFFLAGS, &ifr) < 0) {
+ 		close(skfd);
+ 		return -1;
+ 	}
+ 	ife->flags = ifr.ifr_flags;
+ 
+-	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 	memset(ife->hwaddr, 0, 32);
+ 	if (ioctl(skfd, SIOCGIFHWADDR, &ifr) >= 0)
+ 		memcpy(ife->hwaddr, ifr.ifr_hwaddr.sa_data, 8);
+ 
+ 	ife->type = ifr.ifr_hwaddr.sa_family;
+ 
+-	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 	ife->metric = 0;
+ 	if (ioctl(skfd, SIOCGIFMETRIC, &ifr) >= 0)
+ 		ife->metric = ifr.ifr_metric;
+ 
+-	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 	ife->mtu = 0;
+ 	if (ioctl(skfd, SIOCGIFMTU, &ifr) >= 0)
+ 		ife->mtu = ifr.ifr_mtu;
+ 
+ 	memset(&ife->map, 0, sizeof(struct ifmap));
+ #ifdef SIOCGIFMAP
+-	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 	if (ioctl(skfd, SIOCGIFMAP, &ifr) == 0)
+ 		ife->map = ifr.ifr_map;
+ #endif
+ 
+ #ifdef HAVE_TXQUEUELEN
+-	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 	ife->tx_queue_len = -1;	/* unknown value */
+ 	if (ioctl(skfd, SIOCGIFTXQLEN, &ifr) >= 0)
+ 		ife->tx_queue_len = ifr.ifr_qlen;
+@@ -654,23 +654,23 @@ static int if_fetch(struct interface *ife)
+ 	ife->tx_queue_len = -1;	/* unknown value */
+ #endif
+ 
+-	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 	ifr.ifr_addr.sa_family = AF_INET;
+ 	memset(&ife->addr, 0, sizeof(struct sockaddr));
+ 	if (ioctl(skfd, SIOCGIFADDR, &ifr) == 0) {
+ 		ife->has_ip = 1;
+ 		ife->addr = ifr.ifr_addr;
+-		strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 		memset(&ife->dstaddr, 0, sizeof(struct sockaddr));
+ 		if (ioctl(skfd, SIOCGIFDSTADDR, &ifr) >= 0)
+ 			ife->dstaddr = ifr.ifr_dstaddr;
+ 
+-		strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 		memset(&ife->broadaddr, 0, sizeof(struct sockaddr));
+ 		if (ioctl(skfd, SIOCGIFBRDADDR, &ifr) >= 0)
+ 			ife->broadaddr = ifr.ifr_broadaddr;
+ 
+-		strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 		memset(&ife->netmask, 0, sizeof(struct sockaddr));
+ 		if (ioctl(skfd, SIOCGIFNETMASK, &ifr) >= 0)
+ 			ife->netmask = ifr.ifr_netmask;
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index 288dcca..fadab6f 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -83,7 +83,7 @@ static void print_queuelen(char *name)
+ 		return;
+ 
+ 	memset(&ifr, 0, sizeof(ifr));
+-	strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, name);
+ 	if (ioctl_or_warn(s, SIOCGIFTXQLEN, &ifr) < 0) {
+ 		close(s);
+ 		return;
+diff --git a/networking/libiproute/iplink.c b/networking/libiproute/iplink.c
+index 8de17bf..d3d0338 100644
+--- a/networking/libiproute/iplink.c
++++ b/networking/libiproute/iplink.c
+@@ -41,7 +41,7 @@ static void do_chflags(char *dev, uint32_t flags, uint32_t mask)
+ 	struct ifreq ifr;
+ 	int fd;
+ 
+-	strncpy(ifr.ifr_name, dev, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, dev);
+ 	fd = get_ctl_fd();
+ 	xioctl(fd, SIOCGIFFLAGS, &ifr);
+ 	if ((ifr.ifr_flags ^ flags) & mask) {
+@@ -58,8 +58,8 @@ static void do_changename(char *dev, char *newdev)
+ 	struct ifreq ifr;
+ 	int fd;
+ 
+-	strncpy(ifr.ifr_name, dev, sizeof(ifr.ifr_name));
+-	strncpy(ifr.ifr_newname, newdev, sizeof(ifr.ifr_newname));
++	strncpy_IFNAMSIZ(ifr.ifr_name, dev);
++	strncpy_IFNAMSIZ(ifr.ifr_newname, newdev);
+ 	fd = get_ctl_fd();
+ 	xioctl(fd, SIOCSIFNAME, &ifr);
+ 	close(fd);
+@@ -73,7 +73,7 @@ static void set_qlen(char *dev, int qlen)
+ 
+ 	s = get_ctl_fd();
+ 	memset(&ifr, 0, sizeof(ifr));
+-	strncpy(ifr.ifr_name, dev, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, dev);
+ 	ifr.ifr_qlen = qlen;
+ 	xioctl(s, SIOCSIFTXQLEN, &ifr);
+ 	close(s);
+@@ -87,7 +87,7 @@ static void set_mtu(char *dev, int mtu)
+ 
+ 	s = get_ctl_fd();
+ 	memset(&ifr, 0, sizeof(ifr));
+-	strncpy(ifr.ifr_name, dev, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, dev);
+ 	ifr.ifr_mtu = mtu;
+ 	xioctl(s, SIOCSIFMTU, &ifr);
+ 	close(s);
+@@ -104,7 +104,7 @@ static int get_address(char *dev, int *htype)
+ 	s = xsocket(PF_PACKET, SOCK_DGRAM, 0);
+ 
+ 	memset(&ifr, 0, sizeof(ifr));
+-	strncpy(ifr.ifr_name, dev, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, dev);
+ 	xioctl(s, SIOCGIFINDEX, &ifr);
+ 
+ 	memset(&me, 0, sizeof(me));
+@@ -128,7 +128,7 @@ static void parse_address(char *dev, int hatype, int halen, char *lla, struct if
+ 	int alen;
+ 
+ 	memset(ifr, 0, sizeof(*ifr));
+-	strncpy(ifr->ifr_name, dev, sizeof(ifr->ifr_name));
++	strncpy_IFNAMSIZ(ifr->ifr_name, dev);
+ 	ifr->ifr_hwaddr.sa_family = hatype;
+ 
+ 	alen = hatype == 1/*ARPHRD_ETHER*/ ? 14/*ETH_HLEN*/ : 19/*INFINIBAND_HLEN*/;
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index 65c27f9..ab4d65b 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -34,7 +34,7 @@ static int do_ioctl_get_ifindex(char *dev)
+ 	struct ifreq ifr;
+ 	int fd;
+ 
+-	strncpy(ifr.ifr_name, dev, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, dev);
+ 	fd = xsocket(AF_INET, SOCK_DGRAM, 0);
+ 	xioctl(fd, SIOCGIFINDEX, &ifr);
+ 	close(fd);
+@@ -47,7 +47,7 @@ static int do_ioctl_get_iftype(char *dev)
+ 	int fd;
+ 	int err;
+ 
+-	strncpy(ifr.ifr_name, dev, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, dev);
+ 	fd = xsocket(AF_INET, SOCK_DGRAM, 0);
+ 	err = ioctl_or_warn(fd, SIOCGIFHWADDR, &ifr);
+ 	close(fd);
+@@ -73,7 +73,7 @@ static int do_get_ioctl(const char *basedev, struct ip_tunnel_parm *p)
+ 	int fd;
+ 	int err;
+ 
+-	strncpy(ifr.ifr_name, basedev, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, basedev);
+ 	ifr.ifr_ifru.ifru_data = (void*)p;
+ 	fd = xsocket(AF_INET, SOCK_DGRAM, 0);
+ 	err = ioctl_or_warn(fd, SIOCGETTUNNEL, &ifr);
+@@ -88,9 +88,9 @@ static int do_add_ioctl(int cmd, const char *basedev, struct ip_tunnel_parm *p)
+ 	int fd;
+ 
+ 	if (cmd == SIOCCHGTUNNEL && p->name[0]) {
+-		strncpy(ifr.ifr_name, p->name, sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, p->name);
+ 	} else {
+-		strncpy(ifr.ifr_name, basedev, sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, basedev);
+ 	}
+ 	ifr.ifr_ifru.ifru_data = (void*)p;
+ 	fd = xsocket(AF_INET, SOCK_DGRAM, 0);
+@@ -114,9 +114,9 @@ static int do_del_ioctl(const char *basedev, struct ip_tunnel_parm *p)
+ 	int fd;
+ 
+ 	if (p->name[0]) {
+-		strncpy(ifr.ifr_name, p->name, sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, p->name);
+ 	} else {
+-		strncpy(ifr.ifr_name, basedev, sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, basedev);
+ 	}
+ 	ifr.ifr_ifru.ifru_data = (void*)p;
+ 	fd = xsocket(AF_INET, SOCK_DGRAM, 0);
+@@ -148,7 +148,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 	int key;
+ 
+ 	memset(p, 0, sizeof(*p));
+-	memset(&medium, 0, sizeof(medium));
++	medium[0] = '\0';
+ 
+ 	p->iph.version = 4;
+ 	p->iph.ihl = 5;
+@@ -250,7 +250,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 				p->iph.saddr = get_addr32(*argv);
+ 		} else if (key == ARG_dev) {
+ 			NEXT_ARG();
+-			strncpy(medium, *argv, IFNAMSIZ-1);
++			strncpy_IFNAMSIZ(medium, *argv);
+ 		} else if (key == ARG_ttl) {
+ 			unsigned uval;
+ 			NEXT_ARG();
+@@ -279,7 +279,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			}
+ 			if (p->name[0])
+ 				duparg2("name", *argv);
+-			strncpy(p->name, *argv, IFNAMSIZ);
++			strncpy_IFNAMSIZ(p->name, *argv);
+ 			if (cmd == SIOCCHGTUNNEL && count == 0) {
+ 				struct ip_tunnel_parm old_p;
+ 				memset(&old_p, 0, sizeof(old_p));
+@@ -324,7 +324,6 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 	}
+ }
+ 
+-
+ /* Return value becomes exitcode. It's okay to not return at all */
+ static int do_add(int cmd, char **argv)
+ {
+diff --git a/networking/libiproute/ll_map.c b/networking/libiproute/ll_map.c
+index eeae4e2..3412dc7 100644
+--- a/networking/libiproute/ll_map.c
++++ b/networking/libiproute/ll_map.c
+@@ -176,7 +176,7 @@ int xll_name_to_index(const char *const name)
+ 		struct ifreq ifr;
+ 		int tmp;
+ 
+-		strncpy(ifr.ifr_name, name, IFNAMSIZ);
++		strncpy_IFNAMSIZ(ifr.ifr_name, name);
+ 		ifr.ifr_ifindex = -1;
+ 		tmp = ioctl(sock_fd, SIOCGIFINDEX, &ifr);
+ 		close(sock_fd);
+diff --git a/networking/nameif.c b/networking/nameif.c
+index 75829fa..4d68c8d 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -177,7 +177,7 @@ int nameif_main(int argc, char **argv)
+ 
+ 		/* Find the current interface name and copy it to ifr.ifr_name */
+ 		memset(&ifr, 0, sizeof(struct ifreq));
+-		strncpy(ifr.ifr_name, token[0], sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, token[0]);
+ 
+ #if ENABLE_FEATURE_NAMEIF_EXTENDED
+ 		/* Check for driver etc. */
+diff --git a/networking/route.c b/networking/route.c
+index 8778ecd..5d25408 100644
+--- a/networking/route.c
++++ b/networking/route.c
+@@ -423,7 +423,7 @@ static void INET6_setroute(int action, char **args)
+ 	if (devname) {
+ 		struct ifreq ifr;
+ 		memset(&ifr, 0, sizeof(ifr));
+-		strncpy(ifr.ifr_name, devname, sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, devname);
+ 		xioctl(skfd, SIOGIFINDEX, &ifr);
+ 		rt.rtmsg_ifindex = ifr.ifr_ifindex;
+ 	}
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 29cebfa..5d1baac 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -447,7 +447,7 @@ ifaddrlist(struct IFADDRLIST **ipaddrp)
+ 		 * SIOCGIFFLAGS stomps over it because the requests
+ 		 * are returned in a union.)
+ 		 */
+-		strncpy(ifr.ifr_name, ifrp->ifr_name, sizeof(ifr.ifr_name));
++		strncpy_IFNAMSIZ(ifr.ifr_name, ifrp->ifr_name);
+ 		if (ioctl(fd, SIOCGIFFLAGS, (char *)&ifr) < 0) {
+ 			if (errno == ENXIO)
+ 				continue;
+diff --git a/networking/udhcp/socket.c b/networking/udhcp/socket.c
+index ea0a2c3..857f0a4 100644
+--- a/networking/udhcp/socket.c
++++ b/networking/udhcp/socket.c
+@@ -47,7 +47,7 @@ int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t
+ 	fd = xsocket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+ 
+ 	ifr.ifr_addr.sa_family = AF_INET;
+-	strncpy(ifr.ifr_name, interface, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, interface);
+ 	if (addr) {
+ 		if (ioctl_or_perror(fd, SIOCGIFADDR, &ifr,
+ 			"is interface %s up and configured?", interface)
+diff --git a/networking/vconfig.c b/networking/vconfig.c
+index 3f12e76..69c729a 100644
+--- a/networking/vconfig.c
++++ b/networking/vconfig.c
+@@ -133,7 +133,7 @@ int vconfig_main(int argc, char **argv)
+ 	if (ifr.cmd == SET_VLAN_NAME_TYPE_CMD) { /* set_name_type */
+ 		ifr.u.name_type = *xfind_str(name_types+1, argv[1]);
+ 	} else {
+-		strncpy(ifr.device1, argv[1], IFNAMSIZ);
++		strncpy_IFNAMSIZ(ifr.device1, argv[1]);
+ 		p = argv[2];
+ 
+ 		/* I suppose one could try to combine some of the function calls below,
+diff --git a/networking/zcip.c b/networking/zcip.c
+index ff9c83d..3a349a5 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -268,7 +268,7 @@ int zcip_main(int argc, char **argv)
+ 
+ 	// get the interface's ethernet address
+ 	//memset(&ifr, 0, sizeof(ifr));
+-	strncpy(ifr.ifr_name, argv_intf, sizeof(ifr.ifr_name));
++	strncpy_IFNAMSIZ(ifr.ifr_name, argv_intf);
+ 	xioctl(sock_fd, SIOCGIFHWADDR, &ifr);
+ 	memcpy(&eth_addr, &ifr.ifr_hwaddr.sa_data, ETH_ALEN);
+ 

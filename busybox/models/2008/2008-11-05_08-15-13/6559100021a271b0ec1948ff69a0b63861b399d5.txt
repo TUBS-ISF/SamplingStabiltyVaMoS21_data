@@ -1,0 +1,14 @@
+2008-11-05 08:15:13 +0000
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 001595f..3a12011 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -60,7 +60,7 @@ static int print_group(gid_t id, const char *prefix)
+ 	return print_common(id, bb_getgrgid, prefix);
+ }
+ 
+-static int print_user(gid_t id, const char *prefix)
++static int print_user(uid_t id, const char *prefix)
+ {
+ 	return print_common(id, bb_getpwuid, prefix);
+ }

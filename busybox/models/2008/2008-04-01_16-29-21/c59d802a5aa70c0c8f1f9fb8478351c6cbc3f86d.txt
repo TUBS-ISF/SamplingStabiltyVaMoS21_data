@@ -1,0 +1,14 @@
+2008-04-01 16:29:21 +0000
+diff --git a/coreutils/basename.c b/coreutils/basename.c
+index ed23779..2216182 100644
+--- a/coreutils/basename.c
++++ b/coreutils/basename.c
+@@ -42,7 +42,7 @@ int basename_main(int argc, char **argv)
+ 		n = strlen(*argv);
+ 		if ((m > n) && ((strcmp)(s+m-n, *argv) == 0)) {
+ 			m -= n;
+-			s[m] = '\0';
++			/*s[m] = '\0'; - redundant */
+ 		}
+ 	}
+ 

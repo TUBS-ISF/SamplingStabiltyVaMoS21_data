@@ -1,0 +1,268 @@
+2010-03-25 20:32:38 +0100
+diff --git a/include/usage.h b/include/usage.h
+index 40cb6b2..a343b41 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4821,6 +4821,7 @@
+      "\n	-t,--retries N		Send up to N discover packets" \
+      "\n	-T,--timeout N		Pause between packets (default 3 seconds)" \
+      "\n	-A,--tryagain N		Wait N seconds (default 20) after failure" \
++     "\n	-x OPT:VAL		Include option OPT in sent packets (cumulative)" \
+      "\n	-O,--request-option OPT	Request DHCP option OPT (cumulative)" \
+      "\n	-o,--no-default-options	Don't request any options (unless -O is given)" \
+      "\n	-f,--foreground		Run in foreground" \
+@@ -4851,6 +4852,7 @@
+      "\n	-t N		Send up to N discover packets" \
+      "\n	-T N		Pause between packets (default 3 seconds)" \
+      "\n	-A N		Wait N seconds (default 20) after failure" \
++     "\n	-x OPT:VAL	Include option OPT in sent packets" \
+      "\n	-O OPT		Request DHCP option OPT (cumulative)" \
+      "\n	-o		Don't request any options (unless -O is given)" \
+      "\n	-f		Run in foreground" \
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 15fe785..9c3b496 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -161,6 +161,11 @@ struct dhcp_option {
+ 	uint8_t code;
+ };
+ 
++struct option_set {
++	uint8_t *data;
++	struct option_set *next;
++};
++
+ extern const struct dhcp_option dhcp_options[];
+ extern const char dhcp_option_strings[];
+ extern const uint8_t dhcp_option_lengths[];
+@@ -173,6 +178,9 @@ void udhcp_add_simple_option(uint8_t *optionptr, uint8_t code, uint32_t data) FA
+ char *dname_dec(const uint8_t *cstr, int clen, const char *pre) FAST_FUNC;
+ uint8_t *dname_enc(const uint8_t *cstr, int clen, const char *src, int *retlen) FAST_FUNC;
+ #endif
++/* 2nd param is actually "struct option_set**" */
++int FAST_FUNC udhcp_str2optset(const char *const_line, void *arg);
++
+ 
+ // RFC 2131  Table 5: Fields and options used by DHCP clients
+ //
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 7587509..4565d7f 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -331,11 +331,11 @@ static void init_packet(struct dhcp_packet *packet, char type)
+ 	}
+ }
+ 
+-/* Add a parameter request list for stubborn DHCP servers. Pull the data
+- * from the struct in options.c. Don't do bounds checking here because it
+- * goes towards the head of the packet. */
+-static void add_param_req_option(struct dhcp_packet *packet)
++static void add_client_options(struct dhcp_packet *packet)
+ {
++	/* Add am "param req" option with the list of options we'd like to have
++	 * from stubborn DHCP servers. Pull the data from the struct in options.c.
++	 * No bounds checking because it goes towards the head of the packet. */
+ 	uint8_t c;
+ 	int end = udhcp_end_option(packet->options);
+ 	int i, len = 0;
+@@ -355,6 +355,19 @@ static void add_param_req_option(struct dhcp_packet *packet)
+ 		packet->options[end + OPT_LEN] = len;
+ 		packet->options[end + OPT_DATA + len] = DHCP_END;
+ 	}
++
++	/* Add -x options if any */
++	{
++		struct option_set *curr = client_config.options;
++		while (curr) {
++			udhcp_add_option_string(packet->options, curr->data);
++			curr = curr->next;
++		}
++//		if (client_config.sname)
++//			strncpy((char*)packet->sname, client_config.sname, sizeof(packet->sname) - 1);
++//		if (client_config.boot_file)
++//			strncpy((char*)packet->file, client_config.boot_file, sizeof(packet->file) - 1);
++	}
+ }
+ 
+ /* RFC 2131
+@@ -395,7 +408,7 @@ static int send_discover(uint32_t xid, uint32_t requested)
+ 	/* Explicitly saying that we want RFC-compliant packets helps
+ 	 * some buggy DHCP servers to NOT send bigger packets */
+ 	udhcp_add_simple_option(packet.options, DHCP_MAX_SIZE, htons(576));
+-	add_param_req_option(&packet);
++	add_client_options(&packet);
+ 
+ 	bb_info_msg("Sending discover...");
+ 	return raw_bcast_from_client_config_ifindex(&packet);
+@@ -414,7 +427,7 @@ static int send_select(uint32_t xid, uint32_t server, uint32_t requested)
+ 	packet.xid = xid;
+ 	udhcp_add_simple_option(packet.options, DHCP_REQUESTED_IP, requested);
+ 	udhcp_add_simple_option(packet.options, DHCP_SERVER_ID, server);
+-	add_param_req_option(&packet);
++	add_client_options(&packet);
+ 
+ 	addr.s_addr = requested;
+ 	bb_info_msg("Sending select for %s...", inet_ntoa(addr));
+@@ -429,7 +442,7 @@ static int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr)
+ 	init_packet(&packet, DHCPREQUEST);
+ 	packet.xid = xid;
+ 	packet.ciaddr = ciaddr;
+-	add_param_req_option(&packet);
++	add_client_options(&packet);
+ 
+ 	bb_info_msg("Sending renew...");
+ 	if (server)
+@@ -728,6 +741,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 	const char *str_c, *str_V, *str_h, *str_F, *str_r;
+ 	IF_FEATURE_UDHCP_PORT(char *str_P;)
+ 	llist_t *list_O = NULL;
++	llist_t *list_x = NULL;
+ 	int tryagain_timeout = 20;
+ 	int discover_timeout = 3;
+ 	int discover_retries = 3;
+@@ -792,9 +806,10 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		OPT_A = 1 << 16,
+ 		OPT_O = 1 << 17,
+ 		OPT_o = 1 << 18,
+-		OPT_f = 1 << 19,
++		OPT_x = 1 << 19,
++		OPT_f = 1 << 20,
+ /* The rest has variable bit positions, need to be clever */
+-		OPTBIT_f = 19,
++		OPTBIT_f = 20,
+ 		USE_FOR_MMU(             OPTBIT_b,)
+ 		IF_FEATURE_UDHCPC_ARPING(OPTBIT_a,)
+ 		IF_FEATURE_UDHCP_PORT(   OPTBIT_P,)
+@@ -811,14 +826,14 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 	str_V = "udhcp "BB_VER;
+ 
+ 	/* Parse command line */
+-	/* Cc: mutually exclusive; O: list; -T,-t,-A take numeric param */
+-	opt_complementary = "c--C:C--c:O::T+:t+:A+"
++	/* Cc: mutually exclusive; O,x: list; -T,-t,-A take numeric param */
++	opt_complementary = "c--C:C--c:O::x::T+:t+:A+"
+ #if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
+ 		":vv"
+ #endif
+ 		;
+ 	IF_LONG_OPTS(applet_long_options = udhcpc_longopts;)
+-	opt = getopt32(argv, "c:CV:H:h:F:i:np:qRr:s:T:t:SA:O:of"
++	opt = getopt32(argv, "c:CV:H:h:F:i:np:qRr:s:T:t:SA:O:ox:f"
+ 		USE_FOR_MMU("b")
+ 		IF_FEATURE_UDHCPC_ARPING("a")
+ 		IF_FEATURE_UDHCP_PORT("P:")
+@@ -828,6 +843,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		, &client_config.script /* s */
+ 		, &discover_timeout, &discover_retries, &tryagain_timeout /* T,t,A */
+ 		, &list_O
++		, &list_x
+ 		IF_FEATURE_UDHCP_PORT(, &str_P)
+ #if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
+ 		, &dhcp_verbose
+@@ -868,6 +884,19 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		n = dhcp_options[n].code;
+ 		client_config.opt_mask[n >> 3] |= 1 << (n & 7);
+ 	}
++	while (list_x) {
++		int n;
++		char *optstr = llist_pop(&list_x);
++		char *colon = strchr(optstr, ':');
++		if (colon)
++			*colon = '\0';
++		n = index_in_strings(dhcp_option_strings, optstr);
++		if (n < 0)
++			bb_error_msg_and_die("unknown option '%s'", optstr);
++		if (colon)
++			*colon = ' ';
++		udhcp_str2optset(optstr, &client_config.options);
++	}
+ 
+ 	if (udhcp_read_interface(client_config.interface,
+ 			&client_config.ifindex,
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index 4c17353..fba747f 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -13,6 +13,7 @@ struct client_config_t {
+ 	const char *interface;          /* The name of the interface to use */
+ 	char *pidfile;                  /* Optionally store the process ID */
+ 	const char *script;             /* User script to run at dhcp events */
++	struct option_set *options;     /* list of DHCP options to send to server */
+ 	uint8_t *clientid;              /* Optional client id to use */
+ 	uint8_t *vendorclass;           /* Optional vendor class-id to use */
+ 	uint8_t *hostname;              /* Optional hostname to use */
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index b163ce7..a4e9a58 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -13,11 +13,6 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ #define DHCPD_CONF_FILE         "/etc/udhcpd.conf"
+ 
+ 
+-struct option_set {
+-	uint8_t *data;
+-	struct option_set *next;
+-};
+-
+ struct static_lease {
+ 	struct static_lease *next;
+ 	uint32_t nip;
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 05a7b99..fddda4c 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -145,7 +145,7 @@ static NOINLINE void attach_option(
+ }
+ 
+ /* read a dhcp option and add it to opt_list */
+-static int FAST_FUNC read_opt(const char *const_line, void *arg)
++int FAST_FUNC udhcp_str2optset(const char *const_line, void *arg)
+ {
+ 	struct option_set **opt_list = arg;
+ 	char *opt, *val, *endptr;
+@@ -292,8 +292,8 @@ static const struct config_keyword keywords[] = {
+ 	{"pidfile",      read_str, &(server_config.pidfile),      "/var/run/udhcpd.pid"},
+ 	{"siaddr",       read_nip, &(server_config.siaddr_nip),   "0.0.0.0"},
+ 	/* keywords with no defaults must be last! */
+-	{"option",       read_opt, &(server_config.options),      ""},
+-	{"opt",          read_opt, &(server_config.options),      ""},
++	{"option",       udhcp_str2optset, &(server_config.options), ""},
++	{"opt",          udhcp_str2optset, &(server_config.options), ""},
+ 	{"notify_file",  read_str, &(server_config.notify_file),  ""},
+ 	{"sname",        read_str, &(server_config.sname),        ""},
+ 	{"boot_file",    read_str, &(server_config.boot_file),    ""},
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index b4d2d2d..af3c217 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -212,7 +212,7 @@ int FAST_FUNC udhcp_end_option(uint8_t *optionptr)
+ 
+ 	while (optionptr[i] != DHCP_END) {
+ 		if (optionptr[i] != DHCP_PADDING)
+-			i += optionptr[i + OPT_LEN] + 1;
++			i += optionptr[i + OPT_LEN] + OPT_DATA-1;
+ 		i++;
+ 	}
+ 	return i;
+@@ -222,7 +222,8 @@ int FAST_FUNC udhcp_end_option(uint8_t *optionptr)
+ /* option bytes: [code][len][data1][data2]..[dataLEN] */
+ void FAST_FUNC udhcp_add_option_string(uint8_t *optionptr, uint8_t *string)
+ {
+-	int end = udhcp_end_option(optionptr);
++	unsigned len;
++	unsigned end = udhcp_end_option(optionptr);
+ 
+ 	/* end position + string length + option code/length + end option */
+ 	if (end + string[OPT_LEN] + 2 + 1 >= DHCP_OPTIONS_BUFSIZE) {
+@@ -231,8 +232,9 @@ void FAST_FUNC udhcp_add_option_string(uint8_t *optionptr, uint8_t *string)
+ 		return;
+ 	}
+ 	log_option("Adding option", string);
+-	memcpy(optionptr + end, string, string[OPT_LEN] + 2);
+-	optionptr[end + string[OPT_LEN] + 2] = DHCP_END;
++	len = OPT_DATA + string[OPT_LEN];
++	memcpy(optionptr + end, string, len);
++	optionptr[end + len] = DHCP_END;
+ }
+ 
+ /* add a one to four byte option to a packet */

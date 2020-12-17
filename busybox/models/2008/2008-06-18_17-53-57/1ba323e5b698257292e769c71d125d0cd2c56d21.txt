@@ -1,0 +1,22 @@
+2008-06-18 17:53:57 +0000
+diff --git a/shell/hush_test/hush-vars/empty.tests b/shell/hush_test/hush-vars/empty.tests
+index 72ac2c7..a9c247e 100755
+--- a/shell/hush_test/hush-vars/empty.tests
++++ b/shell/hush_test/hush-vars/empty.tests
+@@ -1,5 +1,3 @@
+-#!/bin/sh
+-
+ e=
+ 
+ echo a b c d e f 1 2 3 4 5 6 7 8 9 0 A B C D E F
+diff --git a/shell/hush_test/hush-vars/var_subst_in_for.tests b/shell/hush_test/hush-vars/var_subst_in_for.tests
+index 4d1c112..433c606 100755
+--- a/shell/hush_test/hush-vars/var_subst_in_for.tests
++++ b/shell/hush_test/hush-vars/var_subst_in_for.tests
+@@ -1,5 +1,5 @@
+ if test $# = 0; then
+-    exec "$THIS_SH" var_subst_in_for.tests abc "d e"
++    exec "$THIS_SH" "$0" abc "d e"
+ fi
+ 
+ echo 'Testing: in x y z'

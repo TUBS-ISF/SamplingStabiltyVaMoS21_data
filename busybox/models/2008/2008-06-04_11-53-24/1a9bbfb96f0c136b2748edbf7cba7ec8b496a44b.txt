@@ -1,0 +1,16 @@
+2008-06-04 11:53:24 +0000
+diff --git a/Makefile.flags b/Makefile.flags
+index 1cfda26..cb2c878 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -71,10 +71,6 @@ endif
+ ifeq ($(CONFIG_PIE),y)
+ CFLAGS_busybox += $(ARCH_PIE)
+ CFLAGS += $(ARCH_FPIE)
+-# No switch() jump tables. Code growth +1k, binary size down -12k
+-# due to reduced number of code pointers.
+-# (TODO: make overridable: some arches may want to not do this)
+-CFLAGS += $(call cc-option,-fno-jump-tables)
+ endif
+ 
+ LDLIBS += m crypt

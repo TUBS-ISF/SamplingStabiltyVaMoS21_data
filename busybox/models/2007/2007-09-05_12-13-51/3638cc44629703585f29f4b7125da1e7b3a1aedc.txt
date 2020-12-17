@@ -1,0 +1,86 @@
+2007-09-05 12:13:51 +0000
+diff --git a/include/usage.h b/include/usage.h
+index e062c0c..6a88b6c 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3843,7 +3843,7 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+ #define watch_full_usage \
+        "Execute a program periodically" \
+        "\n\nOptions:\n" \
+-       "	-n	Loop period in seconds - default is 2\n" \
++       "	-n	Loop period in seconds (default 2)\n" \
+        "	-t	Don't print header"
+ #define watch_example_usage \
+        "$ watch date\n" \
+@@ -3852,12 +3852,14 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "Mon Dec 17 10:31:44 GMT 2000"
+ 
+ #define watchdog_trivial_usage \
+-       "[-t seconds] [-F] DEV"
++       "[-t N[ms]] [-F] DEV"
+ #define watchdog_full_usage \
+        "Periodically write to watchdog device DEV" \
+-       "\n\nOptions:\n" \
+-       "	-t	Timer period in seconds - default is 30\n" \
+-       "	-F	Stay in the foreground and don't fork"
++       "\n\nOptions:" \
++     "\n	-t N	Timer period (default 30)" \
++     "\n	-F	Stay in the foreground and don't fork" \
++     "\n" \
++     "\nUse -t 500ms to specify period in milliseconds"
+ 
+ #define wc_trivial_usage \
+        "[OPTION]... [FILE]..."
+diff --git a/miscutils/watchdog.c b/miscutils/watchdog.c
+index aa367d5..14bd44f 100644
+--- a/miscutils/watchdog.c
++++ b/miscutils/watchdog.c
+@@ -16,7 +16,9 @@
+ static void watchdog_shutdown(int ATTRIBUTE_UNUSED sig) ATTRIBUTE_NORETURN;
+ static void watchdog_shutdown(int ATTRIBUTE_UNUSED sig)
+ {
+-	write(3, "V", 1);	/* Magic, see watchdog-api.txt in kernel */
++	static const char V = 'V';
++
++	write(3, &V, 1);	/* Magic, see watchdog-api.txt in kernel */
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		close(3);
+ 	exit(0);
+@@ -26,14 +28,20 @@ int watchdog_main(int argc, char **argv);
+ int watchdog_main(int argc, char **argv)
+ {
+ 	unsigned opts;
+-	unsigned timer_duration = 30; /* Userspace timer duration, in seconds */
++	unsigned timer_duration = 30000; /* Userspace timer duration, in milliseconds */
+ 	char *t_arg;
+ 
+ 	opt_complementary = "=1"; /* must have 1 argument */
+ 	opts = getopt32(argv, "Ft:", &t_arg);
+ 
+-	if (opts & OPT_TIMER)
+-		timer_duration = xatou(t_arg);
++	if (opts & OPT_TIMER) {
++		static const struct suffix_mult suffixes[] = {
++			{ "ms", 1 },
++			{ "", 1000 },
++			{ }
++		};
++		timer_duration = xatou_sfx(t_arg, suffixes);
++	}
+ 
+ 	if (!(opts & OPT_FOREGROUND)) {
+ 		bb_daemonize_or_rexec(DAEMON_CHDIR_ROOT, argv);
+@@ -50,10 +58,8 @@ int watchdog_main(int argc, char **argv)
+ 		 * Make sure we clear the counter before sleeping, as the counter value
+ 		 * is undefined at this point -- PFM
+ 		 */
+-		write(3, "", 1);
+-		sleep(timer_duration);
++		write(3, "", 1); /* write zero byte */
++		usleep(timer_duration * 1000L);
+ 	}
+-
+-	watchdog_shutdown(0);
+-	/* return EXIT_SUCCESS; */
++	return EXIT_SUCCESS; /* - not reached, but gcc 4.2.1 is too dumb! */
+ }

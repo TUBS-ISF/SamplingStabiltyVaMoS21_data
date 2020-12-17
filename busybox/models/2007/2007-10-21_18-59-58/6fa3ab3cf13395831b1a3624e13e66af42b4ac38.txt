@@ -1,0 +1,23 @@
+2007-10-21 18:59:58 +0000
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index 61b5e39..b467f1b 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -11,7 +11,7 @@
+ enum {
+ 	OPT_STDOUT = 0x1,
+ 	OPT_FORCE = 0x2,
+-/* gunzip only: */
++/* gunzip and bunzip2 only: */
+ 	OPT_VERBOSE = 0x4,
+ 	OPT_DECOMPRESS = 0x8,
+ 	OPT_TEST = 0x10,
+@@ -161,7 +161,7 @@ USE_DESKTOP(long long) int unpack_bunzip2(void)
+ int bunzip2_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int bunzip2_main(int argc, char **argv)
+ {
+-	getopt32(argv, "cf");
++	getopt32(argv, "cfvdt");
+ 	argv += optind;
+ 	if (applet_name[2] == 'c')
+ 		option_mask32 |= OPT_STDOUT;

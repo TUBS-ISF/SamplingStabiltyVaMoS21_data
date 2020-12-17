@@ -1,0 +1,810 @@
+2009-06-17 11:57:09 +0200
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 7d44697..21c1a7b 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -38,7 +38,7 @@ uint32_t FAST_FUNC random_xid(void)
+ 
+ 
+ /* Initialize the packet with the proper defaults */
+-static void init_packet(struct dhcpMessage *packet, char type)
++static void init_packet(struct dhcp_packet *packet, char type)
+ {
+ 	udhcp_init_header(packet, type);
+ 	memcpy(packet->chaddr, client_config.client_mac, 6);
+@@ -56,7 +56,7 @@ static void init_packet(struct dhcpMessage *packet, char type)
+ /* Add a parameter request list for stubborn DHCP servers. Pull the data
+  * from the struct in options.c. Don't do bounds checking here because it
+  * goes towards the head of the packet. */
+-static void add_param_req_option(struct dhcpMessage *packet)
++static void add_param_req_option(struct dhcp_packet *packet)
+ {
+ 	uint8_t c;
+ 	int end = end_option(packet->options);
+@@ -96,7 +96,7 @@ static void add_param_req_option(struct dhcpMessage *packet)
+  * client reverts to using the IP broadcast address.
+  */
+ 
+-static int raw_bcast_from_client_config_ifindex(struct dhcpMessage *packet)
++static int raw_bcast_from_client_config_ifindex(struct dhcp_packet *packet)
+ {
+ 	return udhcp_send_raw_packet(packet,
+ 		/*src*/ INADDR_ANY, CLIENT_PORT,
+@@ -109,7 +109,7 @@ static int raw_bcast_from_client_config_ifindex(struct dhcpMessage *packet)
+ /* Broadcast a DHCP decline message */
+ int FAST_FUNC send_decline(uint32_t xid, uint32_t server, uint32_t requested)
+ {
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 
+ 	init_packet(&packet, DHCPDECLINE);
+ 	packet.xid = xid;
+@@ -126,7 +126,7 @@ int FAST_FUNC send_decline(uint32_t xid, uint32_t server, uint32_t requested)
+ /* Broadcast a DHCP discover packet to the network, with an optionally requested IP */
+ int FAST_FUNC send_discover(uint32_t xid, uint32_t requested)
+ {
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 
+ 	init_packet(&packet, DHCPDISCOVER);
+ 	packet.xid = xid;
+@@ -150,7 +150,7 @@ int FAST_FUNC send_discover(uint32_t xid, uint32_t requested)
+  */
+ int FAST_FUNC send_select(uint32_t xid, uint32_t server, uint32_t requested)
+ {
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 	struct in_addr addr;
+ 
+ 	init_packet(&packet, DHCPREQUEST);
+@@ -169,7 +169,7 @@ int FAST_FUNC send_select(uint32_t xid, uint32_t server, uint32_t requested)
+ /* Unicasts or broadcasts a DHCP renew message */
+ int FAST_FUNC send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr)
+ {
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 
+ 	init_packet(&packet, DHCPREQUEST);
+ 	packet.xid = xid;
+@@ -189,7 +189,7 @@ int FAST_FUNC send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr)
+ /* Unicasts a DHCP release message */
+ int FAST_FUNC send_release(uint32_t server, uint32_t ciaddr)
+ {
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 
+ 	init_packet(&packet, DHCPRELEASE);
+ 	packet.xid = random_xid();
+@@ -203,10 +203,10 @@ int FAST_FUNC send_release(uint32_t server, uint32_t ciaddr)
+ 
+ 
+ /* Returns -1 on errors that are fatal for the socket, -2 for those that aren't */
+-int FAST_FUNC udhcp_recv_raw_packet(struct dhcpMessage *dhcp_pkt, int fd)
++int FAST_FUNC udhcp_recv_raw_packet(struct dhcp_packet *dhcp_pkt, int fd)
+ {
+ 	int bytes;
+-	struct udp_dhcp_packet packet;
++	struct ip_udp_dhcp_packet packet;
+ 	uint16_t check;
+ 
+ 	memset(&packet, 0, sizeof(packet));
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 40b8df4..a01597f 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -23,8 +23,8 @@ extern const uint8_t MAC_BCAST_ADDR[6]; /* six all-ones */
+ 
+ #define DHCP_OPTIONS_BUFSIZE  308
+ 
+-//TODO: rename to dhcp_packet; rename ciaddr/yiaddr/chaddr
+-struct dhcpMessage {
++//TODO: rename ciaddr/yiaddr/chaddr
++struct dhcp_packet {
+ 	uint8_t op;      /* 1 = BOOTREQUEST, 2 = BOOTREPLY */
+ 	uint8_t htype;   /* hardware address type. 1 = 10mb ethernet */
+ 	uint8_t hlen;    /* hardware address length */
+@@ -45,39 +45,38 @@ struct dhcpMessage {
+ 	uint8_t options[DHCP_OPTIONS_BUFSIZE + CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS];
+ } PACKED;
+ 
+-//TODO: rename to ip_udp_dhcp_packet?
+-struct udp_dhcp_packet {
++struct ip_udp_dhcp_packet {
+ 	struct iphdr ip;
+ 	struct udphdr udp;
+-	struct dhcpMessage data;
++	struct dhcp_packet data;
+ } PACKED;
+ 
+ /* Let's see whether compiler understood us right */
+-struct BUG_bad_sizeof_struct_udp_dhcp_packet {
+-	char BUG_bad_sizeof_struct_udp_dhcp_packet
+-		[(sizeof(struct udp_dhcp_packet) != 576 + CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS) ? -1 : 1];
++struct BUG_bad_sizeof_struct_ip_udp_dhcp_packet {
++	char BUG_bad_sizeof_struct_ip_udp_dhcp_packet
++		[(sizeof(struct ip_udp_dhcp_packet) != 576 + CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS) ? -1 : 1];
+ };
+ 
+ uint16_t udhcp_checksum(void *addr, int count) FAST_FUNC;
+ 
+-void udhcp_init_header(struct dhcpMessage *packet, char type) FAST_FUNC;
++void udhcp_init_header(struct dhcp_packet *packet, char type) FAST_FUNC;
+ 
+-/*int udhcp_recv_raw_packet(struct dhcpMessage *dhcp_pkt, int fd); - in dhcpc.h */
+-int udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd) FAST_FUNC;
++/*int udhcp_recv_raw_packet(struct dhcp_packet *dhcp_pkt, int fd); - in dhcpc.h */
++int udhcp_recv_kernel_packet(struct dhcp_packet *packet, int fd) FAST_FUNC;
+ 
+-int udhcp_send_raw_packet(struct dhcpMessage *dhcp_pkt,
++int udhcp_send_raw_packet(struct dhcp_packet *dhcp_pkt,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port, const uint8_t *dest_arp,
+ 		int ifindex) FAST_FUNC;
+ 
+-int udhcp_send_kernel_packet(struct dhcpMessage *dhcp_pkt,
++int udhcp_send_kernel_packet(struct dhcp_packet *dhcp_pkt,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port) FAST_FUNC;
+ 
+ 
+ /**/
+ 
+-void udhcp_run_script(struct dhcpMessage *packet, const char *name) FAST_FUNC;
++void udhcp_run_script(struct dhcp_packet *packet, const char *name) FAST_FUNC;
+ 
+ // Still need to clean these up...
+ 
+@@ -104,16 +103,22 @@ int arpping(uint32_t test_ip,
+ extern int dhcp_verbose;
+ # define log1(...) do { if (dhcp_verbose >= 1) bb_info_msg(__VA_ARGS__); } while (0)
+ # if CONFIG_UDHCP_DEBUG >= 2
+-void udhcp_dump_packet(struct dhcpMessage *packet) FAST_FUNC;
++void udhcp_dump_packet(struct dhcp_packet *packet) FAST_FUNC;
+ #  define log2(...) do { if (dhcp_verbose >= 2) bb_info_msg(__VA_ARGS__); } while (0)
+ # else
+ #  define udhcp_dump_packet(...) ((void)0)
+ #  define log2(...) ((void)0)
+ # endif
++# if CONFIG_UDHCP_DEBUG >= 3
++#  define log3(...) do { if (dhcp_verbose >= 3) bb_info_msg(__VA_ARGS__); } while (0)
++# else
++#  define log3(...) ((void)0)
++# endif
+ #else
+ # define udhcp_dump_packet(...) ((void)0)
+ # define log1(...) ((void)0)
+ # define log2(...) ((void)0)
++# define log3(...) ((void)0)
+ #endif
+ 
+ POP_SAVED_FUNCTION_VISIBILITY
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index eed9d9a..41bb0b0 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -149,7 +149,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 	int max_fd;
+ 	int retval;
+ 	struct timeval tv;
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 	fd_set rfds;
+ 
+ #if ENABLE_GETOPT_LONG
+@@ -498,7 +498,9 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 			}
+ 
+ 			/* Ignore packets that aren't for us */
+-			if (memcmp(packet.chaddr, client_config.client_mac, 6)) {
++			if (packet.hlen != 6
++			 || memcmp(packet.chaddr, client_config.client_mac, 6)
++			) {
+ //FIXME: need to also check that last 10 bytes are zero
+ 				log1("chaddr does not match, ignoring packet"); // log2?
+ 				continue;
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index a7ed779..9bb1ac2 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -43,7 +43,7 @@ int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr) FAST_FUNC;
+ int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr) FAST_FUNC;
+ int send_release(uint32_t server, uint32_t ciaddr) FAST_FUNC;
+ 
+-int udhcp_recv_raw_packet(struct dhcpMessage *dhcp_pkt, int fd) FAST_FUNC;
++int udhcp_recv_raw_packet(struct dhcp_packet *dhcp_pkt, int fd) FAST_FUNC;
+ 
+ POP_SAVED_FUNCTION_VISIBILITY
+ 
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index cbc9684..3482463 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -18,7 +18,7 @@
+ 
+ 
+ /* globals */
+-struct dhcpOfferedAddr *leases;
++struct dyn_lease *leases;
+ /* struct server_config_t server_config is in bb_common_bufsiz1 */
+ 
+ 
+@@ -27,7 +27,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	fd_set rfds;
+ 	int server_socket = -1, retval, max_sock;
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 	uint8_t *state, *server_id, *requested;
+ 	uint32_t server_id_aligned = server_id_aligned; /* for compiler */
+ 	uint32_t requested_aligned = requested_aligned;
+@@ -36,7 +36,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 	unsigned num_ips;
+ 	unsigned opt;
+ 	struct option_set *option;
+-	struct dhcpOfferedAddr *lease, static_lease;
++	struct dyn_lease *lease, static_lease;
+ 	IF_FEATURE_UDHCP_PORT(char *str_P;)
+ 
+ #if ENABLE_FEATURE_UDHCP_PORT
+@@ -170,6 +170,11 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 			continue;
+ 		}
+ 
++		if (packet.hlen != 6) {
++			bb_error_msg("MAC length != 6, ignoring packet");
++			continue;
++		}
++
+ 		state = get_option(&packet, DHCP_MESSAGE_TYPE);
+ 		if (state == NULL) {
+ 			bb_error_msg("no message type option, ignoring packet");
+@@ -181,7 +186,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 		if (static_lease_ip) {
+ 			bb_info_msg("Found static lease: %x", static_lease_ip);
+ 
+-			memcpy(&static_lease.lease_mac16, &packet.chaddr, 16);
++			memcpy(&static_lease.lease_mac, &packet.chaddr, 6);
+ 			static_lease.lease_nip = static_lease_ip;
+ 			static_lease.expires = 0;
+ 
+@@ -212,7 +217,6 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 			if (lease) {
+ 				if (server_id) {
+ 					/* SELECTING State */
+-					log1("server_id = %08x", ntohl(server_id_aligned));
+ 					if (server_id_aligned == server_config.server_nip
+ 					 && requested
+ 					 && requested_aligned == lease->lease_nip
+@@ -242,7 +246,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 				if (lease) {
+ 					if (lease_expired(lease)) {
+ 						/* probably best if we drop this lease */
+-						memset(lease->lease_mac16, 0, 16);
++						memset(lease->lease_mac, 0, sizeof(lease->lease_mac));
+ 					} else {
+ 						/* make some contention for this address */
+ 						send_NAK(&packet);
+@@ -264,7 +268,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 		case DHCPDECLINE:
+ 			log1("Received DECLINE");
+ 			if (lease) {
+-				memset(lease->lease_mac16, 0, 16);
++				memset(lease->lease_mac, 0, sizeof(lease->lease_mac));
+ 				lease->expires = time(NULL) + server_config.decline_time;
+ 			}
+ 			break;
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 53cfad4..7776708 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -79,30 +79,33 @@ struct server_config_t {
+ typedef uint32_t leasetime_t;
+ typedef int32_t signed_leasetime_t;
+ 
+-//TODO: (1) rename to dyn_lease (that's what it is. we also have static_lease).
+-//(2) lease_mac16 may be shortened to lease_mac[6], since e.g. ARP probing uses
+-//only 6 first bytes anyway. We can check received dhcp packets
+-//that their "chaddr"s have only 6 first bytes != 0, and complain otherwise.
+-struct dhcpOfferedAddr {
+-	uint8_t lease_mac16[16];
++struct dyn_lease {
+ 	/* "nip": IP in network order */
+-	uint32_t lease_nip;
+ 	/* Unix time when lease expires. Kept in memory in host order.
+ 	 * When written to file, converted to network order
+ 	 * and adjusted (current time subtracted) */
+ 	leasetime_t expires;
+-	uint8_t hostname[20]; /* (size is a multiply of 4) */
++	uint32_t lease_nip;
++	/* We use lease_mac[6], since e.g. ARP probing uses
++	 * only 6 first bytes anyway. We check received dhcp packets
++	 * that their hlen == 6 and thus chaddr has only 6 significant bytes
++	 * (dhcp packet has chaddr[16])
++	 */
++	uint8_t lease_mac[6];
++	uint8_t hostname[20];
++	uint8_t pad[2];
++	/* total size is a multiply of 4 */
+ };
+ 
+-extern struct dhcpOfferedAddr *leases;
++extern struct dyn_lease *leases;
+ 
+-struct dhcpOfferedAddr *add_lease(
++struct dyn_lease *add_lease(
+ 		const uint8_t *chaddr, uint32_t yiaddr,
+ 		leasetime_t leasetime, uint8_t *hostname
+ 		) FAST_FUNC;
+-int lease_expired(struct dhcpOfferedAddr *lease) FAST_FUNC;
+-struct dhcpOfferedAddr *find_lease_by_chaddr(const uint8_t *chaddr) FAST_FUNC;
+-struct dhcpOfferedAddr *find_lease_by_yiaddr(uint32_t yiaddr) FAST_FUNC;
++int lease_expired(struct dyn_lease *lease) FAST_FUNC;
++struct dyn_lease *find_lease_by_chaddr(const uint8_t *chaddr) FAST_FUNC;
++struct dyn_lease *find_lease_by_yiaddr(uint32_t yiaddr) FAST_FUNC;
+ uint32_t find_free_or_expired_address(const uint8_t *chaddr) FAST_FUNC;
+ 
+ 
+@@ -121,10 +124,10 @@ void print_static_leases(struct static_lease **st_lease_pp) FAST_FUNC;
+ 
+ /*** serverpacket.h ***/
+ 
+-int send_offer(struct dhcpMessage *oldpacket) FAST_FUNC;
+-int send_NAK(struct dhcpMessage *oldpacket) FAST_FUNC;
+-int send_ACK(struct dhcpMessage *oldpacket, uint32_t yiaddr) FAST_FUNC;
+-int send_inform(struct dhcpMessage *oldpacket) FAST_FUNC;
++int send_offer(struct dhcp_packet *oldpacket) FAST_FUNC;
++int send_NAK(struct dhcp_packet *oldpacket) FAST_FUNC;
++int send_ACK(struct dhcp_packet *oldpacket, uint32_t yiaddr) FAST_FUNC;
++int send_inform(struct dhcp_packet *oldpacket) FAST_FUNC;
+ 
+ 
+ /*** files.h ***/
+diff --git a/networking/udhcp/dhcprelay.c b/networking/udhcp/dhcprelay.c
+index 2fee49a..a7e715f 100644
+--- a/networking/udhcp/dhcprelay.c
++++ b/networking/udhcp/dhcprelay.c
+@@ -97,7 +97,7 @@ static void xid_del(uint32_t xid)
+  * p - pointer to the dhcp packet
+  * returns the message type on success, -1 otherwise
+  */
+-static int get_dhcp_packet_type(struct dhcpMessage *p)
++static int get_dhcp_packet_type(struct dhcp_packet *p)
+ {
+ 	uint8_t *op;
+ 
+@@ -175,7 +175,7 @@ static int init_sockets(char **client_ifaces, int num_clients,
+  * p - packet to send
+  * client - number of the client
+  */
+-static void pass_to_server(struct dhcpMessage *p, int packet_len, int client, int *fds,
++static void pass_to_server(struct dhcp_packet *p, int packet_len, int client, int *fds,
+ 			struct sockaddr_in *client_addr, struct sockaddr_in *server_addr)
+ {
+ 	int res, type;
+@@ -206,7 +206,7 @@ static void pass_to_server(struct dhcpMessage *p, int packet_len, int client, in
+  * pass_to_client() - forwards dhcp packets from server to client
+  * p - packet to send
+  */
+-static void pass_to_client(struct dhcpMessage *p, int packet_len, int *fds)
++static void pass_to_client(struct dhcp_packet *p, int packet_len, int *fds)
+ {
+ 	int res, type;
+ 	struct xid_item *item;
+@@ -240,7 +240,7 @@ static void pass_to_client(struct dhcpMessage *p, int packet_len, int *fds)
+ int dhcprelay_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dhcprelay_main(int argc, char **argv)
+ {
+-	struct dhcpMessage dhcp_msg;
++	struct dhcp_packet dhcp_msg;
+ 	struct sockaddr_in server_addr;
+ 	struct sockaddr_in client_addr;
+ 	fd_set rfds;
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 5b98aa5..d6176fb 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -25,7 +25,7 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 	unsigned opt;
+ 	int64_t written_at, curr, expires_abs;
+ 	const char *file = LEASES_FILE;
+-	struct dhcpOfferedAddr lease;
++	struct dyn_lease lease;
+ 	struct in_addr addr;
+ 
+ 	enum {
+@@ -61,7 +61,7 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 	while (full_read(fd, &lease, sizeof(lease)) == sizeof(lease)) {
+ 		const char *fmt = ":%02x" + 1;
+ 		for (i = 0; i < 6; i++) {
+-			printf(fmt, lease.lease_mac16[i]);
++			printf(fmt, lease.lease_mac[i]);
+ 			fmt = ":%02x";
+ 		}
+ 		addr.s_addr = lease.lease_nip;
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 9d5633b..bddf3e1 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -390,7 +390,7 @@ void FAST_FUNC write_leases(void)
+ 
+ void FAST_FUNC read_leases(const char *file)
+ {
+-	struct dhcpOfferedAddr lease;
++	struct dyn_lease lease;
+ 	int64_t written_at, time_passed;
+ 	int fd;
+ #if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
+@@ -420,7 +420,7 @@ void FAST_FUNC read_leases(const char *file)
+ 				continue;
+ 			/* NB: add_lease takes "relative time", IOW,
+ 			 * lease duration, not lease deadline. */
+-			if (!(add_lease(lease.lease_mac16, lease.lease_nip, expires, lease.hostname))) {
++			if (!(add_lease(lease.lease_mac, lease.lease_nip, expires, lease.hostname))) {
+ 				bb_error_msg("too many leases while loading %s", file);
+ 				break;
+ 			}
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index 06bc086..4039f4d 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -11,9 +11,9 @@
+ 
+ 
+ /* Find the oldest expired lease, NULL if there are no expired leases */
+-static struct dhcpOfferedAddr *oldest_expired_lease(void)
++static struct dyn_lease *oldest_expired_lease(void)
+ {
+-	struct dhcpOfferedAddr *oldest_lease = NULL;
++	struct dyn_lease *oldest_lease = NULL;
+ 	leasetime_t oldest_time = time(NULL);
+ 	unsigned i;
+ 
+@@ -38,7 +38,7 @@ static void clear_lease(const uint8_t *chaddr, uint32_t yiaddr)
+ 		continue;
+ 
+ 	for (i = 0; i < server_config.max_leases; i++) {
+-		if ((j != 16 && memcmp(leases[i].lease_mac16, chaddr, 16) == 0)
++		if ((j != 16 && memcmp(leases[i].lease_mac, chaddr, 6) == 0)
+ 		 || (yiaddr && leases[i].lease_nip == yiaddr)
+ 		) {
+ 			memset(&leases[i], 0, sizeof(leases[i]));
+@@ -48,11 +48,11 @@ static void clear_lease(const uint8_t *chaddr, uint32_t yiaddr)
+ 
+ 
+ /* Add a lease into the table, clearing out any old ones */
+-struct dhcpOfferedAddr* FAST_FUNC add_lease(
++struct dyn_lease* FAST_FUNC add_lease(
+ 		const uint8_t *chaddr, uint32_t yiaddr,
+ 		leasetime_t leasetime, uint8_t *hostname)
+ {
+-	struct dhcpOfferedAddr *oldest;
++	struct dyn_lease *oldest;
+ 	uint8_t hostname_length;
+ 
+ 	/* clean out any old ones */
+@@ -75,7 +75,7 @@ struct dhcpOfferedAddr* FAST_FUNC add_lease(
+ 				hostname++;
+ 			}
+ 		}
+-		memcpy(oldest->lease_mac16, chaddr, 16);
++		memcpy(oldest->lease_mac, chaddr, 6);
+ 		oldest->lease_nip = yiaddr;
+ 		oldest->expires = time(NULL) + leasetime;
+ 	}
+@@ -85,19 +85,19 @@ struct dhcpOfferedAddr* FAST_FUNC add_lease(
+ 
+ 
+ /* True if a lease has expired */
+-int FAST_FUNC lease_expired(struct dhcpOfferedAddr *lease)
++int FAST_FUNC lease_expired(struct dyn_lease *lease)
+ {
+ 	return (lease->expires < (leasetime_t) time(NULL));
+ }
+ 
+ 
+ /* Find the first lease that matches chaddr, NULL if no match */
+-struct dhcpOfferedAddr* FAST_FUNC find_lease_by_chaddr(const uint8_t *chaddr)
++struct dyn_lease* FAST_FUNC find_lease_by_chaddr(const uint8_t *chaddr)
+ {
+ 	unsigned i;
+ 
+ 	for (i = 0; i < server_config.max_leases; i++)
+-		if (!memcmp(leases[i].lease_mac16, chaddr, 16))
++		if (memcmp(leases[i].lease_mac, chaddr, 6) == 0)
+ 			return &(leases[i]);
+ 
+ 	return NULL;
+@@ -105,7 +105,7 @@ struct dhcpOfferedAddr* FAST_FUNC find_lease_by_chaddr(const uint8_t *chaddr)
+ 
+ 
+ /* Find the first lease that matches yiaddr, NULL is no match */
+-struct dhcpOfferedAddr* FAST_FUNC find_lease_by_yiaddr(uint32_t yiaddr)
++struct dyn_lease* FAST_FUNC find_lease_by_yiaddr(uint32_t yiaddr)
+ {
+ 	unsigned i;
+ 
+@@ -146,12 +146,12 @@ static int nobody_responds_to_arp(uint32_t addr, const uint8_t *safe_mac)
+ uint32_t FAST_FUNC find_free_or_expired_address(const uint8_t *chaddr)
+ {
+ 	uint32_t addr;
+-	struct dhcpOfferedAddr *oldest_lease = NULL;
++	struct dyn_lease *oldest_lease = NULL;
+ 
+ 	addr = server_config.start_ip; /* addr is in host order here */
+ 	for (; addr <= server_config.end_ip; addr++) {
+ 		uint32_t net_addr;
+-		struct dhcpOfferedAddr *lease;
++		struct dyn_lease *lease;
+ 
+ 		/* ie, 192.168.55.0 */
+ 		if ((addr & 0xff) == 0)
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index 7b80e6b..b86b313 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -120,7 +120,7 @@ const uint8_t dhcp_option_lengths[] ALIGN1 = {
+ 
+ 
+ /* get an option with bounds checking (warning, result is not aligned). */
+-uint8_t* FAST_FUNC get_option(struct dhcpMessage *packet, int code)
++uint8_t* FAST_FUNC get_option(struct dhcp_packet *packet, int code)
+ {
+ 	uint8_t *optionptr;
+ 	int len;
+@@ -159,15 +159,21 @@ uint8_t* FAST_FUNC get_option(struct dhcpMessage *packet, int code)
+ 				rem = sizeof(packet->sname);
+ 				continue;
+ 			}
+-			return NULL;
++			break;
+ 		}
+ 		len = 2 + optionptr[OPT_LEN];
+ 		rem -= len;
+ 		if (rem < 0)
+ 			continue; /* complain and return NULL */
+ 
+-		if (optionptr[OPT_CODE] == code)
++		if (optionptr[OPT_CODE] == code) {
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 2
++			char buf[256 * 2 + 2];
++			*bin2hex(buf, (void*) (optionptr + OPT_DATA), optionptr[OPT_LEN]) = '\0';
++			log2("Option 0x%02x found: %s", code, buf);
++#endif
+ 			return optionptr + OPT_DATA;
++		}
+ 
+ 		if (optionptr[OPT_CODE] == DHCP_OPTION_OVERLOAD) {
+ 			overload |= optionptr[OPT_DATA];
+@@ -175,6 +181,9 @@ uint8_t* FAST_FUNC get_option(struct dhcpMessage *packet, int code)
+ 		}
+ 		optionptr += len;
+ 	}
++
++	/* log3 because udhcpc uses it a lot - very noisy */
++	log3("Option 0x%02x not found", code);
+ 	return NULL;
+ }
+ 
+diff --git a/networking/udhcp/options.h b/networking/udhcp/options.h
+index 23370da..8c80485 100644
+--- a/networking/udhcp/options.h
++++ b/networking/udhcp/options.h
+@@ -100,7 +100,7 @@ extern const struct dhcp_option dhcp_options[];
+ extern const char dhcp_option_strings[];
+ extern const uint8_t dhcp_option_lengths[];
+ 
+-uint8_t *get_option(struct dhcpMessage *packet, int code) FAST_FUNC;
++uint8_t *get_option(struct dhcp_packet *packet, int code) FAST_FUNC;
+ int end_option(uint8_t *optionptr) FAST_FUNC;
+ int add_option_string(uint8_t *optionptr, uint8_t *string) FAST_FUNC;
+ int add_simple_option(uint8_t *optionptr, uint8_t code, uint32_t data) FAST_FUNC;
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index 2cd5f61..911bd3b 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -19,9 +19,9 @@
+ #include "dhcpd.h"
+ #include "options.h"
+ 
+-void FAST_FUNC udhcp_init_header(struct dhcpMessage *packet, char type)
++void FAST_FUNC udhcp_init_header(struct dhcp_packet *packet, char type)
+ {
+-	memset(packet, 0, sizeof(struct dhcpMessage));
++	memset(packet, 0, sizeof(struct dhcp_packet));
+ 	packet->op = BOOTREQUEST; /* if client to a server */
+ 	switch (type) {
+ 	case DHCPOFFER:
+@@ -37,7 +37,7 @@ void FAST_FUNC udhcp_init_header(struct dhcpMessage *packet, char type)
+ }
+ 
+ #if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
+-void FAST_FUNC udhcp_dump_packet(struct dhcpMessage *packet)
++void FAST_FUNC udhcp_dump_packet(struct dhcp_packet *packet)
+ {
+ 	char buf[sizeof(packet->chaddr)*2 + 1];
+ 
+@@ -84,7 +84,7 @@ void FAST_FUNC udhcp_dump_packet(struct dhcpMessage *packet)
+ #endif
+ 
+ /* Read a packet from socket fd, return -1 on read error, -2 on packet error */
+-int FAST_FUNC udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd)
++int FAST_FUNC udhcp_recv_kernel_packet(struct dhcp_packet *packet, int fd)
+ {
+ 	int bytes;
+ 	unsigned char *vendor;
+@@ -165,20 +165,20 @@ uint16_t FAST_FUNC udhcp_checksum(void *addr, int count)
+ }
+ 
+ /* Construct a ip/udp header for a packet, send packet */
+-int FAST_FUNC udhcp_send_raw_packet(struct dhcpMessage *dhcp_pkt,
++int FAST_FUNC udhcp_send_raw_packet(struct dhcp_packet *dhcp_pkt,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port, const uint8_t *dest_arp,
+ 		int ifindex)
+ {
+ 	struct sockaddr_ll dest;
+-	struct udp_dhcp_packet packet;
++	struct ip_udp_dhcp_packet packet;
+ 	int fd;
+ 	int result = -1;
+ 	const char *msg;
+ 
+ 	enum {
+-		IP_UPD_DHCP_SIZE = sizeof(struct udp_dhcp_packet) - CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS,
+-		UPD_DHCP_SIZE    = IP_UPD_DHCP_SIZE - offsetof(struct udp_dhcp_packet, udp),
++		IP_UPD_DHCP_SIZE = sizeof(struct ip_udp_dhcp_packet) - CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS,
++		UPD_DHCP_SIZE    = IP_UPD_DHCP_SIZE - offsetof(struct ip_udp_dhcp_packet, udp),
+ 	};
+ 
+ 	fd = socket(PF_PACKET, SOCK_DGRAM, htons(ETH_P_IP));
+@@ -236,7 +236,7 @@ int FAST_FUNC udhcp_send_raw_packet(struct dhcpMessage *dhcp_pkt,
+ }
+ 
+ /* Let the kernel do all the work for packet generation */
+-int FAST_FUNC udhcp_send_kernel_packet(struct dhcpMessage *dhcp_pkt,
++int FAST_FUNC udhcp_send_kernel_packet(struct dhcp_packet *dhcp_pkt,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port)
+ {
+@@ -246,7 +246,7 @@ int FAST_FUNC udhcp_send_kernel_packet(struct dhcpMessage *dhcp_pkt,
+ 	const char *msg;
+ 
+ 	enum {
+-		DHCP_SIZE = sizeof(struct dhcpMessage) - CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS,
++		DHCP_SIZE = sizeof(struct dhcp_packet) - CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS,
+ 	};
+ 
+ 	fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+diff --git a/networking/udhcp/script.c b/networking/udhcp/script.c
+index 22780d8..794e3ca 100644
+--- a/networking/udhcp/script.c
++++ b/networking/udhcp/script.c
+@@ -129,7 +129,7 @@ static char *alloc_fill_opts(uint8_t *option, const struct dhcp_option *type_p,
+ 
+ 
+ /* put all the parameters into an environment */
+-static char **fill_envp(struct dhcpMessage *packet)
++static char **fill_envp(struct dhcp_packet *packet)
+ {
+ 	int num_options = 0;
+ 	int i;
+@@ -210,7 +210,7 @@ static char **fill_envp(struct dhcpMessage *packet)
+ 
+ 
+ /* Call a script with a par file and env vars */
+-void FAST_FUNC udhcp_run_script(struct dhcpMessage *packet, const char *name)
++void FAST_FUNC udhcp_run_script(struct dhcp_packet *packet, const char *name)
+ {
+ 	char **envp, **curr;
+ 	char *argv[3];
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index 831165d..209d3c8 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -27,7 +27,7 @@
+ 
+ 
+ /* send a packet to gateway_nip using the kernel ip stack */
+-static int send_packet_to_relay(struct dhcpMessage *dhcp_pkt)
++static int send_packet_to_relay(struct dhcp_packet *dhcp_pkt)
+ {
+ 	log1("Forwarding packet to relay");
+ 
+@@ -38,7 +38,7 @@ static int send_packet_to_relay(struct dhcpMessage *dhcp_pkt)
+ 
+ 
+ /* send a packet to a specific mac address and ip address by creating our own ip packet */
+-static int send_packet_to_client(struct dhcpMessage *dhcp_pkt, int force_broadcast)
++static int send_packet_to_client(struct dhcp_packet *dhcp_pkt, int force_broadcast)
+ {
+ 	const uint8_t *chaddr;
+ 	uint32_t ciaddr;
+@@ -76,7 +76,7 @@ static int send_packet_to_client(struct dhcpMessage *dhcp_pkt, int force_broadca
+ 
+ 
+ /* send a dhcp packet, if force broadcast is set, the packet will be broadcast to the client */
+-static int send_packet(struct dhcpMessage *dhcp_pkt, int force_broadcast)
++static int send_packet(struct dhcp_packet *dhcp_pkt, int force_broadcast)
+ {
+ 	if (dhcp_pkt->gateway_nip)
+ 		return send_packet_to_relay(dhcp_pkt);
+@@ -84,11 +84,11 @@ static int send_packet(struct dhcpMessage *dhcp_pkt, int force_broadcast)
+ }
+ 
+ 
+-static void init_packet(struct dhcpMessage *packet, struct dhcpMessage *oldpacket, char type)
++static void init_packet(struct dhcp_packet *packet, struct dhcp_packet *oldpacket, char type)
+ {
+ 	udhcp_init_header(packet, type);
+ 	packet->xid = oldpacket->xid;
+-	memcpy(packet->chaddr, oldpacket->chaddr, 16);
++	memcpy(packet->chaddr, oldpacket->chaddr, sizeof(oldpacket->chaddr));
+ 	packet->flags = oldpacket->flags;
+ 	packet->gateway_nip = oldpacket->gateway_nip;
+ 	packet->ciaddr = oldpacket->ciaddr;
+@@ -97,7 +97,7 @@ static void init_packet(struct dhcpMessage *packet, struct dhcpMessage *oldpacke
+ 
+ 
+ /* add in the bootp options */
+-static void add_bootp_options(struct dhcpMessage *packet)
++static void add_bootp_options(struct dhcp_packet *packet)
+ {
+ 	packet->siaddr_nip = server_config.siaddr_nip;
+ 	if (server_config.sname)
+@@ -108,9 +108,9 @@ static void add_bootp_options(struct dhcpMessage *packet)
+ 
+ 
+ /* send a DHCP OFFER to a DHCP DISCOVER */
+-int FAST_FUNC send_offer(struct dhcpMessage *oldpacket)
++int FAST_FUNC send_offer(struct dhcp_packet *oldpacket)
+ {
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 	uint32_t req_align;
+ 	uint32_t lease_time_aligned = server_config.lease;
+ 	uint32_t static_lease_ip;
+@@ -124,7 +124,7 @@ int FAST_FUNC send_offer(struct dhcpMessage *oldpacket)
+ 
+ 	/* ADDME: if static, short circuit */
+ 	if (!static_lease_ip) {
+-		struct dhcpOfferedAddr *lease;
++		struct dyn_lease *lease;
+ 
+ 		lease = find_lease_by_chaddr(oldpacket->chaddr);
+ 		/* The client is in our lease/offered table */
+@@ -195,9 +195,9 @@ int FAST_FUNC send_offer(struct dhcpMessage *oldpacket)
+ }
+ 
+ 
+-int FAST_FUNC send_NAK(struct dhcpMessage *oldpacket)
++int FAST_FUNC send_NAK(struct dhcp_packet *oldpacket)
+ {
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 
+ 	init_packet(&packet, oldpacket, DHCPNAK);
+ 
+@@ -206,9 +206,9 @@ int FAST_FUNC send_NAK(struct dhcpMessage *oldpacket)
+ }
+ 
+ 
+-int FAST_FUNC send_ACK(struct dhcpMessage *oldpacket, uint32_t yiaddr)
++int FAST_FUNC send_ACK(struct dhcp_packet *oldpacket, uint32_t yiaddr)
+ {
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 	struct option_set *curr;
+ 	uint8_t *lease_time;
+ 	uint32_t lease_time_aligned = server_config.lease;
+@@ -256,9 +256,9 @@ int FAST_FUNC send_ACK(struct dhcpMessage *oldpacket, uint32_t yiaddr)
+ }
+ 
+ 
+-int FAST_FUNC send_inform(struct dhcpMessage *oldpacket)
++int FAST_FUNC send_inform(struct dhcp_packet *oldpacket)
+ {
+-	struct dhcpMessage packet;
++	struct dhcp_packet packet;
+ 	struct option_set *curr;
+ 
+ 	init_packet(&packet, oldpacket, DHCPACK);

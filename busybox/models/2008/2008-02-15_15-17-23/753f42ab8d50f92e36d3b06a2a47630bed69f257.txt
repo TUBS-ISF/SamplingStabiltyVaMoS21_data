@@ -1,0 +1,54 @@
+2008-02-15 15:17:23 +0000
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index 6f2702e..6ee154c 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -88,6 +88,13 @@ config ADDUSER
+ 	help
+ 	  Utility for creating a new user account.
+ 
++config FEATURE_ADDUSER_LONG_OPTIONS
++	bool "Enable long options"
++	default n
++	depends on ADDUSER && GETOPT_LONG
++	help
++	  Support long options for the adduser applet.
++
+ config DELUSER
+ 	bool "deluser"
+ 	default n
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index a859f4b..7b5283e 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -66,6 +66,19 @@ static void passwd_wrapper(const char *login)
+ 	bb_error_msg_and_die("cannot execute %s, you must set password manually", prog);
+ }
+ 
++#if ENABLE_FEATURE_ADDUSER_LONG_OPTIONS
++static const char adduser_longopts[] ALIGN1 =
++		"home\0"                Required_argument "h"
++		"gecos\0"               Required_argument "g"
++		"shell\0"               Required_argument "s"
++		"ingroup\0"             Required_argument "G"
++		"disabled-password\0"   No_argument       "D"
++		"empty-password\0"      No_argument       "D"
++		"system\0"              No_argument       "S"
++		"no-create-home\0"      No_argument       "H"
++		;
++#endif
++
+ /*
+  * adduser will take a login_name as its first parameter.
+  * home, shell, gecos:
+@@ -78,6 +91,10 @@ int adduser_main(int argc, char **argv)
+ 	const char *usegroup = NULL;
+ 	FILE *file;
+ 
++#if ENABLE_FEATURE_ADDUSER_LONG_OPTIONS
++	applet_long_options = adduser_longopts;
++#endif
++
+ 	/* got root? */
+ 	if (geteuid()) {
+ 		bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);

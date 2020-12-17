@@ -1,0 +1,229 @@
+2008-02-19 11:26:28 +0000
+diff --git a/archival/Config.in b/archival/Config.in
+index 160c54d..6f803f4 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -166,6 +166,14 @@ config FEATURE_TAR_CREATE
+ 	  If you enable this option you'll be able to create
+ 	  tar archives using the `-c' option.
+ 
++config FEATURE_TAR_GZIP
++	bool "Enable -z option"
++	default y
++	depends on TAR
++	help
++	  If you enable this option tar will be able to call gzip,
++	  when creating or extracting tar gziped archives.
++
+ config FEATURE_TAR_BZIP2
+ 	bool "Enable -j option to handle .tar.bz2 files"
+ 	default n
+@@ -182,29 +190,29 @@ config FEATURE_TAR_LZMA
+ 	  If you enable this option you'll be able to extract
+ 	  archives compressed with lzma.
+ 
+-config FEATURE_TAR_FROM
+-	bool "Enable -X (exclude from) and -T (include from) options)"
++config FEATURE_TAR_COMPRESS
++	bool "Enable -Z option"
+ 	default n
+ 	depends on TAR
+ 	help
+-	  If you enable this option you'll be able to specify
+-	  a list of files to include or exclude from an archive.
++	  If you enable this option tar will be able to call uncompress,
++	  when extracting .tar.Z archives.
+ 
+-config FEATURE_TAR_GZIP
+-	bool "Enable -z option"
+-	default y
+-	depends on TAR
++config FEATURE_TAR_AUTODETECT
++	bool "Let tar autodetect gz/bz2 compresses tarballs"
++	default n
++	depends on FEATURE_TAR_GZIP || FEATURE_TAR_BZIP2
+ 	help
+-	  If you enable this option tar will be able to call gzip,
+-	  when creating or extracting tar gziped archives.
++	  With this option tar can automatically detect gzip/bzip2 compressed
++	  tarballs. Currently it works only on seekable streams.
+ 
+-config FEATURE_TAR_COMPRESS
+-	bool "Enable -Z option"
++config FEATURE_TAR_FROM
++	bool "Enable -X (exclude from) and -T (include from) options)"
+ 	default n
+ 	depends on TAR
+ 	help
+-	  If you enable this option tar will be able to call uncompress,
+-	  when extracting .tar.Z archives.
++	  If you enable this option you'll be able to specify
++	  a list of files to include or exclude from an archive.
+ 
+ config FEATURE_TAR_OLDGNU_COMPATIBILITY
+ 	bool "Enable support for old tar header format"
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index 893cd5b..54c8f76 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -46,6 +46,9 @@ void BUG_tar_header_size(void);
+ char get_header_tar(archive_handle_t *archive_handle)
+ {
+ 	static smallint end;
++#if ENABLE_FEATURE_TAR_AUTODETECT
++	static smallint not_first;
++#endif
+ 
+ 	file_header_t *file_header = archive_handle->file_header;
+ 	struct {
+@@ -115,7 +118,7 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 			 * Read until the end to empty the pipe from gz or bz2
+ 			 */
+ 			while (full_read(archive_handle->src_fd, &tar, 512) == 512)
+-				/* repeat */;
++				continue;
+ 			return EXIT_FAILURE;
+ 		}
+ 		end = 1;
+@@ -123,16 +126,49 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 	}
+ 	end = 0;
+ 
+-	/* Check header has valid magic, "ustar" is for the proper tar
+-	 * 0's are for the old tar format
+-	 */
+-	if (strncmp(tar.magic, "ustar", 5) != 0) {
+-#if ENABLE_FEATURE_TAR_OLDGNU_COMPATIBILITY
+-		if (memcmp(tar.magic, "\0\0\0\0", 5) != 0)
++	/* Check header has valid magic, "ustar" is for the proper tar,
++	 * five NULs are for the old tar format  */
++	if (strncmp(tar.magic, "ustar", 5) != 0
++	 && (!ENABLE_FEATURE_TAR_OLDGNU_COMPATIBILITY
++	     || memcmp(tar.magic, "\0\0\0\0", 5) != 0)
++	) {
++#if ENABLE_FEATURE_TAR_AUTODETECT
++		char (*get_header_ptr)(archive_handle_t *);
++
++		/* tar gz/bz autodetect: check for gz/bz2 magic.
++		 * If it is the very first block, and we see the magic,
++		 * we can switch to get_header_tar_gz/bz2/lzma().
++		 * Needs seekable fd. I wish recv(MSG_PEEK) would work
++		 * on any fd... */
++		if (not_first)
++			goto err;
++#if ENABLE_FEATURE_TAR_GZIP
++		if (tar.name[0] == 0x1f && tar.name[1] == 0x8b) { /* gzip */
++			get_header_ptr = get_header_tar_gz;
++		} else
+ #endif
+-			bb_error_msg_and_die("invalid tar magic");
++#if ENABLE_FEATURE_TAR_BZIP2
++		if (tar.name[0] == 'B' && tar.name[1] == 'Z'
++		 && tar.name[2] == 'h' && isdigit(tar.name[3])
++		) { /* bzip2 */
++			get_header_ptr = get_header_tar_bz2;
++		} else
++#endif
++			goto err;
++		if (lseek(archive_handle->src_fd, -512, SEEK_CUR) != 0)
++			goto err;
++		while (get_header_ptr(archive_handle) == EXIT_SUCCESS)
++			continue;
++		return EXIT_FAILURE;
++ err:
++#endif /* FEATURE_TAR_AUTODETECT */
++		bb_error_msg_and_die("invalid tar magic");
+ 	}
+ 
++#if ENABLE_FEATURE_TAR_AUTODETECT
++	not_first = 1;
++#endif
++
+ 	/* Do checksum on headers.
+ 	 * POSIX says that checksum is done on unsigned bytes, but
+ 	 * Sun and HP-UX gets it wrong... more details in
+diff --git a/archival/tar.c b/archival/tar.c
+index 4ec454b..e790f28 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -33,8 +33,17 @@
+ #define FNM_LEADING_DIR 0
+ #endif
+ 
++
+ #define block_buf bb_common_bufsiz1
+ 
++
++#if !ENABLE_FEATURE_TAR_GZIP && !ENABLE_FEATURE_TAR_BZIP2
++/* Do not pass gzip flag to writeTarFile() */
++#define writeTarFile(tar_fd, verboseFlag, dereferenceFlag, include, exclude, gzip) \
++	writeTarFile(tar_fd, verboseFlag, dereferenceFlag, include, exclude)
++#endif
++
++
+ #if ENABLE_FEATURE_TAR_CREATE
+ 
+ /* Tar file constants  */
+@@ -514,18 +523,23 @@ static int writeTarFile(const int tar_fd, const int verboseFlag,
+ 	if (fstat(tbInfo.tarFd, &tbInfo.statBuf) < 0)
+ 		bb_perror_msg_and_die("cannot stat tar file");
+ 
+-	if ((ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2) && gzip) {
+-// On Linux, vfork never unpauses parent early, although standard
+-// allows for that. Do we want to waste bytes checking for it?
++#if ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2
++	if (gzip) {
++#if ENABLE_FEATURE_TAR_GZIP && ENABLE_FEATURE_TAR_BZIP2
++		const char *zip_exec = (gzip == 1) ? "gzip" : "bzip2";
++#elif ENABLE_FEATURE_TAR_GZIP
++		const char *zip_exec = "gzip";
++#else /* only ENABLE_FEATURE_TAR_BZIP2 */
++		const char *zip_exec = "bzip2";
++#endif
++	// On Linux, vfork never unpauses parent early, although standard
++	// allows for that. Do we want to waste bytes checking for it?
+ #define WAIT_FOR_CHILD 0
+-
+ 		volatile int vfork_exec_errno = 0;
+ #if WAIT_FOR_CHILD
+ 		struct fd_pair gzipStatusPipe;
+ #endif
+ 		struct fd_pair gzipDataPipe;
+-		const char *zip_exec = (gzip == 1) ? "gzip" : "bzip2";
+-
+ 		xpiped_pair(gzipDataPipe);
+ #if WAIT_FOR_CHILD
+ 		xpiped_pair(gzipStatusPipe);
+@@ -584,6 +598,7 @@ static int writeTarFile(const int tar_fd, const int verboseFlag,
+ 			bb_perror_msg_and_die("cannot exec %s", zip_exec);
+ 		}
+ 	}
++#endif
+ 
+ 	tbInfo.excludeList = exclude;
+ 
+@@ -934,11 +949,13 @@ int tar_main(int argc, char **argv)
+ 
+ 	/* create an archive */
+ 	if (opt & OPT_CREATE) {
++#if ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2
+ 		int zipMode = 0;
+-		if (ENABLE_FEATURE_TAR_GZIP && get_header_ptr == get_header_tar_gz)
++		if (ENABLE_FEATURE_TAR_GZIP && (opt & OPT_GZIP))
+ 			zipMode = 1;
+-		if (ENABLE_FEATURE_TAR_BZIP2 && get_header_ptr == get_header_tar_bz2)
++		if (ENABLE_FEATURE_TAR_BZIP2 && (opt & OPT_BZIP2))
+ 			zipMode = 2;
++#endif
+ 		/* NB: writeTarFile() closes tar_handle->src_fd */
+ 		return writeTarFile(tar_handle->src_fd, verboseFlag, opt & OPT_DEREFERENCE,
+ 				tar_handle->accept,
+@@ -946,7 +963,7 @@ int tar_main(int argc, char **argv)
+ 	}
+ 
+ 	while (get_header_ptr(tar_handle) == EXIT_SUCCESS)
+-		/* nothing */;
++		continue;
+ 
+ 	/* Check that every file that should have been extracted was */
+ 	while (tar_handle->accept) {

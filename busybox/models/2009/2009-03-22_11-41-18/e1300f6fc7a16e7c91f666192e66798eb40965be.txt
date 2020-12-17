@@ -1,0 +1,165 @@
+2009-03-22 11:41:18 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 2c4704a..9c0cd7c 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -471,8 +471,10 @@ struct globals {
+ 	smallint fake_mode;
+ 	/* these three support $?, $#, and $1 */
+ 	smalluint last_return_code;
++	/* is global_argv and global_argv[1..n] malloced? (note: not [0]) */
+ 	smalluint global_args_malloced;
+-	int global_argc; /* NB: $# + 1 */
++	/* how many non-NULL argv's we have. NB: $# + 1 */
++	int global_argc;
+ 	char **global_argv;
+ #if ENABLE_HUSH_LOOPS
+ 	unsigned depth_break_continue;
+@@ -4728,9 +4730,14 @@ static int builtin_shift(char **argv)
+ 		n = atoi(argv[1]);
+ 	}
+ 	if (n >= 0 && n < G.global_argc) {
+-		G.global_argv[n] = G.global_argv[0];
++		if (G.global_args_malloced) {
++			int m = 1;
++			while (m <= n)
++				free(G.global_argv[m++]);
++		}
+ 		G.global_argc -= n;
+-		G.global_argv += n;
++		memmove(&G.global_argv[1], &G.global_argv[n+1],
++				G.global_argc * sizeof(G.global_argv[0]));
+ 		return EXIT_SUCCESS;
+ 	}
+ 	return EXIT_FAILURE;
+diff --git a/shell/hush_test/hush-leak/leak_argv1.right b/shell/hush_test/hush-leak/leak_argv1.right
+new file mode 100644
+index 0000000..7bccc1e
+--- /dev/null
++++ b/shell/hush_test/hush-leak/leak_argv1.right
+@@ -0,0 +1,2 @@
++Measuring memory leak...
++vsz does not grow
+diff --git a/shell/hush_test/hush-leak/leak_argv1.tests b/shell/hush_test/hush-leak/leak_argv1.tests
+new file mode 100644
+index 0000000..34991ce
+--- /dev/null
++++ b/shell/hush_test/hush-leak/leak_argv1.tests
+@@ -0,0 +1,117 @@
++pid=$$
++
++# Warm up
++beg=`ps -o pid,vsz | grep "^ *$pid "`
++i=1
++while test $i != X; do
++    set -- a b c d e f g h i j k l m n o p q r s t u v w x y z
++    shift
++    shift 2
++    shift 5
++    shift 11
++    set -- A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
++    shift 3
++    shift 7
++    i=1$i
++    if test $i = 1111111111111111111111111111111111111111111111; then i=2; fi
++    if test $i = 1111111111111111111111111111111111111111111112; then i=3; fi
++    if test $i = 1111111111111111111111111111111111111111111113; then i=4; fi
++    if test $i = 1111111111111111111111111111111111111111111114; then i=5; fi
++    if test $i = 1111111111111111111111111111111111111111111115; then i=6; fi
++    if test $i = 1111111111111111111111111111111111111111111116; then i=7; fi
++    if test $i = 1111111111111111111111111111111111111111111117; then i=8; fi
++    if test $i = 1111111111111111111111111111111111111111111118; then i=9; fi
++    if test $i = 1111111111111111111111111111111111111111111119; then i=a; fi
++    if test $i = 111111111111111111111111111111111111111111111a; then i=b; fi
++    if test $i = 111111111111111111111111111111111111111111111b; then i=c; fi
++    if test $i = 111111111111111111111111111111111111111111111c; then i=d; fi
++    if test $i = 111111111111111111111111111111111111111111111d; then i=e; fi
++    if test $i = 111111111111111111111111111111111111111111111e; then i=f; fi
++    if test $i = 111111111111111111111111111111111111111111111f; then i=g; fi
++    if test $i = 111111111111111111111111111111111111111111111g; then i=h; fi
++    if test $i = 111111111111111111111111111111111111111111111h; then i=i; fi
++    if test $i = 111111111111111111111111111111111111111111111i; then i=j; fi
++    if test $i = 111111111111111111111111111111111111111111111j; then i=X; fi
++done
++end=`ps -o pid,vsz | grep "^ *$pid "`
++
++# Warm up again (I do need it on my machine)
++beg=`ps -o pid,vsz | grep "^ *$pid "`
++i=1
++while test $i != X; do
++    set -- a b c d e f g h i j k l m n o p q r s t u v w x y z
++    shift
++    shift 2
++    shift 5
++    shift 11
++    set -- A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
++    shift 3
++    shift 7
++    i=1$i
++    if test $i = 1111111111111111111111111111111111111111111111; then i=2; fi
++    if test $i = 1111111111111111111111111111111111111111111112; then i=3; fi
++    if test $i = 1111111111111111111111111111111111111111111113; then i=4; fi
++    if test $i = 1111111111111111111111111111111111111111111114; then i=5; fi
++    if test $i = 1111111111111111111111111111111111111111111115; then i=6; fi
++    if test $i = 1111111111111111111111111111111111111111111116; then i=7; fi
++    if test $i = 1111111111111111111111111111111111111111111117; then i=8; fi
++    if test $i = 1111111111111111111111111111111111111111111118; then i=9; fi
++    if test $i = 1111111111111111111111111111111111111111111119; then i=a; fi
++    if test $i = 111111111111111111111111111111111111111111111a; then i=b; fi
++    if test $i = 111111111111111111111111111111111111111111111b; then i=c; fi
++    if test $i = 111111111111111111111111111111111111111111111c; then i=d; fi
++    if test $i = 111111111111111111111111111111111111111111111d; then i=e; fi
++    if test $i = 111111111111111111111111111111111111111111111e; then i=f; fi
++    if test $i = 111111111111111111111111111111111111111111111f; then i=g; fi
++    if test $i = 111111111111111111111111111111111111111111111g; then i=h; fi
++    if test $i = 111111111111111111111111111111111111111111111h; then i=i; fi
++    if test $i = 111111111111111111111111111111111111111111111i; then i=j; fi
++    if test $i = 111111111111111111111111111111111111111111111j; then i=X; fi
++done
++end=`ps -o pid,vsz | grep "^ *$pid "`
++if test "$beg" != "$end"; then
++    true echo "vsz grows: $beg -> $end"
++else
++    true echo "vsz does not grow"
++fi
++
++echo "Measuring memory leak..."
++beg=`ps -o pid,vsz | grep "^ *$pid "`
++i=1
++while test $i != X; do
++    set -- a b c d e f g h i j k l m n o p q r s t u v w x y z
++    shift
++    shift 2
++    shift 5
++    shift 11
++    set -- A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
++    shift 3
++    shift 7
++    i=1$i
++    if test $i = 1111111111111111111111111111111111111111111111; then i=2; fi
++    if test $i = 1111111111111111111111111111111111111111111112; then i=3; fi
++    if test $i = 1111111111111111111111111111111111111111111113; then i=4; fi
++    if test $i = 1111111111111111111111111111111111111111111114; then i=5; fi
++    if test $i = 1111111111111111111111111111111111111111111115; then i=6; fi
++    if test $i = 1111111111111111111111111111111111111111111116; then i=7; fi
++    if test $i = 1111111111111111111111111111111111111111111117; then i=8; fi
++    if test $i = 1111111111111111111111111111111111111111111118; then i=9; fi
++    if test $i = 1111111111111111111111111111111111111111111119; then i=a; fi
++    if test $i = 111111111111111111111111111111111111111111111a; then i=b; fi
++    if test $i = 111111111111111111111111111111111111111111111b; then i=c; fi
++    if test $i = 111111111111111111111111111111111111111111111c; then i=d; fi
++    if test $i = 111111111111111111111111111111111111111111111d; then i=e; fi
++    if test $i = 111111111111111111111111111111111111111111111e; then i=f; fi
++    if test $i = 111111111111111111111111111111111111111111111f; then i=g; fi
++    if test $i = 111111111111111111111111111111111111111111111g; then i=h; fi
++    if test $i = 111111111111111111111111111111111111111111111h; then i=i; fi
++    if test $i = 111111111111111111111111111111111111111111111i; then i=j; fi
++    if test $i = 111111111111111111111111111111111111111111111j; then i=X; fi
++done
++end=`ps -o pid,vsz | grep "^ *$pid "`
++
++if test "$beg" != "$end"; then
++    echo "vsz grows: $beg -> $end"
++else
++    echo "vsz does not grow"
++fi

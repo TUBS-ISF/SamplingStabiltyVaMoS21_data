@@ -1,0 +1,14 @@
+2008-08-05 23:01:01 +0000
+diff --git a/console-tools/kbd_mode.c b/console-tools/kbd_mode.c
+index e155881..2162fd4 100644
+--- a/console-tools/kbd_mode.c
++++ b/console-tools/kbd_mode.c
+@@ -46,7 +46,7 @@ int kbd_mode_main(int argc UNUSED_PARAM, char **argv)
+ 		printf("The keyboard is in %s mode\n", mode);
+ 	} else {
+ 		opt = opt & UNICODE ? 3 : opt >> 1;
+-		xioctl(fd, KDSKBMODE, &opt);
++		xioctl(fd, KDSKBMODE, opt);
+ 	}
+ 
+ 	if (ENABLE_FEATURE_CLEAN_UP)

@@ -1,0 +1,15 @@
+2007-05-24 12:26:39 +0000
+diff --git a/shell/hush_test/hush-misc/syntax_err.right b/shell/hush_test/hush-misc/syntax_err.right
+new file mode 100644
+index 0000000..fbf3c9f
+--- /dev/null
++++ b/shell/hush_test/hush-misc/syntax_err.right
+@@ -0,0 +1 @@
++hush: syntax error: unterminated '
+diff --git a/shell/hush_test/hush-misc/syntax_err.tests b/shell/hush_test/hush-misc/syntax_err.tests
+new file mode 100755
+index 0000000..c990c64
+--- /dev/null
++++ b/shell/hush_test/hush-misc/syntax_err.tests
+@@ -0,0 +1 @@
++echo test `echo 'aa`

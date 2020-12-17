@@ -1,0 +1,4 @@
+2009-08-03 10:36:58 +0200
+diff --git a/testsuite/rx.tests b/testsuite/rx.tests
+old mode 100644
+new mode 100755

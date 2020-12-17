@@ -1,0 +1,14 @@
+2009-03-18 20:00:46 +0000
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 01b56eb..6bf103c 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1386,6 +1386,8 @@ static void send_cgi_and_exit(
+ 	if (referer)
+ 		setenv1("HTTP_REFERER", referer);
+ 	setenv1("HTTP_HOST", host); /* set to "" if NULL */
++	/* setenv1("SERVER_NAME", safe_gethostname()); - don't do this,
++	 * just run "env SERVER_NAME=xyz httpd ..." instead */
+ 
+ 	xpiped_pair(fromCgi);
+ 	xpiped_pair(toCgi);

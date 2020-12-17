@@ -1,0 +1,80 @@
+2009-06-01 14:16:43 -0400
+diff --git a/shell/hush.c b/shell/hush.c
+index 7d04167..b5cf861 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -5303,6 +5303,9 @@ static int handle_dollar(o_string *as_string,
+ 					all_digits = true;
+ 					goto char_ok;
+ 				}
++				/* They're being verbose and doing ${?} */
++				if (i_peek(input) == '}' && strchr("$!?#*@_", ch))
++					goto char_ok;
+ 			}
+ 
+ 			if (expansion < 2
+diff --git a/shell/hush_test/hush-vars/param_expand_indicate_error.right b/shell/hush_test/hush-vars/param_expand_indicate_error.right
+index ec4908c..590bb20 100644
+--- a/shell/hush_test/hush-vars/param_expand_indicate_error.right
++++ b/shell/hush_test/hush-vars/param_expand_indicate_error.right
+@@ -1,5 +1,4 @@
+ hush: syntax error: unterminated ${name}
+-hush: syntax error: unterminated ${name}
+ 0
+ 0
+ _
+diff --git a/shell/hush_test/hush-vars/param_expand_indicate_error.tests b/shell/hush_test/hush-vars/param_expand_indicate_error.tests
+index 1f94181..bccba3e 100755
+--- a/shell/hush_test/hush-vars/param_expand_indicate_error.tests
++++ b/shell/hush_test/hush-vars/param_expand_indicate_error.tests
+@@ -1,7 +1,7 @@
+ # do all of these in subshells since it's supposed to error out
+ 
+ # first try some invalid patterns
+-"$THIS_SH" -c 'echo ${?}'
++#"$THIS_SH" -c 'echo ${?}' -- this is valid as it's the same as $?
+ "$THIS_SH" -c 'echo ${:?}'
+ 
+ # then some funky ones
+diff --git a/shell/hush_test/hush-vars/var1.right b/shell/hush_test/hush-vars/var1.right
+index 14b2314..194e7db 100644
+--- a/shell/hush_test/hush-vars/var1.right
++++ b/shell/hush_test/hush-vars/var1.right
+@@ -1,4 +1,4 @@
+ http://busybox.net
+ http://busybox.net_abc
+-1
+-1
++1 1
++1 1
+diff --git a/shell/hush_test/hush-vars/var1.tests b/shell/hush_test/hush-vars/var1.tests
+index 0a63696..48a6782 100755
+--- a/shell/hush_test/hush-vars/var1.tests
++++ b/shell/hush_test/hush-vars/var1.tests
+@@ -4,6 +4,6 @@ echo $URL
+ echo ${URL}_abc
+ 
+ true
+-false; echo $?
++false; echo $? ${?}
+ true
+-{ false; echo $?; }
++{ false; echo $? ${?}; }
+diff --git a/shell/hush_test/hush-vars/var3.right b/shell/hush_test/hush-vars/var3.right
+index e772aaa..5e28d2f 100644
+--- a/shell/hush_test/hush-vars/var3.right
++++ b/shell/hush_test/hush-vars/var3.right
+@@ -1,3 +1,2 @@
+ hush: syntax error: unterminated ${name}
+ hush: syntax error: unterminated ${name}
+-hush: syntax error: unterminated ${name}
+diff --git a/shell/hush_test/hush-vars/var3.tests b/shell/hush_test/hush-vars/var3.tests
+index e09f433..aea36d6 100755
+--- a/shell/hush_test/hush-vars/var3.tests
++++ b/shell/hush_test/hush-vars/var3.tests
+@@ -1,4 +1,4 @@
+ # reject invalid vars
+ "$THIS_SH" -c 'echo ${1q}'
+ "$THIS_SH" -c 'echo ${&}'
+-"$THIS_SH" -c 'echo ${$}'
++#"$THIS_SH" -c 'echo ${$}' -- this is valid as it's the same as $$

@@ -1,0 +1,294 @@
+2008-04-21 02:21:45 +0000
+diff --git a/networking/Config.in b/networking/Config.in
+index f7f189c..fb6988b 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -576,7 +576,7 @@ config NAMEIF
+ 	  Renamed interfaces MUST be in the down state.
+ 	  It is possible to use a file (default: /etc/mactab)
+ 	  with list of new interface names and MACs.
+-	  Maximum interface name length: IF_NAMESIZE = 16
++	  Maximum interface name length: IFNAMSIZ = 16
+ 	  File fields are separated by space or tab.
+ 	  File format:
+ 	  # Comment
+diff --git a/networking/brctl.c b/networking/brctl.c
+index bd13878..acc7897 100644
+--- a/networking/brctl.c
++++ b/networking/brctl.c
+@@ -137,7 +137,7 @@ int brctl_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 				if (!if_indextoname(bridx[i], brname))
+ 					bb_perror_msg_and_die("can't get bridge name for index %d", i);
+-				safe_strncpy(ifr.ifr_name, brname, IFNAMSIZ);
++				strncpy(ifr.ifr_name, brname, IFNAMSIZ);
+ 
+ 				arm_ioctl(args, BRCTL_GET_BRIDGE_INFO,
+ 							(unsigned long) &bi, 0);
+@@ -191,7 +191,7 @@ int brctl_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		if (!*argv) /* all but 'addif/delif' need at least two arguments */
+ 			bb_show_usage();
+ 
+-		safe_strncpy(ifr.ifr_name, br, IFNAMSIZ);
++		strncpy(ifr.ifr_name, br, IFNAMSIZ);
+ 		if (key == ARG_addif || key == ARG_delif) { /* addif or delif */
+ 			brif = *argv;
+ 			ifr.ifr_ifindex = if_nametoindex(brif);
+diff --git a/networking/ifconfig.c b/networking/ifconfig.c
+index fcbeb24..9e95533 100644
+--- a/networking/ifconfig.c
++++ b/networking/ifconfig.c
+@@ -315,7 +315,7 @@ int ifconfig_main(int argc, char **argv)
+ 	sockfd = xsocket(AF_INET, SOCK_DGRAM, 0);
+ 
+ 	/* get interface name */
+-	safe_strncpy(ifr.ifr_name, *argv, IFNAMSIZ);
++	strncpy(ifr.ifr_name, *argv, IFNAMSIZ);
+ 
+ 	/* Process the remaining arguments. */
+ 	while (*++argv != (char *) NULL) {
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index b119517..0aa2320 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -148,6 +148,10 @@ static void change_active(char *master_ifname, char *slave_ifname);
+ static int enslave(char *master_ifname, char *slave_ifname);
+ static int release(char *master_ifname, char *slave_ifname);
+ 
++static void strncpy_IFNAMSIZ(char *dst, const char *src)
++{
++	strncpy(dst, src, IFNAMSIZ);
++}
+ 
+ int ifenslave_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ifenslave_main(int argc ATTRIBUTE_UNUSED, char **argv)
+@@ -302,7 +306,7 @@ static void get_drv_info(char *master_ifname)
+ 	struct ethtool_drvinfo info;
+ 
+ 	memset(&ifr, 0, sizeof(ifr));
+-	strncpy(ifr.ifr_name, master_ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(ifr.ifr_name, master_ifname);
+ 	ifr.ifr_data = (caddr_t)&info;
+ 
+ 	info.cmd = ETHTOOL_GDRVINFO;
+@@ -332,8 +336,8 @@ static void change_active(char *master_ifname, char *slave_ifname)
+ 			slave_ifname);
+ 	}
+ 
+-	strncpy(ifr.ifr_name, master_ifname, IFNAMSIZ);
+-	strncpy(ifr.ifr_slave, slave_ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(ifr.ifr_name, master_ifname);
++	strncpy_IFNAMSIZ(ifr.ifr_slave, slave_ifname);
+ 	if (ioctl(skfd, SIOCBONDCHANGEACTIVE, &ifr) < 0
+ 	 && ioctl(skfd, BOND_CHANGE_ACTIVE_OLD, &ifr) < 0
+ 	) {
+@@ -448,8 +452,8 @@ static int enslave(char *master_ifname, char *slave_ifname)
+ 	}
+ 
+ 	/* Do the real thing */
+-	strncpy(ifr.ifr_name, master_ifname, IFNAMSIZ);
+-	strncpy(ifr.ifr_slave, slave_ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(ifr.ifr_name, master_ifname);
++	strncpy_IFNAMSIZ(ifr.ifr_slave, slave_ifname);
+ 	if (ioctl(skfd, SIOCBONDENSLAVE, &ifr) < 0
+ 	 && ioctl(skfd, BOND_ENSLAVE_OLD, &ifr) < 0
+ 	) {
+@@ -484,8 +488,8 @@ static int release(char *master_ifname, char *slave_ifname)
+ 		return 1;
+ 	}
+ 
+-	strncpy(ifr.ifr_name, master_ifname, IFNAMSIZ);
+-	strncpy(ifr.ifr_slave, slave_ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(ifr.ifr_name, master_ifname);
++	strncpy_IFNAMSIZ(ifr.ifr_slave, slave_ifname);
+ 	if (ioctl(skfd, SIOCBONDRELEASE, &ifr) < 0
+ 	 && ioctl(skfd, BOND_RELEASE_OLD, &ifr) < 0
+ 	) {
+@@ -508,11 +512,11 @@ static int get_if_settings(char *ifname, struct dev_data *dd)
+ {
+ 	int res;
+ 
+-	strncpy(dd->mtu.ifr_name, ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(dd->mtu.ifr_name, ifname);
+ 	res = ioctl(skfd, SIOCGIFMTU, &dd->mtu);
+-	strncpy(dd->flags.ifr_name, ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(dd->flags.ifr_name, ifname);
+ 	res |= ioctl(skfd, SIOCGIFFLAGS, &dd->flags);
+-	strncpy(dd->hwaddr.ifr_name, ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(dd->hwaddr.ifr_name, ifname);
+ 	res |= ioctl(skfd, SIOCGIFHWADDR, &dd->hwaddr);
+ 
+ 	return res;
+@@ -520,7 +524,7 @@ static int get_if_settings(char *ifname, struct dev_data *dd)
+ 
+ static int get_slave_flags(char *slave_ifname)
+ {
+-	strncpy(slave.flags.ifr_name, slave_ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(slave.flags.ifr_name, slave_ifname);
+ 	return ioctl(skfd, SIOCGIFFLAGS, &slave.flags);
+ }
+ 
+@@ -528,7 +532,7 @@ static int set_master_hwaddr(char *master_ifname, struct sockaddr *hwaddr)
+ {
+ 	struct ifreq ifr;
+ 
+-	strncpy(ifr.ifr_name, master_ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(ifr.ifr_name, master_ifname);
+ 	memcpy(&(ifr.ifr_hwaddr), hwaddr, sizeof(struct sockaddr));
+ 	return ioctl(skfd, SIOCSIFHWADDR, &ifr);
+ }
+@@ -537,7 +541,7 @@ static int set_slave_hwaddr(char *slave_ifname, struct sockaddr *hwaddr)
+ {
+ 	struct ifreq ifr;
+ 
+-	strncpy(ifr.ifr_name, slave_ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(ifr.ifr_name, slave_ifname);
+ 	memcpy(&(ifr.ifr_hwaddr), hwaddr, sizeof(struct sockaddr));
+ 	return ioctl(skfd, SIOCSIFHWADDR, &ifr);
+ }
+@@ -547,7 +551,7 @@ static int set_slave_mtu(char *slave_ifname, int mtu)
+ 	struct ifreq ifr;
+ 
+ 	ifr.ifr_mtu = mtu;
+-	strncpy(ifr.ifr_name, slave_ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(ifr.ifr_name, slave_ifname);
+ 	return ioctl(skfd, SIOCSIFMTU, &ifr);
+ }
+ 
+@@ -556,7 +560,7 @@ static int set_if_flags(char *ifname, short flags)
+ 	struct ifreq ifr;
+ 
+ 	ifr.ifr_flags = flags;
+-	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 	return ioctl(skfd, SIOCSIFFLAGS, &ifr);
+ }
+ 
+@@ -580,7 +584,7 @@ static int clear_if_addr(char *ifname)
+ {
+ 	struct ifreq ifr;
+ 
+-	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
++	strncpy_IFNAMSIZ(ifr.ifr_name, ifname);
+ 	ifr.ifr_addr.sa_family = AF_INET;
+ 	memset(ifr.ifr_addr.sa_data, 0, sizeof(ifr.ifr_addr.sa_data));
+ 	return ioctl(skfd, SIOCSIFADDR, &ifr);
+@@ -603,7 +607,7 @@ static int set_if_addr(char *master_ifname, char *slave_ifname)
+ 	int i;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(ifra); i++) {
+-		strncpy(ifr.ifr_name, master_ifname, IFNAMSIZ);
++		strncpy_IFNAMSIZ(ifr.ifr_name, master_ifname);
+ 		res = ioctl(skfd, ifra[i].g_ioctl, &ifr);
+ 		if (res < 0) {
+ 			ifr.ifr_addr.sa_family = AF_INET;
+@@ -611,7 +615,7 @@ static int set_if_addr(char *master_ifname, char *slave_ifname)
+ 			       sizeof(ifr.ifr_addr.sa_data));
+ 		}
+ 
+-		strncpy(ifr.ifr_name, slave_ifname, IFNAMSIZ);
++		strncpy_IFNAMSIZ(ifr.ifr_name, slave_ifname);
+ 		res = ioctl(skfd, ifra[i].s_ioctl, &ifr);
+ 		if (res < 0)
+ 			return res;
+diff --git a/networking/interface.c b/networking/interface.c
+index 44bd8d3..f5c94f1 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -321,23 +321,23 @@ struct user_net_device_stats {
+ 
+ struct interface {
+ 	struct interface *next, *prev;
+-	char name[IFNAMSIZ];	/* interface name        */
+-	short type;			/* if type               */
+-	short flags;		/* various flags         */
+-	int metric;			/* routing metric        */
+-	int mtu;			/* MTU value             */
+-	int tx_queue_len;	/* transmit queue length */
+-	struct ifmap map;	/* hardware setup        */
+-	struct sockaddr addr;	/* IP address            */
+-	struct sockaddr dstaddr;	/* P-P IP address        */
+-	struct sockaddr broadaddr;	/* IP broadcast address  */
+-	struct sockaddr netmask;	/* IP network mask       */
++	char name[IFNAMSIZ];                    /* interface name        */
++	short type;                             /* if type               */
++	short flags;                            /* various flags         */
++	int metric;                             /* routing metric        */
++	int mtu;                                /* MTU value             */
++	int tx_queue_len;                       /* transmit queue length */
++	struct ifmap map;                       /* hardware setup        */
++	struct sockaddr addr;                   /* IP address            */
++	struct sockaddr dstaddr;                /* P-P IP address        */
++	struct sockaddr broadaddr;              /* IP broadcast address  */
++	struct sockaddr netmask;                /* IP network mask       */
+ 	int has_ip;
+-	char hwaddr[32];	/* HW address            */
++	char hwaddr[32];                        /* HW address            */
+ 	int statistics_valid;
+-	struct user_net_device_stats stats;	/* statistics            */
+-	int keepalive;		/* keepalive value for SLIP */
+-	int outfill;		/* outfill value for SLIP */
++	struct user_net_device_stats stats;     /* statistics            */
++	int keepalive;                          /* keepalive value for SLIP */
++	int outfill;                            /* outfill value for SLIP */
+ };
+ 
+ 
+@@ -388,7 +388,7 @@ static struct interface *add_interface(char *name)
+ 	}
+ 
+ 	new = xzalloc(sizeof(*new));
+-	safe_strncpy(new->name, name, IFNAMSIZ);
++	strncpy(new->name, name, IFNAMSIZ);
+ 	nextp = ife ? &ife->next : &int_list;
+ 	new->prev = ife;
+ 	new->next = *nextp;
+diff --git a/networking/nameif.c b/networking/nameif.c
+index afc8891..f3d333b 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -16,16 +16,11 @@
+ #include <netinet/ether.h>
+ #include <linux/sockios.h>
+ 
+-/* Older versions of net/if.h do not appear to define IF_NAMESIZE. */
+-#ifndef IF_NAMESIZE
+-#  ifdef IFNAMSIZ
+-#    define IF_NAMESIZE IFNAMSIZ
+-#  else
+-#    define IF_NAMESIZE 16
+-#  endif
++#ifndef IFNAMSIZ
++#define IFNAMSIZ 16
+ #endif
+ 
+-/* take from linux/sockios.h */
++/* Taken from linux/sockios.h */
+ #define SIOCSIFNAME	0x8923	/* set interface name */
+ 
+ /* Octets in one Ethernet addr, from <linux/if_ether.h> */
+@@ -111,7 +106,7 @@ static void nameif_parse_selector(ethtable_t *ch, char *selector)
+ static void prepend_new_eth_table(ethtable_t **clist, char *ifname, char *selector)
+ {
+ 	ethtable_t *ch;
+-	if (strlen(ifname) >= IF_NAMESIZE)
++	if (strlen(ifname) >= IFNAMSIZ)
+ 		bb_error_msg_and_die("interface name '%s' too long", ifname);
+ 	ch = xzalloc(sizeof(*ch));
+ 	ch->ifname = xstrdup(ifname);
+diff --git a/networking/vconfig.c b/networking/vconfig.c
+index 7b6c2fa..3f12e76 100644
+--- a/networking/vconfig.c
++++ b/networking/vconfig.c
+@@ -133,10 +133,7 @@ int vconfig_main(int argc, char **argv)
+ 	if (ifr.cmd == SET_VLAN_NAME_TYPE_CMD) { /* set_name_type */
+ 		ifr.u.name_type = *xfind_str(name_types+1, argv[1]);
+ 	} else {
+-		if (strlen(argv[1]) >= IF_NAMESIZE) {
+-			bb_error_msg_and_die("if_name >= %d chars", IF_NAMESIZE);
+-		}
+-		strcpy(ifr.device1, argv[1]);
++		strncpy(ifr.device1, argv[1], IFNAMSIZ);
+ 		p = argv[2];
+ 
+ 		/* I suppose one could try to combine some of the function calls below,

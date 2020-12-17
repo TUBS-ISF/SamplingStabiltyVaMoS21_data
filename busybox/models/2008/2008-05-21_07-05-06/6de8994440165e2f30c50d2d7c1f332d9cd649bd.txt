@@ -1,0 +1,313 @@
+2008-05-21 07:05:06 +0000
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index f826c1b..c562c12 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -175,7 +175,7 @@ int send_release(uint32_t server, uint32_t ciaddr)
+ 
+ 
+ /* Returns -1 on errors that are fatal for the socket, -2 for those that aren't */
+-int get_raw_packet(struct dhcpMessage *payload, int fd)
++int udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd)
+ {
+ 	int bytes;
+ 	struct udp_dhcp_packet packet;
+@@ -185,7 +185,7 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
+ 	bytes = safe_read(fd, &packet, sizeof(packet));
+ 	if (bytes < 0) {
+ 		DEBUG("Cannot read on raw listening socket - ignoring");
+-		sleep(1); /* possible down interface, looping condition */
++		/* NB: possible down interface, etc. Caller should pause. */
+ 		return bytes; /* returns -1 */
+ 	}
+ 
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 1131bae..bf0ecc7 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -61,7 +61,9 @@ uint16_t udhcp_checksum(void *addr, int count);
+ 
+ void udhcp_init_header(struct dhcpMessage *packet, char type);
+ 
+-int udhcp_recv_packet(struct dhcpMessage *packet, int fd);
++/*int udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd); - in dhcpc.h */
++int udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd);
++
+ int udhcp_send_raw_packet(struct dhcpMessage *payload,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port,
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 7138389..fef8632 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -147,9 +147,7 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	unsigned opt;
+ 	int max_fd;
+ 	int retval;
+-	int len;
+ 	struct timeval tv;
+-	struct in_addr temp_addr;
+ 	struct dhcpMessage packet;
+ 	fd_set rfds;
+ 
+@@ -380,7 +378,6 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					if (packet_num == 0)
+ 						xid = random_xid();
+ 
+-					/* send discover packet */
+ 					send_discover(xid, requested_ip); /* broadcast */
+ 
+ 					timeout = discover_timeout;
+@@ -396,7 +393,7 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					retval = 1;
+ 					goto ret;
+ 				}
+-				/* wait to try again */
++				/* wait before trying again */
+ 				timeout = tryagain_timeout;
+ 				packet_num = 0;
+ 				continue;
+@@ -404,11 +401,12 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			case REQUESTING:
+ 				if (packet_num < discover_retries) {
+ 					/* send request packet */
+-					if (state == RENEW_REQUESTED)
+-						send_renew(xid, server_addr, requested_ip); /* unicast */
+-					else send_selecting(xid, server_addr, requested_ip); /* broadcast */
++					if (state == RENEW_REQUESTED) /* unicast */
++						send_renew(xid, server_addr, requested_ip);
++					else /* broadcast */
++						send_selecting(xid, server_addr, requested_ip);
+ 
+-					timeout = ((packet_num == 2) ? 10 : 2);
++					timeout = discover_timeout;
+ 					packet_num++;
+ 					continue;
+ 				}
+@@ -436,7 +434,7 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				/* Timed out, enter rebinding state */
+ 				DEBUG("Entering rebinding state");
+ 				state = REBINDING;
+-				continue;
++				/* fall right through */
+ 			case REBINDING:
+ 				/* Lease is *really* about to run out,
+ 				 * try to find DHCP server using broadcast */
+@@ -464,23 +462,24 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		/* select() didn't timeout, something did happen. */
+ 		/* Is is a packet? */
+ 		if (listen_mode != LISTEN_NONE && FD_ISSET(sockfd, &rfds)) {
++			int len;
+ 			/* A packet is ready, read it */
+ 
+ 			if (listen_mode == LISTEN_KERNEL)
+-				len = udhcp_recv_packet(&packet, sockfd);
++				len = udhcp_recv_kernel_packet(&packet, sockfd);
+ 			else
+-				len = get_raw_packet(&packet, sockfd);
+-
+-			/* If this packet will turn out to be unrelated/bogus,
+-			 * we will go back and wait for next one.
+-			 * Be sure timeout is properly decreased. */
+-			already_waited_sec += (unsigned)monotonic_sec() - timestamp_before_wait;
+-
++				len = udhcp_recv_raw_packet(&packet, sockfd);
+ 			if (len == -1) { /* error is severe, reopen socket */
+ 				DEBUG("error on read, %s, reopening socket", strerror(errno));
++				sleep(discover_timeout); /* 3 seconds by default */
+ 				change_listen_mode(listen_mode); /* just close and reopen */
+ 			}
+-			if (len < 0) continue;
++			/* If this packet will turn out to be unrelated/bogus,
++			 * we will go back and wait for next one.
++			 * Be sure timeout is properly decreased. */
++			already_waited_sec += (unsigned)monotonic_sec() - timestamp_before_wait;
++			if (len < 0)
++				continue;
+ 
+ 			if (packet.xid != xid) {
+ 				DEBUG("Ignoring XID %x (our xid is %x)",
+@@ -563,9 +562,12 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #endif
+ 					/* enter bound state */
+ 					timeout = lease_seconds / 2;
+-					temp_addr.s_addr = packet.yiaddr;
+-					bb_info_msg("Lease of %s obtained, lease time %u",
+-						inet_ntoa(temp_addr), (unsigned)lease_seconds);
++					{
++						struct in_addr temp_addr;
++						temp_addr.s_addr = packet.yiaddr;
++						bb_info_msg("Lease of %s obtained, lease time %u",
++							inet_ntoa(temp_addr), (unsigned)lease_seconds);
++					}
+ 					requested_ip = packet.yiaddr;
+ 					udhcp_run_script(&packet,
+ 						   ((state == RENEWING || state == REBINDING) ? "renew" : "bound"));
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index 452afcf..9331466 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -62,7 +62,8 @@ int send_decline(uint32_t xid, uint32_t server, uint32_t requested);
+ int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr);
+ int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr);
+ int send_release(uint32_t server, uint32_t ciaddr);
+-int get_raw_packet(struct dhcpMessage *payload, int fd);
++
++int udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd);
+ 
+ #if __GNUC_PREREQ(4,1)
+ # pragma GCC visibility pop
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 2637196..a6264ad 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -145,7 +145,7 @@ int udhcpd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		default: continue;	/* signal or error (probably EINTR) */
+ 		}
+ 
+-		bytes = udhcp_recv_packet(&packet, server_socket); /* this waits for a packet - idle */
++		bytes = udhcp_recv_kernel_packet(&packet, server_socket); /* this waits for a packet - idle */
+ 		if (bytes < 0) {
+ 			if (bytes == -1 && errno != EINTR) {
+ 				DEBUG("error on read, %s, reopening socket", strerror(errno));
+@@ -180,7 +180,7 @@ int udhcpd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		case DHCPDISCOVER:
+ 			DEBUG("Received DISCOVER");
+ 
+-			if (sendOffer(&packet) < 0) {
++			if (send_offer(&packet) < 0) {
+ 				bb_error_msg("send OFFER failed");
+ 			}
+ 			break;
+@@ -200,20 +200,19 @@ int udhcpd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					if (server_id_align == server_config.server && requested
+ 					 && requested_align == lease->yiaddr
+ 					) {
+-						sendACK(&packet, lease->yiaddr);
++						send_ACK(&packet, lease->yiaddr);
+ 					}
+ 				} else if (requested) {
+ 					/* INIT-REBOOT State */
+ 					if (lease->yiaddr == requested_align)
+-						sendACK(&packet, lease->yiaddr);
++						send_ACK(&packet, lease->yiaddr);
+ 					else
+-						sendNAK(&packet);
++						send_NAK(&packet);
+ 				} else if (lease->yiaddr == packet.ciaddr) {
+ 					/* RENEWING or REBINDING State */
+-					sendACK(&packet, lease->yiaddr);
+-				} else {
+-					/* don't know what to do!!!! */
+-					sendNAK(&packet);
++					send_ACK(&packet, lease->yiaddr);
++				} else { /* don't know what to do!!!! */
++					send_NAK(&packet);
+ 				}
+ 
+ 			/* what to do if we have no record of the client */
+@@ -229,13 +228,13 @@ int udhcpd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 						memset(lease->chaddr, 0, 16);
+ 					/* make some contention for this address */
+ 					} else
+-						sendNAK(&packet);
++						send_NAK(&packet);
+ 				} else {
+ 					uint32_t r = ntohl(requested_align);
+ 					if (r < server_config.start_ip
+ 				         || r > server_config.end_ip
+ 					) {
+-						sendNAK(&packet);
++						send_NAK(&packet);
+ 					}
+ 					/* else remain silent */
+ 				}
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 8a206ea..87e1afc 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -104,9 +104,9 @@ void printStaticLeases(struct static_lease **lease_struct);
+ 
+ /*** serverpacket.h ***/
+ 
+-int sendOffer(struct dhcpMessage *oldpacket);
+-int sendNAK(struct dhcpMessage *oldpacket);
+-int sendACK(struct dhcpMessage *oldpacket, uint32_t yiaddr);
++int send_offer(struct dhcpMessage *oldpacket);
++int send_NAK(struct dhcpMessage *oldpacket);
++int send_ACK(struct dhcpMessage *oldpacket, uint32_t yiaddr);
+ int send_inform(struct dhcpMessage *oldpacket);
+ 
+ 
+diff --git a/networking/udhcp/dhcprelay.c b/networking/udhcp/dhcprelay.c
+index def1bc2..08fb733 100644
+--- a/networking/udhcp/dhcprelay.c
++++ b/networking/udhcp/dhcprelay.c
+@@ -257,7 +257,7 @@ static void dhcprelay_loop(int *fds, int num_sockets, int max_socket, char **cli
+ 		if (select(max_socket + 1, &rfds, NULL, NULL, &tv) > 0) {
+ 			/* server */
+ 			if (FD_ISSET(fds[0], &rfds)) {
+-				packlen = udhcp_recv_packet(&dhcp_msg, fds[0]);
++				packlen = udhcp_recv_kernel_packet(&dhcp_msg, fds[0]);
+ 				if (packlen > 0) {
+ 					pass_back(&dhcp_msg, packlen, fds);
+ 				}
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index fb6ef71..923add6 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -34,7 +34,7 @@ void udhcp_init_header(struct dhcpMessage *packet, char type)
+ 
+ 
+ /* read a packet from socket fd, return -1 on read error, -2 on packet error */
+-int udhcp_recv_packet(struct dhcpMessage *packet, int fd)
++int udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd)
+ {
+ 	int bytes;
+ 	unsigned char *vendor;
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index 1dc7233..fc62497 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -67,12 +67,9 @@ static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcas
+ /* send a dhcp packet, if force broadcast is set, the packet will be broadcast to the client */
+ static int send_packet(struct dhcpMessage *payload, int force_broadcast)
+ {
+-	int ret;
+-
+ 	if (payload->giaddr)
+-		ret = send_packet_to_relay(payload);
+-	else ret = send_packet_to_client(payload, force_broadcast);
+-	return ret;
++		return send_packet_to_relay(payload);
++	return send_packet_to_client(payload, force_broadcast);
+ }
+ 
+ 
+@@ -100,7 +97,7 @@ static void add_bootp_options(struct dhcpMessage *packet)
+ 
+ 
+ /* send a DHCP OFFER to a DHCP DISCOVER */
+-int sendOffer(struct dhcpMessage *oldpacket)
++int send_offer(struct dhcpMessage *oldpacket)
+ {
+ 	struct dhcpMessage packet;
+ 	struct dhcpOfferedAddr *lease = NULL;
+@@ -188,7 +185,7 @@ int sendOffer(struct dhcpMessage *oldpacket)
+ }
+ 
+ 
+-int sendNAK(struct dhcpMessage *oldpacket)
++int send_NAK(struct dhcpMessage *oldpacket)
+ {
+ 	struct dhcpMessage packet;
+ 
+@@ -199,7 +196,7 @@ int sendNAK(struct dhcpMessage *oldpacket)
+ }
+ 
+ 
+-int sendACK(struct dhcpMessage *oldpacket, uint32_t yiaddr)
++int send_ACK(struct dhcpMessage *oldpacket, uint32_t yiaddr)
+ {
+ 	struct dhcpMessage packet;
+ 	struct option_set *curr;

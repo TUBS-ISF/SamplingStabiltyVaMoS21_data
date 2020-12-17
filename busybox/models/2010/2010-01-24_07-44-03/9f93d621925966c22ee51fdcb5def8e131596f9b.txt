@@ -1,0 +1,756 @@
+2010-01-24 07:44:03 +0100
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index e6f9af9..5ecb913 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -16,8 +16,8 @@
+  *
+  * Major size reduction... over 50% (>1.5k) on i386.
+  */
+-
+ #include "libbb.h"
++#include "unicode.h"
+ 
+ /* We often use "unsigned" intead of "int", it's easier to div on most CPUs */
+ 
+@@ -83,9 +83,16 @@ int cal_main(int argc UNUSED_PARAM, char **argv)
+ 	time_t now;
+ 	unsigned month, year, flags, i;
+ 	char *month_names[12];
+-	char day_headings[28];	/* 28 for julian, 21 for nonjulian */
++	/* normal heading: */
++	/* "Su Mo Tu We Th Fr Sa" */
++	/* -j heading: */
++	/* " Su  Mo  Tu  We  Th  Fr  Sa" */
++	char day_headings[ENABLE_FEATURE_ASSUME_UNICODE ? 28 * 6 : 28];
++	IF_FEATURE_ASSUME_UNICODE(char *hp = day_headings;)
+ 	char buf[40];
+ 
++	init_unicode();
++
+ 	flags = getopt32(argv, "jy");
+ 	/* This sets julian = flags & 1: */
+ 	option_mask32 &= 1;
+@@ -122,15 +129,24 @@ int cal_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 		if (i < 7) {
+ 			zero_tm.tm_wday = i;
+-//FIXME: unicode
+-//Bug 839:
+-//testcase with doublewidth Japanese chars: "LANG=zh_TW.utf8 cal"
+-//perhaps use wc[s]width() to probe terminal width
+ 			/* abbreviated weekday name according to locale */
+ 			strftime(buf, sizeof(buf), "%a", &zero_tm);
++#if ENABLE_FEATURE_ASSUME_UNICODE
++			if (julian)
++				*hp++ = ' ';
++			{
++				char *two_wchars = unicode_cut_nchars(2, buf);
++				strcpy(hp, two_wchars);
++				free(two_wchars);
++			}
++			hp += strlen(hp);
++			*hp++ = ' ';
++#else
+ 			strncpy(day_headings + i * (3+julian) + julian, buf, 2);
++#endif
+ 		}
+ 	} while (++i < 12);
++	IF_FEATURE_ASSUME_UNICODE(hp[-1] = '\0';)
+ 
+ 	if (month) {
+ 		unsigned row, len, days[MAXDAYS];
+diff --git a/coreutils/df.c b/coreutils/df.c
+index bcde783..ae68f08 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -178,7 +178,7 @@ int df_main(int argc UNUSED_PARAM, char **argv)
+ #endif
+ 
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+-			dev_len = bb_mbstrlen(device);
++			dev_len = unicode_strlen(device);
+ 			if (dev_len > 20) {
+ 				printf("%s\n%20s", device, "");
+ 			} else {
+diff --git a/coreutils/expand.c b/coreutils/expand.c
+index 649b4c1..2f6a708 100644
+--- a/coreutils/expand.c
++++ b/coreutils/expand.c
+@@ -49,7 +49,7 @@ static void expand(FILE *file, unsigned tab_size, unsigned opt)
+ 				unsigned len;
+ 				*ptr = '\0';
+ # if ENABLE_FEATURE_ASSUME_UNICODE
+-				len = bb_mbstrlen(ptr_strbeg);
++				len = unicode_strlen(ptr_strbeg);
+ # else
+ 				len = ptr - ptr_strbeg;
+ # endif
+@@ -105,7 +105,7 @@ static void unexpand(FILE *file, unsigned tab_size, unsigned opt)
+ 				char c;
+ 				c = ptr[n];
+ 				ptr[n] = '\0';
+-				len = bb_mbstrlen(ptr);
++				len = unicode_strlen(ptr);
+ 				ptr[n] = c;
+ 			}
+ # else
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index b8da1ad..e754447 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -550,7 +550,7 @@ static void showfiles(struct dnode **dn, unsigned nfiles)
+ 	} else {
+ 		/* find the longest file name, use that as the column width */
+ 		for (i = 0; dn[i]; i++) {
+-			int len = bb_mbstrlen(dn[i]->name);
++			int len = unicode_strlen(dn[i]->name);
+ 			if (column_width < len)
+ 				column_width = len;
+ 		}
+@@ -742,7 +742,7 @@ static int print_name(const char *name)
+ {
+ 	if (option_mask32 & OPT_Q) {
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+-		unsigned len = 2 + bb_mbstrlen(name);
++		unsigned len = 2 + unicode_strlen(name);
+ #else
+ 		unsigned len = 2;
+ #endif
+@@ -762,7 +762,7 @@ static int print_name(const char *name)
+ 	/* No -Q: */
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+ 	fputs(name, stdout);
+-	return bb_mbstrlen(name);
++	return unicode_strlen(name);
+ #else
+ 	return printf("%s", name);
+ #endif
+diff --git a/include/unicode.h b/include/unicode.h
+index e11f2f9..f1a252c 100644
+--- a/include/unicode.h
++++ b/include/unicode.h
+@@ -13,13 +13,16 @@ enum {
+ 
+ #if !ENABLE_FEATURE_ASSUME_UNICODE
+ 
+-# define bb_mbstrlen(string) strlen(string)
++# define unicode_strlen(string) strlen(string)
++# define unicode_scrlen(string) TODO
+ # define unicode_status UNICODE_OFF
+ # define init_unicode() ((void)0)
+ 
+ #else
+ 
+-size_t bb_mbstrlen(const char *string) FAST_FUNC;
++size_t FAST_FUNC unicode_strlen(const char *string);
++char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src);
++unsigned FAST_FUNC unicode_padding_to_width(unsigned width, const char *src);
+ 
+ # if ENABLE_LOCALE_SUPPORT
+ 
+@@ -30,7 +33,7 @@ void init_unicode(void) FAST_FUNC;
+ 
+ # else
+ 
+-/* Crude "locale support" which knows only C and Unicode locales */
++/* Homegrown Unicode support. It knows only C and Unicode locales. */
+ 
+ #  if !ENABLE_FEATURE_CHECK_UNICODE_IN_ENV
+ #   define unicode_status UNICODE_ON
+@@ -52,6 +55,7 @@ void init_unicode(void) FAST_FUNC;
+ #  define iswspace  bb_iswspace
+ #  define iswalnum  bb_iswalnum
+ #  define iswpunct  bb_iswpunct
++#  define wcwidth   bb_wcwidth
+ 
+ typedef int32_t wint_t;
+ typedef struct {
+@@ -68,27 +72,6 @@ int iswpunct(wint_t wc) FAST_FUNC;
+ 
+ # endif /* !LOCALE_SUPPORT */
+ 
+-
+-# if 0 /* TODO: better support for printfing Unicode fields: */
+-
+-/* equivalent to printf("%-20.20s", str) */
+-char unicode_buffer[20 * MB_CUR_MAX];
+-printf("%s", unicode_exact(20, str, unicode_buffer);
+-/* no need to free() anything */
+-
+-/* equivalent to printf("%-20s", str) */
+-char *malloced = unicode_minimum(20, str);
+-printf("%s", malloced);
+-free(malloced); /* ugh */
+-
+-/* equivalent to printf("%-20s", str), better one */
+-printf("%s%*s", str, unicode_pad_to_width(str, 20), "");
+-/* equivalent to printf("%20s", str) */
+-printf("%*s%s", unicode_pad_to_width(str, 20), "", str);
+-
+-# endif
+-
+-
+ #endif /* FEATURE_ASSUME_UNICODE */
+ 
+ #endif
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index b73f1d6..c50b31d 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -878,7 +878,7 @@ static void showfiles(void)
+ 
+ 	/* find the longest file name - use that as the column width */
+ 	for (row = 0; row < nrows; row++) {
+-		l = bb_mbstrlen(matches[row]);
++		l = unicode_strlen(matches[row]);
+ 		if (column_width < l)
+ 			column_width = l;
+ 	}
+@@ -898,7 +898,7 @@ static void showfiles(void)
+ 
+ 		for (nc = 1; nc < ncols && n+nrows < nfiles; n += nrows, nc++) {
+ 			printf("%s%-*s", matches[n],
+-				(int)(column_width - bb_mbstrlen(matches[n])), ""
++				(int)(column_width - unicode_strlen(matches[n])), ""
+ 			);
+ 		}
+ 		puts(matches[n]);
+diff --git a/libbb/unicode.c b/libbb/unicode.c
+index 8004295..844c154 100644
+--- a/libbb/unicode.c
++++ b/libbb/unicode.c
+@@ -9,22 +9,19 @@
+ #include "libbb.h"
+ #include "unicode.h"
+ 
+-/* If it's not a constant... */
++/* If it's not #defined as a constant in unicode.h... */
+ #ifndef unicode_status
+ uint8_t unicode_status;
+ #endif
+ 
+-size_t FAST_FUNC bb_mbstrlen(const char *string)
+-{
+-	size_t width = mbstowcs(NULL, string, INT_MAX);
+-	if (width == (size_t)-1L)
+-		return strlen(string);
+-	return width;
+-}
++/* This file is compiled only if FEATURE_ASSUME_UNICODE is on.
++ * We check other options and decide whether to use libc support
++ * via locale, or use our own logic:
++ */
+ 
+ #if ENABLE_LOCALE_SUPPORT
+ 
+-/* Unicode support using libc */
++/* Unicode support using libc locale support. */
+ 
+ void FAST_FUNC init_unicode(void)
+ {
+@@ -34,12 +31,12 @@ void FAST_FUNC init_unicode(void)
+ 	if (unicode_status != UNICODE_UNKNOWN)
+ 		return;
+ 
+-	unicode_status = bb_mbstrlen(unicode_0x394) == 1 ? UNICODE_ON : UNICODE_OFF;
++	unicode_status = unicode_strlen(unicode_0x394) == 1 ? UNICODE_ON : UNICODE_OFF;
+ }
+ 
+ #else
+ 
+-/* Crude "locale support" which knows only C and Unicode locales */
++/* Homegrown Unicode support. It knows only C and Unicode locales. */
+ 
+ # if ENABLE_FEATURE_CHECK_UNICODE_IN_ENV
+ void FAST_FUNC init_unicode(void)
+@@ -93,7 +90,6 @@ static size_t wcrtomb_internal(char *s, wchar_t wc)
+ 	s[0] = wc | (uint8_t)(0x3f00 >> n);
+ 	return n;
+ }
+-
+ size_t FAST_FUNC wcrtomb(char *s, wchar_t wc, mbstate_t *ps UNUSED_PARAM)
+ {
+ 	if (unicode_status != UNICODE_ON) {
+@@ -103,7 +99,6 @@ size_t FAST_FUNC wcrtomb(char *s, wchar_t wc, mbstate_t *ps UNUSED_PARAM)
+ 
+ 	return wcrtomb_internal(s, wc);
+ }
+-
+ size_t FAST_FUNC wcstombs(char *dest, const wchar_t *src, size_t n)
+ {
+ 	size_t org_n = n;
+@@ -144,6 +139,51 @@ size_t FAST_FUNC wcstombs(char *dest, const wchar_t *src, size_t n)
+ 	return org_n - n;
+ }
+ 
++static const char *mbstowc_internal(wchar_t *res, const char *src)
++{
++	int bytes;
++	unsigned c = (unsigned char) *src++;
++
++	if (c <= 0x7f) {
++		*res = c;
++		return src;
++	}
++
++	/* 80-7FF -> 110yyyxx 10xxxxxx */
++	/* 800-FFFF -> 1110yyyy 10yyyyxx 10xxxxxx */
++	/* 10000-1FFFFF -> 11110zzz 10zzyyyy 10yyyyxx 10xxxxxx */
++	/* 200000-3FFFFFF -> 111110tt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
++	/* 4000000-FFFFFFFF -> 111111tt 10tttttt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
++	bytes = 0;
++	do {
++		c <<= 1;
++		bytes++;
++	} while ((c & 0x80) && bytes < 6);
++	if (bytes == 1)
++		return NULL;
++	c = (uint8_t)(c) >> bytes;
++
++	while (--bytes) {
++		unsigned ch = (unsigned char) *src++;
++		if ((ch & 0xc0) != 0x80) {
++			return NULL;
++		}
++		c = (c << 6) + (ch & 0x3f);
++	}
++
++	/* TODO */
++	/* Need to check that c isn't produced by overlong encoding */
++	/* Example: 11000000 10000000 converts to NUL */
++	/* 11110000 10000000 10000100 10000000 converts to 0x100 */
++	/* correct encoding: 11000100 10000000 */
++	if (c <= 0x7f) { /* crude check */
++		return NULL;
++		//or maybe 0xfffd; /* replacement character */
++	}
++
++	*res = c;
++	return src;
++}
+ size_t FAST_FUNC mbstowcs(wchar_t *dest, const char *src, size_t n)
+ {
+ 	size_t org_n = n;
+@@ -162,58 +202,20 @@ size_t FAST_FUNC mbstowcs(wchar_t *dest, const char *src, size_t n)
+ 	}
+ 
+ 	while (n) {
+-		int bytes;
+-		unsigned c = (unsigned char) *src++;
+-
+-		if (c <= 0x7f) {
+-			if (dest)
+-				*dest++ = c;
+-			if (c == '\0')
+-				break;
+-			n--;
+-			continue;
+-		}
+-
+-		/* 80-7FF -> 110yyyxx 10xxxxxx */
+-		/* 800-FFFF -> 1110yyyy 10yyyyxx 10xxxxxx */
+-		/* 10000-1FFFFF -> 11110zzz 10zzyyyy 10yyyyxx 10xxxxxx */
+-		/* 200000-3FFFFFF -> 111110tt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
+-		/* 4000000-FFFFFFFF -> 111111tt 10tttttt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
+-		bytes = 0;
+-		do {
+-			c <<= 1;
+-			bytes++;
+-		} while ((c & 0x80) && bytes < 6);
+-		if (bytes == 1)
++		wchar_t wc;
++		const char *rc = mbstowc_internal(dest ? dest : &wc, src);
++		if (rc == NULL) /* error */
+ 			return (size_t) -1L;
+-		c = (uint8_t)(c) >> bytes;
+-
+-		while (--bytes) {
+-			unsigned ch = (unsigned char) *src++;
+-			if ((ch & 0xc0) != 0x80) {
+-				return (size_t) -1L;
+-			}
+-			c = (c << 6) + (ch & 0x3f);
+-		}
+-
+-		/* TODO */
+-		/* Need to check that c isn't produced by overlong encoding */
+-		/* Example: 11000000 10000000 converts to NUL */
+-		/* 11110000 10000000 10000100 10000000 converts to 0x100 */
+-		/* correct encoding: 11000100 10000000 */
+-		if (c <= 0x7f) { /* crude check */
+-			return (size_t) -1L;
+-			//or maybe: c = 0xfffd; /* replacement character */
+-		}
+-
+ 		if (dest)
+-			*dest++ = c;
++			dest++;
+ 		n--;
+ 	}
+ 
+ 	return org_n - n;
+ }
+ 
++#include "unicode_wcwidth.c"
++
+ int FAST_FUNC iswspace(wint_t wc)
+ {
+ 	return (unsigned)wc <= 0x7f && isspace(wc);
+@@ -229,4 +231,98 @@ int FAST_FUNC iswpunct(wint_t wc)
+ 	return (unsigned)wc <= 0x7f && ispunct(wc);
+ }
+ 
++#endif /* Homegrown Unicode support */
++
++
++/* The rest is mostly same for libc and for "homegrown" support */
++
++size_t FAST_FUNC unicode_strlen(const char *string)
++{
++	size_t width = mbstowcs(NULL, string, INT_MAX);
++	if (width == (size_t)-1L)
++		return strlen(string);
++	return width;
++}
++
++char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src)
++{
++	char *dst;
++	unsigned dst_len;
++
++	if (unicode_status != UNICODE_ON)
++		return xasprintf("%-*.*s", width, width, src);
++
++	dst = NULL;
++	dst_len = 0;
++	while (1) {
++		int w;
++		wchar_t wc;
++
++		dst = xrealloc(dst, dst_len + 2 * MB_CUR_MAX);
++#if ENABLE_LOCALE_SUPPORT
++		{
++			mbstate_t mbst = { 0 };
++			ssize_t rc = mbsrtowcs(&wc, &src, 1, &mbst);
++			if (rc <= 0) /* error, or end-of-string */
++				break;
++		}
++#else
++		src = mbstowc_internal(&wc, src);
++		if (!src || wc == 0) /* error, or end-of-string */
++			break;
+ #endif
++		w = wcwidth(wc);
++		if (w < 0) /* non-printable wchar */
++			break;
++		width -= w;
++		if ((int)width < 0) { /* string is longer than width */
++			width += w;
++			while (width) {
++				dst[dst_len++] = ' ';
++				width--;
++			}
++			break;
++		}
++#if ENABLE_LOCALE_SUPPORT
++		{
++			mbstate_t mbst = { 0 };
++			dst_len += wcrtomb(&dst[dst_len], wc, &mbst);
++		}
++#else
++		dst_len += wcrtomb_internal(&dst[dst_len], wc);
++#endif
++	}
++	dst[dst_len] = '\0';
++	return dst;
++}
++
++unsigned FAST_FUNC unicode_padding_to_width(unsigned width, const char *src)
++{
++	if (unicode_status != UNICODE_ON) {
++		return width - strnlen(src, width);
++	}
++
++	while (1) {
++		int w;
++		wchar_t wc;
++
++#if ENABLE_LOCALE_SUPPORT
++		{
++			mbstate_t mbst = { 0 };
++			ssize_t rc = mbsrtowcs(&wc, &src, 1, &mbst);
++			if (rc <= 0) /* error, or end-of-string */
++				return width;
++		}
++#else
++		src = mbstowc_internal(&wc, src);
++		if (!src || wc == 0) /* error, or end-of-string */
++			return width;
++#endif
++		w = wcwidth(wc);
++		if (w < 0) /* non-printable wchar */
++			return width;
++		width -= w;
++		if ((int)width <= 0) /* string is longer than width */
++			return 0;
++	}
++}
+diff --git a/libbb/unicode_wcwidth.c b/libbb/unicode_wcwidth.c
+new file mode 100644
+index 0000000..515c084
+--- /dev/null
++++ b/libbb/unicode_wcwidth.c
+@@ -0,0 +1,217 @@
++/*
++ * This is an implementation of wcwidth() and wcswidth() (defined in
++ * IEEE Std 1002.1-2001) for Unicode.
++ *
++ * http://www.opengroup.org/onlinepubs/007904975/functions/wcwidth.html
++ * http://www.opengroup.org/onlinepubs/007904975/functions/wcswidth.html
++ *
++ * In fixed-width output devices, Latin characters all occupy a single
++ * "cell" position of equal width, whereas ideographic CJK characters
++ * occupy two such cells. Interoperability between terminal-line
++ * applications and (teletype-style) character terminals using the
++ * UTF-8 encoding requires agreement on which character should advance
++ * the cursor by how many cell positions. No established formal
++ * standards exist at present on which Unicode character shall occupy
++ * how many cell positions on character terminals. These routines are
++ * a first attempt of defining such behavior based on simple rules
++ * applied to data provided by the Unicode Consortium.
++ *
++ * For some graphical characters, the Unicode standard explicitly
++ * defines a character-cell width via the definition of the East Asian
++ * FullWidth (F), Wide (W), Half-width (H), and Narrow (Na) classes.
++ * In all these cases, there is no ambiguity about which width a
++ * terminal shall use. For characters in the East Asian Ambiguous (A)
++ * class, the width choice depends purely on a preference of backward
++ * compatibility with either historic CJK or Western practice.
++ * Choosing single-width for these characters is easy to justify as
++ * the appropriate long-term solution, as the CJK practice of
++ * displaying these characters as double-width comes from historic
++ * implementation simplicity (8-bit encoded characters were displayed
++ * single-width and 16-bit ones double-width, even for Greek,
++ * Cyrillic, etc.) and not any typographic considerations.
++ *
++ * Much less clear is the choice of width for the Not East Asian
++ * (Neutral) class. Existing practice does not dictate a width for any
++ * of these characters. It would nevertheless make sense
++ * typographically to allocate two character cells to characters such
++ * as for instance EM SPACE or VOLUME INTEGRAL, which cannot be
++ * represented adequately with a single-width glyph. The following
++ * routines at present merely assign a single-cell width to all
++ * neutral characters, in the interest of simplicity. This is not
++ * entirely satisfactory and should be reconsidered before
++ * establishing a formal standard in this area. At the moment, the
++ * decision which Not East Asian (Neutral) characters should be
++ * represented by double-width glyphs cannot yet be answered by
++ * applying a simple rule from the Unicode database content. Setting
++ * up a proper standard for the behavior of UTF-8 character terminals
++ * will require a careful analysis not only of each Unicode character,
++ * but also of each presentation form, something the author of these
++ * routines has avoided to do so far.
++ *
++ * http://www.unicode.org/unicode/reports/tr11/
++ *
++ * Markus Kuhn -- 2007-05-26 (Unicode 5.0)
++ *
++ * Permission to use, copy, modify, and distribute this software
++ * for any purpose and without fee is hereby granted. The author
++ * disclaims all warranties with regard to this software.
++ *
++ * Latest version: http://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c
++ */
++
++struct interval {
++	uint16_t first;
++	uint16_t last;
++};
++
++/* auxiliary function for binary search in interval table */
++static int in_table(unsigned ucs, const struct interval *table, unsigned max)
++{
++	unsigned min = 0;
++	unsigned mid;
++
++	if (ucs < table[0].first || ucs > table[max].last)
++		return 0;
++
++	while (max >= min) {
++		mid = (min + max) / 2;
++		if (ucs > table[mid].last)
++    			min = mid + 1;
++		else if (ucs < table[mid].first)
++    			max = mid - 1;
++		else
++    			return 1;
++	}
++	return 0;
++}
++
++
++/* The following two functions define the column width of an ISO 10646
++ * character as follows:
++ *
++ *    - The null character (U+0000) has a column width of 0.
++ *
++ *    - Other C0/C1 control characters and DEL will lead to a return
++ *      value of -1.
++ *
++ *    - Non-spacing and enclosing combining characters (general
++ *      category code Mn or Me in the Unicode database) have a
++ *      column width of 0.
++ *
++ *    - SOFT HYPHEN (U+00AD) has a column width of 1.
++ *
++ *    - Other format characters (general category code Cf in the Unicode
++ *      database) and ZERO WIDTH SPACE (U+200B) have a column width of 0.
++ *
++ *    - Hangul Jamo medial vowels and final consonants (U+1160-U+11FF)
++ *      have a column width of 0.
++ *
++ *    - Spacing characters in the East Asian Wide (W) or East Asian
++ *      Full-width (F) category as defined in Unicode Technical
++ *      Report #11 have a column width of 2.
++ *
++ *    - All remaining characters (including all printable
++ *      ISO 8859-1 and WGL4 characters, Unicode control characters,
++ *      etc.) have a column width of 1.
++ *
++ * This implementation assumes that wchar_t characters are encoded
++ * in ISO 10646.
++ */
++static int wcwidth(unsigned ucs)
++{
++	/* sorted list of non-overlapping intervals of non-spacing characters */
++	/* generated by "uniset +cat=Me +cat=Mn +cat=Cf -00AD +1160-11FF +200B c" */
++	static const struct interval combining[] = {
++		{ 0x0300, 0x036F }, { 0x0483, 0x0486 }, { 0x0488, 0x0489 },
++		{ 0x0591, 0x05BD }, { 0x05BF, 0x05BF }, { 0x05C1, 0x05C2 },
++		{ 0x05C4, 0x05C5 }, { 0x05C7, 0x05C7 }, { 0x0600, 0x0603 },
++		{ 0x0610, 0x0615 }, { 0x064B, 0x065E }, { 0x0670, 0x0670 },
++		{ 0x06D6, 0x06E4 }, { 0x06E7, 0x06E8 }, { 0x06EA, 0x06ED },
++		{ 0x070F, 0x070F }, { 0x0711, 0x0711 }, { 0x0730, 0x074A },
++		{ 0x07A6, 0x07B0 }, { 0x07EB, 0x07F3 }, { 0x0901, 0x0902 },
++		{ 0x093C, 0x093C }, { 0x0941, 0x0948 }, { 0x094D, 0x094D },
++		{ 0x0951, 0x0954 }, { 0x0962, 0x0963 }, { 0x0981, 0x0981 },
++		{ 0x09BC, 0x09BC }, { 0x09C1, 0x09C4 }, { 0x09CD, 0x09CD },
++		{ 0x09E2, 0x09E3 }, { 0x0A01, 0x0A02 }, { 0x0A3C, 0x0A3C },
++		{ 0x0A41, 0x0A42 }, { 0x0A47, 0x0A48 }, { 0x0A4B, 0x0A4D },
++		{ 0x0A70, 0x0A71 }, { 0x0A81, 0x0A82 }, { 0x0ABC, 0x0ABC },
++		{ 0x0AC1, 0x0AC5 }, { 0x0AC7, 0x0AC8 }, { 0x0ACD, 0x0ACD },
++		{ 0x0AE2, 0x0AE3 }, { 0x0B01, 0x0B01 }, { 0x0B3C, 0x0B3C },
++		{ 0x0B3F, 0x0B3F }, { 0x0B41, 0x0B43 }, { 0x0B4D, 0x0B4D },
++		{ 0x0B56, 0x0B56 }, { 0x0B82, 0x0B82 }, { 0x0BC0, 0x0BC0 },
++		{ 0x0BCD, 0x0BCD }, { 0x0C3E, 0x0C40 }, { 0x0C46, 0x0C48 },
++		{ 0x0C4A, 0x0C4D }, { 0x0C55, 0x0C56 }, { 0x0CBC, 0x0CBC },
++		{ 0x0CBF, 0x0CBF }, { 0x0CC6, 0x0CC6 }, { 0x0CCC, 0x0CCD },
++		{ 0x0CE2, 0x0CE3 }, { 0x0D41, 0x0D43 }, { 0x0D4D, 0x0D4D },
++		{ 0x0DCA, 0x0DCA }, { 0x0DD2, 0x0DD4 }, { 0x0DD6, 0x0DD6 },
++		{ 0x0E31, 0x0E31 }, { 0x0E34, 0x0E3A }, { 0x0E47, 0x0E4E },
++		{ 0x0EB1, 0x0EB1 }, { 0x0EB4, 0x0EB9 }, { 0x0EBB, 0x0EBC },
++		{ 0x0EC8, 0x0ECD }, { 0x0F18, 0x0F19 }, { 0x0F35, 0x0F35 },
++		{ 0x0F37, 0x0F37 }, { 0x0F39, 0x0F39 }, { 0x0F71, 0x0F7E },
++		{ 0x0F80, 0x0F84 }, { 0x0F86, 0x0F87 }, { 0x0F90, 0x0F97 },
++		{ 0x0F99, 0x0FBC }, { 0x0FC6, 0x0FC6 }, { 0x102D, 0x1030 },
++		{ 0x1032, 0x1032 }, { 0x1036, 0x1037 }, { 0x1039, 0x1039 },
++		{ 0x1058, 0x1059 }, { 0x1160, 0x11FF }, { 0x135F, 0x135F },
++		{ 0x1712, 0x1714 }, { 0x1732, 0x1734 }, { 0x1752, 0x1753 },
++		{ 0x1772, 0x1773 }, { 0x17B4, 0x17B5 }, { 0x17B7, 0x17BD },
++		{ 0x17C6, 0x17C6 }, { 0x17C9, 0x17D3 }, { 0x17DD, 0x17DD },
++		{ 0x180B, 0x180D }, { 0x18A9, 0x18A9 }, { 0x1920, 0x1922 },
++		{ 0x1927, 0x1928 }, { 0x1932, 0x1932 }, { 0x1939, 0x193B },
++		{ 0x1A17, 0x1A18 }, { 0x1B00, 0x1B03 }, { 0x1B34, 0x1B34 },
++		{ 0x1B36, 0x1B3A }, { 0x1B3C, 0x1B3C }, { 0x1B42, 0x1B42 },
++		{ 0x1B6B, 0x1B73 }, { 0x1DC0, 0x1DCA }, { 0x1DFE, 0x1DFF },
++		{ 0x200B, 0x200F }, { 0x202A, 0x202E }, { 0x2060, 0x2063 },
++		{ 0x206A, 0x206F }, { 0x20D0, 0x20EF }, { 0x302A, 0x302F },
++		{ 0x3099, 0x309A }, { 0xA806, 0xA806 }, { 0xA80B, 0xA80B },
++		{ 0xA825, 0xA826 }, { 0xFB1E, 0xFB1E }, { 0xFE00, 0xFE0F },
++		{ 0xFE20, 0xFE23 }, { 0xFEFF, 0xFEFF }, { 0xFFF9, 0xFFFB }
++	};
++	static const struct interval combining0x10000[] = {
++		{ 0x0A01, 0x0A03 }, { 0x0A05, 0x0A06 }, { 0x0A0C, 0x0A0F },
++		{ 0x0A38, 0x0A3A }, { 0x0A3F, 0x0A3F }, { 0xD167, 0xD169 },
++		{ 0xD173, 0xD182 }, { 0xD185, 0xD18B }, { 0xD1AA, 0xD1AD },
++		{ 0xD242, 0xD244 }
++	};
++
++	if (ucs == 0)
++		return 0;
++	/* test for 8-bit control characters (00-1f, 80-9f, 7f) */
++	if ((ucs & ~0x80) < 0x20 || ucs == 0x7f)
++		return -1;
++	if (ucs < 0x0300) /* optimization */
++		return 1;
++
++	/* binary search in table of non-spacing characters */
++	if (in_table(ucs, combining, ARRAY_SIZE(combining) - 1))
++		return 0;
++
++	if (ucs < 0x1100) /* optimization */
++		return 1;
++
++	/* binary search in table of non-spacing characters, cont. */
++	if (in_table(ucs ^ 0x10000, combining0x10000, ARRAY_SIZE(combining0x10000) - 1))
++		return 0;
++	if (ucs == 0xE0001
++	 || (ucs >= 0xE0020 && ucs <= 0xE007F)
++	 || (ucs >= 0xE0100 && ucs <= 0xE01EF)
++	) {
++		return 0;
++	}
++
++	/* if we arrive here, ucs is not a combining or C0/C1 control character */
++
++	return 1 +
++		(  (/*ucs >= 0x1100 &&*/ ucs <= 0x115f) /* Hangul Jamo init. consonants */
++		|| ucs == 0x2329
++		|| ucs == 0x232a
++		|| (ucs >= 0x2e80 && ucs <= 0xa4cf && ucs != 0x303f) /* CJK ... Yi */
++		|| (ucs >= 0xac00 && ucs <= 0xd7a3) /* Hangul Syllables */
++		|| (ucs >= 0xf900 && ucs <= 0xfaff) /* CJK Compatibility Ideographs */
++		|| (ucs >= 0xfe10 && ucs <= 0xfe19) /* Vertical forms */
++		|| (ucs >= 0xfe30 && ucs <= 0xfe6f) /* CJK Compatibility Forms */
++		|| (ucs >= 0xff00 && ucs <= 0xff60) /* Fullwidth Forms */
++		|| (ucs >= 0xffe0 && ucs <= 0xffe6)
++		|| (ucs >= 0x20000 && ucs <= 0x2fffd)
++		|| (ucs >= 0x30000 && ucs <= 0x3fffd)
++		);
++}
+diff --git a/modutils/lsmod.c b/modutils/lsmod.c
+index 20d9cf1..cc6b616 100644
+--- a/modutils/lsmod.c
++++ b/modutils/lsmod.c
+@@ -64,7 +64,7 @@ int lsmod_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 			} else
+ 				token[3] = (char *) "";
+ # if ENABLE_FEATURE_ASSUME_UNICODE
+-			name_len = bb_mbstrlen(token[0]);
++			name_len = unicode_strlen(token[0]);
+ 			name_len = (name_len > 19) ? 0 : 19 - name_len;
+ 			printf("%s%*s %8s %2s %s\n", token[0], name_len, "", token[1], token[2], token[3]);
+ # else
+@@ -78,7 +78,7 @@ int lsmod_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 			// so trimming the trailing char is just what we need!
+ 			token[3][strlen(token[3])-1] = '\0';
+ # if ENABLE_FEATURE_ASSUME_UNICODE
+-			name_len = bb_mbstrlen(token[0]);
++			name_len = unicode_strlen(token[0]);
+ 			name_len = (name_len > 19) ? 0 : 19 - name_len;
+ 			printf("%s%*s %8s %2s %s\n", token[0], name_len, "", token[1], token[2], token[3]);
+ # else
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 97605f0..d8f5da7 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -72,7 +72,7 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 		/* lease.hostname is char[20] and is always NUL terminated */
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+ 		printf(" %-16s%s%*s", inet_ntoa(addr), lease.hostname,
+-			20 - (int)bb_mbstrlen(lease.hostname), "");
++			20 - (int)unicode_strlen(lease.hostname), "");
+ #else
+ 		printf(" %-16s%-20s", inet_ntoa(addr), lease.hostname);
+ #endif

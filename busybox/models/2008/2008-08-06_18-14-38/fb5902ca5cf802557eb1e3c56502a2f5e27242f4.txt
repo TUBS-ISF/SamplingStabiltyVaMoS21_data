@@ -1,0 +1,50 @@
+2008-08-06 18:14:38 +0000
+diff --git a/include/platform.h b/include/platform.h
+index d2c1f9d..0f2f83a 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -350,7 +350,9 @@ static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+ #ifndef MS_SHARED
+ #define MS_SHARED      (1<<20)
+ #endif
+-
++#ifndef MS_RELATIME
++#define MS_RELATIME   (1 << 21)
++#endif
+ 
+ #if !defined(BLKSSZGET)
+ #define BLKSSZGET _IO(0x12, 104)
+diff --git a/include/usage.h b/include/usage.h
+index 78f4036..e242990 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2661,6 +2661,7 @@
+        "	[a]sync		Writes are asynchronous / synchronous\n" \
+        "	[no]atime	Disable / enable updates to inode access times\n" \
+        "	[no]diratime	Disable / enable atime updates to directories\n" \
++       "	[no]relatime	Disable / enable atime updates relative to modification time\n" \
+        "	[no]dev		Allow use of special device files / disallow them\n" \
+        "	[no]exec	Allow use of executable files / disallow them\n" \
+        "	[no]suid	Allow set-user-id-root programs / disallow them\n" \
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 2288e2c..4cc1d4b 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -137,6 +137,8 @@ static const int32_t mount_options[] = {
+ 		/* "nodiratime"  */ MS_NODIRATIME,
+ 		/* "mand"        */ MS_MANDLOCK,
+ 		/* "nomand"      */ ~MS_MANDLOCK,
++		/* "relatime"    */ MS_RELATIME,
++		/* "norelatime"  */ ~MS_RELATIME,
+ 		/* "loud"        */ ~MS_SILENT,
+ 
+ 		// action flags
+@@ -189,6 +191,8 @@ static const char mount_option_str[] =
+ 		"nodiratime" "\0"
+ 		"mand" "\0"
+ 		"nomand" "\0"
++		"relatime" "\0"
++		"norelatime" "\0"
+ 		"loud" "\0"
+ 
+ 		// action flags

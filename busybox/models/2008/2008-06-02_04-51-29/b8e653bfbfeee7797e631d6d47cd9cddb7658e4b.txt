@@ -1,0 +1,171 @@
+2008-06-02 04:51:29 +0000
+diff --git a/Config.in b/Config.in
+index 5ce642f..a991b8a 100644
+--- a/Config.in
++++ b/Config.in
+@@ -363,6 +363,16 @@ config LFS
+ 	  cp, mount, tar, and many others.  If you want to access files larger
+ 	  than 2 Gigabytes, enable this option.  Otherwise, leave it set to 'N'.
+ 
++config CROSS_COMPILER_PREFIX
++	string "Cross Compiler prefix"
++	default ""
++	help
++	  If you want to build BusyBox with a cross compiler, then you
++	  will need to set this to the cross-compiler prefix, for example,
++	  "i386-uclibc-". Note that CROSS_COMPILE environment variable
++	  or "make CROSS_COMPILE=xxx ..." will override this selection.
++	  For native build leave it empty.
++
+ endmenu
+ 
+ menu 'Debugging Options'
+diff --git a/Makefile b/Makefile
+index 9c1b496..78c701e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -142,17 +142,6 @@ VPATH		:= $(srctree)$(if $(KBUILD_EXTMOD),:$(KBUILD_EXTMOD))
+ export srctree objtree VPATH TOPDIR
+ 
+ 
+-# SUBARCH tells the usermode build what the underlying arch is.  That is set
+-# first, and if a usermode build is happening, the "ARCH=um" on the command
+-# line overrides the setting of ARCH below.  If a native build is happening,
+-# then ARCH is assigned, getting whatever value it gets normally, and
+-# SUBARCH is subsequently ignored.
+-
+-SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
+-				  -e s/arm.*/arm/ -e s/sa110/arm/ \
+-				  -e s/s390x/s390/ -e s/parisc64/parisc/ \
+-				  -e s/ppc.*/powerpc/ -e s/mips.*/mips/ )
+-
+ # Cross compiling and selecting different set of gcc/bin-utils
+ # ---------------------------------------------------------------------------
+ #
+@@ -172,8 +161,33 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
+ # Default value for CROSS_COMPILE is not to prefix executables
+ # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
+ 
+-ARCH		?= $(SUBARCH)
+ CROSS_COMPILE	?=
++# bbox: we may have CONFIG_CROSS_COMPILER_PREFIX in .config,
++# and it has not been included yet... thus using an awkward syntax.
++ifeq ($(CROSS_COMPILE),)
++CROSS_COMPILE := $(shell grep ^CONFIG_CROSS_COMPILER_PREFIX .config 2>/dev/null)
++CROSS_COMPILE := $(subst CONFIG_CROSS_COMPILER_PREFIX=,,$(CROSS_COMPILE))
++CROSS_COMPILE := $(subst ",,$(CROSS_COMPILE))
++endif
++
++# SUBARCH tells the usermode build what the underlying arch is.  That is set
++# first, and if a usermode build is happening, the "ARCH=um" on the command
++# line overrides the setting of ARCH below.  If a native build is happening,
++# then ARCH is assigned, getting whatever value it gets normally, and
++# SUBARCH is subsequently ignored.
++
++ifneq ($(CROSS_COMPILE),)
++SUBARCH := $(shell echo $(CROSS_COMPILE) | cut -d- -f1)
++else
++SUBARCH := $(shell uname -m)
++endif
++SUBARCH := $(shell echo $(SUBARCH) | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
++					 -e s/arm.*/arm/ -e s/sa110/arm/ \
++					 -e s/s390x/s390/ -e s/parisc64/parisc/ \
++					 -e s/ppc.*/powerpc/ -e s/mips.*/mips/ )
++
++ARCH		?= $(SUBARCH)
++$(warning ARCH=$(ARCH) SUBARCH=$(SUBARCH))
+ 
+ # Architecture as present in compile.h
+ UTS_MACHINE := $(ARCH)
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 3a8201f..f45a594 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -452,7 +452,7 @@ enum {
+ /* The system calls unchanged between 2.0 and 2.1.  */
+ 
+ unsigned long create_module(const char *, size_t);
+-int delete_module(const char *);
++int delete_module(const char *module, unsigned int flags);
+ 
+ 
+ #endif /* module.h */
+@@ -4141,18 +4141,18 @@ int insmod_main(int argc, char **argv)
+ 	 * now we can load them directly into the kernel memory
+ 	 */
+ 	if (!obj_load_progbits(fp, f, (char*)m_addr)) {
+-		delete_module(m_name);
++		delete_module(m_name, 0);
+ 		goto out;
+ 	}
+ #endif
+ 
+ 	if (!obj_relocate(f, m_addr)) {
+-		delete_module(m_name);
++		delete_module(m_name, 0);
+ 		goto out;
+ 	}
+ 
+ 	if (!new_init_module(m_name, f, m_size)) {
+-		delete_module(m_name);
++		delete_module(m_name, 0);
+ 		goto out;
+ 	}
+ 
+diff --git a/scripts/Makefile.IMA b/scripts/Makefile.IMA
+index 353a4ac..988c6a6 100644
+--- a/scripts/Makefile.IMA
++++ b/scripts/Makefile.IMA
+@@ -1,4 +1,7 @@
+ # This is completely unsupported.
++#
++# Uasge: make -f scripts/Makefile.IMA
++#
+ # Fix COMBINED_COMPILE upstream (in the Kbuild) and propagate
+ # the changes back
+ srctree		:= $(if $(KBUILD_SRC),$(KBUILD_SRC),$(CURDIR))
+@@ -11,6 +14,24 @@ MAKEFLAGS += --include-dir=$(srctree)
+ 
+ default: busybox
+ 
++include .config
++
++# Cross compiling and selecting different set of gcc/bin-utils
++ifeq ($(CROSS_COMPILE),)
++CROSS_COMPILE := $(subst ",,$(CONFIG_CROSS_COMPILER_PREFIX))
++endif
++
++ifneq ($(CROSS_COMPILE),)
++SUBARCH := $(shell echo $(CROSS_COMPILE) | cut -d- -f1)
++else
++SUBARCH := $(shell uname -m)
++endif
++SUBARCH := $(shell echo $(SUBARCH) | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
++                                         -e s/arm.*/arm/ -e s/sa110/arm/ \
++                                         -e s/s390x/s390/ -e s/parisc64/parisc/ \
++                                         -e s/ppc.*/powerpc/ -e s/mips.*/mips/ )
++ARCH ?= $(SUBARCH)
++
+ ifndef HOSTCC
+ HOSTCC = cc
+ endif
+@@ -27,19 +48,11 @@ OBJDUMP         = $(CROSS_COMPILE)objdump
+ CFLAGS := $(CFLAGS)
+ CPPFLAGS+= -D"KBUILD_STR(s)=\#s" #-Q
+ 
+-include .config
+ # We need some generic definitions
+ include $(srctree)/scripts/Kbuild.include
+ 
+ include Makefile.flags
+ 
+-SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
+-				  -e s/arm.*/arm/ -e s/sa110/arm/ \
+-				  -e s/s390x/s390/ -e s/parisc64/parisc/ \
+-				  -e s/ppc.*/powerpc/ -e s/mips.*/mips/ )
+-ARCH ?= $(SUBARCH)
+-
+-# Cross compiling and selecting different set of gcc/bin-utils
+ -include $(srctree)/arch/$(ARCH)/Makefile
+ ifdef CONFIG_FEATURE_COMPRESS_USAGE
+ usage_stuff = include/usage_compressed.h

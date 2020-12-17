@@ -1,0 +1,95 @@
+2008-07-19 22:57:00 +0000
+diff --git a/Config.in b/Config.in
+index 8de6678..8e55edb 100644
+--- a/Config.in
++++ b/Config.in
+@@ -482,10 +482,6 @@ config INCLUDE_SUSv2
+ config PARSE
+ 	bool "Uniform config file parser debugging applet: parse"
+ 
+-config FEATURE_PARSE_COPY
+-	bool "Keep a copy of current line"
+-	depends on PARSE
+-
+ endmenu
+ 
+ menu 'Installation Options'
+diff --git a/include/libbb.h b/include/libbb.h
+index af6c138..4e4e379 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -990,14 +990,18 @@ int bb_parse_mode(const char* s, mode_t* theMode) FAST_FUNC;
+ /*
+  * Config file parser
+  */
+-#define PARSE_DONT_REDUCE       0x00010000 // do not treat consecutive delimiters as one
+-#define PARSE_DONT_TRIM         0x00020000 // do not trim line of leading and trailing delimiters
+-#define PARSE_LAST_IS_GREEDY    0x00040000 // last token takes whole remainder of the line
+-//#define PARSE_DONT_NULL         0x00080000 // do not set tokens[] to NULL
++enum {
++	PARSE_DONT_REDUCE    = 0x00010000, // do not treat consecutive delimiters as one
++	PARSE_DONT_TRIM      = 0x00020000, // do not trim line of leading and trailing delimiters
++	PARSE_LAST_IS_GREEDY = 0x00040000, // last token takes whole remainder of the line
++//	PARSE_DONT_NULL      = 0x00080000, // do not set tokens[] to NULL
++	// keep a copy of current line
++	PARSE_KEEP_COPY      = 0x00200000 * ENABLE_DEBUG_CROND_OPTION,
++};
+ typedef struct parser_t {
+ 	FILE *fp;
+ 	char *line;
+-	USE_FEATURE_PARSE_COPY(char *data;)
++	char *data;
+ 	int lineno;
+ } parser_t;
+ parser_t* config_open(const char *filename) FAST_FUNC;
+diff --git a/libbb/parse_config.c b/libbb/parse_config.c
+index 3945501..8d7c97e 100644
+--- a/libbb/parse_config.c
++++ b/libbb/parse_config.c
+@@ -75,10 +75,10 @@ static void config_free_data(parser_t *const parser)
+ {
+ 	free(parser->line);
+ 	parser->line = NULL;
+-	USE_FEATURE_PARSE_COPY(
++	if (PARSE_KEEP_COPY) { /* compile-time constant */
+ 		free(parser->data);
+ 		parser->data = NULL;
+-	)
++	}
+ }
+ 
+ void FAST_FUNC config_close(parser_t *parser)
+@@ -179,9 +179,9 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 
+ 	// store line
+ 	parser->line = line = xrealloc(line, ii + 1);
+-	USE_FEATURE_PARSE_COPY(
++	if (flags & PARSE_KEEP_COPY) {
+ 		parser->data = xstrdup(line);
+-	)
++	}
+ 
+ 	/* now split line to tokens */
+ 	ntokens--; // now it's max allowed token no
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 154243c..c7ee793 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -470,14 +470,12 @@ static void SynchronizeFile(const char *fileName)
+ 		pline = &file->cf_LineBase;
+ 
+ 		while (--maxLines
+-		 && (n = config_read(parser, tokens, 6, 1, "# \t", PARSE_LAST_IS_GREEDY))
++		 && (n = config_read(parser, tokens, 6, 1, "# \t", PARSE_LAST_IS_GREEDY|PARSE_KEEP_COPY))
+ 		) {
+ 			CronLine *line;
+ 
+-			USE_FEATURE_PARSE_COPY(
+-				if (DebugOpt)
+-					crondlog(LVL5 "user:%s entry:%s", fileName, parser->data);
+-			)
++			if (DebugOpt)
++				crondlog(LVL5 "user:%s entry:%s", fileName, parser->data);
+ 
+ 			/* check if line is setting MAILTO= */
+ 			if (0 == strncmp(tokens[0], "MAILTO=", 7)) {

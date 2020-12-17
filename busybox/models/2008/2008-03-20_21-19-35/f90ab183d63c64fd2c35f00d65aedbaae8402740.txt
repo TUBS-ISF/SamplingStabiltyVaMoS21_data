@@ -1,0 +1,56 @@
+2008-03-20 21:19:35 +0000
+diff --git a/e2fsprogs/old_e2fsprogs/fsck.c b/e2fsprogs/old_e2fsprogs/fsck.c
+index d4914a5..a51c33a 100644
+--- a/e2fsprogs/old_e2fsprogs/fsck.c
++++ b/e2fsprogs/old_e2fsprogs/fsck.c
+@@ -477,8 +477,7 @@ static void load_fs_info(const char *filename)
+ 	int     old_fstab = 1;
+ 	struct fs_info *fs;
+ 
+-	if ((f = fopen(filename, "r")) == NULL) {
+-		bb_perror_msg("WARNING: cannot open %s", filename);
++	if ((f = fopen_or_warn(filename, "r")) == NULL) {
+ 		return;
+ 	}
+ 	while (!feof(f)) {
+diff --git a/networking/interface.c b/networking/interface.c
+index 367d2b0..44bd8d3 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -560,9 +560,8 @@ static int if_readlist_proc(char *target)
+ 	if (!target)
+ 		proc_read = 1;
+ 
+-	fh = fopen(_PATH_PROCNET_DEV, "r");
++	fh = fopen_or_warn(_PATH_PROCNET_DEV, "r");
+ 	if (!fh) {
+-		bb_perror_msg("warning: cannot open %s, limiting output", _PATH_PROCNET_DEV);
+ 		return if_readconf();
+ 	}
+ 	fgets(buf, sizeof buf, fh);	/* eat line */
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index 5ded99b..670f188 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -91,7 +91,6 @@ static int print_route(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
+ 	int host_len = -1;
+ 	SPRINT_BUF(b1);
+ 
+-
+ 	if (n->nlmsg_type != RTM_NEWROUTE && n->nlmsg_type != RTM_DELROUTE) {
+ 		fprintf(stderr, "Not a route: %08x %08x %08x\n",
+ 			n->nlmsg_len, n->nlmsg_type, n->nlmsg_flags);
+diff --git a/shell/hush.c b/shell/hush.c
+index 2d56972..4e6d500 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -891,7 +891,8 @@ static int builtin_cd(char **argv)
+ static int builtin_exec(char **argv)
+ {
+ 	if (argv[1] == NULL)
+-		return EXIT_SUCCESS;   /* Really? */
++		return EXIT_SUCCESS; /* bash does this */
++// FIXME: if exec fails, bash does NOT exit! We do...
+ 	pseudo_exec_argv(argv + 1);
+ 	/* never returns */
+ }

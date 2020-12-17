@@ -1,0 +1,42 @@
+2007-11-18 06:17:52 +0000
+diff --git a/scripts/kconfig/Makefile b/scripts/kconfig/Makefile
+index a28414d..f56863f 100644
+--- a/scripts/kconfig/Makefile
++++ b/scripts/kconfig/Makefile
+@@ -117,14 +117,8 @@ clean-files	:= lkc_defs.h qconf.moc .tmp_qtcheck \
+ 		   .tmp_gtkcheck zconf.tab.c lex.zconf.c zconf.hash.c
+ subdir- += lxdialog
+ 
+-# Needed for systems without gettext
+-KBUILD_HAVE_NLS := $(shell \
+-     if echo "\#include <libintl.h>" | $(HOSTCC) $(HOSTCFLAGS) -E - > /dev/null 2>&1 ; \
+-     then echo yes ; \
+-     else echo no ; fi)
+-ifeq ($(KBUILD_HAVE_NLS),no)
+-HOSTCFLAGS	+= -DKBUILD_NO_NLS
+-endif
++# Add environment specific flags
++HOST_EXTRACFLAGS += $(shell $(CONFIG_SHELL) $(srctree)/$(src)/check.sh $(HOSTCC) $(HOSTCFLAGS))
+ 
+ # generated files seem to need this to find local include files
+ HOSTCFLAGS_lex.zconf.o	:= -I$(src)
+diff --git a/scripts/kconfig/check.sh b/scripts/kconfig/check.sh
+new file mode 100755
+index 0000000..fa59cbf
+--- /dev/null
++++ b/scripts/kconfig/check.sh
+@@ -0,0 +1,14 @@
++#!/bin/sh
++# Needed for systems without gettext
++$* -xc -o /dev/null - > /dev/null 2>&1 << EOF
++#include <libintl.h>
++int main()
++{
++	gettext("");
++	return 0;
++}
++EOF
++if [ ! "$?" -eq "0"  ]; then
++	echo -DKBUILD_NO_NLS;
++fi
++

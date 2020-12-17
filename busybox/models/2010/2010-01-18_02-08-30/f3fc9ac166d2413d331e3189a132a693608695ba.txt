@@ -1,0 +1,46 @@
+2010-01-18 02:08:30 +0100
+diff --git a/networking/Config.in b/networking/Config.in
+index 80834c6..788e128 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -117,6 +117,17 @@ config FEATURE_FTP_WRITE
+ 	help
+ 	  Enable all kinds of FTP upload commands (-w option)
+ 
++config FEATURE_FTPD_ACCEPT_BROKEN_LIST
++	bool "Enable workaround for RFC-violating clients"
++	default y
++	depends on FTPD
++	help
++	  Some ftp-clients (among them KDE's Konqueror) issue illegal
++	  "LIST -la" requests. This option works around those problems.
++	  It might prevent you from listing files starting with "-" and
++	  it increases the code size by ~40 bytes.
++	  Most other ftp servers seem to behave similar to this.
++
+ config FTPGET
+ 	bool "ftpget"
+ 	default n
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index 4e9f65c..fdc6f5e 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -632,6 +632,18 @@ popen_ls(const char *opt)
+ 	argv[3] = G.ftp_arg;
+ 	argv[4] = NULL;
+ 
++	/* Improve compatibility with non-RFC conforming FTP clients
++	 * which send e.g. "LIST -l", "LIST -la".
++	 * See https://bugs.kde.org/show_bug.cgi?id=195578 */
++	if (ENABLE_FEATURE_FTPD_ACCEPT_BROKEN_LIST
++	 && G.ftp_arg && G.ftp_arg[0] == '-' && G.ftp_arg[1] == 'l'
++	) {
++		const char *tmp = strchr(G.ftp_arg, ' ');
++		if (tmp) /* skip the space */
++			tmp++;
++		argv[3] = tmp;
++	}
++
+ 	xpiped_pair(outfd);
+ 
+ 	/*fflush_all(); - so far we dont use stdio on output */

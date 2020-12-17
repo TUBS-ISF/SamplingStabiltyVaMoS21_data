@@ -1,0 +1,223 @@
+2009-01-23 02:07:14 +0000
+diff --git a/include/applets.h b/include/applets.h
+index 8d9d2a2..63cc738 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -382,6 +382,7 @@ USE_TRACEROUTE(APPLET(traceroute, _BB_DIR_USR_BIN, _BB_SUID_MAYBE))
+ USE_TRUE(APPLET_NOFORK(true, true, _BB_DIR_BIN, _BB_SUID_NEVER, true))
+ USE_TTY(APPLET(tty, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_TTYSIZE(APPLET(ttysize, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
++USE_TUNCTL(APPLET(tunctl, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ //USE_TUNE2FS(APPLET(tune2fs, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_APP_UDHCPC(APPLET(udhcpc, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_APP_UDHCPD(APPLET(udhcpd, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index 3b53602..9ceb366 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4457,6 +4457,23 @@
+ #define ttysize_full_usage "\n\n" \
+        "Print dimension(s) of standard input's terminal, on error return 80x25"
+ 
++#define tunctl_trivial_usage \
++       "[-f device] ([-t name] | -d name)" USE_FEATURE_TUNCTL_UG(" [-u owner] [-g group] [-b]")
++#define tunctl_full_usage "\n\n" \
++       "Create or delete tun interfaces" \
++     "\nOptions:" \
++     "\n	-f name		tun device (/dev/net/tun)" \
++     "\n	-t name		Create iface 'name'" \
++     "\n	-d name		Delete iface 'name'" \
++USE_FEATURE_TUNCTL_UG( \
++     "\n	-u owner	Set iface owner" \
++     "\n	-g group	Set iface group" \
++     "\n	-b		Brief output" \
++)
++#define tunctl_example_usage \
++       "# tunctl\n" \
++       "# tunctl -d tun0\n"
++
+ #define tune2fs_trivial_usage \
+        "[-c max-mounts-count] [-e errors-behavior] [-g group] " \
+        "[-i interval[d|m|w]] [-j] [-J journal-options] [-l] [-s sparse-flag] " \
+diff --git a/networking/Config.in b/networking/Config.in
+index 00a07b4..b3d07e6 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -920,6 +920,20 @@ config TCPSVD
+ 	  tcpsvd listens on a TCP port and runs a program for each new
+ 	  connection.
+ 
++config TUNCTL
++	bool "tunctl"
++	default n
++	help
++	  tunctl creates or deletes tun devices.
++
++config FEATURE_TUNCTL_UG
++	bool "Support owner:group assignment"
++	default n
++	depends on TUNCTL
++	help
++	  Allow to specify owner and group of newly created interface.
++	  340 bytes of pure bloat. Say no here.
++
+ config UDPSVD
+ 	bool "udpsvd"
+ 	default n
+diff --git a/networking/Kbuild b/networking/Kbuild
+index 63d0745..7707126 100644
+--- a/networking/Kbuild
++++ b/networking/Kbuild
+@@ -36,6 +36,7 @@ lib-$(CONFIG_TELNETD)      += telnetd.o
+ lib-$(CONFIG_TFTP)         += tftp.o
+ lib-$(CONFIG_TFTPD)        += tftp.o
+ lib-$(CONFIG_TRACEROUTE)   += traceroute.o
++lib-$(CONFIG_TUNCTL)       += tunctl.o
+ lib-$(CONFIG_VCONFIG)      += vconfig.o
+ lib-$(CONFIG_WGET)         += wget.o
+ lib-$(CONFIG_ZCIP)         += zcip.o
+diff --git a/networking/tunctl.c b/networking/tunctl.c
+new file mode 100644
+index 0000000..a8e5270
+--- /dev/null
++++ b/networking/tunctl.c
+@@ -0,0 +1,139 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * tun devices controller
++ *
++ * Copyright (C) 2008 by Vladimir Dronnikov <dronnikov@gmail.com>
++ *
++ * Original code:
++ *      Jeff Dike
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
++#include <netinet/in.h>
++#include <net/if.h>
++#include <linux/if_tun.h>
++#include "libbb.h"
++
++/* TUNSETGROUP appeared in 2.6.23 */
++#ifndef TUNSETGROUP
++#define TUNSETGROUP _IOW('T', 206, int)
++#endif
++
++#define IOCTL(a, b, c) ioctl_or_perror_and_die(a, b, c, NULL)
++
++#if 1
++
++int tunctl_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int tunctl_main(int argc UNUSED_PARAM, char **argv)
++{
++	struct ifreq ifr;
++	int fd;
++	const char *opt_name = "tap%d";
++	const char *opt_device = "/dev/net/tun";
++#if ENABLE_FEATURE_TUNCTL_UG
++	const char *opt_user, *opt_group;
++	long user = -1, group = -1;
++#endif
++	unsigned opts;
++
++	enum {
++		OPT_f = 1 << 0, // control device name (/dev/net/tun)
++		OPT_t = 1 << 1, // create named interface
++		OPT_d = 1 << 2, // delete named interface
++#if ENABLE_FEATURE_TUNCTL_UG
++		OPT_u = 1 << 3, // set new interface owner
++		OPT_g = 1 << 4, // set new interface group
++		OPT_b = 1 << 5, // brief output
++#endif
++	};
++
++	opt_complementary = "=0:t--d:d--t"; // no arguments; t ^ d
++	opts = getopt32(argv, "f:t:d:" USE_FEATURE_TUNCTL_UG("u:g:b"),
++			&opt_device, &opt_name, &opt_name
++			USE_FEATURE_TUNCTL_UG(, &opt_user, &opt_group));
++
++	// select device
++	memset(&ifr, 0, sizeof(ifr));
++	ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
++	strncpy_IFNAMSIZ(ifr.ifr_name, opt_name);
++
++	// open device
++	fd = xopen(opt_device, O_RDWR);
++	IOCTL(fd, TUNSETIFF, (void *)&ifr);
++
++	// delete?
++	if (opts & OPT_d) {
++		IOCTL(fd, TUNSETPERSIST, (void *)(uintptr_t)0);
++		bb_info_msg("Set '%s' %spersistent", ifr.ifr_name, "non");
++		return EXIT_SUCCESS;
++	}
++
++	// create
++#if ENABLE_FEATURE_TUNCTL_UG
++	if (opts & OPT_g) {
++		group = xgroup2gid(opt_group);
++		IOCTL(fd, TUNSETGROUP, (void *)(uintptr_t)group);
++	} else
++		user = geteuid();
++	if (opts & OPT_u)
++		user = xuname2uid(opt_user);
++	IOCTL(fd, TUNSETOWNER, (void *)(uintptr_t)user);
++#endif
++	IOCTL(fd, TUNSETPERSIST, (void *)(uintptr_t)1);
++
++	// show info
++#if ENABLE_FEATURE_TUNCTL_UG
++	if (opts & OPT_b) {
++		puts(ifr.ifr_name);
++	} else {
++		printf("Set '%s' %spersistent", ifr.ifr_name, "");
++		printf(" and owned by uid %ld", user);
++		if (group != -1)
++			printf(" gid %ld", group);
++		bb_putchar('\n');
++	}
++#else
++	puts(ifr.ifr_name);
++#endif
++	return EXIT_SUCCESS;
++}
++
++#else
++
++/* -210 bytes: */
++
++int tunctl_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int tunctl_main(int argc UNUSED_PARAM, char **argv)
++{
++	struct ifreq ifr;
++	int fd;
++	const char *opt_name = "tap%d";
++	const char *opt_device = "/dev/net/tun";
++	unsigned opts;
++
++	enum {
++		OPT_f = 1 << 0, // control device name (/dev/net/tun)
++		OPT_t = 1 << 1, // create named interface
++		OPT_d = 1 << 2, // delete named interface
++	};
++
++	opt_complementary = "=0:t--d:d--t"; // no arguments; t ^ d
++	opts = getopt32(argv, "f:t:d:u:g:b", // u, g, b accepted and ignored
++			&opt_device, &opt_name, &opt_name, NULL, NULL);
++
++	// set interface name
++	memset(&ifr, 0, sizeof(ifr));
++	ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
++	strncpy_IFNAMSIZ(ifr.ifr_name, opt_name);
++
++	// open device
++	fd = xopen(opt_device, O_RDWR);
++	IOCTL(fd, TUNSETIFF, (void *)&ifr);
++
++	// create or delete interface
++	IOCTL(fd, TUNSETPERSIST, (void *)(uintptr_t)(0 == (opts & OPT_d)));
++
++	return EXIT_SUCCESS;
++}
++
++#endif

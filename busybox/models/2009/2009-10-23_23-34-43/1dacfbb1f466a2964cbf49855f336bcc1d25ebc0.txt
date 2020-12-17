@@ -1,0 +1,43 @@
+2009-10-23 23:34:43 +0200
+diff --git a/include/usage.h b/include/usage.h
+index 8db1946..d03ec22 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1362,7 +1362,7 @@
+      "\n	DIR	Change root to this directory" \
+ 
+ #define ftpget_trivial_usage \
+-       "[OPTIONS] HOST LOCAL_FILE REMOTE_FILE"
++       "[OPTIONS] HOST [LOCAL_FILE] REMOTE_FILE"
+ #define ftpget_full_usage "\n\n" \
+        "Retrieve a remote file via FTP\n" \
+      "\nOptions:" \
+@@ -1382,7 +1382,7 @@
+ 	)
+ 
+ #define ftpput_trivial_usage \
+-       "[OPTIONS] HOST REMOTE_FILE LOCAL_FILE"
++       "[OPTIONS] HOST [REMOTE_FILE] LOCAL_FILE"
+ #define ftpput_full_usage "\n\n" \
+        "Store a local file on a remote machine via FTP\n" \
+      "\nOptions:" \
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index d39b73e..c0ecdda 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -306,7 +306,7 @@ int ftpgetput_main(int argc UNUSED_PARAM, char **argv)
+ #if ENABLE_FEATURE_FTPGETPUT_LONG_OPTIONS
+ 	applet_long_options = ftpgetput_longopts;
+ #endif
+-	opt_complementary = "=3:vv:cc"; /* must have 3 params; -v and -c count */
++	opt_complementary = "-2:vv:cc"; /* must have 2 to 3 params; -v and -c count */
+ 	opt = getopt32(argv, "cvu:p:P:", &user, &password, &port,
+ 					&verbose_flag, &do_continue);
+ 	argv += optind;
+@@ -321,5 +321,5 @@ int ftpgetput_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	ftp_login();
+-	return ftp_action(argv[1], argv[2]);
++	return ftp_action(argv[1], argv[2] ? argv[2] : argv[1]);
+ }

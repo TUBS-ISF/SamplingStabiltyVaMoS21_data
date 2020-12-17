@@ -1,0 +1,107 @@
+2007-12-30 01:59:53 +0000
+diff --git a/editors/ed.c b/editors/ed.c
+index cceff0c..a569788 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -847,20 +847,8 @@ static int printLines(int num1, int num2, int expandFlag)
+ 			count--;
+ 
+ 		while (count-- > 0) {
+-			ch = *cp++;
+-			if (ch & 0x80) {
+-				fputs("M-", stdout);
+-				ch &= 0x7f;
+-			}
+-			if (ch < ' ') {
+-				bb_putchar('^');
+-				ch += '@';
+-			}
+-			if (ch == 0x7f) {
+-				bb_putchar('^');
+-				ch = '?';
+-			}
+-			bb_putchar(ch);
++			ch = (unsigned char) *cp++;
++			fputc_printable(ch | PRINTABLE_META, stdout);
+ 		}
+ 
+ 		fputs("$\n", stdout);
+diff --git a/editors/vi.c b/editors/vi.c
+index b6d4dcf..d8492fe 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -899,7 +899,7 @@ static void colon(char *buf)
+ 			if (c_is_no_print) {
+ 				c = '.';
+ 				standout_start();
+-				}
++			}
+ 			if (c == '\n') {
+ 				write1("$\r");
+ 			} else if (c < ' ' || c == 127) {
+diff --git a/include/libbb.h b/include/libbb.h
+index 1da37ed..f35f85c 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -426,6 +426,11 @@ char *safe_strncpy(char *dst, const char *src, size_t size);
+  * But potentially slow, don't use in one-billion-times loops */
+ int bb_putchar(int ch);
+ char *xasprintf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
++/* Prints unprintable chars ch as ^C or M-c to file
++ * (M-c is used only if ch is ORed with PRINTABLE_META),
++ * else it is printed as-is (except for ch = 0x9b) */
++enum { PRINTABLE_META = 0x100 };
++void fputc_printable(int ch, FILE *file);
+ // gcc-4.1.1 still isn't good enough at optimizing it
+ // (+200 bytes compared to macro)
+ //static ALWAYS_INLINE
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 6791299..c4aac95 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -65,6 +65,7 @@ lib-y += perror_msg_and_die.o
+ lib-y += perror_nomsg.o
+ lib-y += perror_nomsg_and_die.o
+ lib-y += pidfile.o
++lib-y += printable.o
+ lib-y += process_escape_sequence.o
+ lib-y += procps.o
+ lib-y += read.o
+diff --git a/networking/netstat.c b/networking/netstat.c
+index 29c2384..348abd8 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -349,13 +349,9 @@ static int unix_do_one(int nr, char *line)
+ 	const char *ss_proto, *ss_state, *ss_type;
+ 	char ss_flags[32];
+ 
+-	/* TODO: currently we stop at first NUL byte. Is it a problem? */
+-
+ 	if (nr == 0)
+ 		return 0; /* skip header */
+ 
+-	*strchrnul(line, '\n') = '\0';
+-
+ 	/* 2.6.15 may report lines like "... @/tmp/fam-user-^@^@^@^@^@^@^@..."
+ 	 * Other users report long lines filled by NUL bytes. 
+ 	 * (those ^@ are NUL bytes too). We see them as empty lines. */
+@@ -443,9 +439,16 @@ static int unix_do_one(int nr, char *line)
+ 		strcat(ss_flags, "N ");
+ 	strcat(ss_flags, "]");
+ 
+-	printf("%-5s %-6ld %-11s %-10s %-13s %6lu %s\n",
+-		ss_proto, refcnt, ss_flags, ss_type, ss_state, inode,
+-		line + path_ofs);
++	printf("%-5s %-6ld %-11s %-10s %-13s %6lu ",
++		ss_proto, refcnt, ss_flags, ss_type, ss_state, inode
++		);
++
++	/* TODO: currently we stop at first NUL byte. Is it a problem? */
++	line += path_ofs;
++	*strchrnul(line, '\n') = '\0';
++	while (*line)
++		fputc_printable(*line++, stdout);
++	bb_putchar('\n');
+ 	return 0;
+ }
+ 

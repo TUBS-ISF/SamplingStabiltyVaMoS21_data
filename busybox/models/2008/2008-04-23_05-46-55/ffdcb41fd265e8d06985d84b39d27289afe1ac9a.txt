@@ -1,0 +1,14 @@
+2008-04-23 05:46:55 +0000
+diff --git a/archival/Config.in b/archival/Config.in
+index 35ac40b..4599b68 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -287,7 +287,7 @@ config UNLZMA
+ 	  should probably say N here.
+ 
+ config FEATURE_LZMA_FAST
+-	bool "Optimze unlzma for speed"
++	bool "Optimize unlzma for speed"
+ 	default n
+ 	depends on UNLZMA
+ 	help

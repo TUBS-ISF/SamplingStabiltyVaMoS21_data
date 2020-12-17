@@ -1,0 +1,978 @@
+2007-05-31 22:42:12 +0000
+diff --git a/archival/cpio.c b/archival/cpio.c
+index 6d1ee16..72d31c3 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -11,20 +11,16 @@
+  *		Only supports new ASCII and CRC formats
+  *
+  */
+-#include <fcntl.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#include <unistd.h>
+-#include "unarchive.h"
+ #include "libbb.h"
++#include "unarchive.h"
+ 
+-#define CPIO_OPT_EXTRACT			0x01
+-#define CPIO_OPT_TEST				0x02
+-#define CPIO_OPT_UNCONDITIONAL		0x04
+-#define CPIO_OPT_VERBOSE			0x08
+-#define CPIO_OPT_FILE				0x10
+-#define CPIO_OPT_CREATE_LEADING_DIR	0x20
+-#define CPIO_OPT_PRESERVE_MTIME		0x40
++#define CPIO_OPT_EXTRACT                0x01
++#define CPIO_OPT_TEST                   0x02
++#define CPIO_OPT_UNCONDITIONAL          0x04
++#define CPIO_OPT_VERBOSE                0x08
++#define CPIO_OPT_FILE                   0x10
++#define CPIO_OPT_CREATE_LEADING_DIR     0x20
++#define CPIO_OPT_PRESERVE_MTIME         0x40
+ 
+ int cpio_main(int argc, char **argv);
+ int cpio_main(int argc, char **argv)
+diff --git a/archival/libunarchive/archive_xread_all_eof.c b/archival/libunarchive/archive_xread_all_eof.c
+index 007f68c..7e082ab 100644
+--- a/archival/libunarchive/archive_xread_all_eof.c
++++ b/archival/libunarchive/archive_xread_all_eof.c
+@@ -3,8 +3,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "unarchive.h"
+ #include "libbb.h"
++#include "unarchive.h"
+ 
+ ssize_t archive_xread_all_eof(archive_handle_t *archive_handle,
+ 			unsigned char *buf, size_t count)
+diff --git a/archival/libunarchive/data_align.c b/archival/libunarchive/data_align.c
+index 946c94d..9803199 100644
+--- a/archival/libunarchive/data_align.c
++++ b/archival/libunarchive/data_align.c
+@@ -3,7 +3,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <sys/types.h>
++//#include <sys/types.h>
+ 
+ #include "libbb.h"
+ #include "unarchive.h"
+diff --git a/archival/libunarchive/data_extract_to_stdout.c b/archival/libunarchive/data_extract_to_stdout.c
+index d87a4a5..c8895ed 100644
+--- a/archival/libunarchive/data_extract_to_stdout.c
++++ b/archival/libunarchive/data_extract_to_stdout.c
+@@ -3,6 +3,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ void data_extract_to_stdout(archive_handle_t *archive_handle)
+diff --git a/archival/libunarchive/decompress_uncompress.c b/archival/libunarchive/decompress_uncompress.c
+index a1d7fd6..ba73f11 100644
+--- a/archival/libunarchive/decompress_uncompress.c
++++ b/archival/libunarchive/decompress_uncompress.c
+@@ -26,9 +26,6 @@
+  * [... History snipped ...]
+  *
+  */
+-#include <stdio.h>
+-#include <string.h>
+-#include <unistd.h>
+ 
+ /* Default input buffer size */
+ #define	IBUFSIZ	2048
+diff --git a/archival/libunarchive/filter_accept_all.c b/archival/libunarchive/filter_accept_all.c
+index 5c991ca..47d771e 100644
+--- a/archival/libunarchive/filter_accept_all.c
++++ b/archival/libunarchive/filter_accept_all.c
+@@ -5,7 +5,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdlib.h>
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ /* Accept any non-null name, its not really a filter at all */
+diff --git a/archival/libunarchive/filter_accept_list.c b/archival/libunarchive/filter_accept_list.c
+index cfc1b0c..6e571ad 100644
+--- a/archival/libunarchive/filter_accept_list.c
++++ b/archival/libunarchive/filter_accept_list.c
+@@ -5,7 +5,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdlib.h>
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ /*
+diff --git a/archival/libunarchive/filter_accept_reject_list.c b/archival/libunarchive/filter_accept_reject_list.c
+index 79da350..bf983b5 100644
+--- a/archival/libunarchive/filter_accept_reject_list.c
++++ b/archival/libunarchive/filter_accept_reject_list.c
+@@ -5,7 +5,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdlib.h>
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ /*
+diff --git a/archival/libunarchive/find_list_entry.c b/archival/libunarchive/find_list_entry.c
+index d1afc72..f274103 100644
+--- a/archival/libunarchive/find_list_entry.c
++++ b/archival/libunarchive/find_list_entry.c
+@@ -6,7 +6,7 @@
+  */
+ 
+ #include <fnmatch.h>
+-#include <stdlib.h>
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ /* Find a string in a shell pattern list */
+diff --git a/archival/libunarchive/get_header_tar_lzma.c b/archival/libunarchive/get_header_tar_lzma.c
+index 06b8daa..5c02767 100644
+--- a/archival/libunarchive/get_header_tar_lzma.c
++++ b/archival/libunarchive/get_header_tar_lzma.c
+@@ -6,6 +6,7 @@
+  * Licensed under GPL v2, see file LICENSE in this tarball for details.
+  */
+ 
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ char get_header_tar_lzma(archive_handle_t * archive_handle)
+diff --git a/archival/libunarchive/header_list.c b/archival/libunarchive/header_list.c
+index fb461a6..8cb8f40 100644
+--- a/archival/libunarchive/header_list.c
++++ b/archival/libunarchive/header_list.c
+@@ -2,7 +2,7 @@
+ /*
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-#include <stdio.h>
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ void header_list(const file_header_t *file_header)
+diff --git a/archival/libunarchive/header_skip.c b/archival/libunarchive/header_skip.c
+index 53242e0..ef2172b 100644
+--- a/archival/libunarchive/header_skip.c
++++ b/archival/libunarchive/header_skip.c
+@@ -2,7 +2,7 @@
+ /*
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-#include <stdio.h>
++#include "libbb.h"
+ #include "unarchive.h"
+ 
+ void header_skip(const file_header_t *file_header ATTRIBUTE_UNUSED)
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index 58a89b9..0ee0806 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -3,11 +3,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdlib.h>
+-#include <unistd.h>
+-
+ #include "libbb.h"
+-
+ #include "unarchive.h"
+ 
+ /* transformer(), more than meets the eye */
+diff --git a/archival/libunarchive/seek_by_read.c b/archival/libunarchive/seek_by_read.c
+index e46af48..452d82d 100644
+--- a/archival/libunarchive/seek_by_read.c
++++ b/archival/libunarchive/seek_by_read.c
+@@ -3,10 +3,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdlib.h>
+-
+-#include "unarchive.h"
+ #include "libbb.h"
++#include "unarchive.h"
+ 
+ /*  If we are reading through a pipe(), or from stdin then we can't lseek,
+  *  we must read and discard the data to skip over it.
+diff --git a/archival/libunarchive/unpack_ar_archive.c b/archival/libunarchive/unpack_ar_archive.c
+index 6a84ae8..fc1820b 100644
+--- a/archival/libunarchive/unpack_ar_archive.c
++++ b/archival/libunarchive/unpack_ar_archive.c
+@@ -2,11 +2,9 @@
+ /*
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-#include <fcntl.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#include "unarchive.h"
++
+ #include "libbb.h"
++#include "unarchive.h"
+ 
+ void unpack_ar_archive(archive_handle_t *ar_archive)
+ {
+diff --git a/console-tools/clear.c b/console-tools/clear.c
+index 053293c..3c7d704 100644
+--- a/console-tools/clear.c
++++ b/console-tools/clear.c
+@@ -10,11 +10,8 @@
+ 
+ /* no options, no getopt */
+ 
+-#include <stdio.h>
+-#include <stdlib.h>
+ #include "libbb.h"
+ 
+-
+ int clear_main(int argc, char **argv);
+ int clear_main(int argc, char **argv)
+ {
+diff --git a/console-tools/reset.c b/console-tools/reset.c
+index c844e15..deffe286 100644
+--- a/console-tools/reset.c
++++ b/console-tools/reset.c
+@@ -10,9 +10,6 @@
+ 
+ /* no options, no getopt */
+ 
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <unistd.h>
+ #include "libbb.h"
+ 
+ int reset_main(int argc, char **argv);
+diff --git a/console-tools/setkeycodes.c b/console-tools/setkeycodes.c
+index a0d291d..0911ede 100644
+--- a/console-tools/setkeycodes.c
++++ b/console-tools/setkeycodes.c
+@@ -9,10 +9,9 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <sys/ioctl.h>
++//#include <sys/ioctl.h>
+ #include "libbb.h"
+ 
+-
+ /* From <linux/kd.h> */
+ struct kbkeycode {
+ 	unsigned int scancode, keycode;
+diff --git a/coreutils/df.c b/coreutils/df.c
+index d455d27..8273080 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -18,10 +18,6 @@
+  * the command line.  Properly round *-blocks, Used, and Available quantities.
+  */
+ 
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#include <unistd.h>
+ #include <mntent.h>
+ #include <sys/vfs.h>
+ #include "libbb.h"
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 064bd29..9dd5b48 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -14,9 +14,6 @@
+  */
+ 
+ #include "libbb.h"
+-#include <stdio.h>
+-#include <unistd.h>
+-#include <sys/types.h>
+ 
+ #define PRINT_REAL        1
+ #define NAME_NOT_NUMBER   2
+diff --git a/coreutils/libcoreutils/getopt_mk_fifo_nod.c b/coreutils/libcoreutils/getopt_mk_fifo_nod.c
+index 32fa9be..5065c38 100644
+--- a/coreutils/libcoreutils/getopt_mk_fifo_nod.c
++++ b/coreutils/libcoreutils/getopt_mk_fifo_nod.c
+@@ -20,11 +20,8 @@
+  *
+  */
+ 
+-#include <sys/types.h>
+-#include <sys/stat.h>
+-#include <unistd.h>
+ #include "libbb.h"
+-#include "coreutils.h"
++//#include "coreutils.h"
+ 
+ mode_t getopt_mk_fifo_nod(int argc, char **argv)
+ {
+diff --git a/coreutils/printenv.c b/coreutils/printenv.c
+index 0e69ff2..2531d5a 100644
+--- a/coreutils/printenv.c
++++ b/coreutils/printenv.c
+@@ -8,9 +8,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdio.h>
+-#include <string.h>
+-#include <stdlib.h>
+ #include "libbb.h"
+ extern char **environ;
+ 
+diff --git a/coreutils/uname.c b/coreutils/uname.c
+index d4188cd..a934c15 100644
+--- a/coreutils/uname.c
++++ b/coreutils/uname.c
+@@ -30,12 +30,6 @@
+  * Now does proper error checking on i/o.  Plus some further space savings.
+  */
+ 
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <stddef.h>
+-#include <string.h>
+-#include <unistd.h>
+-#include <sys/types.h>
+ #include <sys/utsname.h>
+ #include "libbb.h"
+ 
+diff --git a/debianutils/pipe_progress.c b/debianutils/pipe_progress.c
+index f950084..ac8fb50 100644
+--- a/debianutils/pipe_progress.c
++++ b/debianutils/pipe_progress.c
+@@ -8,10 +8,6 @@
+  */
+ 
+ #include "libbb.h"
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <unistd.h>
+-#include <time.h>
+ 
+ #define PIPE_PROGRESS_SIZE 4096
+ 
+diff --git a/include/unarchive.h b/include/unarchive.h
+index 8aa90be..8b2da56 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -10,7 +10,7 @@
+ #define ARCHIVE_NOPRESERVE_OWN          32
+ #define ARCHIVE_NOPRESERVE_PERM         64
+ 
+-#include "libbb.h"
++//#include "libbb.h"
+ 
+ typedef struct file_headers_s {
+ 	char *name;
+diff --git a/init/init.c b/init/init.c
+index 3dcd072..cb83b08 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -11,9 +11,9 @@
+ 
+ #include "libbb.h"
+ #include <paths.h>
+-#include <signal.h>
+-#include <sys/ioctl.h>
+-#include <sys/wait.h>
++//#include <signal.h>
++//#include <sys/ioctl.h>
++//#include <sys/wait.h>
+ #include <sys/reboot.h>
+ 
+ #if ENABLE_FEATURE_INIT_SYSLOG
+diff --git a/libbb/ask_confirmation.c b/libbb/ask_confirmation.c
+index 4642fa0..646ec4b 100644
+--- a/libbb/ask_confirmation.c
++++ b/libbb/ask_confirmation.c
+@@ -11,8 +11,6 @@
+  * return 1.  Otherwise return 0.
+  */
+ 
+-#include <stdio.h>
+-#include <ctype.h>
+ #include "libbb.h"
+ 
+ int bb_ask_confirmation(void)
+diff --git a/libbb/bb_askpass.c b/libbb/bb_askpass.c
+index 097a0a2..0f1f686 100644
+--- a/libbb/bb_askpass.c
++++ b/libbb/bb_askpass.c
+@@ -8,13 +8,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdio.h>
+-#include <string.h>
+-#include <unistd.h>
+-#include <fcntl.h>
+-#include <signal.h>
+ #include <termios.h>
+-#include <sys/ioctl.h>
++//#include <sys/ioctl.h>
+ 
+ #include "libbb.h"
+ 
+diff --git a/libbb/bb_do_delay.c b/libbb/bb_do_delay.c
+index e14b67a..aa26ade 100644
+--- a/libbb/bb_do_delay.c
++++ b/libbb/bb_do_delay.c
+@@ -7,8 +7,6 @@
+  * Licensed under the GPL v2, see the file LICENSE in this tarball.
+  */
+ 
+-#include <time.h>
+-#include <unistd.h>
+ #include "libbb.h"
+ 
+ void bb_do_delay(int seconds)
+diff --git a/libbb/get_console.c b/libbb/get_console.c
+index 9797ad6..b129518 100644
+--- a/libbb/get_console.c
++++ b/libbb/get_console.c
+@@ -8,7 +8,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <sys/ioctl.h>
++//#include <sys/ioctl.h>
+ #include "libbb.h"
+ 
+ 
+diff --git a/libbb/herror_msg.c b/libbb/herror_msg.c
+index 1e6908d..943702c 100644
+--- a/libbb/herror_msg.c
++++ b/libbb/herror_msg.c
+@@ -7,9 +7,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdarg.h>
+-#include <stdlib.h>
+-
+ #include "libbb.h"
+ 
+ void bb_herror_msg(const char *s, ...)
+diff --git a/libbb/human_readable.c b/libbb/human_readable.c
+index 7469e79..7714abe 100644
+--- a/libbb/human_readable.c
++++ b/libbb/human_readable.c
+@@ -26,7 +26,6 @@
+  *      and "#if 0"'d below.
+  */
+ 
+-#include <stdio.h>
+ #include "libbb.h"
+ 
+ const char *make_human_readable_str(unsigned long long size,
+diff --git a/libbb/inode_hash.c b/libbb/inode_hash.c
+index 78c1b0f..69e39af 100644
+--- a/libbb/inode_hash.c
++++ b/libbb/inode_hash.c
+@@ -8,9 +8,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <string.h>
+ #include "libbb.h"
+ 
+ typedef struct ino_dev_hash_bucket_struct {
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 9bbc709..b950d7f 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -28,7 +28,7 @@
+    - not true viewing if length prompt less terminal width
+  */
+ 
+-#include <sys/ioctl.h>
++//#include <sys/ioctl.h>
+ #include "libbb.h"
+ 
+ 
+diff --git a/libbb/llist.c b/libbb/llist.c
+index 7067514..4b3971b 100644
+--- a/libbb/llist.c
++++ b/libbb/llist.c
+@@ -10,7 +10,6 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include <stdlib.h>
+ #include "libbb.h"
+ 
+ /* Add data to the start of the linked list.  */
+diff --git a/libbb/login.c b/libbb/login.c
+index f3a3357..1cbadd2 100644
+--- a/libbb/login.c
++++ b/libbb/login.c
+@@ -10,12 +10,8 @@
+  */
+ 
+ #include <sys/param.h>  /* MAXHOSTNAMELEN */
+-#include <stdio.h>
+-#include <unistd.h>
+-#include "libbb.h"
+-
+ #include <sys/utsname.h>
+-#include <time.h>
++#include "libbb.h"
+ 
+ #define LOGIN " login: "
+ 
+diff --git a/libbb/mtab_file.c b/libbb/mtab_file.c
+index 67367e3..d00405d 100644
+--- a/libbb/mtab_file.c
++++ b/libbb/mtab_file.c
+@@ -7,10 +7,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdio.h>
+ #include "libbb.h"
+ 
+-
+ /* Busybox mount uses either /proc/mounts or /etc/mtab to
+  * get the list of currently mounted filesystems */
+ const char bb_path_mtab_file[] =
+diff --git a/libbb/safe_strncpy.c b/libbb/safe_strncpy.c
+index 42bc16e..ebc7e28 100644
+--- a/libbb/safe_strncpy.c
++++ b/libbb/safe_strncpy.c
+@@ -7,11 +7,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <string.h>
+ #include "libbb.h"
+ 
+-
+-
+ /* Like strncpy but make sure the resulting string is always 0 terminated. */
+ char * safe_strncpy(char *dst, const char *src, size_t size)
+ {
+diff --git a/libbb/sha1.c b/libbb/sha1.c
+index 734fde4..552dcad 100644
+--- a/libbb/sha1.c
++++ b/libbb/sha1.c
+@@ -16,14 +16,6 @@
+  *  stored in memory. It runs at 22 cycles per byte on a Pentium P4 processor
+  */
+ 
+-#include <fcntl.h>
+-#include <limits.h>
+-#include <stdio.h>
+-#include <stdint.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#include <unistd.h>
+-
+ #include "libbb.h"
+ 
+ #define SHA1_BLOCK_SIZE  64
+diff --git a/miscutils/chrt.c b/miscutils/chrt.c
+index 8a4b78f..d549708 100644
+--- a/miscutils/chrt.c
++++ b/miscutils/chrt.c
+@@ -6,7 +6,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <unistd.h>
+ #include <sched.h>
+ #include <getopt.h> /* optind */
+ #include "libbb.h"
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 994b80e..ad934a3 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -54,15 +54,15 @@
+       Richard Gooch, c/o ATNF, P. O. Box 76, Epping, N.S.W., 2121, Australia.
+ */
+ 
+-#include "libbb.h"
+-#include "xregex.h"
+-#include <sys/wait.h>
+-#include <sys/ioctl.h>
+-#include <sys/socket.h>
++//#include <sys/wait.h>
++//#include <sys/ioctl.h>
++//#include <sys/socket.h>
+ #include <sys/un.h>
+ #include <dirent.h>
+ #include <syslog.h>
+ #include <sys/sysmacros.h>
++#include "libbb.h"
++#include "xregex.h"
+ 
+ 
+ /* Various defines taken from linux/major.h */
+diff --git a/miscutils/runlevel.c b/miscutils/runlevel.c
+index f7d55de..0aabfb0 100644
+--- a/miscutils/runlevel.c
++++ b/miscutils/runlevel.c
+@@ -12,11 +12,8 @@
+  * initially busyboxified by Bernhard Fischer
+  */
+ 
+-#include "libbb.h"
+-#include <stdio.h>
+ #include <utmp.h>
+-#include <time.h>
+-#include <stdlib.h>
++#include "libbb.h"
+ 
+ int runlevel_main(int argc, char **argv);
+ int runlevel_main(int argc, char **argv)
+@@ -32,12 +29,15 @@ int runlevel_main(int argc, char **argv)
+ 			prev = ut->ut_pid / 256;
+ 			if (prev == 0) prev = 'N';
+ 			printf("%c %c\n", prev, ut->ut_pid % 256);
+-			endutent();
++			if (ENABLE_FEATURE_CLEAN_UP)
++				endutent();
+ 			return 0;
+ 		}
+ 	}
+ 
+ 	puts("unknown");
+-	endutent();
++	
++	if (ENABLE_FEATURE_CLEAN_UP)
++		endutent();
+ 	return 1;
+ }
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index f8be9ce..c84e2b9 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -496,7 +496,6 @@ int delete_module(const char *);
+ 
+ /* The relocatable object is manipulated using elfin types.  */
+ 
+-#include <stdio.h>
+ #include <elf.h>
+ #include <endian.h>
+ 
+diff --git a/networking/arping.c b/networking/arping.c
+index 0371df3..d65be81 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -8,8 +8,8 @@
+  * Busybox port: Nick Fedchik <nick@fedchik.org.ua>
+  */
+ 
+-#include <sys/ioctl.h>
+-#include <signal.h>
++//#include <sys/ioctl.h>
++//#include <signal.h>
+ 
+ #include <arpa/inet.h>
+ #include <net/if.h>
+diff --git a/networking/libiproute/ip_parse_common_args.c b/networking/libiproute/ip_parse_common_args.c
+index 6efbc69..cea5b47 100644
+--- a/networking/libiproute/ip_parse_common_args.c
++++ b/networking/libiproute/ip_parse_common_args.c
+@@ -15,12 +15,8 @@
+  * Rani Assaf <rani@magic.metawire.com> 980929:	resolve addresses
+  */
+ 
+-#include <string.h>
+-
+-#include "libbb.h"
++#include "ip_common.h"  /* #include "libbb.h" is inside */
+ #include "utils.h"
+-#include "ip_common.h"
+-
+ 
+ int preferred_family = AF_UNSPEC;
+ smallint oneline;
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index 4f83924..e504862 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -10,20 +10,15 @@
+  *	Laszlo Valko <valko@linux.karinthy.hu> 990223: address label must be zero terminated
+  */
+ 
+-#include "libbb.h"
+-#include <sys/socket.h>
+-#include <sys/ioctl.h>
+-
++//#include <sys/socket.h>
++//#include <sys/ioctl.h>
+ #include <fnmatch.h>
+-#include <string.h>
+-#include <unistd.h>
+-
+ #include <net/if.h>
+ #include <net/if_arp.h>
+ 
++#include "ip_common.h"  /* #include "libbb.h" is inside */
+ #include "rt_names.h"
+ #include "utils.h"
+-#include "ip_common.h"
+ 
+ 
+ typedef struct filter_t {
+diff --git a/networking/libiproute/iplink.c b/networking/libiproute/iplink.c
+index 5feab1e..7db4d7e 100644
+--- a/networking/libiproute/iplink.c
++++ b/networking/libiproute/iplink.c
+@@ -7,20 +7,16 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "libbb.h"
+-
+-#include <sys/ioctl.h>
+-#include <sys/socket.h>
+-
++//#include <sys/ioctl.h>
++//#include <sys/socket.h>
+ #include <net/if.h>
+ #include <net/if_packet.h>
+ #include <netpacket/packet.h>
+-
+ #include <net/ethernet.h>
+ 
++#include "ip_common.h"  /* #include "libbb.h" is inside */
+ #include "rt_names.h"
+ #include "utils.h"
+-#include "ip_common.h"
+ 
+ /* taken from linux/sockios.h */
+ #define SIOCSIFNAME	0x8923		/* set interface name */
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index 4efe9fd..75e5293 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -13,11 +13,9 @@
+  * Kunihiro Ishiguro <kunihiro@zebra.org> 001102: rtnh_ifindex was not initialized
+  */
+ 
+-#include "libbb.h"
+-
++#include "ip_common.h"	/* #include "libbb.h" is inside */
+ #include "rt_names.h"
+ #include "utils.h"
+-#include "ip_common.h"
+ 
+ #ifndef RTAX_RTTVAR
+ #define RTAX_RTTVAR RTAX_HOPS
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index 0499a09..e2e96f0 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -16,16 +16,16 @@
+  * initially integrated into busybox by Bernhard Fischer
+  */
+ 
+-#include "libbb.h"
+ #include <syslog.h>
+-#include <sys/socket.h>
++//#include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <netinet/ip.h>
+ #include <arpa/inet.h>
+ 
++#include "ip_common.h"  /* #include "libbb.h" is inside */
+ #include "rt_names.h"
+ #include "utils.h"
+-#include "ip_common.h"
++
+ /*
+ static void usage(void) __attribute__((noreturn));
+ 
+@@ -41,6 +41,7 @@ static void usage(void)
+ 	exit(-1);
+ }
+ */
++
+ static int print_rule(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
+ 					struct nlmsghdr *n, void *arg)
+ {
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index a2eb0cc..3327b27 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -14,24 +14,20 @@
+  * Phil Karn <karn@ka9q.ampr.org>	990408:	"pmtudisc" flag
+  */
+ 
+-#include "libbb.h"
+-#include <sys/socket.h>
+-#include <sys/ioctl.h>
+-
++//#include <sys/socket.h>
++//#include <sys/ioctl.h>
+ #include <netinet/ip.h>
+-
+ #include <net/if.h>
+ #include <net/if_arp.h>
+-
+ #include <asm/types.h>
+ #ifndef __constant_htons
+ #define __constant_htons htons
+ #endif
+ #include <linux/if_tunnel.h>
+ 
++#include "ip_common.h"  /* #include "libbb.h" is inside */
+ #include "rt_names.h"
+ #include "utils.h"
+-#include "ip_common.h"
+ 
+ 
+ /* Dies on error */
+diff --git a/networking/libiproute/ll_addr.c b/networking/libiproute/ll_addr.c
+index b4a2187..ab5a2c5 100644
+--- a/networking/libiproute/ll_addr.c
++++ b/networking/libiproute/ll_addr.c
+@@ -10,11 +10,9 @@
+  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
+  */
+ 
+-#include "libbb.h"
+-
+-#include <string.h>
+ #include <net/if_arp.h>
+ 
++#include "libbb.h"
+ #include "rt_names.h"
+ #include "utils.h"
+ 
+diff --git a/networking/libiproute/ll_map.c b/networking/libiproute/ll_map.c
+index e9a1616..eb9b0a4 100644
+--- a/networking/libiproute/ll_map.c
++++ b/networking/libiproute/ll_map.c
+@@ -11,16 +11,14 @@
+  *
+  */
+ 
+-#include "libbb.h"
+-#include <string.h>
++//#include <sys/socket.h>	/* socket() */
++#include <net/if.h>	/* struct ifreq and co. */
++//#include <sys/ioctl.h>	/* ioctl() & SIOCGIFINDEX */
+ 
++#include "libbb.h"
+ #include "libnetlink.h"
+ #include "ll_map.h"
+ 
+-#include <sys/socket.h>	/* socket() */
+-#include <net/if.h>	/* struct ifreq and co. */
+-#include <sys/ioctl.h>	/* ioctl() & SIOCGIFINDEX */
+-
+ struct idxmap {
+ 	struct idxmap * next;
+ 	int		index;
+diff --git a/networking/libiproute/ll_proto.c b/networking/libiproute/ll_proto.c
+index aad460b..10d7498 100644
+--- a/networking/libiproute/ll_proto.c
++++ b/networking/libiproute/ll_proto.c
+@@ -11,7 +11,6 @@
+  */
+ 
+ #include "libbb.h"
+-
+ #include "rt_names.h"
+ #include "utils.h"
+ 
+diff --git a/networking/libiproute/ll_types.c b/networking/libiproute/ll_types.c
+index 416ea6b..5d2843b 100644
+--- a/networking/libiproute/ll_types.c
++++ b/networking/libiproute/ll_types.c
+@@ -9,10 +9,10 @@
+  *
+  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
+  */
+-#include <stdio.h>
+ #include <arpa/inet.h>
+ #include <linux/if_arp.h>
+ 
++#include "libbb.h"
+ #include "rt_names.h"
+ 
+ const char* ll_type_n2a(int type, char *buf, int len)
+diff --git a/networking/libiproute/rtm_map.c b/networking/libiproute/rtm_map.c
+index c16406b..7fad0ec 100644
+--- a/networking/libiproute/rtm_map.c
++++ b/networking/libiproute/rtm_map.c
+@@ -11,8 +11,7 @@
+  *
+  */
+ 
+-#include <stdlib.h>
+-#include <string.h>
++#include "libbb.h"
+ #include "rt_names.h"
+ #include "utils.h"
+ 
+diff --git a/networking/libiproute/utils.c b/networking/libiproute/utils.c
+index 9605c39..7fc1dbc 100644
+--- a/networking/libiproute/utils.c
++++ b/networking/libiproute/utils.c
+@@ -12,7 +12,6 @@
+  */
+ 
+ #include "libbb.h"
+-
+ #include "utils.h"
+ #include "inet_common.h"
+ 
+diff --git a/networking/libiproute/utils.h b/networking/libiproute/utils.h
+index 3b6fef1..3bbc71d 100644
+--- a/networking/libiproute/utils.h
++++ b/networking/libiproute/utils.h
+@@ -2,8 +2,6 @@
+ #ifndef __UTILS_H__
+ #define __UTILS_H__ 1
+ 
+-#include "libbb.h"
+-
+ #include "libnetlink.h"
+ #include "ll_map.h"
+ #include "rtm_map.h"
+diff --git a/util-linux/dmesg.c b/util-linux/dmesg.c
+index ed908ed..0c1c6fa 100644
+--- a/util-linux/dmesg.c
++++ b/util-linux/dmesg.c
+@@ -9,9 +9,8 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "libbb.h"
+-#include <unistd.h>
+ #include <sys/klog.h>
++#include "libbb.h"
+ 
+ int dmesg_main(int argc, char **argv);
+ int dmesg_main(int argc, char **argv)
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index 6864925..c4b793e 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -7,8 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ */
+ 
+-
+-#include <sys/ioctl.h>
++//#include <sys/ioctl.h>
+ #include <sys/utsname.h>
+ #include <getopt.h>
+ #include "libbb.h"

@@ -1,0 +1,195 @@
+2009-11-18 11:34:43 +0100
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index fad6d12..e2e7983 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -128,7 +128,7 @@ static char *get_key(char *str, struct sort_key *key, int flags)
+ 	/* Handle -i */
+ 	if (flags & FLAG_i) {
+ 		for (start = end = 0; str[end]; end++)
+-			if (isprint(str[end]))
++			if (isprint_asciionly(str[end]))
+ 				str[start++] = str[end];
+ 		str[start] = '\0';
+ 	}
+diff --git a/coreutils/tr.c b/coreutils/tr.c
+index d89b80b..6d4cb4a 100644
+--- a/coreutils/tr.c
++++ b/coreutils/tr.c
+@@ -153,7 +153,7 @@ static unsigned expand(const char *arg, char **buffer_p)
+ 				}
+ 				if (j == CLASS_punct || j == CLASS_cntrl) {
+ 					for (i = '\0'; i < ASCII; i++) {
+-						if ((j == CLASS_punct && isprint(i) && !isalnum(i) && !isspace(i))
++						if ((j == CLASS_punct && isprint_asciionly(i) && !isalnum(i) && !isspace(i))
+ 						 || (j == CLASS_cntrl && iscntrl(i))
+ 						) {
+ 							buffer[pos++] = i;
+diff --git a/editors/diff.c b/editors/diff.c
+index e977f4d..745ef0a 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -749,7 +749,7 @@ static int asciifile(FILE *f)
+ 	rewind(f);
+ 	cnt = fread(g_read_buf, 1, COMMON_BUFSIZE, f);
+ 	for (i = 0; i < cnt; i++) {
+-		if (!isprint(g_read_buf[i])
++		if (!isprint_asciionly(g_read_buf[i])
+ 		 && !isspace(g_read_buf[i])
+ 		) {
+ 			return 0;
+diff --git a/editors/vi.c b/editors/vi.c
+index 6a67228..7d83db6 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -30,9 +30,9 @@
+ #if ENABLE_LOCALE_SUPPORT
+ 
+ #if ENABLE_FEATURE_VI_8BIT
+-#define Isprint(c) isprint(c)
++# define Isprint(c) isprint(c)
+ #else
+-#define Isprint(c) (isprint(c) && (unsigned char)(c) < 0x7f)
++# define Isprint(c) (isprint(c) && (unsigned char)(c) < 0x7f)
+ #endif
+ 
+ #else
+diff --git a/include/libbb.h b/include/libbb.h
+index d95be5c..77c9e28 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1606,10 +1606,11 @@ extern const char bb_default_login_shell[];
+ 
+ /* We save ~500 bytes on isdigit alone.
+  * BTW, x86 likes (unsigned char) cast more than (unsigned). */
+-#define isdigit(a) ((unsigned char)((a) - '0') <= 9)
++
++/* These work the same for ASCII and Unicode,
++ * assuming no one asks "is this a *Unicode* letter?" using isalpha(letter) */
+ #define isascii(a) ((unsigned char)(a) <= 0x7f)
+-#define isgraph(a) ((unsigned char)(a) > ' ')
+-#define isprint(a) ((unsigned char)(a) >= ' ')
++#define isdigit(a) ((unsigned char)((a) - '0') <= 9)
+ #define isupper(a) ((unsigned char)((a) - 'A') <= ('Z' - 'A'))
+ #define islower(a) ((unsigned char)((a) - 'a') <= ('z' - 'a'))
+ #define isalpha(a) ((unsigned char)(((a)|0x20) - 'a') <= ('z' - 'a'))
+@@ -1619,9 +1620,9 @@ extern const char bb_default_login_shell[];
+  * "\t\n\v\f\r" happen to have ASCII codes 9,10,11,12,13.
+  */
+ #define isspace(a) ({ unsigned char bb__isspace = (a) - 9; bb__isspace == (' ' - 9) || bb__isspace <= (13 - 9); })
+-
+-// Bigger code:
+-//#define isalnum(a) ({ unsigned char bb__isalnum = (a) - '0'; bb__isalnum <= 9 || ((bb__isalnum - ('A' - '0')) & 0xdf) <= 25; })
++// Unsafe wrt NUL: #define ispunct(a) (strchr("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~", (a)) != NULL)
++#define ispunct(a) (strchrnul("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~", (a))[0])
++// Bigger code: #define isalnum(a) ({ unsigned char bb__isalnum = (a) - '0'; bb__isalnum <= 9 || ((bb__isalnum - ('A' - '0')) & 0xdf) <= 25; })
+ #define isalnum(a) bb_ascii_isalnum(a)
+ static ALWAYS_INLINE int bb_ascii_isalnum(unsigned char a)
+ {
+@@ -1640,11 +1641,6 @@ static ALWAYS_INLINE int bb_ascii_isxdigit(unsigned char a)
+ 	b = (a|0x20) - 'a';
+ 	return b <= 'f' - 'a';
+ }
+-
+-// Unsafe wrt NUL!
+-//#define ispunct(a) (strchr("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~", (a)) != NULL)
+-#define ispunct(a) (strchrnul("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~", (a))[0])
+-
+ #define toupper(a) bb_ascii_toupper(a)
+ static ALWAYS_INLINE unsigned char bb_ascii_toupper(unsigned char a)
+ {
+@@ -1662,6 +1658,14 @@ static ALWAYS_INLINE unsigned char bb_ascii_tolower(unsigned char a)
+ 	return a;
+ }
+ 
++/* In ASCII and Unicode, these are likely to be very different.
++ * Let's prevent ambiguous usage from the start */
++#define isgraph(a) isgraph_is_ambiguous_dont_use(a)
++#define isprint(a) isprint_is_ambiguous_dont_use(a)
++/* NB: must not treat EOF as isgraph or isprint */
++#define isgraph_asciionly(a) ((unsigned)((a) - 0x21) <= 0x7e - 0x21)
++#define isprint_asciionly(a) ((unsigned)((a) - 0x20) <= 0x7e - 0x20)
++
+ 
+ POP_SAVED_FUNCTION_VISIBILITY
+ 
+diff --git a/libbb/dump.c b/libbb/dump.c
+index bef485e..49e5e26 100644
+--- a/libbb/dump.c
++++ b/libbb/dump.c
+@@ -492,13 +492,13 @@ static void conv_c(PR *pr, unsigned char *p)
+ 		str += 4;
+ 	} while (*str);
+ 
+-	if (isprint(*p)) {
++	if (isprint_asciionly(*p)) {
+ 		*pr->cchar = 'c';
+ 		printf(pr->fmt, *p);
+ 	} else {
+ 		sprintf(buf, "%03o", (int) *p);
+ 		str = buf;
+-	  strpr:
++ strpr:
+ 		*pr->cchar = 's';
+ 		printf(pr->fmt, str);
+ 	}
+@@ -519,7 +519,7 @@ static void conv_u(PR *pr, unsigned char *p)
+ 	} else if (*p == 0x7f) {
+ 		*pr->cchar = 's';
+ 		printf(pr->fmt, "del");
+-	} else if (isprint(*p)) {
++	} else if (*p < 0x7f) { /* isprint() */
+ 		*pr->cchar = 'c';
+ 		printf(pr->fmt, *p);
+ 	} else {
+@@ -609,7 +609,7 @@ static void display(priv_dumper_t* dumper)
+ 							break;
+ 						}
+ 						case F_P:
+-							printf(pr->fmt, isprint(*bp) ? *bp : '.');
++							printf(pr->fmt, isprint_asciionly(*bp) ? *bp : '.');
+ 							break;
+ 						case F_STR:
+ 							printf(pr->fmt, (char *) bp);
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index f44d387..20411b0 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -487,7 +487,7 @@ static char *get_logname(char *logname, unsigned size_logname,
+ 			case CTL('D'):
+ 				exit(EXIT_SUCCESS);
+ 			default:
+-				if (!isprint(ascval)) {
++				if (ascval < ' ') {
+ 					/* ignore garbage characters */
+ 				} else if ((int)(bp - logname) >= size_logname - 1) {
+ 					bb_error_msg_and_die("%s: input overrun", op->tty);
+diff --git a/miscutils/strings.c b/miscutils/strings.c
+index fea9edb..b4c5854 100644
+--- a/miscutils/strings.c
++++ b/miscutils/strings.c
+@@ -49,7 +49,7 @@ int strings_main(int argc UNUSED_PARAM, char **argv)
+ 		count = 0;
+ 		do {
+ 			c = fgetc(file);
+-			if (isprint(c) || c == '\t') {
++			if (isprint_asciionly(c) || c == '\t') {
+ 				if (count > n) {
+ 					bb_putchar(c);
+ 				} else {
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 391bb9b..a455733 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1475,9 +1475,8 @@ static void init_ring(void)
+ 	int i;
+ 
+ 	end_ring = ring;
+-	for (i = 0; i <= 128; ++i)
+-		if (isprint(i))
+-			*end_ring++ = i;
++	for (i = ' '; i < 127; i++)
++		*end_ring++ = i;
+ }
+ /* Character generator. MMU arches only. */
+ /* ARGSUSED */

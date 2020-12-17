@@ -1,0 +1,72 @@
+2008-03-20 14:04:30 +0000
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index 21960a0..42d1731 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -1,7 +1,7 @@
+ #
+ # Automatically generated make config: don't edit
+ # Busybox version: 1.10.0.svn
+-# Sat Mar 15 22:51:03 2008
++# Thu Mar 20 14:54:21 2008
+ #
+ CONFIG_HAVE_DOT_CONFIG=y
+ 
+@@ -393,6 +393,7 @@ CONFIG_ADDGROUP=y
+ CONFIG_FEATURE_ADDUSER_TO_GROUP=y
+ CONFIG_DELGROUP=y
+ CONFIG_FEATURE_DEL_USER_FROM_GROUP=y
++CONFIG_FEATURE_CHECK_NAMES=y
+ CONFIG_ADDUSER=y
+ CONFIG_FEATURE_ADDUSER_LONG_OPTIONS=y
+ CONFIG_DELUSER=y
+@@ -631,15 +632,15 @@ CONFIG_FEATURE_IFCONFIG_MEMSTART_IOADDR_IRQ=y
+ CONFIG_FEATURE_IFCONFIG_HW=y
+ CONFIG_FEATURE_IFCONFIG_BROADCAST_PLUS=y
+ CONFIG_IFENSLAVE=y
+-# CONFIG_IFUPDOWN is not set
+-CONFIG_IFUPDOWN_IFSTATE_PATH=""
+-# CONFIG_FEATURE_IFUPDOWN_IP is not set
+-# CONFIG_FEATURE_IFUPDOWN_IP_BUILTIN is not set
++CONFIG_IFUPDOWN=y
++CONFIG_IFUPDOWN_IFSTATE_PATH="/var/run/ifstate"
++CONFIG_FEATURE_IFUPDOWN_IP=y
++CONFIG_FEATURE_IFUPDOWN_IP_BUILTIN=y
+ # CONFIG_FEATURE_IFUPDOWN_IFCONFIG_BUILTIN is not set
+-# CONFIG_FEATURE_IFUPDOWN_IPV4 is not set
+-# CONFIG_FEATURE_IFUPDOWN_IPV6 is not set
+-# CONFIG_FEATURE_IFUPDOWN_MAPPING is not set
+-# CONFIG_FEATURE_IFUPDOWN_EXTERNAL_DHCP is not set
++CONFIG_FEATURE_IFUPDOWN_IPV4=y
++CONFIG_FEATURE_IFUPDOWN_IPV6=y
++CONFIG_FEATURE_IFUPDOWN_MAPPING=y
++CONFIG_FEATURE_IFUPDOWN_EXTERNAL_DHCP=y
+ CONFIG_INETD=y
+ CONFIG_FEATURE_INETD_SUPPORT_BUILTIN_ECHO=y
+ CONFIG_FEATURE_INETD_SUPPORT_BUILTIN_DISCARD=y
+diff --git a/include/libbb.h b/include/libbb.h
+index 19b3bba..9f208b3 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -732,7 +732,7 @@ enum {
+ # define bb_daemonize(flags)                bb_daemonize_or_rexec(flags, bogus)
+ #else
+   void re_exec(char **argv) ATTRIBUTE_NORETURN;
+-  void forkexit_or_rexec(char **argv) ATTRIBUTE_NORETURN;
++  void forkexit_or_rexec(char **argv);
+   extern bool re_execed;
+   int  BUG_fork_is_unavailable_on_nommu(void);
+   int  BUG_daemon_is_unavailable_on_nommu(void);
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index fcfc120..ba9cf35 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -175,7 +175,7 @@ int crond_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	if (!(opt & OPT_f)) {
+ 		/* close stdin, stdout, stderr.
+ 		 * close unused descriptors - don't need them. */
+-		bb_daemonize_or_rexec(DAEMON_CLOSE_EXTRA_FDS, av);
++		bb_daemonize_or_rexec(DAEMON_CLOSE_EXTRA_FDS, argv);
+ 	}
+ 
+ 	if (!DebugOpt && LogFile == NULL) {

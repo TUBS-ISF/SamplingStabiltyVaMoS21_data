@@ -1,0 +1,269 @@
+2009-12-11 02:21:10 +0100
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index 1835b6e..d5ee7be 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -743,12 +743,12 @@ CONFIG_TRACEROUTE=y
+ CONFIG_FEATURE_TRACEROUTE_VERBOSE=y
+ CONFIG_FEATURE_TRACEROUTE_SOURCE_ROUTE=y
+ CONFIG_FEATURE_TRACEROUTE_USE_ICMP=y
+-CONFIG_APP_UDHCPD=y
+-CONFIG_APP_DHCPRELAY=y
+-CONFIG_APP_DUMPLEASES=y
++CONFIG_UDHCPD=y
++CONFIG_DHCPRELAY=y
++CONFIG_DUMPLEASES=y
+ CONFIG_FEATURE_UDHCPD_WRITE_LEASES_EARLY=y
+ CONFIG_DHCPD_LEASES_FILE="/var/lib/misc/udhcpd.leases"
+-CONFIG_APP_UDHCPC=y
++CONFIG_UDHCPC=y
+ CONFIG_FEATURE_UDHCPC_ARPING=y
+ CONFIG_FEATURE_UDHCP_PORT=y
+ CONFIG_UDHCP_DEBUG=9
+diff --git a/docs/ifupdown_design.txt b/docs/ifupdown_design.txt
+index 9df5792..8008e45 100644
+--- a/docs/ifupdown_design.txt
++++ b/docs/ifupdown_design.txt
+@@ -26,7 +26,7 @@ static int dhcp_down(struct interface_defn_t *ifd, execfn *exec)
+        }
+        bb_error_msg("no dhcp clients found, using static interface shutdown");
+        return static_down(ifd, exec);
+-#elif ENABLE_APP_UDHCPC
++#elif ENABLE_UDHCPC
+        return execute("kill "
+                       "`cat /var/run/udhcpc.%iface%.pid` 2>/dev/null", ifd, exec);
+ #else
+diff --git a/include/applets.h b/include/applets.h
+index 69dcdc0..2d784bd 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -123,7 +123,7 @@ IF_MODPROBE_SMALL(APPLET_ODDNAME(depmod, modprobe, _BB_DIR_SBIN, _BB_SUID_DROP,
+ IF_DEVFSD(APPLET(devfsd, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_DEVMEM(APPLET(devmem, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_DF(APPLET(df, _BB_DIR_BIN, _BB_SUID_DROP))
+-IF_APP_DHCPRELAY(APPLET(dhcprelay, _BB_DIR_USR_SBIN, _BB_SUID_DROP))
++IF_DHCPRELAY(APPLET(dhcprelay, _BB_DIR_USR_SBIN, _BB_SUID_DROP))
+ IF_DIFF(APPLET(diff, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_DIRNAME(APPLET_NOFORK(dirname, dirname, _BB_DIR_USR_BIN, _BB_SUID_DROP, dirname))
+ IF_DMESG(APPLET(dmesg, _BB_DIR_BIN, _BB_SUID_DROP))
+@@ -134,7 +134,7 @@ IF_DPKG(APPLET(dpkg, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_DPKG_DEB(APPLET_ODDNAME(dpkg-deb, dpkg_deb, _BB_DIR_USR_BIN, _BB_SUID_DROP, dpkg_deb))
+ IF_DU(APPLET(du, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_DUMPKMAP(APPLET(dumpkmap, _BB_DIR_BIN, _BB_SUID_DROP))
+-IF_APP_DUMPLEASES(APPLET(dumpleases, _BB_DIR_USR_BIN, _BB_SUID_DROP))
++IF_DUMPLEASES(APPLET(dumpleases, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ //IF_E2FSCK(APPLET(e2fsck, _BB_DIR_SBIN, _BB_SUID_DROP))
+ //IF_E2LABEL(APPLET_ODDNAME(e2label, tune2fs, _BB_DIR_SBIN, _BB_SUID_DROP, e2label))
+ IF_ECHO(APPLET_NOFORK(echo, echo, _BB_DIR_BIN, _BB_SUID_DROP, echo))
+@@ -403,8 +403,8 @@ IF_TTY(APPLET(tty, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_TTYSIZE(APPLET(ttysize, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_TUNCTL(APPLET(tunctl, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_MKFS_EXT2(APPLET(tune2fs, _BB_DIR_SBIN, _BB_SUID_DROP))
+-IF_APP_UDHCPC(APPLET(udhcpc, _BB_DIR_SBIN, _BB_SUID_DROP))
+-IF_APP_UDHCPD(APPLET(udhcpd, _BB_DIR_USR_SBIN, _BB_SUID_DROP))
++IF_UDHCPC(APPLET(udhcpc, _BB_DIR_SBIN, _BB_SUID_DROP))
++IF_UDHCPD(APPLET(udhcpd, _BB_DIR_USR_SBIN, _BB_SUID_DROP))
+ IF_UDPSVD(APPLET_ODDNAME(udpsvd, tcpudpsvd, _BB_DIR_USR_BIN, _BB_SUID_DROP, udpsvd))
+ IF_UMOUNT(APPLET(umount, _BB_DIR_BIN, _BB_SUID_DROP))
+ IF_UNAME(APPLET(uname, _BB_DIR_BIN, _BB_SUID_DROP))
+diff --git a/networking/Config.in b/networking/Config.in
+index 6688237..5222b78 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -923,7 +923,7 @@ source networking/udhcp/Config.in
+ config IFUPDOWN_UDHCPC_CMD_OPTIONS
+ 	string "ifup udhcpc command line options"
+ 	default "-R -n"
+-	depends on IFUPDOWN && APP_UDHCPC
++	depends on IFUPDOWN && UDHCPC
+ 	help
+ 	  Command line options to pass to udhcpc from ifup.
+ 	  Intended to alter options not available in /etc/network/interfaces.
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index b16186e..d28c0b8 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -522,7 +522,7 @@ static int FAST_FUNC dhcp_up(struct interface_defn_t *ifd, execfn *exec)
+ 	bb_error_msg("no dhcp clients found");
+ 	return 0;
+ }
+-#elif ENABLE_APP_UDHCPC
++#elif ENABLE_UDHCPC
+ static int FAST_FUNC dhcp_up(struct interface_defn_t *ifd, execfn *exec)
+ {
+ #if ENABLE_FEATURE_IFUPDOWN_IP
+@@ -569,7 +569,7 @@ static int FAST_FUNC dhcp_down(struct interface_defn_t *ifd, execfn *exec)
+ 	result += static_down(ifd, exec);
+ 	return ((result == 3) ? 3 : 0);
+ }
+-#elif ENABLE_APP_UDHCPC
++#elif ENABLE_UDHCPC
+ static int FAST_FUNC dhcp_down(struct interface_defn_t *ifd, execfn *exec)
+ {
+ 	int result;
+diff --git a/networking/udhcp/Config.in b/networking/udhcp/Config.in
+index 5f76dd8..fd2a61c 100644
+--- a/networking/udhcp/Config.in
++++ b/networking/udhcp/Config.in
+@@ -3,26 +3,26 @@
+ # see scripts/kbuild/config-language.txt.
+ #
+ 
+-config APP_UDHCPD
++config UDHCPD
+ 	bool "udhcp server (udhcpd)"
+ 	default n
+ 	help
+ 	  udhcpd is a DHCP server geared primarily toward embedded systems,
+ 	  while striving to be fully functional and RFC compliant.
+ 
+-config APP_DHCPRELAY
++config DHCPRELAY
+ 	bool "dhcprelay"
+ 	default n
+-	depends on APP_UDHCPD
++	depends on UDHCPD
+ 	help
+ 	  dhcprelay listens for dhcp requests on one or more interfaces
+ 	  and forwards these requests to a different interface or dhcp
+ 	  server.
+ 
+-config APP_DUMPLEASES
++config DUMPLEASES
+ 	bool "Lease display utility (dumpleases)"
+ 	default n
+-	depends on APP_UDHCPD
++	depends on UDHCPD
+ 	help
+ 	  dumpleases displays the leases written out by the udhcpd server.
+ 	  Lease times are stored in the file by time remaining in lease, or
+@@ -31,7 +31,7 @@ config APP_DUMPLEASES
+ config FEATURE_UDHCPD_WRITE_LEASES_EARLY
+ 	bool "Rewrite the lease file at every new acknowledge"
+ 	default n
+-	depends on APP_UDHCPD
++	depends on UDHCPD
+ 	help
+ 	  If selected, udhcpd will write a new file with leases every
+ 	  time a new lease has been accepted, thus eliminating the need
+@@ -41,12 +41,12 @@ config FEATURE_UDHCPD_WRITE_LEASES_EARLY
+ config DHCPD_LEASES_FILE
+ 	string "Absolute path to lease file"
+ 	default "/var/lib/misc/udhcpd.leases"
+-	depends on APP_UDHCPD
++	depends on UDHCPD
+ 	help
+ 	  udhcpd stores addresses in a lease file. This is the absolute path
+ 	  of the file. Normally it is safe to leave it untouched.
+ 
+-config APP_UDHCPC
++config UDHCPC
+ 	bool "udhcp client (udhcpc)"
+ 	default n
+ 	help
+@@ -59,7 +59,7 @@ config APP_UDHCPC
+ config FEATURE_UDHCPC_ARPING
+ 	bool "Verify that the offered address is free, using ARP ping"
+ 	default y
+-	depends on APP_UDHCPC
++	depends on UDHCPC
+ 	help
+ 	  If selected, udhcpc will send ARP probes and make sure
+ 	  the offered address is really not in use by anyone. The client
+@@ -69,7 +69,7 @@ config FEATURE_UDHCPC_ARPING
+ config FEATURE_UDHCP_PORT
+ 	bool "Enable '-P port' option for udhcpd and udhcpc"
+ 	default n
+-	depends on APP_UDHCPD || APP_UDHCPC
++	depends on UDHCPD || UDHCPC
+ 	help
+ 	  At the cost of ~300 bytes, enables -P port option.
+ 	  This feature is typically not needed.
+@@ -78,7 +78,7 @@ config UDHCP_DEBUG
+ 	int "Maximum verbosity level for udhcp applets (0..9)"
+ 	default 0
+ 	range 0 9
+-	depends on APP_UDHCPD || APP_UDHCPC || APP_DHCPRELAY
++	depends on UDHCPD || UDHCPC || DHCPRELAY
+ 	help
+ 	  Verbosity can be increased with multiple -v options.
+ 	  This options controls how high it can be cranked up.
+@@ -89,7 +89,7 @@ config UDHCP_DEBUG
+ config FEATURE_UDHCP_RFC3397
+ 	bool "Support for RFC3397 domain search (experimental)"
+ 	default n
+-	depends on APP_UDHCPD || APP_UDHCPC
++	depends on UDHCPD || UDHCPC
+ 	help
+ 	  If selected, both client and server will support passing of domain
+ 	  search lists via option 119, specified in RFC3397.
+@@ -97,7 +97,7 @@ config FEATURE_UDHCP_RFC3397
+ config UDHCPC_DEFAULT_SCRIPT
+ 	string "Absolute path to config script"
+ 	default "/usr/share/udhcpc/default.script"
+-	depends on APP_UDHCPC
++	depends on UDHCPC
+ 	help
+ 	  This script is called after udhcpc receives an answer. See
+ 	  examples/udhcp for a working example. Normally it is safe
+@@ -107,7 +107,7 @@ config UDHCPC_SLACK_FOR_BUGGY_SERVERS
+ 	int "DHCP options slack buffer size"
+ 	default 80
+ 	range 0 924
+-	depends on APP_UDHCPD || APP_UDHCPC
++	depends on UDHCPD || UDHCPC
+ 	help
+ 	  Some buggy DHCP servers send DHCP offer packets with option
+ 	  field larger than we expect (which might also be considered a
+diff --git a/networking/udhcp/Kbuild b/networking/udhcp/Kbuild
+index e938076..d1d3567 100644
+--- a/networking/udhcp/Kbuild
++++ b/networking/udhcp/Kbuild
+@@ -6,20 +6,20 @@
+ #
+ 
+ lib-y:=
+-lib-$(CONFIG_APP_UDHCPC)        += common.o options.o packet.o \
++lib-$(CONFIG_UDHCPC)            += common.o options.o packet.o \
+                                    signalpipe.o socket.o
+-lib-$(CONFIG_APP_UDHCPD)        += common.o options.o packet.o \
++lib-$(CONFIG_UDHCPD)            += common.o options.o packet.o \
+                                    signalpipe.o socket.o
+ 
+-lib-$(CONFIG_APP_UDHCPC)        += dhcpc.o clientpacket.o clientsocket.o \
++lib-$(CONFIG_UDHCPC)            += dhcpc.o clientpacket.o clientsocket.o \
+                                    script.o
+ 
+ UDHCPC_NEEDS_ARPING-$(CONFIG_FEATURE_UDHCPC_ARPING) = y
+ lib-$(UDHCPC_NEEDS_ARPING-y)    += arpping.o
+ 
+-lib-$(CONFIG_APP_UDHCPD)        += dhcpd.o arpping.o files.o leases.o \
++lib-$(CONFIG_UDHCPD)            += dhcpd.o arpping.o files.o leases.o \
+                                    serverpacket.o static_leases.o
+ 
+-lib-$(CONFIG_APP_DUMPLEASES)    += dumpleases.o
+-lib-$(CONFIG_APP_DHCPRELAY)     += dhcprelay.o
++lib-$(CONFIG_DUMPLEASES)        += dumpleases.o
++lib-$(CONFIG_DHCPRELAY)         += dhcprelay.o
+ lib-$(CONFIG_FEATURE_UDHCP_RFC3397) += domain_codec.o
+diff --git a/scripts/defconfig b/scripts/defconfig
+index f8a92d4..a98c7b6 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -744,12 +744,12 @@ CONFIG_TRACEROUTE=y
+ CONFIG_FEATURE_TRACEROUTE_VERBOSE=y
+ # CONFIG_FEATURE_TRACEROUTE_SOURCE_ROUTE is not set
+ # CONFIG_FEATURE_TRACEROUTE_USE_ICMP is not set
+-CONFIG_APP_UDHCPD=y
+-CONFIG_APP_DHCPRELAY=y
+-CONFIG_APP_DUMPLEASES=y
++CONFIG_UDHCPD=y
++CONFIG_DHCPRELAY=y
++CONFIG_DUMPLEASES=y
+ CONFIG_FEATURE_UDHCPD_WRITE_LEASES_EARLY=y
+ CONFIG_DHCPD_LEASES_FILE="/var/lib/misc/udhcpd.leases"
+-CONFIG_APP_UDHCPC=y
++CONFIG_UDHCPC=y
+ CONFIG_FEATURE_UDHCPC_ARPING=y
+ CONFIG_FEATURE_UDHCP_PORT=y
+ CONFIG_UDHCP_DEBUG=9

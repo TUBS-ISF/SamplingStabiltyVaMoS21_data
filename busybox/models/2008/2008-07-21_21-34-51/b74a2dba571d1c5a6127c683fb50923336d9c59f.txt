@@ -1,0 +1,30 @@
+2008-07-21 21:34:51 +0000
+diff --git a/init/init.c b/init/init.c
+index 9923558..d11d425 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -645,7 +645,8 @@ static void new_init_action(uint8_t action_type, const char *command, const char
+ 		/* don't enter action if it's already in the list,
+ 		 * but do overwrite existing actions */
+ 		if ((strcmp(a->command, command) == 0)
+-			&& (strcmp(a->terminal, cons) == 0)) {
++		 && (strcmp(a->terminal, cons) == 0)
++		) {
+ 			a->action_type = action_type;
+ 			return;
+ 		}
+diff --git a/libpwdgrp/uidgid_get.c b/libpwdgrp/uidgid_get.c
+index dc7cc66..ebc7fc5 100644
+--- a/libpwdgrp/uidgid_get.c
++++ b/libpwdgrp/uidgid_get.c
+@@ -78,8 +78,8 @@ int FAST_FUNC get_uidgid(struct bb_uidgid_t *u, const char *ug, int numeric_ok)
+ }
+ void FAST_FUNC xget_uidgid(struct bb_uidgid_t *u, const char *ug)
+ {
+-    if (!get_uidgid(u, ug, 1))
+-	bb_error_msg_and_die("unknown user/group %s", ug);
++	if (!get_uidgid(u, ug, 1))
++		bb_error_msg_and_die("unknown user/group %s", ug);
+ }
+ 
+ /* chown-like:

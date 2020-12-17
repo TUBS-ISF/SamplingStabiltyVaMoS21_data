@@ -1,0 +1,88 @@
+2008-06-10 18:06:24 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index ca854c2..603e19f 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1234,11 +1234,14 @@ static void o_addqchr(o_string *o, int ch, int quote)
+ static int o_save_ptr(o_string *o, int n)
+ {
+ 	char **list = (char**)o->data;
+-	int string_start = ((n + 0xf) & ~0xf) * sizeof(list[0]);
+-	int string_len = o->length - string_start;
++	int string_start;
++	int string_len;
+ 
+ 	if (!o->has_empty_slot) {
++		string_start = ((n + 0xf) & ~0xf) * sizeof(list[0]);
++		string_len = o->length - string_start;
+ 		if (!(n & 0xf)) { /* 0, 0x10, 0x20...? */
++			//bb_error_msg("list[%d]=%d string_start=%d (growing)", n, string_len, string_start);
+ 			/* list[n] points to string_start, make space for 16 more pointers */
+ 			o->maxlen += 0x10 * sizeof(list[0]);
+ 			o->data = xrealloc(o->data, o->maxlen + 1);
+@@ -1246,8 +1249,12 @@ static int o_save_ptr(o_string *o, int n)
+ 			memmove(list + n + 0x10, list + n, string_len);
+ 			o->length += 0x10 * sizeof(list[0]);
+ 		}
++		//else bb_error_msg("list[%d]=%d string_start=%d", n, string_len, string_start);
+ 	} else {
+ 		/* We have empty slot at list[n], reuse without growth */
++		string_start = ((n+1 + 0xf) & ~0xf) * sizeof(list[0]); /* NB: n+1! */
++		string_len = o->length - string_start;
++		//bb_error_msg("list[%d]=%d string_start=%d (empty slot)", n, string_len, string_start);
+ 		o->has_empty_slot = 0;
+ 	}
+ 	list[n] = (char*)string_len;
+@@ -2684,18 +2691,20 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 		arg = ++p;
+ 	} /* end of "while (SPECIAL_VAR_SYMBOL is found) ..." */
+ 
+-	o_debug_list("expand_vars_to_list[a]", output, n);
+-	o_addstr(output, arg, strlen(arg) + 1);
+-	o_debug_list("expand_vars_to_list[b]", output, n);
+-//TESTME
+-	if (output->length - 1 == o_get_last_ptr(output, n)) { /* expansion is empty */
+-		if (!(ored_ch & 0x80)) { /* all vars were not quoted... */
+-			n--;
+-			/* allow to reuse list[n] later without re-growth */
+-			output->has_empty_slot = 1;
++	{
++		int len = strlen(arg);
++		if (len) {
++			o_debug_list("expand_vars_to_list[a]", output, n);
++			o_addstr(output, arg, len + 1);
++			o_debug_list("expand_vars_to_list[b]", output, n);
++		} else if (output->length == o_get_last_ptr(output, n)) { /* expansion is empty */
++			if (!(ored_ch & 0x80)) { /* all vars were not quoted... */
++				n--;
++				/* allow to reuse list[n] later without re-growth */
++				output->has_empty_slot = 1;
++			}
+ 		}
+ 	}
+-
+ 	return n;
+ }
+ 
+diff --git a/shell/hush_test/hush-vars/empty.right b/shell/hush_test/hush-vars/empty.right
+new file mode 100644
+index 0000000..2cb3c70
+--- /dev/null
++++ b/shell/hush_test/hush-vars/empty.right
+@@ -0,0 +1,3 @@
++a b c d e f 1 2 3 4 5 6 7 8 9 0 A B C D E F
++a b c d e f 1 2 3 4 5 6 7 8 9 0 A B C D E F
++a b c d e f 1 2 3 4 5 6 7 8 9 0 A B C D E F
+diff --git a/shell/hush_test/hush-vars/empty.tests b/shell/hush_test/hush-vars/empty.tests
+new file mode 100755
+index 0000000..72ac2c7
+--- /dev/null
++++ b/shell/hush_test/hush-vars/empty.tests
+@@ -0,0 +1,7 @@
++#!/bin/sh
++
++e=
++
++echo a b c d e f 1 2 3 4 5 6 7 8 9 0 A B C D E F
++echo a $e b $e c $e d $e e $e f $e 1 $e 2 $e 3 $e 4 $e 5 $e 6 $e 7 $e 8 $e 9 $e 0 $e A $e B $e C $e D $e E $e F
++echo $e a $e b $e c $e d $e e $e f $e 1 $e 2 $e 3 $e 4 $e 5 $e 6 $e 7 $e 8 $e 9 $e 0 $e A $e B $e C $e D $e E $e F

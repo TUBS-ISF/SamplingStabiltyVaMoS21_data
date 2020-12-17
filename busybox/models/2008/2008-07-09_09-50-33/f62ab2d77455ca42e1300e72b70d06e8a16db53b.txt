@@ -1,0 +1,305 @@
+2008-07-09 09:50:33 +0000
+diff --git a/coreutils/who.c b/coreutils/who.c
+index a4ec740..baf526b 100644
+--- a/coreutils/who.c
++++ b/coreutils/who.c
+@@ -56,16 +56,20 @@ int who_main(int argc UNUSED_PARAM, char **argv)
+ 	printf("USER       TTY      IDLE      TIME            HOST\n");
+ 	while ((ut = getutent()) != NULL) {
+ 		if (ut->ut_user[0] && (opt || ut->ut_type == USER_PROCESS)) {
++			time_t tmp;
+ 			/* ut->ut_line is device name of tty - "/dev/" */
+ 			name = concat_path_file("/dev", ut->ut_line);
+ 			str6[0] = '?';
+ 			str6[1] = '\0';
+ 			if (stat(name, &st) == 0)
+ 				idle_string(str6, st.st_atime);
++			/* manpages say ut_tv.tv_sec *is* time_t,
++			 * but some systems have it wrong */
++			tmp = ut->ut_tv.tv_sec;
+ 			/* 15 chars for time:   Nov 10 19:33:20 */
+ 			printf("%-10s %-8s %-9s %-15.15s %s\n",
+ 					ut->ut_user, ut->ut_line, str6,
+-					ctime(&(ut->ut_tv.tv_sec)) + 4, ut->ut_host);
++					ctime(&tmp) + 4, ut->ut_host);
+ 			if (ENABLE_FEATURE_CLEAN_UP)
+ 				free(name);
+ 		}
+diff --git a/include/libbb.h b/include/libbb.h
+index fc65d52..2dfdded 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -589,6 +589,7 @@ extern char *reads(int fd, char *buf, size_t count) FAST_FUNC;
+ extern char *xmalloc_reads(int fd, char *pfx, size_t *maxsz_p) FAST_FUNC;
+ extern ssize_t read_close(int fd, void *buf, size_t maxsz) FAST_FUNC;
+ extern ssize_t open_read_close(const char *filename, void *buf, size_t maxsz) FAST_FUNC;
++extern void *xmalloc_read(int fd, size_t *sizep) FAST_FUNC;
+ /* Returns NULL if file can't be opened */
+ extern void *xmalloc_open_read_close(const char *filename, size_t *maxsz_p) FAST_FUNC;
+ /* Never returns NULL */
+diff --git a/libbb/read.c b/libbb/read.c
+index 405e216..e67bbfb 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -106,7 +106,7 @@ ssize_t FAST_FUNC full_read(int fd, void *buf, size_t len)
+ 	return total;
+ }
+ 
+-// Die with an error message if we can't read the entire buffer.
++/* Die with an error message if we can't read the entire buffer. */
+ void FAST_FUNC xread(int fd, void *buf, size_t count)
+ {
+ 	if (count) {
+@@ -116,7 +116,7 @@ void FAST_FUNC xread(int fd, void *buf, size_t count)
+ 	}
+ }
+ 
+-// Die with an error message if we can't read one character.
++/* Die with an error message if we can't read one character. */
+ unsigned char FAST_FUNC xread_char(int fd)
+ {
+ 	char tmp;
+@@ -124,7 +124,7 @@ unsigned char FAST_FUNC xread_char(int fd)
+ 	return tmp;
+ }
+ 
+-// Read one line a-la fgets. Works only on seekable streams
++/* Read one line a-la fgets. Works only on seekable streams */
+ char* FAST_FUNC reads(int fd, char *buffer, size_t size)
+ {
+ 	char *p;
+@@ -140,9 +140,9 @@ char* FAST_FUNC reads(int fd, char *buffer, size_t size)
+ 	if (p) {
+ 		off_t offset;
+ 		*p++ = '\0';
+-		// avoid incorrect (unsigned) widening
++		/* avoid incorrect (unsigned) widening */
+ 		offset = (off_t)(p - buffer) - (off_t)size;
+-		// set fd position right after '\n'
++		/* set fd position right after '\n' */
+ 		if (offset && lseek(fd, offset, SEEK_CUR) == (off_t)-1)
+ 			return NULL;
+ 	}
+@@ -203,39 +203,52 @@ ssize_t FAST_FUNC open_read_close(const char *filename, void *buf, size_t size)
+ 	return read_close(fd, buf, size);
+ }
+ 
++
+ // Read (potentially big) files in one go. File size is estimated
+-// by stat.
+-void* FAST_FUNC xmalloc_open_read_close(const char *filename, size_t *sizep)
++// by stat. Extra '\0' byte is appended.
++void* FAST_FUNC xmalloc_read(int fd, size_t *sizep)
+ {
+ 	char *buf;
+-	size_t size;
+-	int fd;
+-	off_t len;
++	size_t size, rd_size, total;
++	off_t to_read;
+ 	struct stat st;
+ 
+-	fd = open(filename, O_RDONLY);
+-	if (fd < 0)
+-		return NULL;
++	to_read = sizep ? *sizep : MAXINT(ssize_t); /* max to read */
+ 
+-	st.st_size = 0; /* in case fstat fail, define to 0 */
++	/* Estimate file size */
++	st.st_size = 0; /* in case fstat fails, assume 0 */
+ 	fstat(fd, &st);
+-	/* /proc/N/stat files report len 0 here */
++	/* /proc/N/stat files report st_size 0 */
+ 	/* In order to make such files readable, we add small const */
+-	len = st.st_size | 0x3ff; /* read only 1k on unseekable files */
+-	size = sizep ? *sizep : INT_MAX;
+-	if (len < size)
+-		size = len;
+-	buf = xmalloc(size + 1);
+-	size = read_close(fd, buf, size);
+-	if ((ssize_t)size < 0) {
+-		free(buf);
+-		return NULL;
++	size = (st.st_size | 0x3ff) + 1;
++
++	total = 0;
++	buf = NULL;
++	while (1) {
++		if (to_read < size)
++			size = to_read;
++		buf = xrealloc(buf, total + size + 1);
++		rd_size = full_read(fd, buf + total, size);
++		if ((ssize_t)rd_size < 0) { /* error */
++			free(buf);
++			return NULL;
++		}
++		total += rd_size;
++		if (rd_size < size) /* EOF */
++			break;
++		to_read -= rd_size;
++		if (to_read <= 0)
++			break;
++		/* grow by 1/8, but in [1k..64k] bounds */
++		size = ((total / 8) | 0x3ff) + 1;
++		if (size > 64*1024)
++			size = 64*1024;
+ 	}
+-	xrealloc(buf, size + 1);
+-	buf[size] = '\0';
++	xrealloc(buf, total + 1);
++	buf[total] = '\0';
+ 
+ 	if (sizep)
+-		*sizep = size;
++		*sizep = total;
+ 	return buf;
+ }
+ 
+@@ -284,59 +297,26 @@ void* FAST_FUNC xmalloc_open_read_close(const char *filename, size_t *sizep)
+ }
+ #endif
+ 
+-void* FAST_FUNC xmalloc_xopen_read_close(const char *filename, size_t *sizep)
+-{
+-	void *buf = xmalloc_open_read_close(filename, sizep);
+-	if (!buf)
+-		bb_perror_msg_and_die("can't read '%s'", filename);
+-	return buf;
+-}
+-
+-/* libbb candidate */
+-#if 0
+-static void *xmalloc_read(int fd, size_t *sizep)
++// Read (potentially big) files in one go. File size is estimated
++// by stat.
++void* FAST_FUNC xmalloc_open_read_close(const char *filename, size_t *sizep)
+ {
+ 	char *buf;
+-	size_t size, rd_size, total;
+-	off_t to_read;
+-	struct stat st;
+-
+-	to_read = sizep ? *sizep : INT_MAX; /* max to read */
++	int fd;
+ 
+-	/* Estimate file size */
+-	st.st_size = 0; /* in case fstat fails, assume 0 */
+-	fstat(fd, &st);
+-	/* /proc/N/stat files report st_size 0 */
+-	/* In order to make such files readable, we add small const */
+-	size = (st.st_size | 0x3ff) + 1;
++	fd = open(filename, O_RDONLY);
++	if (fd < 0)
++		return NULL;
+ 
+-	total = 0;
+-	buf = NULL;
+-	while (1) {
+-		if (to_read < size)
+-			size = to_read;
+-		buf = xrealloc(buf, total + size + 1);
+-		rd_size = full_read(fd, buf + total, size);
+-		if ((ssize_t)rd_size < 0) { /* error */
+-			free(buf);
+-			return NULL;
+-		}
+-		total += rd_size;
+-		if (rd_size < size) /* EOF */
+-			break;
+-		to_read -= rd_size;
+-		if (to_read <= 0)
+-			break;
+-		/* grow by 1/8, but in [1k..64k] bounds */
+-		size = ((total / 8) | 0x3ff) + 1;
+-		if (size > 64*1024)
+-			size = 64*1024;
+-	}
+-	xrealloc(buf, total + 1);
+-	buf[total] = '\0';
++	buf = xmalloc_read(fd, sizep);
++	close(fd);
++	return buf;
++}
+ 
+-	if (sizep)
+-		*sizep = total;
++void* FAST_FUNC xmalloc_xopen_read_close(const char *filename, size_t *sizep)
++{
++	void *buf = xmalloc_open_read_close(filename, sizep);
++	if (!buf)
++		bb_perror_msg_and_die("can't read '%s'", filename);
+ 	return buf;
+ }
+-#endif
+diff --git a/modutils/Config.in b/modutils/Config.in
+index 25841b8..2e7f9b6 100644
+--- a/modutils/Config.in
++++ b/modutils/Config.in
+@@ -31,7 +31,7 @@ config MODPROBE_SMALL
+ 	  than "non-small" modutils.
+ 
+ config FEATURE_MODPROBE_SMALL_OPTIONS_ON_CMDLINE
+-	bool "module options on cmdline"
++	bool "Accept module options on modprobe command line"
+ 	default n
+ 	depends on MODPROBE_SMALL
+ 	help
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index 4f07353..1096ba7 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -14,54 +14,6 @@
+ #include <sys/utsname.h> /* uname() */
+ #include <fnmatch.h>
+ 
+-/* libbb candidate */
+-static void *xmalloc_read(int fd, size_t *sizep)
+-{
+-	char *buf;
+-	size_t size, rd_size, total;
+-	off_t to_read;
+-	struct stat st;
+-
+-	to_read = sizep ? *sizep : INT_MAX; /* max to read */
+-
+-	/* Estimate file size */
+-	st.st_size = 0; /* in case fstat fails, assume 0 */
+-	fstat(fd, &st);
+-	/* /proc/N/stat files report st_size 0 */
+-	/* In order to make such files readable, we add small const */
+-	size = (st.st_size | 0x3ff) + 1;
+-
+-	total = 0;
+-	buf = NULL;
+-	while (1) {
+-		if (to_read < size)
+-			size = to_read;
+-		buf = xrealloc(buf, total + size + 1);
+-		rd_size = full_read(fd, buf + total, size);
+-		if ((ssize_t)rd_size < 0) { /* error */
+-			free(buf);
+-			return NULL;
+-		}
+-		total += rd_size;
+-		if (rd_size < size) /* EOF */
+-			break;
+-		to_read -= rd_size;
+-		if (to_read <= 0)
+-			break;
+-		/* grow by 1/8, but in [1k..64k] bounds */
+-		size = ((total / 8) | 0x3ff) + 1;
+-		if (size > 64*1024)
+-			size = 64*1024;
+-	}
+-	xrealloc(buf, total + 1);
+-	buf[total] = '\0';
+-
+-	if (sizep)
+-		*sizep = total;
+-	return buf;
+-}
+-
+-
+ #define dbg1_error_msg(...) ((void)0)
+ #define dbg2_error_msg(...) ((void)0)
+ //#define dbg1_error_msg(...) bb_error_msg(__VA_ARGS__)

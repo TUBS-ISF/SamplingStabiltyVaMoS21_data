@@ -1,0 +1,232 @@
+2008-02-10 19:44:20 +0000
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 80d5d28..46807a3 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -220,6 +220,14 @@ Special characters:
+  "x--x" Variation of the above, it means that -x option should occur
+         at most once.
+ 
++ "a+:"  A plus after a char in opt_complementary means that the parameter
++        for this option is a nonnegative integer. It will be processed
++        with xatoi_u() - allowed range is 0..INT_MAX.
++
++        int param;  // "unsigned param;" will also work
++        opt_complementary = "p+";
++        getopt32(argv, "p:", &param);
++
+  "a::"  A double colon after a char in opt_complementary means that the
+         option can occur multiple times. Each occurrence will be saved as
+         a llist_t element instead of char*.
+@@ -275,14 +283,20 @@ Special characters:
+ 
+ const char *opt_complementary;
+ 
++enum {
++	PARAM_STRING,
++	PARAM_LIST,
++	PARAM_INT,
++};
++
+ typedef struct {
+-	int opt;
+-	int list_flg;
++	unsigned char opt_char;
++	smallint param_type;
+ 	unsigned switch_on;
+ 	unsigned switch_off;
+ 	unsigned incongruously;
+ 	unsigned requires;
+-	void **optarg;               /* char **optarg or llist_t **optarg */
++	void **optarg;  /* char**, llist_t** or int *. */
+ 	int *counter;
+ } t_complementary;
+ 
+@@ -337,12 +351,14 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 	if (*s == '+' || *s == '-')
+ 		s++;
+ 	while (*s) {
+-		if (c >= 32) break;
+-		on_off->opt = *s;
++		if (c >= 32)
++			break;
++		on_off->opt_char = *s;
+ 		on_off->switch_on = (1 << c);
+ 		if (*++s == ':') {
+ 			on_off->optarg = va_arg(p, void **);
+-			while (*++s == ':') /* skip */;
++			while (*++s == ':')
++				continue;
+ 		}
+ 		on_off++;
+ 		c++;
+@@ -375,11 +391,12 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 		for (l_o = long_options; l_o->name; l_o++) {
+ 			if (l_o->flag)
+ 				continue;
+-			for (on_off = complementary; on_off->opt != 0; on_off++)
+-				if (on_off->opt == l_o->val)
++			for (on_off = complementary; on_off->opt_char; on_off++)
++				if (on_off->opt_char == l_o->val)
+ 					goto next_long;
+-			if (c >= 32) break;
+-			on_off->opt = l_o->val;
++			if (c >= 32)
++				break;
++			on_off->opt_char = l_o->val;
+ 			on_off->switch_on = (1 << c);
+ 			if (l_o->has_arg != no_argument)
+ 				on_off->optarg = va_arg(p, void **);
+@@ -422,11 +439,15 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 			s++;
+ 			continue;
+ 		}
+-		for (on_off = complementary; on_off->opt; on_off++)
+-			if (on_off->opt == *s)
++		for (on_off = complementary; on_off->opt_char; on_off++)
++			if (on_off->opt_char == *s)
+ 				break;
+ 		if (c == ':' && s[2] == ':') {
+-			on_off->list_flg++;
++			on_off->param_type = PARAM_LIST;
++			continue;
++		}
++		if (c == '+' && (s[2] == ':' || s[2] == '\0')) {
++			on_off->param_type = PARAM_INT;
+ 			continue;
+ 		}
+ 		if (c == ':' || c == '\0') {
+@@ -454,8 +475,8 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 				else
+ 					pair_switch = &(pair->switch_off);
+ 			} else {
+-				for (on_off = complementary; on_off->opt; on_off++)
+-					if (on_off->opt == *s) {
++				for (on_off = complementary; on_off->opt_char; on_off++)
++					if (on_off->opt_char == *s) {
+ 						*pair_switch |= on_off->switch_on;
+ 						break;
+ 					}
+@@ -508,9 +529,9 @@ getopt32(char **argv, const char *applet_opts, ...)
+ #endif
+ 		c &= 0xff; /* fight libc's sign extension */
+  loop_arg_is_opt:
+-		for (on_off = complementary; on_off->opt != c; on_off++) {
++		for (on_off = complementary; on_off->opt_char != c; on_off++) {
+ 			/* c==0 if long opt have non NULL flag */
+-			if (on_off->opt == 0 && c != 0)
++			if (on_off->opt_char == '\0' && c != '\0')
+ 				bb_show_usage();
+ 		}
+ 		if (flags & on_off->incongruously)
+@@ -521,8 +542,10 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 		flags ^= trigger;
+ 		if (on_off->counter)
+ 			(*(on_off->counter))++;
+-		if (on_off->list_flg) {
++		if (on_off->param_type == PARAM_LIST) {
+ 			llist_add_to_end((llist_t **)(on_off->optarg), optarg);
++		} else if (on_off->param_type == PARAM_INT) {
++			*(unsigned*)(on_off->optarg) = xatoi_u(optarg);
+ 		} else if (on_off->optarg) {
+ 			*(char **)(on_off->optarg) = optarg;
+ 		}
+@@ -550,7 +573,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 		free(argv[1]);
+ #endif
+ 	/* check depending requires for given options */
+-	for (on_off = complementary; on_off->opt; on_off++) {
++	for (on_off = complementary; on_off->opt_char; on_off++) {
+ 		if (on_off->requires && (flags & on_off->switch_on) &&
+ 					(flags & on_off->requires) == 0)
+ 			bb_show_usage();
+diff --git a/procps/top.c b/procps/top.c
+index 4df58f2..37b6a0c 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -740,7 +740,7 @@ int top_main(int argc, char **argv)
+ 	int count, lines, col;
+ 	unsigned interval;
+ 	int iterations;
+-	char *sinterval, *siterations;
++	char *sinterval;
+ 	SKIP_FEATURE_TOPMEM(const) unsigned scan_mask = TOP_MASK;
+ #if ENABLE_FEATURE_USE_TERMIOS
+ 	struct termios new_settings;
+@@ -757,15 +757,12 @@ int top_main(int argc, char **argv)
+ 	iterations = 0; /* infinite */
+ 
+ 	/* do normal option parsing */
+-	opt_complementary = "-";
+-	getopt32(argv, "d:n:b", &sinterval, &siterations);
++	opt_complementary = "-:n+";
++	getopt32(argv, "d:n:b", &sinterval, &iterations);
+ 	if (option_mask32 & 0x1) {
+ 		/* Need to limit it to not overflow poll timeout */
+ 		interval = xatou16(sinterval); // -d
+ 	}
+-	if (option_mask32 & 0x2)
+-		iterations = xatoi_u(siterations); // -n
+-	//if (option_mask32 & 0x4) // -b
+ 
+ 	/* change to /proc */
+ 	xchdir("/proc");
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index cd053b8..c98a74f 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -2754,7 +2754,6 @@ unknown_command(int c)
+ int fdisk_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int fdisk_main(int argc, char **argv)
+ {
+-	char *str_b, *str_C, *str_H, *str_S;
+ 	unsigned opt;
+ 	/*
+ 	 *  fdisk -v
+@@ -2776,8 +2775,9 @@ int fdisk_main(int argc, char **argv)
+ 
+ 	INIT_G();
+ 
++	opt_complementary = "b+:C+:H+:S+"; /* numeric params */
+ 	opt = getopt32(argv, "b:C:H:lS:u" USE_FEATURE_FDISK_BLKSIZE("s"),
+-				&str_b, &str_C, &str_H, &str_S);
++				&sector_size, &user_cylinders, &user_heads, &user_sectors);
+ 	argc -= optind;
+ 	argv += optind;
+ 	if (opt & OPT_b) { // -b
+@@ -2785,27 +2785,18 @@ int fdisk_main(int argc, char **argv)
+ 		   so cannot be combined with multiple disks,
+ 		   and the same goes for the C/H/S options.
+ 		*/
+-		sector_size = xatoi_u(str_b);
+-		if (sector_size != 512 && sector_size != 1024 &&
+-			sector_size != 2048)
++		if (sector_size != 512 && sector_size != 1024
++		 && sector_size != 2048)
+ 			bb_show_usage();
+ 		sector_offset = 2;
+ 		user_set_sector_size = 1;
+ 	}
+-	if (opt & OPT_C) user_cylinders = xatoi_u(str_C); // -C
+-	if (opt & OPT_H) { // -H
+-		user_heads = xatoi_u(str_H);
+-		if (user_heads <= 0 || user_heads >= 256)
+-			user_heads = 0;
+-	}
+-	//if (opt & OPT_l) // -l
+-	if (opt & OPT_S) { // -S
+-		user_sectors = xatoi_u(str_S);
+-		if (user_sectors <= 0 || user_sectors >= 64)
+-			user_sectors = 0;
+-	}
+-	if (opt & OPT_u) display_in_cyl_units = 0; // -u
+-	//if (opt & OPT_s) // -s
++	if (user_heads <= 0 || user_heads >= 256)
++		user_heads = 0;
++	if (user_sectors <= 0 || user_sectors >= 64)
++		user_sectors = 0;
++	if (opt & OPT_u)
++		display_in_cyl_units = 0; // -u
+ 
+ 	if (user_set_sector_size && argc != 1)
+ 		printf("Warning: the -b (set sector size) option should"

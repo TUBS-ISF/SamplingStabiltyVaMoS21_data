@@ -1,0 +1,31 @@
+2009-09-24 03:09:26 +0200
+diff --git a/shell/ash.c b/shell/ash.c
+index 597bc28..47f968b 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -4525,7 +4525,7 @@ clear_traps(void)
+ 			INT_OFF;
+ 			free(*tp);
+ 			*tp = NULL;
+-			if (tp != &trap[0])
++			if ((tp - trap) != 0)
+ 				setsignal(tp - trap);
+ 			INT_ON;
+ 		}
+@@ -4596,6 +4596,8 @@ forkchild(struct job *jp, union node *n, int mode)
+ 		 *
+ 		 * Our solution: ONLY bare $(trap) or `trap` is special.
+ 		 */
++		free(trap[0]); /* Prevent EXIT trap from firing in `trap` */
++		trap[0] = NULL;
+ 	} else {
+ 		clear_traps();
+ 	}
+@@ -13023,6 +13025,7 @@ exitshell(void)
+ 	if (p) {
+ 		trap[0] = NULL;
+ 		evalstring(p, 0);
++		free(p);
+ 	}
+ 	flush_stdout_stderr();
+  out:

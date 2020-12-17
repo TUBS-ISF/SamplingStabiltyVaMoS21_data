@@ -1,0 +1,14 @@
+2009-07-16 16:09:25 +0200
+diff --git a/libbb/unicode.c b/libbb/unicode.c
+index 3519984..544528a 100644
+--- a/libbb/unicode.c
++++ b/libbb/unicode.c
+@@ -39,7 +39,7 @@ void FAST_FUNC check_unicode_in_env(void)
+ 	unicode_is_enabled = 1;
+ 
+ 	lang = getenv("LANG");
+-	if (!lang || !strstr(lang, ".utf8"))
++	if (!lang || !(strstr(lang, ".utf") || strstr(lang, ".UTF")))
+ 		return;
+ 
+ 	unicode_is_enabled = 2;

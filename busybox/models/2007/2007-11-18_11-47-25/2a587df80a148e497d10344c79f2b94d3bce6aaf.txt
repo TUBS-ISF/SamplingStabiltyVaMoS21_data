@@ -1,0 +1,14 @@
+2007-11-18 11:47:25 +0000
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index 06e3b0e..849f615 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -412,7 +412,7 @@ enum {
+ };
+ 
+ /* The width of the screen, for output wrapping */
+-unsigned max_col = 80; /* default */
++static unsigned max_col = 80; /* default */
+ 
+ struct globals {
+ 	/* Current position, to know when to wrap */

@@ -1,0 +1,13 @@
+2009-01-27 18:54:41 +0000
+diff --git a/Makefile b/Makefile
+index aacc319..5b8cad8 100644
+--- a/Makefile
++++ b/Makefile
+@@ -168,6 +168,7 @@ ifeq ($(CROSS_COMPILE),)
+ CROSS_COMPILE := $(shell grep ^CONFIG_CROSS_COMPILER_PREFIX .config 2>/dev/null)
+ CROSS_COMPILE := $(subst CONFIG_CROSS_COMPILER_PREFIX=,,$(CROSS_COMPILE))
+ CROSS_COMPILE := $(subst ",,$(CROSS_COMPILE))
++#")
+ endif
+ 
+ # SUBARCH tells the usermode build what the underlying arch is.  That is set

@@ -1,0 +1,71 @@
+2007-08-06 15:43:17 +0000
+diff --git a/libbb/uuencode.c b/libbb/uuencode.c
+index 08fe3f3..57d1cbf 100644
+--- a/libbb/uuencode.c
++++ b/libbb/uuencode.c
+@@ -39,27 +39,33 @@ const char bb_uuenc_tbl_std[65] = {
+  * buffer of at least 1+BASE64_LENGTH(length) bytes.
+  * where BASE64_LENGTH(len) = (4 * ((LENGTH + 2) / 3))
+  */
+-void bb_uuencode(char *store, const void *src, int length, const char *tbl)
++void bb_uuencode(char *p, const void *src, int length, const char *tbl)
+ {
+-	int i;
+ 	const unsigned char *s = src;
+-	char *p = store;
+ 
+-	/* Transform the 3x8 bits to 4x6 bits, as required by base64.  */
+-	for (i = 0; i < length; i += 3) {
++	/* Transform the 3x8 bits to 4x6 bits */
++	while (length > 0) {
++		unsigned s1, s2;
++
++		/* Are s[1], s[2] valid or should be assumed 0? */
++		s1 = s2 = 0;
++		length -= 3; /* can be >=0, -1, -2 */
++		if (length != -2) {
++			s1 = s[1];
++			if (length != -1)
++				s2 = s[2];
++		}
+ 		*p++ = tbl[s[0] >> 2];
+-		*p++ = tbl[((s[0] & 3) << 4) + (s[1] >> 4)];
+-		*p++ = tbl[((s[1] & 0xf) << 2) + (s[2] >> 6)];
+-		*p++ = tbl[s[2] & 0x3f];
++		*p++ = tbl[((s[0] & 3) << 4) + (s1 >> 4)];
++		*p++ = tbl[((s1 & 0xf) << 2) + (s2 >> 6)];
++		*p++ = tbl[s2 & 0x3f];
+ 		s += 3;
+ 	}
+-	/* Pad the result if necessary...  */
+-	if (i == length + 1) {
+-		*(p - 1) = tbl[64];
+-	}
+-	else if (i == length + 2) {
+-		*(p - 1) = *(p - 2) = tbl[64];
+-	}
+-	/* ...and zero-terminate it.  */
++	/* Zero-terminate */
+ 	*p = '\0';
++	/* If length is -2 or -1, pad last char or two */
++	while (length) {
++		*--p = tbl[64];
++		length++;
++	}
+ }
+diff --git a/networking/wget.c b/networking/wget.c
+index d944f01..7b583c7 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -109,9 +109,9 @@ int wget_main(int argc, char **argv)
+ 	FILE *sfp = NULL;               /* socket to web/ftp server         */
+ 	FILE *dfp = NULL;               /* socket to ftp server (data)      */
+ 	char *fname_out = NULL;         /* where to direct output (-O)      */
+-	bool got_clen = 0;               /* got content-length: from server  */
++	bool got_clen = 0;              /* got content-length: from server  */
+ 	int output_fd = -1;
+-	bool use_proxy = 1;              /* Use proxies if env vars are set  */
++	bool use_proxy = 1;             /* Use proxies if env vars are set  */
+ 	const char *proxy_flag = "on";  /* Use proxies if env vars are set  */
+ 	const char *user_agent = "Wget";/* "User-Agent" header field        */
+ 	static const char keywords[] =

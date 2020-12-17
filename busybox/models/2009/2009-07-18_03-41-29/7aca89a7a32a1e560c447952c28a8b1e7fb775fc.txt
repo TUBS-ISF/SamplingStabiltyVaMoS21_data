@@ -1,0 +1,263 @@
+2009-07-18 03:41:29 +0200
+diff --git a/coreutils/date.c b/coreutils/date.c
+index 7f2a5b3..09ced0e 100644
+--- a/coreutils/date.c
++++ b/coreutils/date.c
+@@ -142,12 +142,11 @@ int date_main(int argc UNUSED_PARAM, char **argv)
+ 		} else {
+ 			parse_datestr(date_str, &tm_time);
+ 		}
++
+ 		/* Correct any day of week and day of year etc. fields */
+ 		tm_time.tm_isdst = -1;	/* Be sure to recheck dst */
+-		tm = mktime(&tm_time);
+-		if (tm < 0) {
+-			bb_error_msg_and_die(bb_msg_invalid_date, date_str);
+-		}
++		tm = validate_tm_time(date_str, &tm_time);
++
+ 		maybe_set_utc(opt);
+ 
+ 		/* if setting time, set it */
+diff --git a/coreutils/touch.c b/coreutils/touch.c
+index 7d434a2..1b4a5f0 100644
+--- a/coreutils/touch.c
++++ b/coreutils/touch.c
+@@ -41,31 +41,34 @@ int touch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int touch_main(int argc UNUSED_PARAM, char **argv)
+ {
+ #if ENABLE_DESKTOP
+-#if ENABLE_LONG_OPTS
+-	static const char longopts[] ALIGN1 =
++# if ENABLE_LONG_OPTS
++	static const char touch_longopts[] ALIGN1 =
+ 		/* name, has_arg, val */
+ 		"no-create\0"         No_argument       "c"
+ 		"reference\0"         Required_argument "r"
++		"date\0"              Required_argument "d"
+ 	;
+-#endif
++# endif
+ 	struct utimbuf timebuf;
+ 	char *reference_file = NULL;
++	char *date_str = NULL;
+ #else
+-#define reference_file NULL
+-#define timebuf        (*(struct utimbuf*)NULL)
++# define reference_file NULL
++# define date_str       NULL
++# define timebuf        (*(struct utimbuf*)NULL)
+ #endif
+ 	int fd;
+ 	int status = EXIT_SUCCESS;
+ 	int opts;
+ 
+-#if ENABLE_DESKTOP
+-#if ENABLE_LONG_OPTS
+-	applet_long_options = longopts;
++#if ENABLE_DESKTOP && ENABLE_LONG_OPTS
++	applet_long_options = touch_longopts;
+ #endif
+-#endif
+-	opts = getopt32(argv, "c" IF_DESKTOP("r:")
++	opts = getopt32(argv, "c" IF_DESKTOP("r:d:")
+ 				/*ignored:*/ "fma"
+-				IF_DESKTOP(, &reference_file));
++				IF_DESKTOP(, &reference_file)
++				IF_DESKTOP(, &date_str)
++	);
+ 
+ 	opts &= 1; /* only -c bit is left */
+ 	argv += optind;
+@@ -80,6 +83,23 @@ int touch_main(int argc UNUSED_PARAM, char **argv)
+ 		timebuf.modtime = stbuf.st_mtime;
+ 	}
+ 
++	if (date_str) {
++		struct tm tm_time;
++		time_t t;
++
++		//time(&t);
++		//localtime_r(&t, &tm_time);
++		memset(&tm_time, 0, sizeof(tm_time));
++		parse_datestr(date_str, &tm_time);
++
++		/* Correct any day of week and day of year etc. fields */
++		tm_time.tm_isdst = -1;	/* Be sure to recheck dst */
++		t = validate_tm_time(date_str, &tm_time);
++
++		timebuf.actime = t;
++		timebuf.modtime = t;
++	}
++
+ 	do {
+ 		if (utime(*argv, reference_file ? &timebuf : NULL)) {
+ 			if (errno == ENOENT) { /* no such file */
+diff --git a/coreutils/uname.c b/coreutils/uname.c
+index df45660..8453bcc 100644
+--- a/coreutils/uname.c
++++ b/coreutils/uname.c
+@@ -74,7 +74,7 @@ int uname_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int uname_main(int argc UNUSED_PARAM, char **argv)
+ {
+ #if ENABLE_LONG_OPTS
+-	static const char longopts[] ALIGN1 =
++	static const char uname_longopts[] ALIGN1 =
+ 		/* name, has_arg, val */
+ 		"all\0"               No_argument       "a"
+ 		"kernel-name\0"       No_argument       "s"
+@@ -97,7 +97,7 @@ int uname_main(int argc UNUSED_PARAM, char **argv)
+ 	const unsigned short *delta;
+ 	unsigned toprint;
+ 
+-	IF_LONG_OPTS(applet_long_options = longopts);
++	IF_LONG_OPTS(applet_long_options = uname_longopts);
+ 	toprint = getopt32(argv, options);
+ 
+ 	if (argv[optind]) { /* coreutils-6.9 compat */
+diff --git a/include/libbb.h b/include/libbb.h
+index 9de5233..936d98a 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -438,6 +438,7 @@ struct BUG_too_small {
+ 
+ 
+ void parse_datestr(const char *date_str, struct tm *tm_time) FAST_FUNC;
++time_t validate_tm_time(const char *date_str, struct tm *tm_time) FAST_FUNC;
+ 
+ 
+ int xsocket(int domain, int type, int protocol) FAST_FUNC;
+diff --git a/include/usage.h b/include/usage.h
+index 53ae0a8..9493b6d 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4556,11 +4556,12 @@
+        "and show the status for however many processes will fit on the screen." \
+ 
+ #define touch_trivial_usage \
+-       "[-c] FILE [FILE]..."
++       "[-c] [-d DATE] FILE [FILE]..."
+ #define touch_full_usage "\n\n" \
+        "Update the last-modified date on the given FILE[s]\n" \
+      "\nOptions:" \
+-     "\n	-c	Do not create any files" \
++     "\n	-c	Do not create files" \
++     "\n	-d DT	Date/time to use" \
+ 
+ #define touch_example_usage \
+        "$ ls -l /tmp/foo\n" \
+diff --git a/libbb/time.c b/libbb/time.c
+index 30b760f..1cf2a05 100644
+--- a/libbb/time.c
++++ b/libbb/time.c
+@@ -71,6 +71,15 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *tm_time)
+ 	}
+ }
+ 
++time_t FAST_FUNC validate_tm_time(const char *date_str, struct tm *tm_time)
++{
++	time_t t = mktime(tm_time);
++	if (t == (time_t) -1L) {
++		bb_error_msg_and_die(bb_msg_invalid_date, date_str);
++	}
++	return t;
++}
++
+ #if ENABLE_MONOTONIC_SYSCALL
+ 
+ #include <sys/syscall.h>
+diff --git a/testsuite/bunzip2.tests b/testsuite/bunzip2.tests
+index a7555ac..7875cd1 100755
+--- a/testsuite/bunzip2.tests
++++ b/testsuite/bunzip2.tests
+@@ -517,8 +517,8 @@ if test "${0##*/}" = "bunzip2.tests"; then
+     if test1_bz2 | ${bb}bunzip2 >/dev/null \
+ 	&& test "`test1_bz2 | ${bb}bunzip2 | md5sum`" = "61bbeee4be9c6f110a71447f584fda7b  -"
+     then
+-	echo "$unpack: test bz2 file: PASS"
++	echo "PASS: $unpack: test bz2 file"
+     else
+-	echo "$unpack: test bz2 file: FAIL"
++	echo "FAIL: $unpack: test bz2 file"
+     fi
+ fi
+diff --git a/testsuite/bzcat.tests b/testsuite/bzcat.tests
+index 0bc7442..78d74f2 100755
+--- a/testsuite/bzcat.tests
++++ b/testsuite/bzcat.tests
+@@ -32,9 +32,9 @@ prep() {
+ check() {
+     eval $2 >t_actual 2>&1
+     if $ECHO -ne "$expected" | cmp - t_actual; then
+-	echo "$1: PASS"
++	echo "PASS: $1"
+     else
+-	echo "$1: FAIL"
++	echo "FAIL: $1"
+     fi
+ }
+ 
+diff --git a/testsuite/cp/cp-a-files-to-dir b/testsuite/cp/cp-a-files-to-dir
+index abdbdf7..b199ef9 100644
+--- a/testsuite/cp/cp-a-files-to-dir
++++ b/testsuite/cp/cp-a-files-to-dir
+@@ -3,7 +3,7 @@ echo file number two > file2
+ ln -s file2 link1
+ mkdir dir1
+ # why???
+-#touch --date='Sat Jan 29 21:24:08 PST 2000' dir1/file3
++#TZ=UTC0 touch -d '2000-01-30 05:24:08' dir1/file3
+ mkdir there
+ busybox cp -a file1 file2 link1 dir1 there
+ test -f there/file1
+diff --git a/testsuite/mv/mv-files-to-dir b/testsuite/mv/mv-files-to-dir
+index c8eaba8..2b567f7 100644
+--- a/testsuite/mv/mv-files-to-dir
++++ b/testsuite/mv/mv-files-to-dir
+@@ -2,7 +2,7 @@ echo file number one > file1
+ echo file number two > file2
+ ln -s file2 link1
+ mkdir dir1
+-touch --date='Sat Jan 29 21:24:08 PST 2000' dir1/file3
++TZ=UTC0 touch -d '2000-01-30 05:24:08' dir1/file3
+ mkdir there
+ busybox mv file1 file2 link1 dir1 there
+ test -f there/file1
+diff --git a/testsuite/mv/mv-refuses-mv-dir-to-subdir b/testsuite/mv/mv-refuses-mv-dir-to-subdir
+index 7c572c4..3bad131 100644
+--- a/testsuite/mv/mv-refuses-mv-dir-to-subdir
++++ b/testsuite/mv/mv-refuses-mv-dir-to-subdir
+@@ -2,7 +2,7 @@ echo file number one > file1
+ echo file number two > file2
+ ln -s file2 link1
+ mkdir dir1
+-touch --date='Sat Jan 29 21:24:08 PST 2000' dir1/file3
++TZ=UTC0 touch -d '2000-01-30 05:24:08' dir1/file3
+ mkdir there
+ busybox mv file1 file2 link1 dir1 there
+ test -f there/file1
+diff --git a/testsuite/runtest b/testsuite/runtest
+index 2d60591..5560f7b 100755
+--- a/testsuite/runtest
++++ b/testsuite/runtest
+@@ -120,12 +120,17 @@ fi
+ 
+ # Populate a directory with links to all busybox applets
+ 
+-# Note: if $LINKSDIR/applet exists, we do not overwrite it.
+-# Useful if one wants to run tests against a standard utility, not an applet.
+ LINKSDIR="$bindir/runtest-tempdir-links"
+-#rm -rf "$LINKSDIR" 2>/dev/null
++
++# Comment this line out if you have put a different binary in $LINKSDIR
++# (say, a "standard" tool's binary) in order to run tests against it:
++rm -rf "$LINKSDIR" 2>/dev/null
++
+ mkdir "$LINKSDIR" 2>/dev/null
+ for i in $implemented; do
++	# Note: if $LINKSDIR/applet exists, we do not overwrite it.
++	# Useful if one wants to run tests against a standard utility,
++	# not an applet.
+ 	ln -s "$bindir/busybox" "$LINKSDIR/$i" 2>/dev/null
+ done
+ 

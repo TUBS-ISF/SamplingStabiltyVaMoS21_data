@@ -1,0 +1,154 @@
+2007-11-23 00:08:54 +0000
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index e7eeb58..4a5c627 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -171,7 +171,7 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
+ 	bytes = read(fd, &packet, sizeof(struct udp_dhcp_packet));
+ 	if (bytes < 0) {
+ 		DEBUG("Cannot read on raw listening socket - ignoring");
+-		usleep(500000); /* possible down interface, looping condition */
++		sleep(1); /* possible down interface, looping condition */
+ 		return -1;
+ 	}
+ 
+@@ -190,7 +190,7 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
+ 
+ 	/* Make sure its the right packet for us, and that it passes sanity checks */
+ 	if (packet.ip.protocol != IPPROTO_UDP || packet.ip.version != IPVERSION
+-	 || packet.ip.ihl != sizeof(packet.ip) >> 2
++	 || packet.ip.ihl != (sizeof(packet.ip) >> 2)
+ 	 || packet.udp.dest != htons(CLIENT_PORT)
+ 	 || bytes > (int) sizeof(struct udp_dhcp_packet)
+ 	 || ntohs(packet.udp.len) != (uint16_t)(bytes - sizeof(packet.ip))
+@@ -207,7 +207,7 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
+ 		return -1;
+ 	}
+ 
+-	/* verify the UDP checksum by replacing the header with a psuedo header */
++	/* verify the UDP checksum by replacing the header with a pseudo header */
+ 	source = packet.ip.saddr;
+ 	dest = packet.ip.daddr;
+ 	check = packet.udp.check;
+@@ -225,7 +225,7 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
+ 
+ 	memcpy(payload, &(packet.data), bytes - (sizeof(packet.ip) + sizeof(packet.udp)));
+ 
+-	if (ntohl(payload->cookie) != DHCP_MAGIC) {
++	if (payload->cookie != htonl(DHCP_MAGIC)) {
+ 		bb_error_msg("received bogus message (bad magic) - ignoring");
+ 		return -2;
+ 	}
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 179c21f..4f2d31c 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -38,12 +38,18 @@ struct dhcpMessage {
+ 	uint8_t file[128];
+ 	uint32_t cookie;
+ 	uint8_t options[308]; /* 312 - cookie */
+-};
++} ATTRIBUTE_PACKED;
+ 
+ struct udp_dhcp_packet {
+ 	struct iphdr ip;
+ 	struct udphdr udp;
+ 	struct dhcpMessage data;
++} ATTRIBUTE_PACKED;
++
++/* Let's see whether compiler understood us right */
++struct BUG_bad_sizeof_struct_udp_dhcp_packet {
++	char BUG_bad_sizeof_struct_udp_dhcp_packet
++                [sizeof(struct udp_dhcp_packet) != 576 ? -1 : 1];
+ };
+ 
+ void udhcp_init_header(struct dhcpMessage *packet, char type);
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index 3168fc6..2b4f164 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -73,12 +73,13 @@ uint8_t *get_option(struct dhcpMessage *packet, int code)
+ {
+ 	int i, length;
+ 	uint8_t *optionptr;
+-	int over = 0, done = 0, curr = OPTION_FIELD;
++	int over = 0;
++	int curr = OPTION_FIELD;
+ 
+ 	optionptr = packet->options;
+ 	i = 0;
+-	length = 308;
+-	while (!done) {
++	length = sizeof(packet->options);
++	while (1) {
+ 		if (i >= length) {
+ 			bb_error_msg("bogus packet, option fields too long");
+ 			return NULL;
+@@ -103,17 +104,18 @@ uint8_t *get_option(struct dhcpMessage *packet, int code)
+ 			i += optionptr[OPT_LEN] + 2;
+ 			break;
+ 		case DHCP_END:
+-			if (curr == OPTION_FIELD && over & FILE_FIELD) {
++			if (curr == OPTION_FIELD && (over & FILE_FIELD)) {
+ 				optionptr = packet->file;
+ 				i = 0;
+-				length = 128;
++				length = sizeof(packet->file);
+ 				curr = FILE_FIELD;
+-			} else if (curr == FILE_FIELD && over & SNAME_FIELD) {
++			} else if (curr == FILE_FIELD && (over & SNAME_FIELD)) {
+ 				optionptr = packet->sname;
+ 				i = 0;
+-				length = 64;
++				length = sizeof(packet->sname);
+ 				curr = SNAME_FIELD;
+-			} else done = 1;
++			} else
++				return NULL;
+ 			break;
+ 		default:
+ 			i += optionptr[OPT_LEN + i] + 2;
+diff --git a/networking/udhcp/options.h b/networking/udhcp/options.h
+index 5e9adf8..33a968c 100644
+--- a/networking/udhcp/options.h
++++ b/networking/udhcp/options.h
+@@ -6,7 +6,7 @@
+ #define TYPE_MASK	0x0F
+ 
+ enum {
+-	OPTION_IP=1,
++	OPTION_IP = 1,
+ 	OPTION_IP_PAIR,
+ 	OPTION_STRING,
+ #if ENABLE_FEATURE_RFC3397
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index 41cd321..0abe851 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -57,7 +57,7 @@ int udhcp_get_packet(struct dhcpMessage *packet, int fd)
+ 		return -1;
+ 	}
+ 
+-	if (ntohl(packet->cookie) != DHCP_MAGIC) {
++	if (packet->cookie != htonl(DHCP_MAGIC)) {
+ 		bb_error_msg("received bogus message, ignoring");
+ 		return -2;
+ 	}
+@@ -123,7 +123,6 @@ uint16_t udhcp_checksum(void *addr, int count)
+ 
+ 
+ /* Construct a ip/udp header for a packet, and specify the source and dest hardware address */
+-void BUG_sizeof_struct_udp_dhcp_packet_must_be_576(void);
+ int udhcp_raw_packet(struct dhcpMessage *payload,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port, const uint8_t *dest_arp, int ifindex)
+@@ -169,9 +168,6 @@ int udhcp_raw_packet(struct dhcpMessage *payload,
+ 	packet.ip.ttl = IPDEFTTL;
+ 	packet.ip.check = udhcp_checksum(&(packet.ip), sizeof(packet.ip));
+ 
+-	if (sizeof(struct udp_dhcp_packet) != 576)
+-		BUG_sizeof_struct_udp_dhcp_packet_must_be_576();
+-
+ 	result = sendto(fd, &packet, sizeof(struct udp_dhcp_packet), 0,
+ 			(struct sockaddr *) &dest, sizeof(dest));
+ 	if (result <= 0) {

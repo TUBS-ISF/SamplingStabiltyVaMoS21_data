@@ -1,0 +1,50 @@
+2008-10-17 14:03:56 +0000
+diff --git a/archival/cpio.c b/archival/cpio.c
+index 37b6b5c..d39640d 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -344,5 +344,8 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 	while (get_header_cpio(archive_handle) == EXIT_SUCCESS)
+ 		continue;
+ 
++	/* see get_header_cpio */
++	printf("%lu blocks\n", (unsigned long)(ptrdiff_t)(archive_handle->ah_priv[2]));
++
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/archival/libunarchive/data_extract_all.c b/archival/libunarchive/data_extract_all.c
+index a67587d..8b1ee2a 100644
+--- a/archival/libunarchive/data_extract_all.c
++++ b/archival/libunarchive/data_extract_all.c
+@@ -77,7 +77,9 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 		}
+ 		case S_IFDIR:
+ 			res = mkdir(file_header->name, file_header->mode);
+-			if ((res == -1) && (errno != EISDIR)
++			if ((res == -1)
++			 && (errno != EISDIR) /* btw, Linux doesn't return this */
++			 && (errno != EEXIST)
+ 			 && !(archive_handle->ah_flags & ARCHIVE_EXTRACT_QUIET)
+ 			) {
+ 				bb_perror_msg("cannot make dir %s", file_header->name);
+diff --git a/archival/libunarchive/get_header_cpio.c b/archival/libunarchive/get_header_cpio.c
+index 93f6c61..302f122 100644
+--- a/archival/libunarchive/get_header_cpio.c
++++ b/archival/libunarchive/get_header_cpio.c
+@@ -27,6 +27,7 @@ char FAST_FUNC get_header_cpio(archive_handle_t *archive_handle)
+ 
+ #define hardlinks_to_create (*(hardlinks_t **)(&archive_handle->ah_priv[0]))
+ #define created_hardlinks   (*(hardlinks_t **)(&archive_handle->ah_priv[1]))
++#define block_count         (archive_handle->ah_priv[2])
+ //	if (!archive_handle->ah_priv_inited) {
+ //		archive_handle->ah_priv_inited = 1;
+ //		hardlinks_to_create = NULL;
+@@ -76,7 +77,7 @@ char FAST_FUNC get_header_cpio(archive_handle_t *archive_handle)
+ 
+ 	if (strcmp(file_header->name, "TRAILER!!!") == 0) {
+ 		/* Always round up. ">> 9" divides by 512 */
+-		printf("%"OFF_FMT"u blocks\n", (archive_handle->offset + 511) >> 9);
++		block_count = (void*)(ptrdiff_t) ((archive_handle->offset + 511) >> 9);
+ 		goto create_hardlinks;
+ 	}
+ 

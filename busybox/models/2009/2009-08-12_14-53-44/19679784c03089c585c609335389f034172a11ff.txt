@@ -1,0 +1,42 @@
+2009-08-12 14:53:44 +0200
+diff --git a/shell/hush.c b/shell/hush.c
+index d7b479d..f49630a 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -58,6 +58,7 @@
+  * TODOs:
+  *      grep for "TODO" and fix (some of them are easy)
+  *      builtins: ulimit
++ *      special variables (PWD etc)
+  *      follow IFS rules more precisely, including update semantics
+  *      export builtin should be special, its arguments are assignments
+  *          and therefore expansion of them should be "one-word" expansion:
+diff --git a/shell/hush_test/run-all b/shell/hush_test/run-all
+index 470adaa..cde841e 100755
+--- a/shell/hush_test/run-all
++++ b/shell/hush_test/run-all
+@@ -13,14 +13,20 @@ test -x hush || {
+ 	echo "No ./hush - creating a link to ../../busybox"
+ 	ln -s ../../busybox hush
+ }
+-if test -e ../../.config ; then
+-	eval $(sed -e '/^#/d' -e '/^$/d' -e 's:^:export :' ../../.config)
++if test ! -e .config; then
++	if test -f ../../.config; then
++		cp ../../.config . || exit 1
++	else
++		echo "Missing .config file"
++		exit 1
++	fi
+ fi
++eval $(sed -e '/^#/d' -e '/^$/d' -e 's:^:export :' .config)
+ 
+-PATH="$PWD:$PATH" # for hush and recho/zecho/printenv
++PATH="`pwd`:$PATH" # for hush and recho/zecho/printenv
+ export PATH
+ 
+-THIS_SH="$PWD/hush"
++THIS_SH="`pwd`/hush"
+ export THIS_SH
+ 
+ do_test()

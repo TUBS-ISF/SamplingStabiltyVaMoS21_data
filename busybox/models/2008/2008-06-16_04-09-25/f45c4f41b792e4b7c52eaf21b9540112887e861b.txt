@@ -1,0 +1,152 @@
+2008-06-16 04:09:25 +0000
+diff --git a/docs/busybox.net/news.html b/docs/busybox.net/news.html
+index f13901f..47e61f2 100644
+--- a/docs/busybox.net/news.html
++++ b/docs/busybox.net/news.html
+@@ -191,7 +191,7 @@ iproute_list_or_flush   3680 readhere                2308
+ 	<li>tail: fix "tail -c 20 /dev/huge_disk" (was taking ages)
+ 	<li>tar: compat: handle tarballs with only one zero block at the end
+ 	<li>tar: autodetection of gz/bz2 compressed tarballs. Closes bug 992
+-	<li>tar: real support for -p. By Natanael Copa &lt;natanael.copa at gmail.com&gt; 
++	<li>tar: real support for -p. By Natanael Copa &lt;natanael.copa at gmail.com&gt;
+ 	<li>tcpudp: narrow down time window where we have no wildcard socket
+ 	<li>telnetd: use login always, not "sometimes login, sometimes shell"
+ 	<li>test: fix mishandling of "test ! arg1 op arg2 more args"
+diff --git a/libbb/pw_encrypt.c b/libbb/pw_encrypt.c
+index c1e927e..7363186 100644
+--- a/libbb/pw_encrypt.c
++++ b/libbb/pw_encrypt.c
+@@ -14,10 +14,6 @@
+ /*
+  * DES and MD5 crypt implementations are taken from uclibc.
+  * They were modified to not use static buffers.
+- * Comparison with uclibc (before uclibc had 70k staic buffers reinstated):
+- *   text    data     bss     dec     hex filename
+- * 759909     604    6684  767197   bb4dd busybox_old
+- * 759579     604    6684  766867   bb393 busybox_unstripped
+  */
+ /* Common for them */
+ static const uint8_t ascii64[] = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+diff --git a/libbb/pw_encrypt_des.c b/libbb/pw_encrypt_des.c
+index a13e1a5..cd19a63 100644
+--- a/libbb/pw_encrypt_des.c
++++ b/libbb/pw_encrypt_des.c
+@@ -201,7 +201,7 @@ static const uint32_t bits32[32] =
+ static const uint8_t bits8[8] = { 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01 };
+ 
+ 
+-static int 
++static int
+ ascii_to_bin(char ch)
+ {
+ 	if (ch > 'z')
+@@ -220,8 +220,8 @@ ascii_to_bin(char ch)
+ }
+ 
+ 
+-/* Static stuff that stays resident and doesn't change after 
+- * being initialized, and therefore doesn't need to be made 
++/* Static stuff that stays resident and doesn't change after
++ * being initialized, and therefore doesn't need to be made
+  * reentrant. */
+ struct const_des_ctx {
+ #if USE_ip_mask
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index c3c8dd5..4ca1c25 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -71,8 +71,8 @@ config USE_BB_CRYPT
+ 	  DES encryption/decryption.
+ 
+ 	  For busybox, having large static buffers is undesirable,
+-	  especially on NOMMU machines. Busybox also doesn't
+-	  need DES encryption/decryption and can do with smaller code.
++	  especially on NOMMU machines. Busybox also doesn't need
++	  DES encryption/decryption and can do with smaller code.
+ 
+ 	  If you enable this option, it will add about 4.8k of code
+ 	  if you are building dynamically linked executable.
+diff --git a/modutils/Config.in b/modutils/Config.in
+index c0dff1a..2b0bcdd 100644
+--- a/modutils/Config.in
++++ b/modutils/Config.in
+@@ -153,10 +153,10 @@ config FEATURE_MODPROBE_BLACKLIST
+ 	default n
+ 	depends on MODPROBE && FEATURE_2_6_MODULES
+ 	help
+-	  Say 'y' here to enable support for the 'blacklist' command in 
+-	  modprobe.conf. This prevents the alias resolver to resolve 
+-	  blacklisted modules. This is useful if you want to prevent your 
+-	  hardware autodetection scripts to load modules like evdev, frame 
++	  Say 'y' here to enable support for the 'blacklist' command in
++	  modprobe.conf. This prevents the alias resolver to resolve
++	  blacklisted modules. This is useful if you want to prevent your
++	  hardware autodetection scripts to load modules like evdev, frame
+ 	  buffer drivers etc.
+ 
+ comment "Options common to multiple modutils"
+diff --git a/modutils/depmod.c b/modutils/depmod.c
+index 733cd95..4998d64 100644
+--- a/modutils/depmod.c
++++ b/modutils/depmod.c
+@@ -181,7 +181,7 @@ int depmod_main(int ATTRIBUTE_UNUSED argc, char **argv)
+ 			char *shortname = llist_pop(&old_deps);
+ 
+ 			while (all) {
+-				char *nam = 
++				char *nam =
+ 					xstrdup(bb_get_last_path_component_nostrip(all->name));
+ 				char *tmp = strrstr(nam, ".ko");
+ 
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index db946bb..84a2d76 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -232,10 +232,10 @@ static char *parse_command_string(char *src, char **dst)
+ #endif /* ENABLE_FEATURE_MODPROBE_MULTIPLE_OPTIONS */
+ 
+ static int is_conf_command(char *buffer, const char *command)
+-{ 
++{
+ 	int len = strlen(command);
+ 	return ((strstr(buffer, command) == buffer) &&
+-			isspace(buffer[len])); 
++			isspace(buffer[len]));
+ }
+ 
+ /*
+@@ -325,7 +325,7 @@ static void include_conf(struct dep_t **first, struct dep_t **current, char *buf
+ 				include_conf(first, current, buffer, buflen, fdi);
+ 				close(fdi);
+ 			}
+-		} else if (ENABLE_FEATURE_MODPROBE_BLACKLIST && 
++		} else if (ENABLE_FEATURE_MODPROBE_BLACKLIST &&
+ 				(is_conf_command(buffer, "blacklist"))) {
+ 			char *mod;
+ 			struct dep_t *dt;
+diff --git a/networking/arp.c b/networking/arp.c
+index f85a910..ae1bb1a 100644
+--- a/networking/arp.c
++++ b/networking/arp.c
+@@ -314,7 +314,7 @@ arp_disp(const char *name, char *ip, int type, int arp_flags,
+ 		 char *hwa, char *mask, char *dev)
+ {
+ 	static const int arp_masks[] = {
+-		ATF_PERM, ATF_PUBL, 
++		ATF_PERM, ATF_PUBL,
+ #ifdef HAVE_ATF_MAGIC
+ 		ATF_MAGIC,
+ #endif
+diff --git a/util-linux/fdisk_osf.c b/util-linux/fdisk_osf.c
+index 30c4255..24f240a 100644
+--- a/util-linux/fdisk_osf.c
++++ b/util-linux/fdisk_osf.c
+@@ -516,7 +516,7 @@ xbsd_print_disklabel(int show_all)
+ 		printf("disk: %.*s\n", (int) sizeof(lp->d_typename), lp->d_typename);
+ 		printf("label: %.*s\n", (int) sizeof(lp->d_packname), lp->d_packname);
+ 		printf("flags: ");
+-		print_flags_separated(d_masks, "removable\0""ecc\0""badsect\0", lp->d_flags, " "); 
++		print_flags_separated(d_masks, "removable\0""ecc\0""badsect\0", lp->d_flags, " ");
+ 		bb_putchar('\n');
+ 		/* On various machines the fields of *lp are short/int/long */
+ 		/* In order to avoid problems, we cast them all to long. */

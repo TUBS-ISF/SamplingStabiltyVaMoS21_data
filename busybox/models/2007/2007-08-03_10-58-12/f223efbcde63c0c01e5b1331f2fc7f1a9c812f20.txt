@@ -1,0 +1,113 @@
+2007-08-03 10:58:12 +0000
+diff --git a/include/usage.h b/include/usage.h
+index d4d923b..9c14f45 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3256,8 +3256,18 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+ #define sv_trivial_usage \
+        "[-v] [-w sec] command service..."
+ #define sv_full_usage \
+-       "Report the current status and control the state of services " \
+-       "monitored by the runsv supervisor"
++       "Control services monitored by runsv supervisor.\n" \
++       "Commands (only first character is enough):\n" \
++       "\n" \
++       "status: query service status\n" \
++       "up: if service isn't running, start it. If service stops, restart it\n" \
++       "once: like 'up', but if service stops, don't restart it\n" \
++       "down: send TERM and CONT signals. If ./run exits, start ./finish\n" \
++       "    if it exists. After it stops, do not restart service\n" \
++       "exit: send TERM and CONT signals to service and log service. If they exit,\n" \
++       "    runsv exits too\n" \
++       "pause, cont, hup, alarm, interrupt, quit, 1, 2, term, kill: send\n" \
++       "STOP, CONT, HUP, ALRM, INT, QUIT, USR1, USR2, TERM, KILL signal to service"
+ 
+ #define svlogd_trivial_usage \
+        "[-ttv] [-r c] [-R abc] [-l len] [-b buflen] dir..."
+diff --git a/runit/sv.c b/runit/sv.c
+index a918bb7..9181fff 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -36,7 +36,7 @@ The sv program reports the current status and controls the state of services
+ monitored by the runsv(8) supervisor.
+ 
+ services consists of one or more arguments, each argument naming a directory
+-service used by runsv(8). If service doesn?t start with a dot or slash,
++service used by runsv(8). If service doesn't start with a dot or slash,
+ it is searched in the default services directory /var/service/, otherwise
+ relative to the current directory.
+ 
+@@ -72,6 +72,8 @@ exit
+ 
+ sv actually looks only at the first character of above commands.
+ 
++Commands compatible to LSB init script actions:
++
+ status
+     Same as status.
+ start
+@@ -104,7 +106,7 @@ force-restart
+     7 seconds for the service to restart. Then report the status, and
+     on timeout send the service the kill command. If the script ./check
+     exists in the service directory, sv runs this script to check whether
+-    the service is up and available again; it?s considered to be available
++    the service is up and available again; it's considered to be available
+     if ./check exits with 0.
+ force-shutdown
+     Same as exit, but wait up to 7 seconds for the runsv(8) process to
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index b271b74..e16043e 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -465,8 +465,8 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 
+ 	/* read config */
+ 	i = open_read_close("config", buf, sizeof(buf));
+-	if (i < 0)
+-		warn2("cannot read config", ld->name);
++	if (i < 0 && errno != ENOENT)
++		bb_perror_msg(WARNING": %s/config", ld->name);
+ 	if (i > 0) {
+ 		if (verbose) bb_error_msg(INFO"read: %s/config", ld->name);
+ 		s = buf;
+@@ -835,19 +835,8 @@ int svlogd_main(int argc, char **argv)
+ 		char ch;
+ 
+ 		lineptr = line;
+-		taia_now(&now);
+-		/* Prepare timestamp if needed */
+-		if (timestamp) {
+-			switch (timestamp) {
+-			case 1:
+-				fmt_taia25(stamp, &now);
+-				break;
+-			default: /* case 2: */
+-				fmt_ptime30nul(stamp, &now);
+-				break;
+-			}
++		if (timestamp)
+ 			lineptr += 26;
+-		}
+ 
+ 		/* lineptr[0..linemax-1] - buffer for stdin */
+ 		/* (possibly has some unprocessed data from prev loop) */
+@@ -857,6 +846,7 @@ int svlogd_main(int argc, char **argv)
+ 		if (!np && !exitasap) {
+ 			i = linemax - stdin_cnt; /* avail. bytes at tail */
+ 			if (i >= 128) {
++				taia_now(&now);
+ 				i = buffer_pread(0, lineptr + stdin_cnt, i, &now);
+ 				if (i <= 0) /* EOF or error on stdin */
+ 					exitasap = 1;
+@@ -889,6 +879,11 @@ int svlogd_main(int argc, char **argv)
+ 		printlen = linelen;
+ 		printptr = lineptr;
+ 		if (timestamp) {
++			taia_now(&now);
++			if (timestamp == 1)
++				fmt_taia25(stamp, &now);
++			else /* 2: */
++				fmt_ptime30nul(stamp, &now);
+ 			printlen += 26;
+ 			printptr -= 26;
+ 			memcpy(printptr, stamp, 25);

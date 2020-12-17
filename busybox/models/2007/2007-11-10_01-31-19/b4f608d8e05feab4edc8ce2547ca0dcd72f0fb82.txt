@@ -1,0 +1,52 @@
+2007-11-10 01:31:19 +0000
+diff --git a/coreutils/readlink.c b/coreutils/readlink.c
+index b6e389a..1ab9459 100644
+--- a/coreutils/readlink.c
++++ b/coreutils/readlink.c
+@@ -8,7 +8,6 @@
+  */
+ 
+ #include <getopt.h>
+-
+ #include "libbb.h"
+ 
+ int readlink_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+@@ -16,6 +15,7 @@ int readlink_main(int argc, char **argv)
+ {
+ 	char *buf;
+ 	char *fname;
++	char pathbuf[PATH_MAX];
+ 
+ 	USE_FEATURE_READLINK_FOLLOW(
+ 		unsigned opt;
+@@ -34,7 +34,7 @@ int readlink_main(int argc, char **argv)
+ 	logmode = LOGMODE_NONE;
+ 
+ 	if (opt) {
+-		buf = realpath(fname, bb_common_bufsiz1);
++		buf = realpath(fname, pathbuf);
+ 	} else {
+ 		buf = xmalloc_readlink_or_warn(fname);
+ 	}
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index 17d88b3..7c1b813 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -25,7 +25,7 @@ int umount_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int umount_main(int argc, char **argv)
+ {
+ 	int doForce;
+-	char path[2*PATH_MAX];
++	char path[PATH_MAX + 2];
+ 	struct mntent me;
+ 	FILE *fp;
+ 	char *fstype = 0;
+@@ -89,7 +89,7 @@ int umount_main(int argc, char **argv)
+ 
+ 		// Do we already know what to umount this time through the loop?
+ 		if (m)
+-			safe_strncpy(path, m->dir, PATH_MAX);
++			safe_strncpy(path, m->dir, sizeof(path));
+ 		// For umount -a, end of mtab means time to exit.
+ 		else if (opt & OPT_ALL)
+ 			break;

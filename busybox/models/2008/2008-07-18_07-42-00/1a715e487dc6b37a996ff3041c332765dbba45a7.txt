@@ -1,0 +1,14 @@
+2008-07-18 07:42:00 +0000
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 77d36e1..01b619f 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -841,7 +841,7 @@ arch_apply_relocation(struct obj_file *f,
+ {
+ #if defined(__arm__) || defined(__i386__) || defined(__mc68000__) \
+  || defined(__sh__) || defined(__s390__) || defined(__x86_64__) \
+- || defined(__powerpc__)
++ || defined(__powerpc__) || defined(__mips__)
+ 	struct arch_file *ifile = (struct arch_file *) f;
+ #endif
+ 	enum obj_reloc ret = obj_reloc_ok;

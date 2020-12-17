@@ -1,0 +1,176 @@
+2009-03-31 22:14:32 +0000
+diff --git a/shell/hush_test/hush-trap/catch.tests b/shell/hush_test/hush-trap/catch.tests
+index b1a4ed9..d2a21d1 100755
+--- a/shell/hush_test/hush-trap/catch.tests
++++ b/shell/hush_test/hush-trap/catch.tests
+@@ -1,7 +1,7 @@
+ # avoid ugly warnings about signals not being caught
+ trap ":" USR1 USR2
+ 
+-hush -c '
++"$THIS_SH" -c '
+ trap "echo caught" USR2
+ echo "sending USR2"
+ kill -USR2 $$
+diff --git a/shell/hush_test/hush-trap/exit.tests b/shell/hush_test/hush-trap/exit.tests
+index 174e74f..092543c 100755
+--- a/shell/hush_test/hush-trap/exit.tests
++++ b/shell/hush_test/hush-trap/exit.tests
+@@ -1,3 +1,3 @@
+-hush -c 'trap "echo cow" 0'
+-hush -c 'trap "echo moo" EXIT'
+-hush -c 'trap "echo no" 0; trap 0'
++"$THIS_SH" -c 'trap "echo cow" 0'
++"$THIS_SH" -c 'trap "echo moo" EXIT'
++"$THIS_SH" -c 'trap "echo no" 0; trap 0'
+diff --git a/shell/hush_test/hush-vars/param_expand_alt.tests b/shell/hush_test/hush-vars/param_expand_alt.tests
+index c46075b..dcdca86 100755
+--- a/shell/hush_test/hush-vars/param_expand_alt.tests
++++ b/shell/hush_test/hush-vars/param_expand_alt.tests
+@@ -1,6 +1,6 @@
+ # first try some invalid patterns (do in subshell due to parsing error)
+-hush -c 'echo ${+}  ; echo moo'
+-hush -c 'echo ${:+} ; echo moo'
++"$THIS_SH" -c 'echo ${+}  ; echo moo'
++"$THIS_SH" -c 'echo ${:+} ; echo moo'
+ 
+ # now some funky ones
+ echo _${#+} _${#:+}
+diff --git a/shell/hush_test/hush-vars/param_expand_assign.tests b/shell/hush_test/hush-vars/param_expand_assign.tests
+index 1fba556..149cb20 100755
+--- a/shell/hush_test/hush-vars/param_expand_assign.tests
++++ b/shell/hush_test/hush-vars/param_expand_assign.tests
+@@ -1,22 +1,22 @@
+ # first try some invalid patterns (do in subshell due to parsing error)
+-hush -c 'echo ${=}'
+-hush -c 'echo ${:=}'
++"$THIS_SH" -c 'echo ${=}'
++"$THIS_SH" -c 'echo ${:=}'
+ 
+ # now some funky ones
+-hush -c 'echo ${#=}'
+-hush -c 'echo ${#:=}'
++"$THIS_SH" -c 'echo ${#=}'
++"$THIS_SH" -c 'echo ${#:=}'
+ 
+ # should error out
+-hush -c 'set --; echo _${1=}'
+-hush -c 'set --; echo _${1:=}'
+-hush -c 'set --; echo _${1=word}'
+-hush -c 'set --; echo _${1:=word}'
++"$THIS_SH" -c 'set --; echo _${1=}'
++"$THIS_SH" -c 'set --; echo _${1:=}'
++"$THIS_SH" -c 'set --; echo _${1=word}'
++"$THIS_SH" -c 'set --; echo _${1:=word}'
+ 
+ # should not error
+-hush -c 'set aa; echo _${1=}'
+-hush -c 'set aa; echo _${1:=}'
+-hush -c 'set aa; echo _${1=word}'
+-hush -c 'set aa; echo _${1:=word}'
++"$THIS_SH" -c 'set aa; echo _${1=}'
++"$THIS_SH" -c 'set aa; echo _${1:=}'
++"$THIS_SH" -c 'set aa; echo _${1=word}'
++"$THIS_SH" -c 'set aa; echo _${1:=word}'
+ 
+ # should work fine
+ unset f; echo _$f
+diff --git a/shell/hush_test/hush-vars/param_expand_default.tests b/shell/hush_test/hush-vars/param_expand_default.tests
+index 2320ece..1ea0517 100755
+--- a/shell/hush_test/hush-vars/param_expand_default.tests
++++ b/shell/hush_test/hush-vars/param_expand_default.tests
+@@ -1,6 +1,6 @@
+ # first try some invalid patterns (do in subshell due to parsing error)
+-hush -c 'echo ${-}'
+-hush -c 'echo ${:-}'
++"$THIS_SH" -c 'echo ${-}'
++"$THIS_SH" -c 'echo ${:-}'
+ 
+ # now some funky ones
+ echo _${#-} _${#:-}
+diff --git a/shell/hush_test/hush-vars/param_expand_indicate_error.tests b/shell/hush_test/hush-vars/param_expand_indicate_error.tests
+index 6b431d3..77834fe 100755
+--- a/shell/hush_test/hush-vars/param_expand_indicate_error.tests
++++ b/shell/hush_test/hush-vars/param_expand_indicate_error.tests
+@@ -1,40 +1,40 @@
+ # do all of these in subshells since it's supposed to error out
+ 
+ # first try some invalid patterns
+-hush -c 'echo ${?}'
+-hush -c 'echo ${:?}'
++"$THIS_SH" -c 'echo ${?}'
++"$THIS_SH" -c 'echo ${:?}'
+ 
+ # then some funky ones
+-hush -c 'echo ${#?}'
+-hush -c 'echo ${#:?}'
++"$THIS_SH" -c 'echo ${#?}'
++"$THIS_SH" -c 'echo ${#:?}'
+ 
+ # now some valid ones
+-hush -c 'set --; echo _$1'
+-hush -c 'set --; echo _${1?}'
+-hush -c 'set --; echo _${1:?}'
+-hush -c 'set --; echo _${1?word}'
+-hush -c 'set --; echo _${1:?word}'
++"$THIS_SH" -c 'set --; echo _$1'
++"$THIS_SH" -c 'set --; echo _${1?}'
++"$THIS_SH" -c 'set --; echo _${1:?}'
++"$THIS_SH" -c 'set --; echo _${1?word}'
++"$THIS_SH" -c 'set --; echo _${1:?word}'
+ 
+-hush -c 'set -- aaaa; echo _$1'
+-hush -c 'set -- aaaa; echo _${1?}'
+-hush -c 'set -- aaaa; echo _${1:?}'
+-hush -c 'set -- aaaa; echo _${1?word}'
+-hush -c 'set -- aaaa; echo _${1:?word}'
++"$THIS_SH" -c 'set -- aaaa; echo _$1'
++"$THIS_SH" -c 'set -- aaaa; echo _${1?}'
++"$THIS_SH" -c 'set -- aaaa; echo _${1:?}'
++"$THIS_SH" -c 'set -- aaaa; echo _${1?word}'
++"$THIS_SH" -c 'set -- aaaa; echo _${1:?word}'
+ 
+-hush -c 'unset f; echo _$f'
+-hush -c 'unset f; echo _${f?}'
+-hush -c 'unset f; echo _${f:?}'
+-hush -c 'unset f; echo _${f?word}'
+-hush -c 'unset f; echo _${f:?word}'
++"$THIS_SH" -c 'unset f; echo _$f'
++"$THIS_SH" -c 'unset f; echo _${f?}'
++"$THIS_SH" -c 'unset f; echo _${f:?}'
++"$THIS_SH" -c 'unset f; echo _${f?word}'
++"$THIS_SH" -c 'unset f; echo _${f:?word}'
+ 
+-hush -c 'f=; echo _$f'
+-hush -c 'f=; echo _${f?}'
+-hush -c 'f=; echo _${f:?}'
+-hush -c 'f=; echo _${f?word}'
+-hush -c 'f=; echo _${f:?word}'
++"$THIS_SH" -c 'f=; echo _$f'
++"$THIS_SH" -c 'f=; echo _${f?}'
++"$THIS_SH" -c 'f=; echo _${f:?}'
++"$THIS_SH" -c 'f=; echo _${f?word}'
++"$THIS_SH" -c 'f=; echo _${f:?word}'
+ 
+-hush -c 'f=fff; echo _$f'
+-hush -c 'f=fff; echo _${f?}'
+-hush -c 'f=fff; echo _${f:?}'
+-hush -c 'f=fff; echo _${f?word}'
+-hush -c 'f=fff; echo _${f:?word}'
++"$THIS_SH" -c 'f=fff; echo _$f'
++"$THIS_SH" -c 'f=fff; echo _${f?}'
++"$THIS_SH" -c 'f=fff; echo _${f:?}'
++"$THIS_SH" -c 'f=fff; echo _${f?word}'
++"$THIS_SH" -c 'f=fff; echo _${f:?word}'
+diff --git a/shell/hush_test/hush-vars/var3.tests b/shell/hush_test/hush-vars/var3.tests
+index 2947fcc..e09f433 100755
+--- a/shell/hush_test/hush-vars/var3.tests
++++ b/shell/hush_test/hush-vars/var3.tests
+@@ -1,4 +1,4 @@
+ # reject invalid vars
+-hush -c 'echo ${1q}'
+-hush -c 'echo ${&}'
+-hush -c 'echo ${$}'
++"$THIS_SH" -c 'echo ${1q}'
++"$THIS_SH" -c 'echo ${&}'
++"$THIS_SH" -c 'echo ${$}'

@@ -1,0 +1,17 @@
+2008-05-24 16:46:13 +0000
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index bf07aeb..a32c04f 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -180,8 +180,9 @@ static void make_device(char *path, int delete)
+ 				/* substitute %1..9 with off[1..9], if any */
+ 				n = 0;
+ 				s = val;
+-				while (*s && *s++ == '%')
+-					n++;
++				while (*s)
++					if (*s++ == '%')
++						n++;
+ 
+ 				p = alias = xzalloc(strlen(val) + n * strlen(device_name));
+ 				s = val + 1;

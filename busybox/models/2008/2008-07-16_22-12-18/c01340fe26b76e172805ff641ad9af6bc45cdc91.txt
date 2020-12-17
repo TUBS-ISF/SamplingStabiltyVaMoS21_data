@@ -1,0 +1,406 @@
+2008-07-16 22:12:18 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 3a7c2ee..c124b1a 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -985,30 +985,20 @@ extern int set_loop(char **devname, const char *file, unsigned long long offset)
+ char *bb_askpass(int timeout, const char * prompt) FAST_FUNC;
+ int bb_ask_confirmation(void) FAST_FUNC;
+ 
+-extern int bb_parse_mode(const char* s, mode_t* theMode) FAST_FUNC;
++int bb_parse_mode(const char* s, mode_t* theMode) FAST_FUNC;
+ 
+ /*
+  * Uniform config file parser helpers
+  */
+-#define PARSER_STDIO_BASED 1
+-#if !PARSER_STDIO_BASED
+-typedef struct parser_t {
+-	char *data;
+-	char *line;
+-	int lineno;
+-} parser_t;
+-extern char* config_open(parser_t *parser, const char *filename) FAST_FUNC;
+-#else
+ typedef struct parser_t {
+ 	FILE *fp;
+-	char *line;
++	char *line, *data;
+ 	int lineno;
+ } parser_t;
+-extern FILE* config_open(parser_t *parser, const char *filename) FAST_FUNC;
+-#endif
++FILE* config_open(parser_t *parser, const char *filename) FAST_FUNC;
+ /* TODO: add define magic to collapse ntokens/mintokens/comment into one int param */
+-extern char* config_read(parser_t *parser, char **tokens, int ntokens, int mintokens, const char *delims, char comment) FAST_FUNC;
+-extern void config_close(parser_t *parser) FAST_FUNC;
++int config_read(parser_t *parser, char **tokens, int ntokens, int mintokens, const char *delims, char comment) FAST_FUNC;
++void config_close(parser_t *parser) FAST_FUNC;
+ 
+ /* Concatenate path and filename to new allocated buffer.
+  * Add "/" only as needed (no duplicate "//" are produced).
+diff --git a/libbb/parse_config.c b/libbb/parse_config.c
+index 6612db3..e63204b 100644
+--- a/libbb/parse_config.c
++++ b/libbb/parse_config.c
+@@ -31,101 +31,6 @@ Typical usage:
+ 
+ */
+ 
+-#if !PARSER_STDIO_BASED
+-
+-char* FAST_FUNC config_open(parser_t *parser, const char *filename)
+-{
+-	// empty file configures nothing!
+-	char *data = xmalloc_open_read_close(filename, NULL);
+-	if (!data)
+-		return data;
+-
+-	// convert 0x5c 0x0a (backslashes at the very end of line) to 0x20 0x20 (spaces)
+-	for (char *s = data; (s = strchr(s, '\\')) != NULL; ++s)
+-		if ('\n' == s[1]) {
+-			s[0] = s[1] = ' ';
+-		}
+-
+-	// init parser
+-	parser->line = parser->data = data;
+-	parser->lineno = 0;
+-
+-	return data;
+-}
+-
+-void FAST_FUNC config_close(parser_t *parser)
+-{
+-	// for now just free config data
+-	free(parser->data);
+-}
+-
+-char* FAST_FUNC config_read(parser_t *parser, char **tokens, int ntokens, int mintokens, const char *delims, char comment)
+-{
+-	char *ret, *line;
+-	int noreduce = (ntokens<0); // do not treat subsequent delimiters as one delimiter
+-	if (ntokens < 0)
+-		ntokens = -ntokens;
+-	ret = line = parser->line;
+-	// nullify tokens
+-	memset(tokens, 0, sizeof(void *) * ntokens);
+-	// now split to lines
+-	while (*line) {
+-		int token_num = 0;
+-		// limit the line
+-		char *ptr = strchrnul(line, '\n');
+-		*ptr++ = '\0';
+-		// line number
+-		parser->lineno++;
+-		// comments mean EOLs
+-		if (comment)
+-			*strchrnul(line, comment) = '\0';
+-		// skip leading delimiters
+-		while (*line && strchr(delims, *line))
+-			line++;
+-		// skip empty lines
+-		if (*line) {
+-			char *s;
+-			// now split line to tokens
+-			s = line;
+-			while (s) {
+-				char *p;
+-				// get next token
+-				if (token_num+1 >= ntokens)
+-					break;
+-				p = s;
+-				while (*p && !strchr(delims, *p))
+-					p++;
+-				if (!*p)
+-					break;
+-				*p++ = '\0';
+-				// pin token
+-				if (noreduce || *s) {
+-					tokens[token_num++] = s;
+-//bb_error_msg("L[%d] T[%s]", token_num, s);
+-				}
+-				s = p;
+-	 		}
+-			// non-empty remainder is also a token. So if ntokens == 0, we just return the whole line
+-			if (s && (noreduce || *s))
+-				tokens[token_num++] = s;
+-			// sanity check: have we got all required tokens?
+-			if (token_num < mintokens)
+-				bb_error_msg_and_die("bad line %u, %d tokens found, %d needed", parser->lineno, token_num, mintokens);
+-			// advance data for the next call
+-			line = ptr;
+-			break;
+-		}
+-		// line didn't contain any token -> try next line
+-		ret = line = ptr;
+- 	}
+-	parser->line = line;
+-
+-	// return current line. caller must check *ret to determine whether to continue
+-	return ret;
+-}
+-
+-#else // stdio-based
+-
+ FILE* FAST_FUNC config_open(parser_t *parser, const char *filename)
+ {
+ 	// empty file configures nothing!
+@@ -142,10 +47,12 @@ FILE* FAST_FUNC config_open(parser_t *parser, const char *filename)
+ 
+ void FAST_FUNC config_close(parser_t *parser)
+ {
++	free(parser->line);
++	free(parser->data);
+ 	fclose(parser->fp);
+ }
+ 
+-char* FAST_FUNC config_read(parser_t *parser, char **tokens, int ntokens, int mintokens, const char *delims, char comment)
++int FAST_FUNC config_read(parser_t *parser, char **tokens, int ntokens, int mintokens, const char *delims, char comment)
+ {
+ 	char *line, *q;
+ 	int token_num, len;
+@@ -160,6 +67,8 @@ char* FAST_FUNC config_read(parser_t *parser, char **tokens, int ntokens, int mi
+ 	// free used line
+ 	free(parser->line);
+ 	parser->line = NULL;
++	free(parser->data);
++	parser->data = NULL;
+ 
+ 	while (1) {
+ 		int n;
+@@ -211,6 +120,7 @@ char* FAST_FUNC config_read(parser_t *parser, char **tokens, int ntokens, int mi
+ 
+ 	// store line
+ 	parser->line = line = xrealloc(line, len + 1);
++	parser->data = xstrdup(line);
+ 
+ 	// now split line to tokens
+ //TODO: discard consecutive delimiters?
+@@ -241,7 +151,5 @@ char* FAST_FUNC config_read(parser_t *parser, char **tokens, int ntokens, int mi
+ 		bb_error_msg_and_die("bad line %u: %d tokens found, %d needed",
+ 				parser->lineno, token_num, mintokens);
+ 
+-	return parser->line; // maybe token_num instead?
++	return token_num;
+ }
+-
+-#endif
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index e48abf9..af37bb1 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -304,7 +304,7 @@ static const char MonAry[] ALIGN1 =
+ 	/* "Jan""Feb""Mar""Apr""May""Jun""Jul""Aug""Sep""Oct""Nov""Dec" */
+ ;
+ 
+-static char *ParseField(char *user, char *ary, int modvalue, int off,
++static void ParseField(char *user, char *ary, int modvalue, int off,
+ 				const char *names, char *ptr)
+ /* 'names' is a pointer to a set of 3-char abbreviations */
+ {
+@@ -312,11 +312,11 @@ static char *ParseField(char *user, char *ary, int modvalue, int off,
+ 	int n1 = -1;
+ 	int n2 = -1;
+ 
+-	if (base == NULL) {
+-		return NULL;
+-	}
++	// this can't happen due to config_read()
++	/*if (base == NULL)
++		return;*/
+ 
+-	while (!isspace(*ptr)) {
++	while (1) {
+ 		int skip = 0;
+ 
+ 		/* Handle numeric digit or symbol or '*' */
+@@ -352,8 +352,7 @@ static char *ParseField(char *user, char *ary, int modvalue, int off,
+ 
+ 		/* handle optional range '-' */
+ 		if (skip == 0) {
+-			crondlog(WARN9 "user %s: parse error at %s", user, base);
+-			return NULL;
++			goto err;
+ 		}
+ 		if (*ptr == '-' && n2 < 0) {
+ 			++ptr;
+@@ -388,8 +387,7 @@ static char *ParseField(char *user, char *ary, int modvalue, int off,
+ 					s0 = skip;
+ 				}
+ 				if (--failsafe == 0) {
+-					crondlog(WARN9 "user %s: parse error at %s", user, base);
+-					return NULL;
++					goto err;
+ 				}
+ 			} while (n1 != n2);
+ 
+@@ -402,9 +400,10 @@ static char *ParseField(char *user, char *ary, int modvalue, int off,
+ 		n2 = -1;
+ 	}
+ 
+-	if (!isspace(*ptr)) {
++	if (*ptr) {
++ err:
+ 		crondlog(WARN9 "user %s: parse error at %s", user, base);
+-		return NULL;
++		return;
+ 	}
+ 
+ 	if (DebugOpt && (LogLevel <= 5)) { /* like LVL5 */
+@@ -414,7 +413,6 @@ static char *ParseField(char *user, char *ary, int modvalue, int off,
+ 			fprintf(stderr, "%d", (unsigned char)ary[i]);
+ 		fputc('\n', stderr);
+ 	}
+-	return skip_whitespace(ptr);
+ }
+ 
+ static void FixDayDow(CronLine *line)
+@@ -445,11 +443,10 @@ static void FixDayDow(CronLine *line)
+ 
+ static void SynchronizeFile(const char *fileName)
+ {
+-	FILE *fi;
++	struct parser_t parser;
+ 	struct stat sbuf;
+-	int maxEntries;
+ 	int maxLines;
+-	char buf[1024];
++	char *tokens[6];
+ #if ENABLE_FEATURE_CROND_CALL_SENDMAIL
+ 	char *mailTo = NULL;
+ #endif
+@@ -458,57 +455,44 @@ static void SynchronizeFile(const char *fileName)
+ 		return;
+ 
+ 	DeleteFile(fileName);
+-	fi = fopen(fileName, "r");
+-	if (!fi)
++	if (!config_open(&parser, fileName))
+ 		return;
+ 
+-	maxEntries = MAXLINES;
+-	if (strcmp(fileName, "root") == 0) {
+-		maxEntries = 65535;
+-	}
+-	maxLines = maxEntries * 10;
++	maxLines = (strcmp(fileName, "root") == 0) ? 65535 : MAXLINES;
+ 
+-	if (fstat(fileno(fi), &sbuf) == 0 && sbuf.st_uid == DaemonUid) {
++	if (fstat(fileno(parser.fp), &sbuf) == 0 && sbuf.st_uid == DaemonUid) {
+ 		CronFile *file = xzalloc(sizeof(CronFile));
+ 		CronLine **pline;
++		int n;
+ 
+ 		file->cf_User = xstrdup(fileName);
+ 		pline = &file->cf_LineBase;
+ 
+-		while (fgets(buf, sizeof(buf), fi) != NULL && --maxLines) {
++		while (--maxLines && (n=config_read(&parser, tokens, 6, 0, " \t", '#')) > 0) {
+ 			CronLine *line;
+-			char *ptr;
+ 
+-			trim(buf);
+-			if (buf[0] == '\0' || buf[0] == '#') {
+-				continue;
+-			}
+-			if (--maxEntries == 0) {
+-				break;
+-			}
+ 			if (DebugOpt) {
+-				crondlog(LVL5 "user:%s entry:%s", fileName, buf);
++				crondlog(LVL5 "user:%s entry:%s", fileName, parser.data);
+ 			}
++
+ 			/* check if line is setting MAILTO= */
+-			if (0 == strncmp("MAILTO=", buf, 7)) {
++			if (0 == strncmp(tokens[0], "MAILTO=", 7)) {
+ #if ENABLE_FEATURE_CROND_CALL_SENDMAIL
+ 				free(mailTo);
+-				mailTo = (buf[7]) ? xstrdup(buf+7) : NULL;
++				mailTo = (tokens[0][7]) ? xstrdup(&tokens[0][7]) : NULL;
+ #endif /* otherwise just ignore such lines */
+ 				continue;
+ 			}
++			/* check if a minimum of tokens is specified */
++			if (n < 5)
++				continue;
+ 			*pline = line = xzalloc(sizeof(CronLine));
+ 			/* parse date ranges */
+-			ptr = ParseField(file->cf_User, line->cl_Mins, 60, 0, NULL, buf);
+-			ptr = ParseField(file->cf_User, line->cl_Hrs, 24, 0, NULL, ptr);
+-			ptr = ParseField(file->cf_User, line->cl_Days, 32, 0, NULL, ptr);
+-			ptr = ParseField(file->cf_User, line->cl_Mons, 12, -1, MonAry, ptr);
+-			ptr = ParseField(file->cf_User, line->cl_Dow, 7, 0, DowAry, ptr);
+-			/* check failure */
+-			if (ptr == NULL) {
+-				free(line);
+-				continue;
+-			}
++			ParseField(file->cf_User, line->cl_Mins, 60, 0, NULL, tokens[0]);
++			ParseField(file->cf_User, line->cl_Hrs, 24, 0, NULL, tokens[1]);
++			ParseField(file->cf_User, line->cl_Days, 32, 0, NULL, tokens[2]);
++			ParseField(file->cf_User, line->cl_Mons, 12, -1, MonAry, tokens[3]);
++			ParseField(file->cf_User, line->cl_Dow, 7, 0, DowAry, tokens[4]);
+ 			/*
+ 			 * fix days and dow - if one is not "*" and the other
+ 			 * is "*", the other is set to 0, and vise-versa
+@@ -519,22 +503,23 @@ static void SynchronizeFile(const char *fileName)
+ 			line->cl_MailTo = xstrdup(mailTo);
+ #endif
+ 			/* copy command */
+-			line->cl_Shell = xstrdup(ptr);
++			line->cl_Shell = xstrdup(tokens[5]);
+ 			if (DebugOpt) {
+-				crondlog(LVL5 " command:%s", ptr);
++				crondlog(LVL5 " command:%s", tokens[5]);
+ 			}
+ 			pline = &line->cl_Next;
++//bb_error_msg("M[%s]F[%s][%s][%s][%s][%s][%s]", mailTo, tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]);
+ 		}
+ 		*pline = NULL;
+ 
+ 		file->cf_Next = FileBase;
+ 		FileBase = file;
+ 
+-		if (maxLines == 0 || maxEntries == 0) {
++		if (maxLines == 0) {
+ 			crondlog(WARN9 "user %s: too many lines", fileName);
+ 		}
+ 	}
+-	fclose(fi);
++	config_close(&parser);
+ }
+ 
+ static void CheckUpdates(void)
+diff --git a/networking/nameif.c b/networking/nameif.c
+index f3d333b..506f4fa 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -160,21 +160,13 @@ int nameif_main(int argc, char **argv)
+ 			prepend_new_eth_table(&clist, ifname, *argv++);
+ 		}
+ 	} else {
+-		ifh = xfopen(fname, "r");
+-		while ((line = xmalloc_fgets(ifh)) != NULL) {
+-			char *next;
+-
+-			line_ptr = skip_whitespace(line);
+-			if ((line_ptr[0] == '#') || (line_ptr[0] == '\n'))
+-				goto read_next_line;
+-			next = skip_non_whitespace(line_ptr);
+-			if (*next)
+-				*next++ = '\0';
+-			prepend_new_eth_table(&clist, line_ptr, next);
+-			read_next_line:
+-			free(line);
++		struct parser_t parser;
++		if (config_open(&parser, fname)) {
++			char *tokens[2];
++			while (config_read(&parser, tokens, 2, 2, " \t", '#'))
++				prepend_new_eth_table(&clist, tokens[0], tokens[1]);
++			config_close(&parser);
+ 		}
+-		fclose(ifh);
+ 	}
+ 
+ 	ctl_sk = xsocket(PF_INET, SOCK_DGRAM, 0);

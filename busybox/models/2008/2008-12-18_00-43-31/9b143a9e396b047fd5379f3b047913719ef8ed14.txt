@@ -1,0 +1,285 @@
+2008-12-18 00:43:31 +0000
+diff --git a/docs/busybox.net/download.html b/docs/busybox.net/download.html
+index fa5945e..34195b6 100644
+--- a/docs/busybox.net/download.html
++++ b/docs/busybox.net/download.html
+@@ -44,7 +44,7 @@ the latest development source tree for those wishing to follow BusyBox developme
+ but cannot or do not wish to use Subversion (svn).
+ 
+ <ul>
+-	<li> Click here to <a href="/cgi-bin/viewcvs.cgi/trunk/busybox/">browse the source tree</a>.
++	<li> Click here to <a href="http://sources.busybox.net/index.py/trunk/busybox/">browse the source tree</a>.
+ 	</li>
+ 
+ 	<li>Anonymous <a href="subversion.html">Subversion access</a> is available.
+diff --git a/docs/busybox.net/header.html b/docs/busybox.net/header.html
+index 057b27a..5d152bc 100644
+--- a/docs/busybox.net/header.html
++++ b/docs/busybox.net/header.html
+@@ -60,7 +60,7 @@
+     </ul>
+     <b>Development</b>
+     <ul>
+-        <li><a href="/cgi-bin/viewcvs.cgi/trunk/busybox/">Browse Source</a></li>
++        <li><a href="http://sources.busybox.net/index.py/trunk/busybox/">Browse Source</a></li>
+         <li><a href="subversion.html">Source Control</a></li>
+         <!--li><a href="/downloads/patches/recent.html">Recent Changes</a></li-->
+         <li><a href="lists.html">Mailing Lists</a></li>
+diff --git a/docs/busybox.net/lists.html b/docs/busybox.net/lists.html
+index 3a28cc0..29c2f74 100644
+--- a/docs/busybox.net/lists.html
++++ b/docs/busybox.net/lists.html
+@@ -6,7 +6,7 @@
+ <h3>Mailing List Information</h3>
+ BusyBox has a <a href="/lists/busybox/">mailing list</a> for discussion and
+ development.  You can subscribe by visiting
+-<a href="http://busybox.net/mailman/listinfo/busybox">this page</a>.
++<a href="http://lists.busybox.net/mailman/listinfo/busybox">this page</a>.
+ Only subscribers to the BusyBox mailing list are allowed to post
+ to this list.
+ 
+@@ -14,7 +14,7 @@ to this list.
+ There is also a mailing list for <a href="/lists/busybox-cvs/">active developers</a>
+ wishing to read the complete diff of each and every change to busybox -- not for the
+ faint of heart.  Active developers can subscribe by visiting
+-<a href="http://busybox.net/mailman/listinfo/busybox-cvs">this page</a>.
++<a href="http://lists.busybox.net/mailman/listinfo/busybox-cvs">this page</a>.
+ The Subversion server is the only one permtted to post to this list.  And yes,
+ this list name uses the word 'cvs' even though we don't use that anymore...
+ 
+diff --git a/docs/busybox.net/news.html b/docs/busybox.net/news.html
+index 5c005fb..4f06e21 100644
+--- a/docs/busybox.net/news.html
++++ b/docs/busybox.net/news.html
+@@ -24,11 +24,11 @@
+ 
+   <li><b>29 November 2008 -- BusyBox 1.13.1 (stable), BusyBox 1.12.3 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.13.1.tar.bz2">BusyBox 1.13.1</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_13_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_13_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.13.1/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p><a href="http://busybox.net/downloads/busybox-1.12.3.tar.bz2">BusyBox 1.12.3</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_12_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_12_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.12.3/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -40,11 +40,11 @@
+ 
+   <li><b>10 November 2008 -- BusyBox 1.13.0 (unstable), BusyBox 1.12.2 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.13.0.tar.bz2">BusyBox 1.13.0</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_13_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_13_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.13.0/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p><a href="http://busybox.net/downloads/busybox-1.12.2.tar.bz2">BusyBox 1.12.2</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_12_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_12_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.12.2/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -142,11 +142,11 @@
+ 
+   <li><b>28 September 2008 -- BusyBox 1.12.1 (stable), BusyBox 1.11.3 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.12.1.tar.bz2">BusyBox 1.12.1</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_12_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_12_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.12.1/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p><a href="http://busybox.net/downloads/busybox-1.11.3.tar.bz2">BusyBox 1.11.3</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_11_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_11_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.11.3/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p>
+@@ -156,11 +156,11 @@
+ 
+   <li><b>21 August 2008 -- BusyBox 1.12.0 (unstable), BusyBox 1.11.2 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.12.0.tar.bz2">BusyBox 1.12.0</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_12_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_12_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.12.0/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p><a href="http://busybox.net/downloads/busybox-1.11.2.tar.bz2">BusyBox 1.11.2</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_11_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_11_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.11.2/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -300,7 +300,7 @@
+ 
+   <li><b>12 July 2008 -- BusyBox 1.11.1 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.11.1.tar.bz2">BusyBox 1.11.1</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_11_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_11_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.11.1/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p>
+diff --git a/docs/busybox.net/oldnews.html b/docs/busybox.net/oldnews.html
+index 5747136..8bd0805 100644
+--- a/docs/busybox.net/oldnews.html
++++ b/docs/busybox.net/oldnews.html
+@@ -6,11 +6,11 @@
+ 
+   <li><b>25 June 2008 -- BusyBox 1.11.0 (unstable), BusyBox 1.10.4 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.11.0.tar.bz2">BusyBox 1.11.0</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_11_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_11_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.11.0/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p><a href="http://busybox.net/downloads/busybox-1.10.4.tar.bz2">BusyBox 1.10.4</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_10_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_10_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.10.4/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p>Sizes of busybox-1.10.4 and busybox-1.11.0 (with equivalent config, static uclibc build):<pre>
+@@ -77,7 +77,7 @@
+ 
+   <li><b>5 June 2008 -- BusyBox 1.10.3 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.10.3.tar.bz2">BusyBox 1.10.3</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_10_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_10_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.10.3/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p>
+@@ -88,7 +88,7 @@
+ 
+   <li><b>8 May 2008 -- BusyBox 1.10.2 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.10.2.tar.bz2">BusyBox 1.10.2</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_10_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_10_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.10.2/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p>
+@@ -101,7 +101,7 @@
+ 
+   <li><b>19 April 2008 -- BusyBox 1.10.1 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.10.1.tar.bz2">BusyBox 1.10.1</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_10_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_10_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.10.1/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p>
+@@ -111,7 +111,7 @@
+ 
+   <li><b>21 March 2008 -- BusyBox 1.10.0 (unstable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.10.0.tar.bz2">BusyBox 1.10.0</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_10_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_10_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.10.0/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -285,7 +285,7 @@ iproute_list_or_flush   3680 readhere                2308
+ 
+   <li><b>12 February 2008 -- BusyBox 1.9.1 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.9.1.tar.bz2">BusyBox 1.9.1</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_9_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_9_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.9.1/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -298,7 +298,7 @@ iproute_list_or_flush   3680 readhere                2308
+ 
+   <li><b>24 December 2007 -- BusyBox 1.9.0 (unstable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.9.0.tar.bz2">BusyBox 1.9.0</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_9_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_9_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.9.0/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -366,11 +366,11 @@ parse_prompt           4132  insmod_main            3152
+ 
+   <li><b>23 November 2007 -- BusyBox 1.8.2 (stable), BusyBox 1.7.4 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.8.2.tar.bz2">BusyBox 1.8.2</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_8_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_8_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.8.2/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+     <p><a href="http://busybox.net/downloads/busybox-1.7.4.tar.bz2">BusyBox 1.7.4</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_7_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_7_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.7.4/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -381,7 +381,7 @@ parse_prompt           4132  insmod_main            3152
+ 
+   <li><b>9 November 2007 -- BusyBox 1.8.1 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.8.1.tar.bz2">BusyBox 1.8.1</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_8_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_8_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.8.1/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -390,7 +390,7 @@ parse_prompt           4132  insmod_main            3152
+ 
+   <li><b>4 November 2007 -- BusyBox 1.8.0 (unstable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.8.0.tar.bz2">BusyBox 1.8.0</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_8_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_8_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.8.0/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -497,7 +497,7 @@ Equivalent .config, i386 uclibc static builds:
+ 
+   <li><b>4 November 2007 -- BusyBox 1.7.3 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.7.3.tar.bz2">BusyBox 1.7.3</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_7_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_7_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.7.3/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -506,7 +506,7 @@ Equivalent .config, i386 uclibc static builds:
+ 
+   <li><b>30 September 2007 -- BusyBox 1.7.2 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.7.2.tar.bz2">BusyBox 1.7.2</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_7_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_7_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.7.2/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -515,7 +515,7 @@ Equivalent .config, i386 uclibc static builds:
+ 
+   <li><b>16 September 2007 -- BusyBox 1.7.1 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.7.1.tar.bz2">BusyBox 1.7.1</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_7_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_7_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.7.1/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -524,7 +524,7 @@ Equivalent .config, i386 uclibc static builds:
+ 
+   <li><b>24 August 2007 -- BusyBox 1.7.0 (unstable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.7.0.tar.bz2">BusyBox 1.7.0</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_7_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_7_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.7.0/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -671,7 +671,7 @@ Same .config built against static uclibc:
+ 
+   <li><b>30 June 2007 -- BusyBox 1.6.1 (stable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.6.1.tar.bz2">BusyBox 1.6.1</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_6_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_6_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.6.1/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -680,7 +680,7 @@ Same .config built against static uclibc:
+ 
+   <li><b>1 June 2007 -- BusyBox 1.6.0 (unstable)</b>
+     <p><a href="http://busybox.net/downloads/busybox-1.6.0.tar.bz2">BusyBox 1.6.0</a>.
+-    (<a href="http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_6_stable/">svn</a>,
++    (<a href="http://sources.busybox.net/index.py/branches/busybox_1_6_stable/">svn</a>,
+     <a href="http://busybox.net/downloads/fixes-1.6.0/">patches</a>,
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+@@ -2042,7 +2042,7 @@ image</a>. Here's how you use it:
+      Also, some exciting infrastructure news!  Busybox now has its own
+      <a href="lists/busybox/">mailing list</a>,
+      publically browsable
+-     <a href="/cgi-bin/viewcvs.cgi/trunk/busybox/">CVS tree</a>,
++     <a href="http://sources.busybox.net/index.py/trunk/busybox/">CVS tree</a>,
+      anonymous
+      <a href="cvs_anon.html">CVS access</a>, and
+      for those that are actively contributing there is even

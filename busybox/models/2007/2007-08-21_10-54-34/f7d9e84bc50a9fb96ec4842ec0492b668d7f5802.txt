@@ -1,0 +1,15 @@
+2007-08-21 10:54:34 +0000
+diff --git a/scripts/find_stray_communal_vars b/scripts/find_stray_communal_vars
+index 95563d1..9f26bc7 100755
+--- a/scripts/find_stray_communal_vars
++++ b/scripts/find_stray_communal_vars
+@@ -1,7 +1,7 @@
+ #!/bin/sh
+ 
+-# Communal variables are elusive, they don't show up in size output!
+-# This script will show all communals in *.o, sorted by size
++# Common variables are elusive, they don't show up in size output!
++# This script will show all commons in *.o, sorted by size
+ 
+ find -name '*.o' \
+ | while read name; do

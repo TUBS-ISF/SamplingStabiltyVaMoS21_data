@@ -1,0 +1,385 @@
+2008-12-04 12:05:26 +0000
+diff --git a/include/applets.h b/include/applets.h
+index 9c844ee..8d9d2a2 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -252,7 +252,7 @@ USE_MKFIFO(APPLET(mkfifo, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ //USE_MKE2FS(APPLET_ODDNAME(mkfs.ext3, mke2fs, _BB_DIR_SBIN, _BB_SUID_NEVER, mkfs_ext3))
+ USE_MKFS_MINIX(APPLET_ODDNAME(mkfs.minix, mkfs_minix, _BB_DIR_SBIN, _BB_SUID_NEVER, mkfs_minix))
+ USE_MKNOD(APPLET(mknod, _BB_DIR_BIN, _BB_SUID_NEVER))
+-USE_MKPASSWD(APPLET(mkpasswd, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
++USE_CRYPTPW(APPLET_ODDNAME(mkpasswd, cryptpw, _BB_DIR_USR_BIN, _BB_SUID_NEVER, mkpasswd))
+ USE_MKSWAP(APPLET(mkswap, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_MKTEMP(APPLET(mktemp, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_MODPROBE(APPLET(modprobe, _BB_DIR_SBIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index 8a1d3fa..90dde95 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -573,18 +573,45 @@
+      "\n	-r	Delete crontab" \
+      "\n	FILE	Replace crontab by FILE ('-': stdin)" \
+ 
+-#if !ENABLE_USE_BB_CRYPT || ENABLE_USE_BB_CRYPT_SHA
+ #define cryptpw_trivial_usage \
+-       "[-a des|md5|sha256/512] [string]"
+-#else
+-#define cryptpw_trivial_usage \
+-       "[-a des|md5] [string]"
+-#endif
++       "[OPTIONS] [PASSWORD] [SALT]"
++/* We do support -s, we just don't mention it */
+ #define cryptpw_full_usage "\n\n" \
+-       "Output crypted string.\n" \
+-       "If string isn't supplied on cmdline, read it from stdin.\n" \
++       "Crypt the PASSWORD using crypt(3)\n" \
+      "\nOptions:" \
+-     "\n	-a	Algorithm to use (default: md5)" \
++	USE_GETOPT_LONG( \
++     "\n	-P,--password-fd=NUM	Read password from fd NUM" \
++/*   "\n	-s,--stdin		Use stdin; like -P0" */ \
++     "\n	-m,--method=TYPE	Encryption method TYPE" \
++     "\n	-S,--salt=SALT" \
++	) \
++	SKIP_GETOPT_LONG( \
++     "\n	-P NUM	Read password from fd NUM" \
++/*   "\n	-s	Use stdin; like -P0" */ \
++     "\n	-m TYPE	Encryption method TYPE" \
++     "\n	-S SALT" \
++	) \
++
++/* mkpasswd is an alias to cryptpw */
++
++#define mkpasswd_trivial_usage \
++       "[OPTIONS] [PASSWORD] [SALT]"
++/* We do support -s, we just don't mention it */
++#define mkpasswd_full_usage "\n\n" \
++       "Crypt the PASSWORD using crypt(3)\n" \
++     "\nOptions:" \
++	USE_GETOPT_LONG( \
++     "\n	-P,--password-fd=NUM	Read password from fd NUM" \
++/*   "\n	-s,--stdin		Use stdin; like -P0" */ \
++     "\n	-m,--method=TYPE	Encryption method TYPE" \
++     "\n	-S,--salt=SALT" \
++	) \
++	SKIP_GETOPT_LONG( \
++     "\n	-P NUM	Read password from fd NUM" \
++/*   "\n	-s	Use stdin; like -P0" */ \
++     "\n	-m TYPE	Encryption method TYPE" \
++     "\n	-S SALT" \
++	) \
+ 
+ #define cttyhack_trivial_usage NOUSAGE_STR
+ #define cttyhack_full_usage ""
+@@ -2618,20 +2645,6 @@
+        "$ mknod /dev/fd0 b 2 0\n" \
+        "$ mknod -m 644 /tmp/pipe p\n"
+ 
+-#define mkpasswd_trivial_usage \
+-       "[OPTIONS] [PASSWORD]"
+-#define mkpasswd_full_usage "\n\n" \
+-       "Crypts the PASSWORD using crypt(3)\n" \
+-     "\nOptions:" \
+-     "\n\t-P"USE_GETOPT_LONG(", --password-fd=")"NUM\tread password from fd NUM" \
+-     "\n\t-s"USE_GETOPT_LONG(", --stdin")"\t\tuse stdin; like -P0" \
+-     "\n\t-m"USE_GETOPT_LONG(", --method=")"TYPE\tEncryption method TYPE" \
+-     "\n\t-S"USE_GETOPT_LONG(", --salt=")"SALT\t\tuse SALT"
+-
+-#define mkpasswd_example_usage \
+-       "$ mkpasswd -m md5\n" \
+-       "$ mkpasswd -l 12\n"
+-
+ #define mkswap_trivial_usage \
+        "DEVICE"
+ #define mkswap_full_usage "\n\n" \
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index 6efca7e..ddd0c80 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -242,22 +242,16 @@ config CRYPTPW
+ 	bool "cryptpw"
+ 	default n
+ 	help
+-	  Applet for crypting a string.
++	  Encrypts the given password with the crypt(3) libc function
++	  using the given salt. Debian has this utility under mkpasswd
++	  name. Busybox provides mkpasswd as an alias for cryptpw.
+ 
+ config CHPASSWD
+ 	bool "chpasswd"
+ 	default n
+ 	help
+-	  chpasswd reads a file of user name and password pairs from
+-	  standard input and uses this information to update a group of
+-	  existing users.
+-
+-config MKPASSWD
+-	bool "mkpasswd"
+-	default n
+-	help
+-	  mkpasswd encrypts the given password with the crypt(3) libc function
+-	  using the given salt.
++	  Reads a file of user name and password pairs from standard input
++	  and uses this information to update a group of existing users.
+ 
+ config SU
+ 	bool "su"
+diff --git a/loginutils/Kbuild b/loginutils/Kbuild
+index 616d977..3d0d777 100644
+--- a/loginutils/Kbuild
++++ b/loginutils/Kbuild
+@@ -11,7 +11,6 @@ lib-$(CONFIG_CRYPTPW)	+= cryptpw.o
+ lib-$(CONFIG_CHPASSWD)	+= chpasswd.o
+ lib-$(CONFIG_GETTY)	+= getty.o
+ lib-$(CONFIG_LOGIN)	+= login.o
+-lib-$(CONFIG_MKPASSWD)	+= mkpasswd.o
+ lib-$(CONFIG_PASSWD)	+= passwd.o
+ lib-$(CONFIG_SU)	+= su.o
+ lib-$(CONFIG_SULOGIN)	+= sulogin.o
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index 0c1a9a0..c179e35 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -3,75 +3,111 @@
+  * cryptpw.c
+  *
+  * Cooked from passwd.c by Thomas Lundquist <thomasez@zelow.no>
++ * mkpasswd compatible options added by Bernhard Reutner-Fischer
+  */
+ 
+ #include "libbb.h"
+ 
+-#define TESTING 0
++/* Debian has 'mkpasswd' utility, manpage says:
+ 
+-/*
+-set TESTING to 1 and pipe some file through this script
+-if you played with bbox's crypt implementation.
++NAME
++    mkpasswd - Overfeatured front end to crypt(3)
++SYNOPSIS
++    mkpasswd PASSWORD SALT
++...
++OPTIONS
++-S, --salt=STRING
++    Use the STRING as salt. It must not  contain  prefixes  such  as
++    $1$.
++-R, --rounds=NUMBER
++    Use NUMBER rounds. This argument is ignored if the method
++    choosen does not support variable rounds. For the OpenBSD Blowfish
++    method this is the logarithm of the number of rounds.
++-m, --method=TYPE
++    Compute the password using the TYPE method. If TYPE is 'help'
++    then the available methods are printed.
++-P, --password-fd=NUM
++    Read the password from file descriptor NUM instead of using getpass(3).
++    If the file descriptor is not connected to a tty then
++    no other message than the hashed password is printed on stdout.
++-s, --stdin
++    Like --password-fd=0.
++ENVIRONMENT
++    $MKPASSWD_OPTIONS
++    A list of options which will be evaluated before the ones
++    specified on the command line.
++BUGS
++    This programs suffers of a bad case of featuritis.
++    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 
+-while read line; do
+-	n=`./busybox cryptpw -a des -- "$line"`
+-	o=`./busybox_org cryptpw -a des -- "$line"`
+-	test "$n" != "$o" && {
+-		echo n="$n"
+-		echo o="$o"
+-		exit
+-	}
+-	n=`./busybox cryptpw -- "$line"`
+-	o=`./busybox_org cryptpw -- "$line"`
+-	test "$n" != "$o" && {
+-		echo n="$n"
+-		echo o="$o"
+-		exit
+-	}
+-done
+- */
++Very true...
++
++cryptpw was in bbox before this gem, so we retain it, and alias mkpasswd
++to cryptpw. -a option (alias for -m) came from cryptpw.
++*/
+ 
+ int cryptpw_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cryptpw_main(int argc UNUSED_PARAM, char **argv)
+ {
+-	char salt[sizeof("$N$") + 16 + TESTING*100];
+-	char *opt_a;
+-	int opts;
+-
+-	opts = getopt32(argv, "a:", &opt_a);
++	/* $N$ + sha_salt_16_bytes + NUL */
++	char salt[3 + 16 + 1];
++	char *salt_ptr;
++	const char *opt_m, *opt_S;
++	int len;
++	int fd;
+ 
+-	if (opts && opt_a[0] == 'd') {
+-		crypt_make_salt(salt, 2/2, 0);     /* des */
+-#if TESTING
+-		strcpy(salt, "a.");
++#if ENABLE_GETOPT_LONG
++	static const char mkpasswd_longopts[] ALIGN1 =
++		"stdin\0"       No_argument       "s"
++		"password-fd\0" Required_argument "P"
++		"salt\0"        Required_argument "S"
++		"method\0"      Required_argument "m"
++	;
++	applet_long_options = mkpasswd_longopts;
+ #endif
+-	} else {
+-		salt[0] = '$';
+-		salt[1] = '1';
+-		salt[2] = '$';
++	fd = STDIN_FILENO;
++	opt_m = "d";
++	opt_S = NULL;
++	/* at most two non-option arguments; -P NUM */
++	opt_complementary = "?2:P+";
++	getopt32(argv, "sP:S:m:a:", &fd, &opt_S, &opt_m, &opt_m);
++	argv += optind;
++
++	/* have no idea how to handle -s... */
++
++	if (argv[0] && !opt_S)
++		opt_S = argv[1];
++
++	len = 2/2;
++	salt_ptr = salt;
++	if (opt_m[0] != 'd') { /* not des */
++		len = 8/2; /* so far assuming md5 */
++		*salt_ptr++ = '$';
++		*salt_ptr++ = '1';
++		*salt_ptr++ = '$';
+ #if !ENABLE_USE_BB_CRYPT || ENABLE_USE_BB_CRYPT_SHA
+-		if (opts && opt_a[0] == 's') {
+-			salt[1] = '5' + (strcmp(opt_a, "sha512") == 0);
+-			crypt_make_salt(salt + 3, 16/2, 0); /* sha */
+-#if TESTING
+-			strcpy(salt, "$5$rounds=5000$toolongsaltstring");
+-			// with "This is just a test" as password, should produce:
+-			// "$5$rounds=5000$toolongsaltstrin$Un/5jzAHMgOGZ5.mWJpuVolil07guHPvOW8mGRcvxa5"
+-			strcpy(salt, "$6$rounds=5000$toolongsaltstring");
+-			// with "This is just a test" as password, should produce:
+-			// "$6$rounds=5000$toolongsaltstrin$lQ8jolhgVRVhY4b5pZKaysCLi0QBxGoNeKQzQ3glMhwllF7oGDZxUhx1yxdYcz/e1JSbq3y6JMxxl8audkUEm0"
+-#endif
+-		} else
+-#endif
+-		{
+-			crypt_make_salt(salt + 3, 8/2, 0); /* md5 */
+-#if TESTING
+-			strcpy(salt + 3, "ajg./bcf");
+-#endif
++		if (opt_m[0] == 's') { /* sha */
++			salt[1] = '5' + (strcmp(opt_m, "sha512") == 0);
++			len = 16/2;
+ 		}
++#endif
+ 	}
++	if (opt_S)
++		safe_strncpy(salt_ptr, opt_S, sizeof(salt) - 3);
++	else
++		crypt_make_salt(salt_ptr, len, 0);
++
++	xmove_fd(fd, STDIN_FILENO);
+ 
+-	puts(pw_encrypt(argv[optind] ? argv[optind] : xmalloc_fgetline(stdin), salt, 1));
++	puts(pw_encrypt(
++		argv[0]	? argv[0] : (
++			/* Only mkpasswd, and only from tty, prompts.
++			 * Otherwise it is a plain read. */
++			(isatty(0) && applet_name[0] == 'm')
++			? bb_ask(STDIN_FILENO, 0, "Password: ")
++			: xmalloc_fgetline(stdin)
++		),
++		salt, 1));
+ 
+-	return 0;
++	return EXIT_SUCCESS;
+ }
+diff --git a/loginutils/mkpasswd.c b/loginutils/mkpasswd.c
+deleted file mode 100644
+index 442738e..0000000
+--- a/loginutils/mkpasswd.c
++++ /dev/null
+@@ -1,71 +0,0 @@
+-/* vi: set sw=4 ts=4 sts=4: */
+-/*
+- * mkpasswd - Overfeatured front end to crypt(3)
+- * Copyright (c) 2008 Bernhard Reutner-Fischer
+- *
+- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+- */
+-
+-#include "libbb.h"
+-
+-int mkpasswd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int mkpasswd_main(int argc UNUSED_PARAM, char **argv)
+-{
+-	char *chp = NULL, *method = NULL, *salt = NULL;
+-	char *encrypted;
+-	int fd = STDIN_FILENO;
+-	enum {
+-		OPT_P = (1 << 0),
+-		OPT_s = (1 << 1),
+-		OPT_m = (1 << 2),
+-		OPT_S = (1 << 3)
+-	};
+-	static const char methods[] ALIGN1 =
+-		/*"des\0"*/"md5\0""sha-256\0""sha-512\0";
+-	enum { TYPE_des, TYPE_md5, TYPE_sha256, TYPE_sha512 };
+-	unsigned algo = TYPE_des, algobits = 1;
+-#if ENABLE_GETOPT_LONG
+-	static const char mkpasswd_longopts[] ALIGN1 =
+-		"password-fd\0"	Required_argument "P"
+-		"stdin\0"		No_argument "s"
+-		"method\0"		Required_argument "m"
+-		"salt\0"		Required_argument "S"
+-	;
+-	applet_long_options = mkpasswd_longopts;
+-#endif
+-	opt_complementary = "?1"; /* at most one non-option argument */
+-	getopt32(argv, "P:sm:S:", &chp, &method, &salt);
+-	argv += optind;
+-	if (option_mask32 & OPT_P)
+-		fd = xatoi_u(chp);
+-	if (option_mask32 & OPT_m)
+-		algo = index_in_strings(methods, method) + 1;
+-	if (*argv) /* we have a cleartext passwd */
+-		chp = *argv;
+-	else
+-		chp = bb_ask(fd, 0, "Password: ");
+-	if (!salt)
+-		salt = xmalloc(128);
+-
+-	if (algo) {
+-		char foo[2];
+-		foo[0] = foo[2] = '$';
+-		algobits = 4;
+-		/* MD5 == "$1$", SHA-256 == "$5$", SHA-512 == "$6$" */
+-		if (algo > 1) {
+-			algo += 3;
+-			algobits = 8;
+-		}
+-		foo[1] = '0' + (algo);
+-		strcpy(salt, foo);
+-	}
+-	/* The opt_complementary adds a bit of additional noise, which is good
+-	   but not strictly needed.  */
+-	crypt_make_salt(salt + ((!!algo) * 3), algobits, (int)&opt_complementary);
+-	encrypted = pw_encrypt(chp, salt, 1);
+-	puts(encrypted);
+-	if (ENABLE_FEATURE_CLEAN_UP) {
+-		free(encrypted);
+-	}
+-	return EXIT_SUCCESS;
+-}

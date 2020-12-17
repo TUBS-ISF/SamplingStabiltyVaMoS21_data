@@ -1,0 +1,239 @@
+2008-09-26 23:45:20 +0000
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 1ab1732..3f9522f 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -78,6 +78,23 @@ static void add_param_req_option(struct dhcpMessage *packet)
+ 	}
+ }
+ 
++/* RFC 2131
++ * 4.4.4 Use of broadcast and unicast
++ *
++ * The DHCP client broadcasts DHCPDISCOVER, DHCPREQUEST and DHCPINFORM
++ * messages, unless the client knows the address of a DHCP server.
++ * The client unicasts DHCPRELEASE messages to the server. Because
++ * the client is declining the use of the IP address supplied by the server,
++ * the client broadcasts DHCPDECLINE messages.
++ *
++ * When the DHCP client knows the address of a DHCP server, in either
++ * INIT or REBOOTING state, the client may use that address
++ * in the DHCPDISCOVER or DHCPREQUEST rather than the IP broadcast address.
++ * The client may also use unicast to send DHCPINFORM messages
++ * to a known DHCP server. If the client receives no response to DHCP
++ * messages sent to the IP address of a known DHCP server, the DHCP
++ * client reverts to using the IP broadcast address.
++ */
+ 
+ static int raw_bcast_from_client_config_ifindex(struct dhcpMessage *packet)
+ {
+@@ -90,7 +107,6 @@ static int raw_bcast_from_client_config_ifindex(struct dhcpMessage *packet)
+ 
+ #if ENABLE_FEATURE_UDHCPC_ARPING
+ /* Broadcast a DHCP decline message */
+-//FIXME: maybe it should be unicast?
+ int FAST_FUNC send_decline(uint32_t xid, uint32_t server, uint32_t requested)
+ {
+ 	struct dhcpMessage packet;
+@@ -128,7 +144,9 @@ int FAST_FUNC send_discover(uint32_t xid, uint32_t requested)
+ 
+ 
+ /* Broadcasts a DHCP request message */
+-//FIXME: maybe it should be unicast?
++/* RFC 2131 3.1 paragraph 3:
++ * "The client _broadcasts_ a DHCPREQUEST message..."
++ */
+ int FAST_FUNC send_select(uint32_t xid, uint32_t server, uint32_t requested)
+ {
+ 	struct dhcpMessage packet;
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 68fa65c..66a0b0d 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -27,21 +27,23 @@ extern const uint8_t MAC_BCAST_ADDR[6]; /* six all-ones */
+ #define DHCP_OPTIONS_BUFSIZE  308
+ 
+ struct dhcpMessage {
+-	uint8_t op;
+-	uint8_t htype;
+-	uint8_t hlen;
+-	uint8_t hops;
+-	uint32_t xid;
+-	uint16_t secs;
+-	uint16_t flags;
+-	uint32_t ciaddr;
+-	uint32_t yiaddr;
+-	uint32_t siaddr;
+-	uint32_t giaddr;
+-	uint8_t chaddr[16];
+-	uint8_t sname[64];
+-	uint8_t file[128];
+-	uint32_t cookie;
++	uint8_t op;      /* 1 = BOOTREQUEST, 2 = BOOTREPLY */
++	uint8_t htype;   /* hardware address type. 1 = 10mb ethernet */
++	uint8_t hlen;    /* hardware address length */
++	uint8_t hops;    /* used by relay agents only */
++	uint32_t xid;    /* unique id */
++	uint16_t secs;   /* elapsed since client began acquisition/renewal */
++	uint16_t flags;  /* only one flag so far: */
++#define BROADCAST_FLAG 0x8000 /* "I need broadcast replies" */
++	uint32_t ciaddr; /* client IP (if client is in BOUND, RENEW or REBINDING state) */
++	uint32_t yiaddr; /* 'your' (client) IP address */
++	uint32_t siaddr; /* IP address of next server to use in bootstrap,
++	                  * returned in DHCPOFFER, DHCPACK by server */
++	uint32_t giaddr; /* relay agent IP address */
++	uint8_t chaddr[16];/* link-layer client hardware address (MAC) */
++	uint8_t sname[64]; /* server host name (ASCIZ) */
++	uint8_t file[128]; /* boot file name (ASCIZ) */
++	uint32_t cookie;   /* fixed first four option bytes (99,130,83,99 dec) */
+ 	uint8_t options[DHCP_OPTIONS_BUFSIZE + CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS];
+ } PACKED;
+ 
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 8985cc7..2d48980 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -452,7 +452,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		}
+ 
+ 		/* select() didn't timeout, something did happen. */
+-		/* Is is a packet? */
++		/* Is it a packet? */
+ 		if (listen_mode != LISTEN_NONE && FD_ISSET(sockfd, &rfds)) {
+ 			int len;
+ 			/* A packet is ready, read it */
+@@ -474,7 +474,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 				continue;
+ 
+ 			if (packet.xid != xid) {
+-				DEBUG("Ignoring XID %x (our xid is %x)",
++				DEBUG("Ignoring xid %x (our xid is %x)",
+ 					(unsigned)packet.xid, (unsigned)xid);
+ 				continue;
+ 			}
+@@ -524,17 +524,24 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 						bb_error_msg("no lease time with ACK, using 1 hour lease");
+ 						lease_seconds = 60 * 60;
+ 					} else {
+-						/* can be misaligned, thus memcpy */
+-						memcpy(&lease_seconds, temp, 4);
++						/* it IS unaligned sometimes, don't "optimize" */
++						lease_seconds = get_unaligned_u32p((uint32_t*)temp);
+ 						lease_seconds = ntohl(lease_seconds);
+ 						lease_seconds &= 0x0fffffff; /* paranoia: must not be prone to overflows */
+ 						if (lease_seconds < 10) /* and not too small */
+ 							lease_seconds = 10;
+ 					}
+-//FIXME: why do we check ARP only after we've got DHCPACK?
+-//Shouldn't we do it immediately after DHCPOFFER?
+ #if ENABLE_FEATURE_UDHCPC_ARPING
+ 					if (opt & OPT_a) {
++/* RFC 2131 3.1 paragraph 5:
++ * "The client receives the DHCPACK message with configuration
++ * parameters. The client SHOULD perform a final check on the
++ * parameters (e.g., ARP for allocated network address), and notes
++ * the duration of the lease specified in the DHCPACK message. At this
++ * point, the client is configured. If the client detects that the
++ * address is already in use (e.g., through the use of ARP),
++ * the client MUST send a DHCPDECLINE message to the server and restarts
++ * the configuration process..." */
+ 						if (!arpping(packet.yiaddr,
+ 							    (uint32_t) 0,
+ 							    client_config.arp,
+@@ -542,8 +549,6 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 						) {
+ 							bb_info_msg("offered address is in use "
+ 								"(got ARP reply), declining");
+-//NB: not clear whether it should be unicast or bcast.
+-//Currently it is a bcast. Why?
+ 							send_decline(xid, server_addr, packet.yiaddr);
+ 
+ 							if (state != REQUESTING)
+@@ -568,7 +573,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 					}
+ 					requested_ip = packet.yiaddr;
+ 					udhcp_run_script(&packet,
+-						   ((state == RENEWING || state == REBINDING) ? "renew" : "bound"));
++							((state == RENEWING || state == REBINDING) ? "renew" : "bound"));
+ 
+ 					state = BOUND;
+ 					change_listen_mode(LISTEN_NONE);
+diff --git a/networking/udhcp/options.h b/networking/udhcp/options.h
+index 70b8704..fcf1c9a 100644
+--- a/networking/udhcp/options.h
++++ b/networking/udhcp/options.h
+@@ -78,16 +78,14 @@ enum {
+ #define ETH_10MB		1
+ #define ETH_10MB_LEN		6
+ 
+-#define DHCPDISCOVER		1
+-#define DHCPOFFER		2
+-#define DHCPREQUEST		3
+-#define DHCPDECLINE		4
+-#define DHCPACK			5
+-#define DHCPNAK			6
+-#define DHCPRELEASE		7
+-#define DHCPINFORM		8
+-
+-#define BROADCAST_FLAG		0x8000
++#define DHCPDISCOVER		1 /* client -> server */
++#define DHCPOFFER		2 /* client <- server */
++#define DHCPREQUEST		3 /* client -> server */
++#define DHCPDECLINE		4 /* client -> server */
++#define DHCPACK			5 /* client <- server */
++#define DHCPNAK			6 /* client <- server */
++#define DHCPRELEASE		7 /* client -> server */
++#define DHCPINFORM		8 /* client -> server */
+ 
+ #define OPTION_FIELD		0
+ #define FILE_FIELD		1
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index 4eedbb5..1a6f7e6 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -18,12 +18,12 @@
+ void FAST_FUNC udhcp_init_header(struct dhcpMessage *packet, char type)
+ {
+ 	memset(packet, 0, sizeof(struct dhcpMessage));
+-	packet->op = BOOTREQUEST;
++	packet->op = BOOTREQUEST; /* if client to a server */
+ 	switch (type) {
+ 	case DHCPOFFER:
+ 	case DHCPACK:
+ 	case DHCPNAK:
+-		packet->op = BOOTREPLY;
++		packet->op = BOOTREPLY; /* if server to client */
+ 	}
+ 	packet->htype = ETH_10MB;
+ 	packet->hlen = ETH_10MB_LEN;
+@@ -65,7 +65,7 @@ int FAST_FUNC udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd)
+ 				if (vendor[OPT_LEN - 2] == (uint8_t)strlen(broken_vendors[i])
+ 				 && !strncmp((char*)vendor, broken_vendors[i], vendor[OPT_LEN - 2])
+ 				) {
+-					DEBUG("broken client (%s), forcing broadcast",
++					DEBUG("broken client (%s), forcing broadcast replies",
+ 						broken_vendors[i]);
+ 					packet->flags |= htons(BROADCAST_FLAG);
+ 				}
+@@ -74,7 +74,7 @@ int FAST_FUNC udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd)
+ 			if (vendor[OPT_LEN - 2] == (uint8_t)(sizeof("MSFT 98")-1)
+ 			 && memcmp(vendor, "MSFT 98", sizeof("MSFT 98")-1) == 0
+ 			) {
+-				DEBUG("broken client (%s), forcing broadcast", "MSFT 98");
++				DEBUG("broken client (%s), forcing broadcast replies", "MSFT 98");
+ 				packet->flags |= htons(BROADCAST_FLAG);
+ 			}
+ #endif
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index 5b1c615..dcc234c 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -50,7 +50,7 @@ static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcas
+ 		DEBUG("unicasting packet to client ciaddr");
+ 		ciaddr = payload->ciaddr;
+ 		chaddr = payload->chaddr;
+-	} else if (ntohs(payload->flags) & BROADCAST_FLAG) {
++	} else if (payload->flags & htons(BROADCAST_FLAG)) {
+ 		DEBUG("broadcasting packet to client (requested)");
+ 		ciaddr = INADDR_BROADCAST;
+ 		chaddr = MAC_BCAST_ADDR;

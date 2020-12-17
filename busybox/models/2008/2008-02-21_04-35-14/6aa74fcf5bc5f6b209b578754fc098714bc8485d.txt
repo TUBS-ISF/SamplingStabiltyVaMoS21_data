@@ -1,0 +1,14 @@
+2008-02-21 04:35:14 +0000
+diff --git a/shell/ash.c b/shell/ash.c
+index 10c0b61..9c762e2 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -8887,7 +8887,7 @@ pushstring(char *s, void *ap)
+ 	INT_OFF;
+ /*dprintf("*** calling pushstring: %s, %d\n", s, len);*/
+ 	if (parsefile->strpush) {
+-		sp = ckzmalloc(sizeof(struct strpush));
++		sp = ckzalloc(sizeof(struct strpush));
+ 		sp->prev = parsefile->strpush;
+ 		parsefile->strpush = sp;
+ 	} else

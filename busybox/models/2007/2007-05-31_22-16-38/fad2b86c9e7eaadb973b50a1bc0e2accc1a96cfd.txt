@@ -1,0 +1,325 @@
+2007-05-31 22:16:38 +0000
+diff --git a/applets/applets.c b/applets/applets.c
+index e905ebe..bd37043 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -641,10 +641,19 @@ void run_applet_and_exit(const char *name, char **argv)
+ }
+ 
+ 
++#ifdef __GLIBC__
++/* Make it reside in R/W memory: */
++int *const bb_errno __attribute__ ((section (".data")));
++#endif
++
+ int main(int argc, char **argv)
+ {
+ 	const char *s;
+ 
++#ifdef __GLIBC__
++	(*(int **)&bb_errno) = __errno_location();
++#endif
++
+ #if !BB_MMU
+ 	/* NOMMU re-exec trick sets high-order bit in first byte of name */
+ 	if (argv[0][0] & 0x80) {
+diff --git a/archival/libunarchive/data_skip.c b/archival/libunarchive/data_skip.c
+index dc3505a..d9778da 100644
+--- a/archival/libunarchive/data_skip.c
++++ b/archival/libunarchive/data_skip.c
+@@ -3,12 +3,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <sys/types.h>
+-#include <errno.h>
+-#include <unistd.h>
+-#include <stdlib.h>
+-#include "unarchive.h"
+ #include "libbb.h"
++#include "unarchive.h"
+ 
+ void data_skip(archive_handle_t *archive_handle)
+ {
+diff --git a/archival/libunarchive/seek_by_jump.c b/archival/libunarchive/seek_by_jump.c
+index d605f61..6cd2564 100644
+--- a/archival/libunarchive/seek_by_jump.c
++++ b/archival/libunarchive/seek_by_jump.c
+@@ -3,11 +3,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <sys/types.h>
+-#include <errno.h>
+-#include <unistd.h>
+-#include <stdlib.h>
+-
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index ad36051..8d9c982 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -15,10 +15,7 @@
+ 
+ #include <sys/types.h>
+ #include <sys/stat.h>
+-#include <unistd.h>
+ #include <dirent.h>
+-#include <errno.h>
+-#include <stdlib.h>
+ #include <getopt.h> /* struct option */
+ #include "libbb.h"
+ #include "libcoreutils/coreutils.h"
+diff --git a/debianutils/mktemp.c b/debianutils/mktemp.c
+index 966257a..9e7ef7b 100644
+--- a/debianutils/mktemp.c
++++ b/debianutils/mktemp.c
+@@ -10,11 +10,6 @@
+  */
+ 
+ #include "libbb.h"
+-#include <stdio.h>
+-#include <errno.h>
+-#include <string.h>
+-#include <unistd.h>
+-#include <stdlib.h>
+ 
+ int mktemp_main(int argc, char **argv);
+ int mktemp_main(int argc, char **argv)
+diff --git a/include/libbb.h b/include/libbb.h
+index 5e0b438..385b30f 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -165,6 +165,14 @@
+ #endif
+ 
+ 
++#if defined(__GLIBC__)
++/* glibc uses __errno_location() to get a ptr to errno */
++/* We can just memorize it once - no multithreading in busybox :) */
++extern int *const bb_errno;
++#undef errno
++#define errno (*bb_errno)
++#endif
++
+ #if defined(__GLIBC__) && __GLIBC__ < 2
+ int vdprintf(int d, const char *format, va_list ap);
+ #endif
+diff --git a/libbb/error_msg.c b/libbb/error_msg.c
+index b2141f3..5f53f03 100644
+--- a/libbb/error_msg.c
++++ b/libbb/error_msg.c
+@@ -7,10 +7,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdio.h>
+-#include <errno.h>
+-#include <string.h>
+-#include <stdlib.h>
+ #include "libbb.h"
+ 
+ void bb_error_msg(const char *s, ...)
+diff --git a/libbb/perror_msg.c b/libbb/perror_msg.c
+index 7fb0830..5145795 100644
+--- a/libbb/perror_msg.c
++++ b/libbb/perror_msg.c
+@@ -7,10 +7,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdio.h>
+-#include <errno.h>
+-#include <string.h>
+-#include <stdlib.h>
+ #include "libbb.h"
+ 
+ void bb_perror_msg(const char *s, ...)
+diff --git a/libbb/run_shell.c b/libbb/run_shell.c
+index 6be0908..25d55dd 100644
+--- a/libbb/run_shell.c
++++ b/libbb/run_shell.c
+@@ -28,19 +28,12 @@
+  * SUCH DAMAGE.
+  */
+ 
+-#include <stdio.h>
+-#include <errno.h>
+-#include <unistd.h>
+-#include <string.h>
+-#include <stdlib.h>
+-#include <syslog.h>
+-#include <ctype.h>
+ #include "libbb.h"
+-#ifdef CONFIG_SELINUX
++#if ENABLE_SELINUX
+ #include <selinux/selinux.h>  /* for setexeccon  */
+ #endif
+ 
+-#ifdef CONFIG_SELINUX
++#if ENABLE_SELINUX
+ static security_context_t current_sid;
+ 
+ void
+@@ -90,7 +83,7 @@ void run_shell(const char *shell, int loginshell, const char *command, const cha
+ 			args[argno++] = *additional_args;
+ 	}
+ 	args[argno] = NULL;
+-#ifdef CONFIG_SELINUX
++#if ENABLE_SELINUX
+ 	if (current_sid && !setexeccon(current_sid)) {
+ 		freecon(current_sid);
+ 		execve(shell, (char **) args, environ);
+diff --git a/libbb/safe_write.c b/libbb/safe_write.c
+index c81f124..5bbb82e 100644
+--- a/libbb/safe_write.c
++++ b/libbb/safe_write.c
+@@ -7,13 +7,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <stdio.h>
+-#include <errno.h>
+-#include <unistd.h>
+ #include "libbb.h"
+ 
+-
+-
+ ssize_t safe_write(int fd, const void *buf, size_t count)
+ {
+ 	ssize_t n;
+diff --git a/loginutils/login.c b/loginutils/login.c
+index d725466..1426950 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -12,7 +12,6 @@
+ #include <selinux/selinux.h>  /* for is_selinux_enabled()  */
+ #include <selinux/get_context_list.h> /* for get_default_context() */
+ #include <selinux/flask.h> /* for security class definitions  */
+-#include <errno.h>
+ #endif
+ 
+ enum {
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 0b08fb6..994b80e 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -56,23 +56,12 @@
+ 
+ #include "libbb.h"
+ #include "xregex.h"
+-#include <unistd.h>
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <stdarg.h>
+-#include <string.h>
+-#include <ctype.h>
+-#include <sys/stat.h>
+-#include <sys/types.h>
+ #include <sys/wait.h>
+ #include <sys/ioctl.h>
+ #include <sys/socket.h>
+ #include <sys/un.h>
+ #include <dirent.h>
+-#include <fcntl.h>
+ #include <syslog.h>
+-#include <signal.h>
+-#include <errno.h>
+ #include <sys/sysmacros.h>
+ 
+ 
+diff --git a/networking/libiproute/libnetlink.c b/networking/libiproute/libnetlink.c
+index 5307cec..0f60409 100644
+--- a/networking/libiproute/libnetlink.c
++++ b/networking/libiproute/libnetlink.c
+@@ -11,16 +11,10 @@
+  *
+  */
+ 
+-#include "libbb.h"
+ #include <sys/socket.h>
+-
+-#include <errno.h>
+-#include <string.h>
+-#include <time.h>
+-#include <unistd.h>
+-
+ #include <sys/uio.h>
+ 
++#include "libbb.h"
+ #include "libnetlink.h"
+ 
+ void rtnl_close(struct rtnl_handle *rth)
+diff --git a/shell/ash.c b/shell/ash.c
+index b1d22e5..ea10a65 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -127,13 +127,6 @@ static char optlist[NOPTS];
+ 
+ /* ============ Misc data */
+ 
+-#ifdef __GLIBC__
+-/* glibc sucks */
+-static int *dash_errno;
+-#undef errno
+-#define errno (*dash_errno)
+-#endif
+-
+ static char nullstr[1];                /* zero length string */
+ static const char homestr[] = "HOME";
+ static const char snlfmt[] = "%s\n";
+@@ -12734,10 +12727,6 @@ int ash_main(int argc, char **argv)
+ 	struct jmploc jmploc;
+ 	struct stackmark smark;
+ 
+-#ifdef __GLIBC__
+-	dash_errno = __errno_location();
+-#endif
+-
+ #if PROFILE
+ 	monitor(4, etext, profile_buf, sizeof(profile_buf), 50);
+ #endif
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index 393f948..d7d9019 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -8,12 +8,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include "libbb.h"
+-#include <errno.h>
+-#include <time.h>
+-#include <pwd.h>
+-#include <grp.h>
+-
+ /* X/OPEN tells us to use <sys/{types,ipc,sem}.h> for semctl() */
+ /* X/OPEN tells us to use <sys/{types,ipc,msg}.h> for msgctl() */
+ /* X/OPEN tells us to use <sys/{types,ipc,shm}.h> for shmctl() */
+@@ -23,7 +17,7 @@
+ #include <sys/msg.h>
+ #include <sys/shm.h>
+ 
+-
++#include "libbb.h"
+ 
+ /*-------------------------------------------------------------------*/
+ /* SHM_DEST and SHM_LOCKED are defined in kernel headers,
+diff --git a/util-linux/setarch.c b/util-linux/setarch.c
+index f6433d6..2fb47f9 100644
+--- a/util-linux/setarch.c
++++ b/util-linux/setarch.c
+@@ -7,11 +7,6 @@
+  * Licensed under GPL v2 or later, see file License for details.
+ */
+ 
+-#include <stdlib.h>
+-#include <unistd.h>
+-#include <string.h>
+-#include <errno.h>
+-#include <stdio.h>
+ #include <sys/personality.h>
+ 
+ #include "libbb.h"

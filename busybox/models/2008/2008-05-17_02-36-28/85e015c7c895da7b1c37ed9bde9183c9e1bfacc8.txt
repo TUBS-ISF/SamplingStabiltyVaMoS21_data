@@ -1,0 +1,27 @@
+2008-05-17 02:36:28 +0000
+diff --git a/networking/ifconfig.c b/networking/ifconfig.c
+index d021757..965fca3 100644
+--- a/networking/ifconfig.c
++++ b/networking/ifconfig.c
+@@ -514,7 +514,7 @@ static int in_ether(const char *bufp, struct sockaddr *sap)
+ 	unsigned char c;
+ 
+ 	sap->sa_family = ARPHRD_ETHER;
+-	ptr = sap->sa_data;
++	ptr = (char *) sap->sa_data;
+ 
+ 	i = 0;
+ 	do {
+diff --git a/networking/interface.c b/networking/interface.c
+index dff6add..abd58b5 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -1224,7 +1224,7 @@ int in_ib(const char *bufp, struct sockaddr *sap)
+     unsigned val;
+ 
+     sap->sa_family = ib_hwtype.type;
+-    ptr = sap->sa_data;
++    ptr = (unsigned char *) sap->sa_data;
+ 
+     i = 0;
+     orig = bufp;

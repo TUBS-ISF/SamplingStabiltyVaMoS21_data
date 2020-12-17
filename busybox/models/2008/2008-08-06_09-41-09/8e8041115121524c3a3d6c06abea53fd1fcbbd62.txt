@@ -1,0 +1,17 @@
+2008-08-06 09:41:09 +0000
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index ac08ba7..06c4574 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -444,8 +444,10 @@ static module_info* find_alias(const char *alias)
+ 		if (!modinfo[i].aliases) {
+ 			parse_module(&modinfo[i], modinfo[i].pathname);
+ 		}
+-		if (result)
++		if (result) {
++			i++;
+ 			continue;
++		}
+ 		/* "alias1 symbol:sym1 alias2 symbol:sym2" */
+ 		desc = str_2_list(modinfo[i].aliases);
+ 		/* Does matching substring exist? */

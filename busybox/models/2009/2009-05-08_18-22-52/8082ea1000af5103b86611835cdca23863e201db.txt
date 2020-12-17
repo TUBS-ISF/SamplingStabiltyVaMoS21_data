@@ -1,0 +1,13 @@
+2009-05-08 18:22:52 +0200
+diff --git a/TODO b/TODO
+index d6a60d1..52b6bd0 100644
+--- a/TODO
++++ b/TODO
+@@ -251,7 +251,6 @@ FEATURE_CLEAN_UP
+   For right now, exit() handles it just fine.
+ 
+ 
+-
+ Minor stuff:
+   watchdog.c could autodetect the timer duration via:
+     if(!ioctl (fd, WDIOC_GETTIMEOUT, &tmo)) timer_duration = 1 + (tmo / 2);

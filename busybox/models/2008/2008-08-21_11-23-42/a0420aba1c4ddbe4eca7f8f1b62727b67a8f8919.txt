@@ -1,0 +1,14 @@
+2008-08-21 11:23:42 +0000
+diff --git a/docs/busybox.net/footer.html b/docs/busybox.net/footer.html
+index 7f39ccb..4361e77 100644
+--- a/docs/busybox.net/footer.html
++++ b/docs/busybox.net/footer.html
+@@ -12,7 +12,7 @@
+ 	<tr>
+ 	    <td width="60%">
+ 		<font face="arial, helvetica, sans-serif" size="-1">
+-		    <a href="/copyright.txt">Copyright &copy; 1999-2005 Erik Andersen</a>
++		    <a href="/copyright.txt">Copyright &copy; 1999-2008 Erik Andersen</a>
+ 		    <br>
+ 		    Mail all comments, insults, suggestions and bribes to
+ 		    <br>

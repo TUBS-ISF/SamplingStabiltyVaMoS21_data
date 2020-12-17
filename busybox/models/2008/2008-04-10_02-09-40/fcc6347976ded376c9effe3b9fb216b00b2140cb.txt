@@ -1,0 +1,43 @@
+2008-04-10 02:09:40 +0000
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index 9e92b64..8578893 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -175,16 +175,13 @@ int ipcalc_main(int argc, char **argv)
+ 
+ 		if (opt & HOSTNAME) {
+ 			struct hostent *hostinfo;
+-			int x;
+ 
+ 			hostinfo = gethostbyaddr((char *) &ipaddr, sizeof(ipaddr), AF_INET);
+ 			if (!hostinfo) {
+ 				bb_herror_msg_and_die("cannot find hostname for %s", argv[0]);
+ 			}
+-			for (x = 0; hostinfo->h_name[x]; x++) {
+-				hostinfo->h_name[x] = tolower(hostinfo->h_name[x]);
+-			}
+-
++			str_tolower(hostinfo->h_name);
++			
+ 			printf("HOSTNAME=%s\n", hostinfo->h_name);
+ 		}
+ 	}
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 043a95b..e0e8b12 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -26,13 +26,11 @@ static int read_ip(const char *line, void *arg)
+ 
+ static int read_mac(const char *line, void *arg)
+ {
+-	uint8_t *mac_bytes = arg;
+ 	struct ether_addr *temp_ether_addr;
+ 
+-	temp_ether_addr = ether_aton(line);
++	temp_ether_addr = ether_aton_r(line, (struct ether_addr *)arg);
+ 	if (temp_ether_addr == NULL)
+ 		return 0;
+-	memcpy(mac_bytes, temp_ether_addr, 6);
+ 	return 1;
+ }
+ 

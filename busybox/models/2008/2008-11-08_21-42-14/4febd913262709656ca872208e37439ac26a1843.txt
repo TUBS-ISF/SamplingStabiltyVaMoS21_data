@@ -1,0 +1,14 @@
+2008-11-08 21:42:14 +0000
+diff --git a/console-tools/kbd_mode.c b/console-tools/kbd_mode.c
+index c8451e7..544bbb7 100644
+--- a/console-tools/kbd_mode.c
++++ b/console-tools/kbd_mode.c
+@@ -32,7 +32,7 @@ int kbd_mode_main(int argc UNUSED_PARAM, char **argv)
+ 		const char *mode = "unknown";
+ 		int m;
+ 
+-		ioctl(fd, KDGKBMODE, &m);
++		xioctl(fd, KDGKBMODE, &m);
+ 		if (m == K_RAW)
+ 			mode = "raw (scancode)";
+ 		else if (m == K_XLATE)

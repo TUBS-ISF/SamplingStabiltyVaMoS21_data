@@ -1,0 +1,14 @@
+2008-06-28 23:33:02 +0000
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index 888b827..86007ee 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -281,7 +281,7 @@ static void collect_literal(s_stat *s ATTRIBUTE_UNUSED)
+ 
+ static s_stat* init_literal(void)
+ {
+-	s_stat *s = xzalloc(sizeof(s_stat));
++	s_stat *s = xzalloc(sizeof(*s));
+ 	s->collect = collect_literal;
+ 	return (s_stat*)s;
+ }

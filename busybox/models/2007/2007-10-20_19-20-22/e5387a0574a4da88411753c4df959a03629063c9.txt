@@ -1,0 +1,176 @@
+2007-10-20 19:20:22 +0000
+diff --git a/libbb/bb_askpass.c b/libbb/bb_askpass.c
+index 435314e..fd12f92 100644
+--- a/libbb/bb_askpass.c
++++ b/libbb/bb_askpass.c
+@@ -17,7 +17,7 @@ static void askpass_timeout(int ATTRIBUTE_UNUSED ignore)
+ {
+ }
+ 
+-char *bb_askpass(int timeout, const char * prompt)
++char *bb_askpass(int timeout, const char *prompt)
+ {
+ 	/* Was static char[BIGNUM] */
+ 	enum { sizeof_passwd = 128 };
+@@ -25,35 +25,36 @@ char *bb_askpass(int timeout, const char * prompt)
+ 
+ 	char *ret;
+ 	int i;
+-	struct sigaction sa;
+-	struct termios old, new;
++	struct sigaction sa, oldsa;
++	struct termios tio, oldtio;
+ 
+ 	if (!passwd)
+ 		passwd = xmalloc(sizeof_passwd);
+ 	memset(passwd, 0, sizeof_passwd);
+ 
+-	tcgetattr(STDIN_FILENO, &old);
++	tcgetattr(STDIN_FILENO, &oldtio);
+ 	tcflush(STDIN_FILENO, TCIFLUSH);
++	tio = oldtio;
++	tio.c_iflag &= ~(IUCLC|IXON|IXOFF|IXANY);
++	tio.c_lflag &= ~(ECHO|ECHOE|ECHOK|ECHONL|TOSTOP);
++	tcsetattr(STDIN_FILENO, TCSANOW, &tio);
+ 
+-	fputs(prompt, stdout);
+-	fflush(stdout);
+-
+-	tcgetattr(STDIN_FILENO, &new);
+-	new.c_iflag &= ~(IUCLC|IXON|IXOFF|IXANY);
+-	new.c_lflag &= ~(ECHO|ECHOE|ECHOK|ECHONL|TOSTOP);
+-	tcsetattr(STDIN_FILENO, TCSANOW, &new);
+-
++	memset(&sa, 0, sizeof(sa));
++	/* sa.sa_flags = 0; - no SA_RESTART! */
++	/* SIGINT and SIGALRM will interrupt read below */
++	sa.sa_handler = askpass_timeout;
++	sigaction(SIGINT, &sa, &oldsa);
+ 	if (timeout) {
+-		sa.sa_flags = 0;
+-		sa.sa_handler = askpass_timeout;
+ 		sigaction(SIGALRM, &sa, NULL);
+ 		alarm(timeout);
+ 	}
+ 
++	fputs(prompt, stdout);
++	fflush(stdout);
+ 	ret = NULL;
+-	/* On timeout, read will hopefully be interrupted by SIGALRM,
++	/* On timeout or Ctrl-C, read will hopefully be interrupted,
+ 	 * and we return NULL */
+-	if (read(STDIN_FILENO, passwd, sizeof_passwd-1) > 0) {
++	if (read(STDIN_FILENO, passwd, sizeof_passwd - 1) > 0) {
+ 		ret = passwd;
+ 		i = 0;
+ 		/* Last byte is guaranteed to be 0
+@@ -67,8 +68,9 @@ char *bb_askpass(int timeout, const char * prompt)
+ 	if (timeout) {
+ 		alarm(0);
+ 	}
++	sigaction(SIGINT, &oldsa, NULL);
+ 
+-	tcsetattr(STDIN_FILENO, TCSANOW, &old);
++	tcsetattr(STDIN_FILENO, TCSANOW, &oldtio);
+ 	bb_putchar('\n');
+ 	fflush(stdout);
+ 	return ret;
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index 7f100a1..f633fbb 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -9,29 +9,26 @@
+ 
+ #include "libbb.h"
+ 
+-static const char *const forbid[] = {
+-	"ENV",
+-	"BASH_ENV",
+-	"HOME",
+-	"IFS",
+-	"PATH",
+-	"SHELL",
+-	"LD_LIBRARY_PATH",
+-	"LD_PRELOAD",
+-	"LD_TRACE_LOADED_OBJECTS",
+-	"LD_BIND_NOW",
+-	"LD_AOUT_LIBRARY_PATH",
+-	"LD_AOUT_PRELOAD",
+-	"LD_NOWARN",
+-	"LD_KEEPDIR",
+-	(char *) 0
+-};
+-
+-
+-static void catchalarm(int ATTRIBUTE_UNUSED junk)
+-{
+-	exit(EXIT_FAILURE);
+-}
++static const char forbid[] ALIGN1 =
++	"ENV" "\0"
++	"BASH_ENV" "\0"
++	"HOME" "\0"
++	"IFS" "\0"
++	"PATH" "\0"
++	"SHELL" "\0"
++	"LD_LIBRARY_PATH" "\0"
++	"LD_PRELOAD" "\0"
++	"LD_TRACE_LOADED_OBJECTS" "\0"
++	"LD_BIND_NOW" "\0"
++	"LD_AOUT_LIBRARY_PATH" "\0"
++	"LD_AOUT_PRELOAD" "\0"
++	"LD_NOWARN" "\0"
++	"LD_KEEPDIR" "\0";
++
++//static void catchalarm(int ATTRIBUTE_UNUSED junk)
++//{
++//	exit(EXIT_FAILURE);
++//}
+ 
+ 
+ int sulogin_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+@@ -40,7 +37,7 @@ int sulogin_main(int argc, char **argv)
+ 	char *cp;
+ 	int timeout = 0;
+ 	char *timeout_arg;
+-	const char *const *p;
++	const char *p;
+ 	struct passwd *pwd;
+ 	const char *shell;
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+@@ -71,10 +68,14 @@ int sulogin_main(int argc, char **argv)
+ 	}
+ 
+ 	/* Clear out anything dangerous from the environment */
+-	for (p = forbid; *p; p++)
+-		unsetenv(*p);
++	p = forbid;
++	do {
++		unsetenv(p);
++		p += strlen(p) + 1;
++	} while (*p);
+ 
+-	signal(SIGALRM, catchalarm);
++// bb_askpass() already handles this
++//	signal(SIGALRM, catchalarm);
+ 
+ 	pwd = getpwuid(0);
+ 	if (!pwd) {
+@@ -105,7 +106,7 @@ int sulogin_main(int argc, char **argv)
+ 		bb_error_msg("login incorrect");
+ 	}
+ 	memset(cp, 0, strlen(cp));
+-	signal(SIGALRM, SIG_DFL);
++//	signal(SIGALRM, SIG_DFL);
+ 
+ 	bb_info_msg("System Maintenance Mode");
+ 
+@@ -122,6 +123,6 @@ int sulogin_main(int argc, char **argv)
+ 	/* Exec login shell with no additional parameters. Never returns. */
+ 	run_shell(shell, 1, NULL, NULL);
+ 
+-auth_error:
+-	bb_error_msg_and_die("no password entry for 'root'");
++ auth_error:
++	bb_error_msg_and_die("no password entry for root");
+ }

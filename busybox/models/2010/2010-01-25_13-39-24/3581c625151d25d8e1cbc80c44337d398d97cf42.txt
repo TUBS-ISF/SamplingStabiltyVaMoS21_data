@@ -1,0 +1,243 @@
+2010-01-25 13:39:24 +0100
+diff --git a/Config.in b/Config.in
+index 2ed8889..8e75153 100644
+--- a/Config.in
++++ b/Config.in
+@@ -521,7 +521,7 @@ config EFENCE
+ endchoice
+ 
+ ### config PARSE
+-### 	bool "Uniform config file parser debugging applet: parse"
++###	bool "Uniform config file parser debugging applet: parse"
+ 
+ endmenu
+ 
+diff --git a/applets/usage_compressed b/applets/usage_compressed
+index a299ecd..8d34352 100755
+--- a/applets/usage_compressed
++++ b/applets/usage_compressed
+@@ -21,9 +21,9 @@ echo 'static const char packed_usage[] ALIGN1 = {'
+ ##
+ ## "$loc/usage" | bzip2 -1 | od -v -x \
+ ## | $SED -e 's/^[^ ]*//' \
+-## 	-e 's/ //g' \
+-## 	-e '/^$/d' \
+-## 	-e 's/\(..\)\(..\)/0x\2,0x\1,/g'
++##	-e 's/ //g' \
++##	-e '/^$/d' \
++##	-e 's/\(..\)\(..\)/0x\2,0x\1,/g'
+ 
+ "$loc/usage" | bzip2 -1 | $DD bs=2 skip=1 2>/dev/null | od -v -t x1 \
+ | $SED -e 's/^[^ ]*//' \
+diff --git a/editors/patch_toybox.c b/editors/patch_toybox.c
+index f1e0de6..0e5c070 100644
+--- a/editors/patch_toybox.c
++++ b/editors/patch_toybox.c
+@@ -491,7 +491,7 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
+ 				int oldsum, newsum, del = 0;
+ 				char *s, *name;
+ 
+- 				oldsum = oldline + oldlen;
++				oldsum = oldline + oldlen;
+ 				newsum = newline + newlen;
+ 
+ 				name = reverse ? oldname : newname;
+diff --git a/examples/var_service/dhcp_if/convert2ipconf b/examples/var_service/dhcp_if/convert2ipconf
+index 114ab05..62a288e 100755
+--- a/examples/var_service/dhcp_if/convert2ipconf
++++ b/examples/var_service/dhcp_if/convert2ipconf
+@@ -28,7 +28,7 @@ test "$ip" || exit 1
+ 
+ {
+ echo "let cfg=cfg+1"
+-test "$interface" 	&& echo "if[\$cfg]='$interface'"
++test "$interface"	&& echo "if[\$cfg]='$interface'"
+ test "$ip"		&& echo "ip[\$cfg]='$ip'"
+ test "$ip" && test "$mask" \
+ 			&& echo "ipmask[\$cfg]='$ip/$mask'"
+diff --git a/mailutils/mime.c b/mailutils/mime.c
+index 17d0f9d..125ca01 100644
+--- a/mailutils/mime.c
++++ b/mailutils/mime.c
+@@ -369,7 +369,7 @@ static int parse(const char *boundary, char **argv)
+ 			}
+ 		}
+  next:
+- 		free(line);
++		free(line);
+ 	}
+ 
+ //bb_info_msg("ENDPARSE[%s]", boundary);
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index fdc6f5e..b7d5b20 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -716,7 +716,7 @@ handle_dir_common(int opts)
+ 		/* STAT <filename> */
+ 		cmdio_write_raw(STR(FTP_STATFILE_OK)"-File status:\r\n");
+ 		while (1) {
+-    			line = xmalloc_fgetline(ls_fp);
++			line = xmalloc_fgetline(ls_fp);
+ 			if (!line)
+ 				break;
+ 			/* Hack: 0 results in no status at all */
+@@ -731,7 +731,7 @@ handle_dir_common(int opts)
+ 		int remote_fd = get_remote_transfer_fd(" Directory listing");
+ 		if (remote_fd >= 0) {
+ 			while (1) {
+-    				line = xmalloc_fgetline(ls_fp);
++				line = xmalloc_fgetline(ls_fp);
+ 				if (!line)
+ 					break;
+ 				/* I've seen clients complaining when they
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index a30decf..2d3e770 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -364,7 +364,7 @@ wait_for_reply(len_and_sockaddr *from_lsa, struct sockaddr *to)
+ 		read_len = recv_from_to(rcvsock,
+ 				recv_pkt, sizeof(recv_pkt),
+ 				/*flags:*/ 0,
+-            			&from_lsa->u.sa, to, from_lsa->len);
++				&from_lsa->u.sa, to, from_lsa->len);
+ 	}
+ 
+ 	return read_len;
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index afd41bf..78b0d0a 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -66,7 +66,7 @@ struct dyn_lease* FAST_FUNC add_lease(
+ 			char *p;
+ 			if (hostname_len > sizeof(oldest->hostname))
+ 				hostname_len = sizeof(oldest->hostname);
+-            		p = safe_strncpy(oldest->hostname, hostname, hostname_len);
++			p = safe_strncpy(oldest->hostname, hostname, hostname_len);
+ 			/* sanitization (s/non-ASCII/^/g) */
+ 			while (*p) {
+ 				if (*p < ' ' || *p > 126)
+diff --git a/networking/udhcp/script.c b/networking/udhcp/script.c
+index 065ea0c..574c74f 100644
+--- a/networking/udhcp/script.c
++++ b/networking/udhcp/script.c
+@@ -17,7 +17,7 @@
+ static const uint8_t len_of_option_as_string[] = {
+ 	[OPTION_IP] =		sizeof("255.255.255.255 "),
+ 	[OPTION_IP_PAIR] =	sizeof("255.255.255.255 ") * 2,
+- 	[OPTION_STATIC_ROUTES]= sizeof("255.255.255.255/32 255.255.255.255 "),
++	[OPTION_STATIC_ROUTES]= sizeof("255.255.255.255/32 255.255.255.255 "),
+ 	[OPTION_STRING] =	1,
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+ 	[OPTION_STR1035] =	1,
+diff --git a/scripts/checkhelp.awk b/scripts/checkhelp.awk
+index 2468db2..94843d6 100755
+--- a/scripts/checkhelp.awk
++++ b/scripts/checkhelp.awk
+@@ -32,7 +32,7 @@ BEGIN {
+ }
+ END {
+ 	for (i = 0; i <= pos; i++) {
+-# 	printf("%s: help for #%i '%s' == %i\n", file[i], i, conf[i], help[i]);
++#	printf("%s: help for #%i '%s' == %i\n", file[i], i, conf[i], help[i]);
+ 		if (help[i] == 0) {
+ 			printf("%s: No helptext for '%s'\n", file[i], conf[i]);
+ 		}
+diff --git a/shell/hush.c b/shell/hush.c
+index 9a9b5bb..e0c5626 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2037,7 +2037,7 @@ static const char *next_brace_sub(const char *cp)
+ 				break;
+ 			cp++;
+ 			continue;
+-    		}
++		}
+ 		 /*{*/ if ((*cp == '}' && depth-- == 0) || (*cp == ',' && depth == 0))
+ 			break;
+ 		if (*cp++ == '{') /*}*/
+diff --git a/shell/hush_test/hush-misc/func4.tests b/shell/hush_test/hush-misc/func4.tests
+index 33b1663..74c1b9a 100755
+--- a/shell/hush_test/hush-misc/func4.tests
++++ b/shell/hush_test/hush-misc/func4.tests
+@@ -2,6 +2,6 @@ func() {
+ 	eval "echo \"\${val_${1}}\""
+ }
+ 
+-val_x=24 
++val_x=24
+ (func x)
+ echo Done
+diff --git a/shell/msh_test/msh-execution/nested_break.tests b/shell/msh_test/msh-execution/nested_break.tests
+index f2e6f81..1a954d2 100755
+--- a/shell/msh_test/msh-execution/nested_break.tests
++++ b/shell/msh_test/msh-execution/nested_break.tests
+@@ -3,15 +3,15 @@
+ n=0
+ while :
+ do
+-        echo A
+-        while :
+-        do
+-    		echo B
+-                break
+-        done
+-        echo iteration
+-        [ $n = 1 ] && break
++	echo A
++	while :
++	do
++		echo B
++		break
++	done
++	echo iteration
++	[ $n = 1 ] && break
+ 	echo C
+-        n=`expr $n + 1`
++	n=`expr $n + 1`
+ done
+ echo D
+diff --git a/util-linux/mkfs_ext2.c b/util-linux/mkfs_ext2.c
+index 8b435c1..19c3c67 100644
+--- a/util-linux/mkfs_ext2.c
++++ b/util-linux/mkfs_ext2.c
+@@ -145,12 +145,12 @@ static void PUT(uint64_t off, void *buf, uint32_t size)
+ 
+ // Standard mke2fs 1.41.9:
+ // Usage: mke2fs [-c|-l filename] [-b block-size] [-f fragment-size]
+-// 	[-i bytes-per-inode] [-I inode-size] [-J journal-options]
+-// 	[-G meta group size] [-N number-of-inodes]
+-// 	[-m reserved-blocks-percentage] [-o creator-os]
+-// 	[-g blocks-per-group] [-L volume-label] [-M last-mounted-directory]
+-// 	[-O feature[,...]] [-r fs-revision] [-E extended-option[,...]]
+-// 	[-T fs-type] [-U UUID] [-jnqvFSV] device [blocks-count]
++//	[-i bytes-per-inode] [-I inode-size] [-J journal-options]
++//	[-G meta group size] [-N number-of-inodes]
++//	[-m reserved-blocks-percentage] [-o creator-os]
++//	[-g blocks-per-group] [-L volume-label] [-M last-mounted-directory]
++//	[-O feature[,...]] [-r fs-revision] [-E extended-option[,...]]
++//	[-T fs-type] [-U UUID] [-jnqvFSV] device [blocks-count]
+ //
+ // Options not commented below are taken but silently ignored:
+ enum {
+@@ -311,7 +311,7 @@ int mkfs_ext2_main(int argc UNUSED_PARAM, char **argv)
+ 	nreserved = (uint64_t)nblocks * reserved_percent / 100;
+ 
+ 	// N.B. killing e2fsprogs feature! Unused blocks don't account in calculations
+- 	nblocks_full = nblocks;
++	nblocks_full = nblocks;
+ 
+ 	// If last block group is too small, nblocks may be decreased in order
+ 	// to discard it, and control returns here to recalculate some
+diff --git a/util-linux/mkfs_vfat.c b/util-linux/mkfs_vfat.c
+index 54c068d..a9a65aa 100644
+--- a/util-linux/mkfs_vfat.c
++++ b/util-linux/mkfs_vfat.c
+@@ -208,7 +208,7 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 	int dev;
+ 	unsigned bytes_per_sect;
+ 	unsigned sect_per_fat;
+-  	unsigned opts;
++	unsigned opts;
+ 	uint16_t sect_per_track;
+ 	uint8_t media_byte;
+ 	uint8_t sect_per_clust;

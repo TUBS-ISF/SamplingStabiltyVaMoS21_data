@@ -1,0 +1,237 @@
+2008-02-20 22:23:24 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index a91eac4..eb8b2f6 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -475,6 +475,7 @@ extern void *xzalloc(size_t size);
+ extern void *xrealloc(void *old, size_t size);
+ 
+ extern ssize_t safe_read(int fd, void *buf, size_t count);
++extern ssize_t nonblock_safe_read(int fd, void *buf, size_t count);
+ extern ssize_t full_read(int fd, void *buf, size_t count);
+ extern void xread(int fd, void *buf, size_t count);
+ extern unsigned char xread_char(int fd);
+@@ -482,6 +483,7 @@ extern unsigned char xread_char(int fd);
+ extern char *reads(int fd, char *buf, size_t count);
+ // Read one line a-la fgets. Reads byte-by-byte.
+ // Useful when it is important to not read ahead.
++// Bytes are appended to pfx (which must be malloced, or NULL).
+ extern char *xmalloc_reads(int fd, char *pfx);
+ extern ssize_t read_close(int fd, void *buf, size_t count);
+ extern ssize_t open_read_close(const char *filename, void *buf, size_t count);
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 529344f..9aab637 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1408,9 +1408,9 @@ int read_line_input(const char *prompt, char *command, int maxsize, line_input_t
+ 	parse_and_put_prompt(prompt);
+ 
+ 	while (1) {
+-		fflush(stdout);
++		fflush(NULL);
+ 
+-		if (safe_read(STDIN_FILENO, &c, 1) < 1) {
++		if (nonblock_safe_read(STDIN_FILENO, &c, 1) < 1) {
+ 			/* if we can't read input then exit */
+ 			goto prepare_to_die;
+ 		}
+diff --git a/libbb/read.c b/libbb/read.c
+index 502d407..2cd86b8 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -20,6 +20,58 @@ ssize_t safe_read(int fd, void *buf, size_t count)
+ 	return n;
+ }
+ 
++/* Suppose that you are a shell. You start child processes.
++ * They work and eventually exit. You want to get user input.
++ * You read stdin. But what happens if last child switched
++ * its stdin into O_NONBLOCK mode?
++ *
++ * *** SURPRISE! It will affect the parent too! ***
++ * *** BIG SURPRISE! It stays even after child exits! ***
++ *
++ * This is a design bug in UNIX API.
++ *      fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) | O_NONBLOCK);
++ * will set nonblocking mode not only on _your_ stdin, but
++ * also on stdin of your parent, etc.
++ *
++ * In general,
++ *      fd2 = dup(fd1);
++ *      fcntl(fd2, F_SETFL, fcntl(fd2, F_GETFL, 0) | O_NONBLOCK);
++ * sets both fd1 and fd2 to O_NONBLOCK. This includes cases
++ * where duping is done implicitly by fork() etc.
++ *
++ * We need
++ *      fcntl(fd2, F_SETFD, fcntl(fd2, F_GETFD, 0) | O_NONBLOCK);
++ * (note SETFD, not SETFL!) but such thing doesn't exist.
++ *
++ * Alternatively, we need nonblocking_read(fd, ...) which doesn't
++ * require O_NONBLOCK dance at all. Actually, it exists:
++ *      n = recv(fd, buf, len, MSG_DONTWAIT);
++ *      "MSG_DONTWAIT:
++ *      Enables non-blocking operation; if the operation
++ *      would block, EAGAIN is returned."
++ * but recv() works only for sockets!
++ *
++ * So far I don't see any good solution, I can only propose
++ * that affected readers should be careful and use this routine,
++ * which detects EAGAIN and uses poll() to wait on the fd.
++ * Thanksfully, poll() doesn't give rat's ass about O_NONBLOCK flag.
++ */
++ssize_t nonblock_safe_read(int fd, void *buf, size_t count)
++{
++	struct pollfd pfd[1];
++	ssize_t n;
++
++	while (1) {
++		n = safe_read(fd, buf, count);
++		if (n >= 0 || errno != EAGAIN)
++			return n;
++		/* fd is in O_NONBLOCK mode. Wait using poll and repeat */
++		pfd[0].fd = fd;
++		pfd[0].events = POLLIN;
++		safe_poll(pfd, 1, -1);
++	}
++}
++
+ /*
+  * Read all of the supplied buffer from a file.
+  * This does multiple reads as necessary.
+@@ -93,6 +145,7 @@ char *reads(int fd, char *buffer, size_t size)
+ 
+ // Read one line a-la fgets. Reads byte-by-byte.
+ // Useful when it is important to not read ahead.
++// Bytes are appended to pfx (which must be malloced, or NULL).
+ char *xmalloc_reads(int fd, char *buf)
+ {
+ 	char *p;
+@@ -106,7 +159,8 @@ char *xmalloc_reads(int fd, char *buf)
+ 			p = buf + sz;
+ 			sz += 128;
+ 		}
+-		if (safe_read(fd, p, 1) != 1) { /* EOF/error */
++		/* nonblock_safe_read() because we are used by e.g. shells */
++		if (nonblock_safe_read(fd, p, 1) != 1) { /* EOF/error */
+ 			if (p == buf) {
+ 				/* we read nothing [and buf was NULL initially] */
+ 				free(buf);
+diff --git a/shell/ash.c b/shell/ash.c
+index 65f94f6..debe8ec 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -5428,7 +5428,7 @@ expbackq(union node *cmd, int quoted, int quotes)
+  read:
+ 		if (in.fd < 0)
+ 			break;
+-		i = safe_read(in.fd, buf, sizeof(buf));
++		i = nonblock_safe_read(in.fd, buf, sizeof(buf));
+ 		TRACE(("expbackq: read returns %d\n", i));
+ 		if (i <= 0)
+ 			break;
+@@ -8678,7 +8678,7 @@ preadfd(void)
+  retry:
+ #if ENABLE_FEATURE_EDITING
+ 	if (!iflag || parsefile->fd)
+-		nr = safe_read(parsefile->fd, buf, BUFSIZ - 1);
++		nr = nonblock_safe_read(parsefile->fd, buf, BUFSIZ - 1);
+ 	else {
+ #if ENABLE_FEATURE_TAB_COMPLETION
+ 		line_input_state->path_lookup = pathval();
+@@ -8700,9 +8700,11 @@ preadfd(void)
+ 		}
+ 	}
+ #else
+-	nr = safe_read(parsefile->fd, buf, BUFSIZ - 1);
++	nr = nonblock_safe_read(parsefile->fd, buf, BUFSIZ - 1);
+ #endif
+ 
++#if 0
++/* nonblock_safe_read() handles this problem */
+ 	if (nr < 0) {
+ 		if (parsefile->fd == 0 && errno == EWOULDBLOCK) {
+ 			int flags = fcntl(0, F_GETFL);
+@@ -8715,6 +8717,7 @@ preadfd(void)
+ 			}
+ 		}
+ 	}
++#endif
+ 	return nr;
+ }
+ 
+@@ -11801,7 +11804,7 @@ readcmd(int argc, char **argv)
+ 	backslash = 0;
+ 	STARTSTACKSTR(p);
+ 	do {
+-		if (read(0, &c, 1) != 1) {
++		if (nonblock_safe_read(0, &c, 1) != 1) {
+ 			status = 1;
+ 			break;
+ 		}
+diff --git a/shell/hush.c b/shell/hush.c
+index 4d48431..820fd88 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1273,10 +1273,10 @@ static void get_user_input(struct in_str *i)
+ 	prompt_str = setup_prompt_string(i->promptmode);
+ #if ENABLE_FEATURE_EDITING
+ 	/* Enable command line editing only while a command line
+-	 * is actually being read; otherwise, we'll end up bequeathing
+-	 * atexit() handlers and other unwanted stuff to our
+-	 * child processes (rob@sysgo.de) */
+-	r = read_line_input(prompt_str, user_input_buf, BUFSIZ-1, line_input_state);
++	 * is actually being read */
++	do {
++		r = read_line_input(prompt_str, user_input_buf, BUFSIZ-1, line_input_state);
++	} while (r == 0); /* repeat if Ctrl-C */
+ 	i->eof_flag = (r < 0);
+ 	if (i->eof_flag) { /* EOF/error detected */
+ 		user_input_buf[0] = EOF; /* yes, it will be truncated, it's ok */
+diff --git a/shell/msh.c b/shell/msh.c
+index fd287f1..917b08a 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -42,6 +42,7 @@
+ # define xmalloc(size) malloc(size)
+ # define msh_main(argc,argv) main(argc,argv)
+ # define safe_read(fd,buf,count) read(fd,buf,count)
++# define nonblock_safe_read(fd,buf,count) read(fd,buf,count)
+ # define NOT_LONE_DASH(s) ((s)[0] != '-' || (s)[1])
+ # define LONE_CHAR(s,c) ((s)[0] == (c) && !(s)[1])
+ # define ATTRIBUTE_NORETURN __attribute__ ((__noreturn__))
+@@ -3376,7 +3377,7 @@ static int doread(struct op *t)
+ 	}
+ 	for (wp = t->words + 1; *wp; wp++) {
+ 		for (cp = global_env.linep; !nl && cp < elinep - 1; cp++) {
+-			nb = read(0, cp, sizeof(*cp));
++			nb = nonblock_safe_read(0, cp, sizeof(*cp));
+ 			if (nb != sizeof(*cp))
+ 				break;
+ 			nl = (*cp == '\n');
+@@ -4799,7 +4800,7 @@ static int filechar(struct ioarg *ap)
+ 			if (i)
+ 				lseek(ap->afile, ap->afpos, SEEK_SET);
+ 
+-			i = safe_read(ap->afile, bp->buf, sizeof(bp->buf));
++			i = nonblock_safe_read(ap->afile, bp->buf, sizeof(bp->buf));
+ 			if (i <= 0) {
+ 				closef(ap->afile);
+ 				return 0;
+@@ -4830,7 +4831,7 @@ static int filechar(struct ioarg *ap)
+ 		return c;
+ 	}
+ #endif
+-	i = safe_read(ap->afile, &c, sizeof(c));
++	i = nonblock_safe_read(ap->afile, &c, sizeof(c));
+ 	return i == sizeof(c) ? (c & 0x7f) : (closef(ap->afile), 0);
+ }
+ 
+@@ -4841,7 +4842,7 @@ static int herechar(struct ioarg *ap)
+ {
+ 	char c;
+ 
+-	if (read(ap->afile, &c, sizeof(c)) != sizeof(c)) {
++	if (nonblock_safe_read(ap->afile, &c, sizeof(c)) != sizeof(c)) {
+ 		close(ap->afile);
+ 		c = '\0';
+ 	}

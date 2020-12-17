@@ -1,0 +1,16 @@
+2009-04-06 12:34:27 +0000
+diff --git a/shell/hush_test/hush-misc/redir1.tests b/shell/hush_test/hush-misc/redir1.tests
+index 5f6c206..7e20451 100755
+--- a/shell/hush_test/hush-misc/redir1.tests
++++ b/shell/hush_test/hush-misc/redir1.tests
+@@ -19,7 +19,9 @@ test -f shell_test_$$ && echo "File created:ok"
+ rm shell_test_$$ 2>/dev/null
+ var=ok
+ { var=bad >shell_test_$$; } &
+-usleep 100000
++# cant use usleep as it isnt standard in $PATH --
++# we fail when testing busybox compiled solely as "hush"
++sleep 1
+ echo "Test 4:  var:$var"
+ test -f shell_test_$$ && echo "File created:ok"
+ 

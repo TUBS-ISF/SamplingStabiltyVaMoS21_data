@@ -1,0 +1,50 @@
+2007-09-28 22:13:55 +0000
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 318f080..2452eb0 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -30,7 +30,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 
+         "r" will add 1    (bit 0)
+         "n" will add 2    (bit 1)
+-        "u  will add 4    (bit 2)
++        "u" will add 4    (bit 2)
+         "g" will add 8    (bit 3)
+ 
+         and so on.  You can also look at the return value as a bit
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 3a31eef..f1c0b6d 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -353,14 +353,10 @@ procps_status_t *procps_scan(procps_status_t* sp, int flags)
+ 
+ #if 0 /* PSSCAN_CMD is not used */
+ 		if (flags & (PSSCAN_CMD|PSSCAN_ARGV0)) {
+-			if (sp->argv0) {
+-				free(sp->argv0);
+-				sp->argv0 = NULL;
+-			}
+-			if (sp->cmd) {
+-				free(sp->cmd);
+-				sp->cmd = NULL;
+-			}
++			free(sp->argv0);
++			sp->argv0 = NULL;
++			free(sp->cmd);
++			sp->cmd = NULL;
+ 			strcpy(filename_tail, "/cmdline");
+ 			/* TODO: to get rid of size limits, read into malloc buf,
+ 			 * then realloc it down to real size. */
+@@ -380,10 +376,8 @@ procps_status_t *procps_scan(procps_status_t* sp, int flags)
+ 		}
+ #else
+ 		if (flags & PSSCAN_ARGV0) {
+-			if (sp->argv0) {
+-				free(sp->argv0);
+-				sp->argv0 = NULL;
+-			}
++			free(sp->argv0);
++			sp->argv0 = NULL;
+ 			strcpy(filename_tail, "/cmdline");
+ 			n = read_to_buf(filename, buf);
+ 			if (n <= 0)

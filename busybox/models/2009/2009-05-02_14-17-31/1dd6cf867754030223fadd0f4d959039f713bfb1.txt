@@ -1,0 +1,48 @@
+2009-05-02 14:17:31 +0200
+diff --git a/shell/hush.c b/shell/hush.c
+index cbec2dd..5daca96 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2646,7 +2646,9 @@ static int setup_redirects(struct command *prog, int squirrel[])
+ 	for (redir = prog->redirects; redir; redir = redir->next) {
+ 		if (redir->rd_type == REDIRECT_HEREDOC2) {
+ 			/* rd_fd<<HERE case */
+-			if (squirrel && redir->rd_fd < 3) {
++			if (squirrel && redir->rd_fd < 3
++			 && squirrel[redir->rd_fd] < 0
++			) {
+ 				squirrel[redir->rd_fd] = dup(redir->rd_fd);
+ 			}
+ 			/* for REDIRECT_HEREDOC2, rd_filename holds _contents_
+@@ -2682,7 +2684,9 @@ static int setup_redirects(struct command *prog, int squirrel[])
+ 		}
+ 
+ 		if (openfd != redir->rd_fd) {
+-			if (squirrel && redir->rd_fd < 3) {
++			if (squirrel && redir->rd_fd < 3
++			 && squirrel[redir->rd_fd] < 0
++			) {
+ 				squirrel[redir->rd_fd] = dup(redir->rd_fd);
+ 			}
+ 			if (openfd == REDIRFD_CLOSE) {
+diff --git a/shell/hush_test/hush-misc/redir6.right b/shell/hush_test/hush-misc/redir6.right
+new file mode 100644
+index 0000000..a97c4bd
+--- /dev/null
++++ b/shell/hush_test/hush-misc/redir6.right
+@@ -0,0 +1,4 @@
++Testing multiple redirections to same fd
++Hello
++Done1
++Done2
+diff --git a/shell/hush_test/hush-misc/redir6.tests b/shell/hush_test/hush-misc/redir6.tests
+new file mode 100755
+index 0000000..c639ebb
+--- /dev/null
++++ b/shell/hush_test/hush-misc/redir6.tests
+@@ -0,0 +1,5 @@
++echo "Testing multiple redirections to same fd"
++# bug was making us lose fd #1 after this:
++echo Hello >/dev/null 1>&2
++echo Done1
++echo Done2 >&2

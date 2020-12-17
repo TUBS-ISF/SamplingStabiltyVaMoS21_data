@@ -1,0 +1,34 @@
+2009-01-22 13:27:14 +0000
+diff --git a/Config.in b/Config.in
+index 4fd9d11..fff6d83 100644
+--- a/Config.in
++++ b/Config.in
+@@ -411,6 +411,12 @@ config CROSS_COMPILER_PREFIX
+ 
+ 	  Native builds leave this empty.
+ 
++config EXTRA_CFLAGS
++	string "Additional CFLAGS"
++	default ""
++	help
++	  Additional CFLAGS to pass to the compiler verbatim.
++
+ endmenu
+ 
+ menu 'Debugging Options'
+diff --git a/Makefile.flags b/Makefile.flags
+index e314802..ad8d5e1 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -81,6 +81,11 @@ CFLAGS_busybox += $(ARCH_PIE)
+ CFLAGS += $(ARCH_FPIE)
+ endif
+ 
++ifneq ($(CONFIG_EXTRA_CFLAGS),)
++CFLAGS += $(strip $(subst ",,$(CONFIG_EXTRA_CFLAGS)))
++#"))
++endif
++
+ LDLIBS += m crypt
+ 
+ ifeq ($(CONFIG_PAM),y)

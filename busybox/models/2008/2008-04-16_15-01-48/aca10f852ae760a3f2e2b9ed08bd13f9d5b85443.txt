@@ -1,0 +1,13 @@
+2008-04-16 15:01:48 +0000
+diff --git a/networking/arping.c b/networking/arping.c
+index 39dcb7c..2b7a43c 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -75,7 +75,6 @@ static int send_pack(struct in_addr *src_addr,
+ 	struct arphdr *ah = (struct arphdr *) buf;
+ 	unsigned char *p = (unsigned char *) (ah + 1);
+ 
+-	ah->ar_hrd = htons(ME->sll_hatype);
+ 	ah->ar_hrd = htons(ARPHRD_ETHER);
+ 	ah->ar_pro = htons(ETH_P_IP);
+ 	ah->ar_hln = ME->sll_halen;

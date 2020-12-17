@@ -1,0 +1,170 @@
+2008-01-25 22:46:34 +0000
+diff --git a/networking/udhcp/clientsocket.c b/networking/udhcp/clientsocket.c
+index 541f883..954db53 100644
+--- a/networking/udhcp/clientsocket.c
++++ b/networking/udhcp/clientsocket.c
+@@ -30,22 +30,75 @@
+ #include <linux/if_packet.h>
+ #include <linux/if_ether.h>
+ #endif
++#include <linux/filter.h>
+ 
+ #include "common.h"
+ 
++#define SERVER_AND_CLIENT_PORTS  ((SERVER_PORT << 16) + CLIENT_PORT)
+ 
+ int raw_socket(int ifindex)
+ {
+ 	int fd;
+ 	struct sockaddr_ll sock;
+ 
+-	DEBUG("Opening raw socket on ifindex %d", ifindex);
++	/*
++	 * Comment:
++	 *
++	 *	I've selected not to see LL header, so BPF doesn't see it, too.
++	 *	The filter may also pass non-IP and non-ARP packets, but we do
++	 *	a more complete check when receiving the message in userspace.
++	 *
++	 * and filter shamelessly stolen from:
++	 *
++	 *	http://www.flamewarmaster.de/software/dhcpclient/
++	 *
++	 * There are a few other interesting ideas on that page (look under
++	 * "Motivation").  Use of netlink events is most interesting.  Think
++	 * of various network servers listening for events and reconfiguring.
++	 * That would obsolete sending HUP signals and/or make use of restarts.
++	 *
++	 * Copyright: 2006, 2007 Stefan Rompf <sux@loplof.de>.
++	 * License: GPL v2.
++	 *
++	 * TODO: make conditional?
++	 */
++	static const struct sock_filter filter_instr[] = {
++		/* check for udp */
++		BPF_STMT(BPF_LD|BPF_B|BPF_ABS, 9),
++		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, IPPROTO_UDP, 2, 0),     /* L5, L1, is UDP? */
++		/* ugly check for arp on ethernet-like and IPv4 */
++		BPF_STMT(BPF_LD|BPF_W|BPF_ABS, 2),                      /* L1: */
++		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, 0x08000604, 3, 4),      /* L3, L4 */
++		/* skip IP header */
++		BPF_STMT(BPF_LDX|BPF_B|BPF_MSH, 0),                     /* L5: */
++		/* check udp source and destination ports */
++		BPF_STMT(BPF_LD|BPF_W|BPF_IND, 0),
++		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, SERVER_AND_CLIENT_PORTS, 0, 1),	/* L3, L4 */
++		/* returns */
++		BPF_STMT(BPF_RET|BPF_K, ~0UL),                          /* L3: pass */
++		BPF_STMT(BPF_RET|BPF_K, 0),                             /* L4: reject */
++	};
++	static const struct sock_fprog filter_prog = {
++		.len = sizeof(filter_instr) / sizeof(filter_instr[0]),
++		/* casting const away: */
++		.filter = (struct sock_filter *) filter_instr,
++	};
++
++	DEBUG("opening raw socket on ifindex %d", ifindex);
++
+ 	fd = xsocket(PF_PACKET, SOCK_DGRAM, htons(ETH_P_IP));
++	DEBUG("got raw socket fd %d", fd);
++
++	/* Ignoring error (kernel may lack support for this) */
++	if (setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &filter_prog,
++				sizeof(filter_prog)) >= 0)
++		DEBUG("attached filter to raw socket fd %d", fd);
+ 
+ 	sock.sll_family = AF_PACKET;
+ 	sock.sll_protocol = htons(ETH_P_IP);
+ 	sock.sll_ifindex = ifindex;
+ 	xbind(fd, (struct sockaddr *) &sock, sizeof(sock));
++	DEBUG("bound to raw socket fd %d", fd);
+ 
+ 	return fd;
+ }
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 38ede01..b1d629b 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -14,6 +14,9 @@
+ 
+ #define DEFAULT_SCRIPT  "/usr/share/udhcpc/default.script"
+ 
++#define SERVER_PORT  67
++#define CLIENT_PORT  68
++
+ extern const uint8_t MAC_BCAST_ADDR[6]; /* six all-ones */
+ 
+ /*** packet.h ***/
+@@ -21,7 +24,7 @@ extern const uint8_t MAC_BCAST_ADDR[6]; /* six all-ones */
+ #include <netinet/udp.h>
+ #include <netinet/ip.h>
+ 
+-#define DHCP_OPTIONS_BUFSIZE 308
++#define DHCP_OPTIONS_BUFSIZE  308
+ 
+ struct dhcpMessage {
+ 	uint8_t op;
+@@ -93,7 +96,7 @@ int listen_socket(/*uint32_t ip,*/ int port, const char *inf);
+ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *interface);
+ 
+ #if ENABLE_FEATURE_UDHCP_DEBUG
+-# define DEBUG(str, args...) bb_info_msg(str, ## args)
++# define DEBUG(str, args...) bb_info_msg("### " str, ## args)
+ #else
+ # define DEBUG(str, args...) do {;} while (0)
+ #endif
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index e9b728a..f54bc08 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -452,7 +452,8 @@ int udhcpc_main(int argc, char **argv)
+ 
+ 			if (listen_mode == LISTEN_KERNEL)
+ 				len = udhcp_recv_packet(&packet, sockfd);
+-			else len = get_raw_packet(&packet, sockfd);
++			else
++				len = get_raw_packet(&packet, sockfd);
+ 
+ 			if (len == -1) { /* error is severe, reopen socket */
+ 				DEBUG("error on read, %s, reopening socket", strerror(errno));
+diff --git a/networking/udhcp/dhcprelay.c b/networking/udhcp/dhcprelay.c
+index a6483fc..c243cc1 100644
+--- a/networking/udhcp/dhcprelay.c
++++ b/networking/udhcp/dhcprelay.c
+@@ -155,12 +155,12 @@ static int init_sockets(char **client, int num_clients,
+ 	int i, n;
+ 
+ 	/* talk to real server on bootps */
+-	fds[0] = listen_socket(/*INADDR_ANY,*/ 67, server);
++	fds[0] = listen_socket(/*INADDR_ANY,*/ SERVER_PORT, server);
+ 	n = fds[0];
+ 
+ 	for (i = 1; i < num_clients; i++) {
+ 		/* listen for clients on bootps */
+-		fds[i] = listen_socket(/*INADDR_ANY,*/ 67, client[i-1]);
++		fds[i] = listen_socket(/*INADDR_ANY,*/ SERVER_PORT, client[i-1]);
+ 		if (fds[i] > n)
+ 			n = fds[i];
+ 	}
+@@ -289,7 +289,7 @@ int dhcprelay_main(int argc, char **argv)
+ 	struct sockaddr_in server_addr;
+ 
+ 	server_addr.sin_family = AF_INET;
+-	server_addr.sin_port = htons(67);
++	server_addr.sin_port = htons(SERVER_PORT);
+ 	if (argc == 4) {
+ 		if (!inet_aton(argv[3], &server_addr.sin_addr))
+ 			bb_perror_msg_and_die("didn't grok server");
+diff --git a/networking/udhcp/options.h b/networking/udhcp/options.h
+index c98aec4..e9eeefb 100644
+--- a/networking/udhcp/options.h
++++ b/networking/udhcp/options.h
+@@ -28,9 +28,6 @@ enum {
+ /*****************************************************************/
+ 
+ /* DHCP protocol -- see RFC 2131 */
+-#define SERVER_PORT		67
+-#define CLIENT_PORT		68
+-
+ #define DHCP_MAGIC		0x63825363
+ 
+ 

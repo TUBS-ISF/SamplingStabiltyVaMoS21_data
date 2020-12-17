@@ -1,0 +1,37 @@
+2009-09-22 23:16:39 +0200
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 6068223..0917b41 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -15,6 +15,9 @@
+ /* must be _after_ libbb.h: */
+ #include <linux/hdreg.h>
+ #include <sys/mount.h>
++#if !defined(BLKGETSIZE64)
++# define BLKGETSIZE64 _IOR(0x12,114,size_t)
++#endif
+ 
+ /* device types */
+ /* ------------ */
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index e50ee77..1bb3a9d 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -9,13 +9,16 @@
+ 
+ #ifndef _LARGEFILE64_SOURCE
+ /* For lseek64 */
+-#define _LARGEFILE64_SOURCE
++# define _LARGEFILE64_SOURCE
+ #endif
+ #include <assert.h>             /* assert */
+ #include <sys/mount.h>
+ #if !defined(BLKSSZGET)
+ # define BLKSSZGET _IO(0x12, 104)
+ #endif
++#if !defined(BLKGETSIZE64)
++# define BLKGETSIZE64 _IOR(0x12,114,size_t)
++#endif
+ #include "libbb.h"
+ 
+ /* Looks like someone forgot to add this to config system */

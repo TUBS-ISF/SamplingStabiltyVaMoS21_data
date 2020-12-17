@@ -1,0 +1,97 @@
+2009-07-15 20:02:19 +0200
+diff --git a/archival/lzo1x_9x.c b/archival/lzo1x_9x.c
+index d30e2e7..f2d4fac 100644
+--- a/archival/lzo1x_9x.c
++++ b/archival/lzo1x_9x.c
+@@ -304,7 +304,7 @@ static void swd_search(lzo_swd_p s, unsigned node, unsigned cnt)
+ 		    p2[1] == p1[1]) {
+ 			unsigned i;
+ 			assert(lzo_memcmp(bp,&b[node],3) == 0);
+-				
++
+ 			p1 += 2; p2 += 2;
+ 			do {} while (++p1 < px && *p1 == *++p2);
+ 			i = p1-bp;
+diff --git a/archival/lzop.c b/archival/lzop.c
+index a30d5e7..b4757e8 100644
+--- a/archival/lzop.c
++++ b/archival/lzop.c
+@@ -856,7 +856,7 @@ static const unsigned char lzop_magic[9] = {
+ /* This coding is derived from Alexander Lehmann's pngcheck code. */
+ static void check_magic(void)
+ {
+-	unsigned char magic[sizeof(lzop_magic)];	
++	unsigned char magic[sizeof(lzop_magic)];
+ 	xread(0, magic, sizeof(magic));
+ 	if (memcmp(magic, lzop_magic, sizeof(lzop_magic)) != 0)
+ 		bb_error_msg_and_die("bad magic number");
+@@ -948,7 +948,7 @@ static int read_header(header_t *h)
+ 	/* skip extra field [not used yet] */
+ 	if (h->flags & F_H_EXTRA_FIELD) {
+ 		uint32_t k;
+-		
++
+ 		/* note: the checksum also covers the length */
+ 		init_chksum(&G.chksum_in);
+ 		h->extra_field_len = f_read32();
+@@ -1033,7 +1033,7 @@ static smallint do_lzo_compress(void)
+ static smallint do_lzo_decompress(void)
+ {
+ 	header_t header;
+-	
++
+ 	check_magic();
+ 	p_header(&header);
+ 	return lzo_decompress(&header);
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 5ebea70..a99f9b5 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -233,7 +233,7 @@ static size_t load_string(const char *src, int maxsize)
+ 	safe_strncpy(command_ps, src, maxsize);
+ 	return strlen(command_ps);
+ }
+-# if ENABLE_FEATURE_TAB_COMPLETION 
++# if ENABLE_FEATURE_TAB_COMPLETION
+ static void save_string(char *dst, int maxsize)
+ {
+ 	safe_strncpy(dst, command_ps, maxsize);
+diff --git a/networking/hostname.c b/networking/hostname.c
+index 7a120fa..579eff7 100644
+--- a/networking/hostname.c
++++ b/networking/hostname.c
+@@ -31,7 +31,7 @@ static void do_sethostname(char *s, int isfile)
+ 
+ /* Manpage circa 2009:
+  *
+- * hostname [-v] [-a] [--alias] [-d] [--domain] [-f] [--fqdn] [--long] 
++ * hostname [-v] [-a] [--alias] [-d] [--domain] [-f] [--fqdn] [--long]
+  *      [-i] [--ip-address] [-s] [--short] [-y] [--yp] [--nis]
+  *
+  * hostname [-v] [-F filename] [--file filename] / [hostname]
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index 4c72d7a..90410cb 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -53,7 +53,7 @@ void FAST_FUNC udhcp_dump_packet(struct dhcp_packet *packet)
+ 		//" secs %x"
+ 		//" flags %x"
+ 		" ciaddr %x"
+-		" yiaddr %x" 
++		" yiaddr %x"
+ 		" siaddr %x"
+ 		" giaddr %x"
+ 		//" chaddr %s"
+diff --git a/shell/hush.c b/shell/hush.c
+index fe05e47..d7b479d 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -7207,7 +7207,7 @@ static int FAST_FUNC builtin_memleak(char **argv UNUSED_PARAM)
+ 
+ 	if (!G.memleak_value)
+ 		G.memleak_value = l;
+-	
++
+ 	l -= G.memleak_value;
+ 	if ((long)l < 0)
+ 		l = 0;

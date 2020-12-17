@@ -1,0 +1,14 @@
+2007-06-14 09:29:48 +0000
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index fca4fd0..8743cdb 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -241,7 +241,7 @@ static inline void load_firmware(const char * const firmware, const char * const
+ 
+ 	/* check for /lib/firmware/$FIRMWARE */
+ 	xchdir("/lib/firmware");
+-	firmware_fd = xopen(firmware, O_WRONLY);
++	firmware_fd = xopen(firmware, O_RDONLY);
+ 
+ 	/* in case we goto out ... */
+ 	data_fd = -1;

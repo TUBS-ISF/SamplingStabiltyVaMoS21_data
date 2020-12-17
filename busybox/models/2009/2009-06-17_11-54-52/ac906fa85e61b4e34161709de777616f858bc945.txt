@@ -1,0 +1,913 @@
+2009-06-17 11:54:52 +0200
+diff --git a/networking/udhcp/Config.in b/networking/udhcp/Config.in
+index 495b079..a31240a 100644
+--- a/networking/udhcp/Config.in
++++ b/networking/udhcp/Config.in
+@@ -74,15 +74,17 @@ config FEATURE_UDHCP_PORT
+ 	  At the cost of ~300 bytes, enables -P port option.
+ 	  This feature is typically not needed.
+ 
+-# TODO: UDHCP_DEBUG is inconvenient to use.
+-# Make it controllable at runtime (say, via -v, -vv, -vvv)
+-
+ config UDHCP_DEBUG
+-	bool "Compile udhcp with noisy debugging messages"
+-	default n
+-	depends on APP_UDHCPD || APP_UDHCPC
++	int "Maximum verbosity level for udhcp applets (0..3)"
++	default 0
++	range 0 3
++	depends on APP_UDHCPD || APP_UDHCPC || APP_DHCPRELAY
+ 	help
+-	  If selected, udhcpd will output extra debugging output.
++	  Verbosity can be increased with multiple -v options.
++	  This options controls how high it can be cranked up.
++
++	  Bigger values result in bigger code. Levels above 1
++	  are very verbose and useful for debugging only.
+ 
+ config FEATURE_UDHCP_RFC3397
+ 	bool "Support for RFC3397 domain search (experimental)"
+diff --git a/networking/udhcp/arpping.c b/networking/udhcp/arpping.c
+index fa0989d..47a7b13 100644
+--- a/networking/udhcp/arpping.c
++++ b/networking/udhcp/arpping.c
+@@ -128,6 +128,6 @@ int FAST_FUNC arpping(uint32_t test_ip,
+ 
+  ret:
+ 	close(s);
+-	DEBUG("%srp reply received for this address", rv ? "No a" : "A");
++	log1("%srp reply received for this address", rv ? "No a" : "A");
+ 	return rv;
+ }
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 068f947..7d44697 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -203,7 +203,7 @@ int FAST_FUNC send_release(uint32_t server, uint32_t ciaddr)
+ 
+ 
+ /* Returns -1 on errors that are fatal for the socket, -2 for those that aren't */
+-int FAST_FUNC udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd)
++int FAST_FUNC udhcp_recv_raw_packet(struct dhcpMessage *dhcp_pkt, int fd)
+ {
+ 	int bytes;
+ 	struct udp_dhcp_packet packet;
+@@ -212,19 +212,19 @@ int FAST_FUNC udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd)
+ 	memset(&packet, 0, sizeof(packet));
+ 	bytes = safe_read(fd, &packet, sizeof(packet));
+ 	if (bytes < 0) {
+-		DEBUG("Cannot read on raw listening socket - ignoring");
++		log1("Packet read error, ignoring");
+ 		/* NB: possible down interface, etc. Caller should pause. */
+ 		return bytes; /* returns -1 */
+ 	}
+ 
+ 	if (bytes < (int) (sizeof(packet.ip) + sizeof(packet.udp))) {
+-		DEBUG("Packet is too short, ignoring");
++		log1("Packet is too short, ignoring");
+ 		return -2;
+ 	}
+ 
+ 	if (bytes < ntohs(packet.ip.tot_len)) {
+ 		/* packet is bigger than sizeof(packet), we did partial read */
+-		DEBUG("Oversized packet, ignoring");
++		log1("Oversized packet, ignoring");
+ 		return -2;
+ 	}
+ 
+@@ -238,7 +238,7 @@ int FAST_FUNC udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd)
+ 	/* || bytes > (int) sizeof(packet) - can't happen */
+ 	 || ntohs(packet.udp.len) != (uint16_t)(bytes - sizeof(packet.ip))
+ 	) {
+-		DEBUG("Unrelated/bogus packet");
++		log1("Unrelated/bogus packet, ignoring");
+ 		return -2;
+ 	}
+ 
+@@ -246,7 +246,7 @@ int FAST_FUNC udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd)
+ 	check = packet.ip.check;
+ 	packet.ip.check = 0;
+ 	if (check != udhcp_checksum(&packet.ip, sizeof(packet.ip))) {
+-		DEBUG("Bad IP header checksum, ignoring");
++		log1("Bad IP header checksum, ignoring");
+ 		return -2;
+ 	}
+ 
+@@ -257,16 +257,17 @@ int FAST_FUNC udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd)
+ 	check = packet.udp.check;
+ 	packet.udp.check = 0;
+ 	if (check && check != udhcp_checksum(&packet, bytes)) {
+-		bb_error_msg("packet with bad UDP checksum received, ignoring");
++		log1("Packet with bad UDP checksum received, ignoring");
+ 		return -2;
+ 	}
+ 
+-	memcpy(payload, &packet.data, bytes - (sizeof(packet.ip) + sizeof(packet.udp)));
++	memcpy(dhcp_pkt, &packet.data, bytes - (sizeof(packet.ip) + sizeof(packet.udp)));
+ 
+-	if (payload->cookie != htonl(DHCP_MAGIC)) {
+-		bb_error_msg("received bogus message (bad magic), ignoring");
++	if (dhcp_pkt->cookie != htonl(DHCP_MAGIC)) {
++		bb_info_msg("Packet with bad magic, ignoring");
+ 		return -2;
+ 	}
+-	DEBUG("Got valid DHCP packet");
++	log1("Got valid DHCP packet");
++	udhcp_dump_packet(dhcp_pkt);
+ 	return bytes - (sizeof(packet.ip) + sizeof(packet.udp));
+ }
+diff --git a/networking/udhcp/clientsocket.c b/networking/udhcp/clientsocket.c
+index 1dcc105..851d5ab 100644
+--- a/networking/udhcp/clientsocket.c
++++ b/networking/udhcp/clientsocket.c
+@@ -85,24 +85,24 @@ int FAST_FUNC udhcp_raw_socket(int ifindex)
+ 		.filter = (struct sock_filter *) filter_instr,
+ 	};
+ 
+-	DEBUG("opening raw socket on ifindex %d", ifindex);
++	log1("Opening raw socket on ifindex %d", ifindex); //log2?
+ 
+ 	fd = xsocket(PF_PACKET, SOCK_DGRAM, htons(ETH_P_IP));
+-	DEBUG("got raw socket fd %d", fd);
++	log1("Got raw socket fd %d", fd); //log2?
+ 
+ 	if (SERVER_PORT == 67 && CLIENT_PORT == 68) {
+ 		/* Use only if standard ports are in use */
+ 		/* Ignoring error (kernel may lack support for this) */
+ 		if (setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &filter_prog,
+ 				sizeof(filter_prog)) >= 0)
+-			DEBUG("attached filter to raw socket fd %d", fd);
++			log1("Attached filter to raw socket fd %d", fd); // log?
+ 	}
+ 
+ 	sock.sll_family = AF_PACKET;
+ 	sock.sll_protocol = htons(ETH_P_IP);
+ 	sock.sll_ifindex = ifindex;
+ 	xbind(fd, (struct sockaddr *) &sock, sizeof(sock));
+-	DEBUG("bound to raw socket fd %d", fd);
++	log1("Created raw socket");
+ 
+ 	return fd;
+ }
+diff --git a/networking/udhcp/common.c b/networking/udhcp/common.c
+index a47bbaf..c44f382 100644
+--- a/networking/udhcp/common.c
++++ b/networking/udhcp/common.c
+@@ -3,9 +3,12 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+ #include "common.h"
+ 
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
++int dhcp_verbose;
++#endif
++
+ const uint8_t MAC_BCAST_ADDR[6] ALIGN2 = {
+ 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+ };
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 0f12be0..40b8df4 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -62,15 +62,15 @@ uint16_t udhcp_checksum(void *addr, int count) FAST_FUNC;
+ 
+ void udhcp_init_header(struct dhcpMessage *packet, char type) FAST_FUNC;
+ 
+-/*int udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd); - in dhcpc.h */
++/*int udhcp_recv_raw_packet(struct dhcpMessage *dhcp_pkt, int fd); - in dhcpc.h */
+ int udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd) FAST_FUNC;
+ 
+-int udhcp_send_raw_packet(struct dhcpMessage *payload,
++int udhcp_send_raw_packet(struct dhcpMessage *dhcp_pkt,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port, const uint8_t *dest_arp,
+ 		int ifindex) FAST_FUNC;
+ 
+-int udhcp_send_kernel_packet(struct dhcpMessage *payload,
++int udhcp_send_kernel_packet(struct dhcpMessage *dhcp_pkt,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port) FAST_FUNC;
+ 
+@@ -100,10 +100,20 @@ int arpping(uint32_t test_ip,
+ 		uint8_t *from_mac,
+ 		const char *interface) FAST_FUNC;
+ 
+-#if ENABLE_UDHCP_DEBUG
+-# define DEBUG(str, args...) bb_info_msg("### " str, ## args)
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
++extern int dhcp_verbose;
++# define log1(...) do { if (dhcp_verbose >= 1) bb_info_msg(__VA_ARGS__); } while (0)
++# if CONFIG_UDHCP_DEBUG >= 2
++void udhcp_dump_packet(struct dhcpMessage *packet) FAST_FUNC;
++#  define log2(...) do { if (dhcp_verbose >= 2) bb_info_msg(__VA_ARGS__); } while (0)
++# else
++#  define udhcp_dump_packet(...) ((void)0)
++#  define log2(...) ((void)0)
++# endif
+ #else
+-# define DEBUG(str, args...) do {;} while (0)
++# define udhcp_dump_packet(...) ((void)0)
++# define log1(...) ((void)0)
++# define log2(...) ((void)0)
+ #endif
+ 
+ POP_SAVED_FUNCTION_VISIBILITY
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 44ff197..eed9d9a 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -20,9 +20,9 @@
+ 
+ static int sockfd = -1;
+ 
+-#define LISTEN_NONE 0
++#define LISTEN_NONE   0
+ #define LISTEN_KERNEL 1
+-#define LISTEN_RAW 2
++#define LISTEN_RAW    2
+ static smallint listen_mode;
+ 
+ #define INIT_SELECTING  0
+@@ -41,7 +41,7 @@ static smallint state;
+ /* just a little helper */
+ static void change_listen_mode(int new_mode)
+ {
+-	DEBUG("entering %s listen mode",
++	log1("entering %s listen mode",
+ 		new_mode ? (new_mode == 1 ? "kernel" : "raw") : "none");
+ 
+ 	listen_mode = new_mode;
+@@ -195,18 +195,17 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		OPT_s = 1 << 12,
+ 		OPT_T = 1 << 13,
+ 		OPT_t = 1 << 14,
+-		OPT_v = 1 << 15,
+-		OPT_S = 1 << 16,
+-		OPT_A = 1 << 17,
+-		OPT_O = 1 << 18,
+-		OPT_o = 1 << 19,
+-		OPT_f = 1 << 20,
++		OPT_S = 1 << 15,
++		OPT_A = 1 << 16,
++		OPT_O = 1 << 17,
++		OPT_o = 1 << 18,
++		OPT_f = 1 << 19,
+ /* The rest has variable bit positions, need to be clever */
+-		OPTBIT_f = 20,
+-		USE_FOR_MMU(              OPTBIT_b,)
++		OPTBIT_f = 19,
++		USE_FOR_MMU(             OPTBIT_b,)
+ 		IF_FEATURE_UDHCPC_ARPING(OPTBIT_a,)
+ 		IF_FEATURE_UDHCP_PORT(   OPTBIT_P,)
+-		USE_FOR_MMU(              OPT_b = 1 << OPTBIT_b,)
++		USE_FOR_MMU(             OPT_b = 1 << OPTBIT_b,)
+ 		IF_FEATURE_UDHCPC_ARPING(OPT_a = 1 << OPTBIT_a,)
+ 		IF_FEATURE_UDHCP_PORT(   OPT_P = 1 << OPTBIT_P,)
+ 	};
+@@ -219,18 +218,26 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* Parse command line */
+ 	/* Cc: mutually exclusive; O: list; -T,-t,-A take numeric param */
+-	opt_complementary = "c--C:C--c:O::T+:t+:A+";
++	opt_complementary = "c--C:C--c:O::T+:t+:A+"
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
++		":vv"
++#endif
++		;
+ 	IF_GETOPT_LONG(applet_long_options = udhcpc_longopts;)
+-	opt = getopt32(argv, "c:CV:H:h:F:i:np:qRr:s:T:t:vSA:O:of"
++	opt = getopt32(argv, "c:CV:H:h:F:i:np:qRr:s:T:t:SA:O:of"
+ 		USE_FOR_MMU("b")
+ 		IF_FEATURE_UDHCPC_ARPING("a")
+ 		IF_FEATURE_UDHCP_PORT("P:")
++		"v"
+ 		, &str_c, &str_V, &str_h, &str_h, &str_F
+ 		, &client_config.interface, &client_config.pidfile, &str_r /* i,p */
+ 		, &client_config.script /* s */
+ 		, &discover_timeout, &discover_retries, &tryagain_timeout /* T,t,A */
+ 		, &list_O
+ 		IF_FEATURE_UDHCP_PORT(, &str_P)
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
++		, &dhcp_verbose
++#endif
+ 		);
+ 	if (opt & OPT_c)
+ 		client_config.clientid = alloc_dhcp_option(DHCP_CLIENT_ID, str_c, 0);
+@@ -252,10 +259,6 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 	if (opt & OPT_r)
+ 		requested_ip = inet_addr(str_r);
+-	if (opt & OPT_v) {
+-		puts("version "BB_VER);
+-		return 0;
+-	}
+ #if ENABLE_FEATURE_UDHCP_PORT
+ 	if (opt & OPT_P) {
+ 		CLIENT_PORT = xatou16(str_P);
+@@ -348,7 +351,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		retval = 0; /* If we already timed out, fall through, else... */
+ 		if (tv.tv_sec > 0) {
+ 			timestamp_before_wait = (unsigned)monotonic_sec();
+-			DEBUG("Waiting on select...");
++			log1("Waiting on select...");
+ 			retval = select(max_fd + 1, &rfds, NULL, NULL, &tv);
+ 			if (retval < 0) {
+ 				/* EINTR? A signal was caught, don't panic */
+@@ -428,7 +431,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 			case BOUND:
+ 				/* Half of the lease passed, time to enter renewing state */
+ 				change_listen_mode(LISTEN_KERNEL);
+-				DEBUG("Entering renew state");
++				log1("Entering renew state");
+ 				state = RENEWING;
+ 				/* fall right through */
+ 			case RENEWING:
+@@ -439,7 +442,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 					continue;
+ 				}
+ 				/* Timed out, enter rebinding state */
+-				DEBUG("Entering rebinding state");
++				log1("Entering rebinding state");
+ 				state = REBINDING;
+ 				/* fall right through */
+ 			case REBINDING:
+@@ -477,7 +480,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 			else
+ 				len = udhcp_recv_raw_packet(&packet, sockfd);
+ 			if (len == -1) { /* error is severe, reopen socket */
+-				DEBUG("error on read, %s, reopening socket", strerror(errno));
++				bb_info_msg("Read error: %s, reopening socket", strerror(errno));
+ 				sleep(discover_timeout); /* 3 seconds by default */
+ 				change_listen_mode(listen_mode); /* just close and reopen */
+ 			}
+@@ -489,20 +492,21 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 				continue;
+ 
+ 			if (packet.xid != xid) {
+-				DEBUG("Ignoring xid %x (our xid is %x)",
++				log1("xid %x (our is %x), ignoring packet",
+ 					(unsigned)packet.xid, (unsigned)xid);
+ 				continue;
+ 			}
+ 
+ 			/* Ignore packets that aren't for us */
+ 			if (memcmp(packet.chaddr, client_config.client_mac, 6)) {
+-				DEBUG("Packet does not have our chaddr - ignoring");
++//FIXME: need to also check that last 10 bytes are zero
++				log1("chaddr does not match, ignoring packet"); // log2?
+ 				continue;
+ 			}
+ 
+ 			message = get_option(&packet, DHCP_MESSAGE_TYPE);
+ 			if (message == NULL) {
+-				bb_error_msg("cannot get message type from packet - ignoring");
++				bb_error_msg("no message type option, ignoring packet");
+ 				continue;
+ 			}
+ 
+@@ -563,7 +567,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 								client_config.client_mac,
+ 								client_config.interface)
+ 						) {
+-							bb_info_msg("offered address is in use "
++							bb_info_msg("Offered address is in use "
+ 								"(got ARP reply), declining");
+ 							send_decline(xid, server_addr, packet.yiaddr);
+ 
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index 861e134..a7ed779 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -6,12 +6,11 @@
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ struct client_config_t {
+-	uint8_t client_mac[6];          /* Our arp address */
+-	/* TODO: combine flag fields into single "unsigned opt" */
+-	/* (can be set directly to the result of getopt32) */
+-	char no_default_options;        /* Do not include default optins in request */
++	uint8_t client_mac[6];          /* Our mac address */
++	char no_default_options;        /* Do not include default options in request */
+ 	IF_FEATURE_UDHCP_PORT(uint16_t port;)
+ 	int ifindex;                    /* Index number of the interface to use */
++	int verbose;
+ 	uint8_t opt_mask[256 / 8];      /* Bitmask of options to send (-O option) */
+ 	const char *interface;          /* The name of the interface to use */
+ 	char *pidfile;                  /* Optionally store the process ID */
+@@ -44,7 +43,7 @@ int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr) FAST_FUNC;
+ int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr) FAST_FUNC;
+ int send_release(uint32_t server, uint32_t ciaddr) FAST_FUNC;
+ 
+-int udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd) FAST_FUNC;
++int udhcp_recv_raw_packet(struct dhcpMessage *dhcp_pkt, int fd) FAST_FUNC;
+ 
+ POP_SAVED_FUNCTION_VISIBILITY
+ 
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index c74a11b..cbc9684 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -44,7 +44,15 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 	CLIENT_PORT = 68;
+ #endif
+ 
+-	opt = getopt32(argv, "fS" IF_FEATURE_UDHCP_PORT("P:", &str_P));
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
++	opt_complementary = "vv";
++#endif
++	opt = getopt32(argv, "fSv"
++		IF_FEATURE_UDHCP_PORT("P:", &str_P)
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
++		, &dhcp_verbose
++#endif
++		);
+ 	argv += optind;
+ 	if (!(opt & 1)) { /* no -f */
+ 		bb_daemonize_or_rexec(0, argv);
+@@ -131,7 +139,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 			continue;
+ 		}
+ 		if (retval < 0 && errno != EINTR) {
+-			DEBUG("error on select");
++			log1("Error on select");
+ 			continue;
+ 		}
+ 
+@@ -155,7 +163,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 		if (bytes < 0) {
+ 			/* bytes can also be -2 ("bad packet data") */
+ 			if (bytes == -1 && errno != EINTR) {
+-				DEBUG("error on read, %s, reopening socket", strerror(errno));
++				log1("Read error: %s, reopening socket", strerror(errno));
+ 				close(server_socket);
+ 				server_socket = -1;
+ 			}
+@@ -164,7 +172,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 		state = get_option(&packet, DHCP_MESSAGE_TYPE);
+ 		if (state == NULL) {
+-			bb_error_msg("cannot get option from packet, ignoring");
++			bb_error_msg("no message type option, ignoring packet");
+ 			continue;
+ 		}
+ 
+@@ -184,14 +192,14 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 		switch (state[0]) {
+ 		case DHCPDISCOVER:
+-			DEBUG("Received DISCOVER");
++			log1("Received DISCOVER");
+ 
+ 			if (send_offer(&packet) < 0) {
+ 				bb_error_msg("send OFFER failed");
+ 			}
+ 			break;
+ 		case DHCPREQUEST:
+-			DEBUG("received REQUEST");
++			log1("Received REQUEST");
+ 
+ 			requested = get_option(&packet, DHCP_REQUESTED_IP);
+ 			server_id = get_option(&packet, DHCP_SERVER_ID);
+@@ -204,7 +212,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 			if (lease) {
+ 				if (server_id) {
+ 					/* SELECTING State */
+-					DEBUG("server_id = %08x", ntohl(server_id_aligned));
++					log1("server_id = %08x", ntohl(server_id_aligned));
+ 					if (server_id_aligned == server_config.server_nip
+ 					 && requested
+ 					 && requested_aligned == lease->lease_nip
+@@ -254,19 +262,19 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 			}
+ 			break;
+ 		case DHCPDECLINE:
+-			DEBUG("Received DECLINE");
++			log1("Received DECLINE");
+ 			if (lease) {
+ 				memset(lease->lease_mac16, 0, 16);
+ 				lease->expires = time(NULL) + server_config.decline_time;
+ 			}
+ 			break;
+ 		case DHCPRELEASE:
+-			DEBUG("Received RELEASE");
++			log1("Received RELEASE");
+ 			if (lease)
+ 				lease->expires = time(NULL);
+ 			break;
+ 		case DHCPINFORM:
+-			DEBUG("Received INFORM");
++			log1("Received INFORM");
+ 			send_inform(&packet);
+ 			break;
+ 		default:
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index bb2febb..53cfad4 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -42,6 +42,7 @@ struct server_config_t {
+ #endif
+ 	uint8_t server_mac[6];          /* our MAC address (used only for ARP probing) */
+ 	struct option_set *options;     /* list of DHCP options loaded from the config file */
++	int verbose;
+ 	/* start,end are in host order: we need to compare start <= ip <= end */
+ 	uint32_t start_ip;              /* start address of leases, in host order */
+ 	uint32_t end_ip;                /* end of leases, in host order */
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index f389971..9d5633b 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -96,7 +96,7 @@ static void attach_option(struct option_set **opt_list,
+ 
+ 	existing = find_option(*opt_list, option->code);
+ 	if (!existing) {
+-		DEBUG("Attaching option %02x to list", option->code);
++		log2("Attaching option %02x to list", option->code);
+ 
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+ 		if ((option->flags & TYPE_MASK) == OPTION_STR1035)
+@@ -125,7 +125,7 @@ static void attach_option(struct option_set **opt_list,
+ 	}
+ 
+ 	/* add it to an existing option */
+-	DEBUG("Attaching option %02x to existing member of list", option->code);
++	log1("Attaching option %02x to existing member of list", option->code);
+ 	if (option->flags & OPTION_LIST) {
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+ 		if ((option->flags & TYPE_MASK) == OPTION_STR1035)
+@@ -393,7 +393,9 @@ void FAST_FUNC read_leases(const char *file)
+ 	struct dhcpOfferedAddr lease;
+ 	int64_t written_at, time_passed;
+ 	int fd;
+-	IF_UDHCP_DEBUG(unsigned i;)
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
++	unsigned i = 0;
++#endif
+ 
+ 	fd = open_or_warn(file, O_RDONLY);
+ 	if (fd < 0)
+@@ -409,9 +411,8 @@ void FAST_FUNC read_leases(const char *file)
+ 	if ((uint64_t)time_passed > 12 * 60 * 60)
+ 		goto ret;
+ 
+-	IF_UDHCP_DEBUG(i = 0;)
+ 	while (full_read(fd, &lease, sizeof(lease)) == sizeof(lease)) {
+-		/* ADDME: what if it matches some static lease? */
++//FIXME: what if it matches some static lease?
+ 		uint32_t y = ntohl(lease.lease_nip);
+ 		if (y >= server_config.start_ip && y <= server_config.end_ip) {
+ 			signed_leasetime_t expires = ntohl(lease.expires) - (signed_leasetime_t)time_passed;
+@@ -423,10 +424,12 @@ void FAST_FUNC read_leases(const char *file)
+ 				bb_error_msg("too many leases while loading %s", file);
+ 				break;
+ 			}
+-			IF_UDHCP_DEBUG(i++;)
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
++			i++;
++#endif
+ 		}
+ 	}
+-	DEBUG("Read %d leases", i);
++	log1("Read %d leases", i);
+  ret:
+ 	close(fd);
+ }
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index 143a1fd..7b80e6b 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -205,7 +205,7 @@ int FAST_FUNC add_option_string(uint8_t *optionptr, uint8_t *string)
+ 				string[OPT_CODE]);
+ 		return 0;
+ 	}
+-	DEBUG("adding option 0x%02x", string[OPT_CODE]);
++	log1("Adding option 0x%02x", string[OPT_CODE]);
+ 	memcpy(optionptr + end, string, string[OPT_LEN] + 2);
+ 	optionptr[end + string[OPT_LEN] + 2] = DHCP_END;
+ 	return string[OPT_LEN] + 2;
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index e2c8e6e..2cd5f61 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -5,7 +5,6 @@
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+-
+ #include <netinet/in.h>
+ #if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined _NEWLIB_VERSION
+ #include <netpacket/packet.h>
+@@ -20,7 +19,6 @@
+ #include "dhcpd.h"
+ #include "options.h"
+ 
+-
+ void FAST_FUNC udhcp_init_header(struct dhcpMessage *packet, char type)
+ {
+ 	memset(packet, 0, sizeof(struct dhcpMessage));
+@@ -38,8 +36,54 @@ void FAST_FUNC udhcp_init_header(struct dhcpMessage *packet, char type)
+ 	add_simple_option(packet->options, DHCP_MESSAGE_TYPE, type);
+ }
+ 
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
++void FAST_FUNC udhcp_dump_packet(struct dhcpMessage *packet)
++{
++	char buf[sizeof(packet->chaddr)*2 + 1];
++
++	if (dhcp_verbose < 2)
++		return;
++
++	bb_info_msg(
++		//" op %x"
++		//" htype %x"
++		" hlen %x"
++		//" hops %x"
++		" xid %x"
++		//" secs %x"
++		//" flags %x"
++		" ciaddr %x"
++		" yiaddr %x" 
++		" siaddr %x"
++		" giaddr %x"
++		//" chaddr %s"
++		//" sname %s"
++		//" file %s"
++		//" cookie %x"
++		//" options %s"
++		//, packet->op
++		//, packet->htype
++		, packet->hlen
++		//, packet->hops
++		, packet->xid
++		//, packet->secs
++		//, packet->flags
++		, packet->ciaddr
++		, packet->yiaddr
++		, packet->siaddr_nip
++		, packet->gateway_nip
++		//, packet->chaddr[16]
++		//, packet->sname[64]
++		//, packet->file[128]
++		//, packet->cookie
++		//, packet->options[]
++	);
++	bin2hex(buf, (void *) packet->chaddr, sizeof(packet->chaddr));
++	bb_info_msg(" chaddr %s", buf);
++}
++#endif
+ 
+-/* read a packet from socket fd, return -1 on read error, -2 on packet error */
++/* Read a packet from socket fd, return -1 on read error, -2 on packet error */
+ int FAST_FUNC udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd)
+ {
+ 	int bytes;
+@@ -48,15 +92,16 @@ int FAST_FUNC udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd)
+ 	memset(packet, 0, sizeof(*packet));
+ 	bytes = safe_read(fd, packet, sizeof(*packet));
+ 	if (bytes < 0) {
+-		DEBUG("cannot read on listening socket, ignoring");
++		log1("Packet read error, ignoring");
+ 		return bytes; /* returns -1 */
+ 	}
+ 
+ 	if (packet->cookie != htonl(DHCP_MAGIC)) {
+-		bb_error_msg("received bogus message, ignoring");
++		bb_info_msg("Packet with bad magic, ignoring");
+ 		return -2;
+ 	}
+-	DEBUG("Received a packet");
++	log1("Received a packet");
++	udhcp_dump_packet(packet);
+ 
+ 	if (packet->op == BOOTREQUEST) {
+ 		vendor = get_option(packet, DHCP_VENDOR);
+@@ -71,7 +116,7 @@ int FAST_FUNC udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd)
+ 				if (vendor[OPT_LEN - 2] == (uint8_t)strlen(broken_vendors[i])
+ 				 && !strncmp((char*)vendor, broken_vendors[i], vendor[OPT_LEN - 2])
+ 				) {
+-					DEBUG("broken client (%s), forcing broadcast replies",
++					log1("Broken client (%s), forcing broadcast replies",
+ 						broken_vendors[i]);
+ 					packet->flags |= htons(BROADCAST_FLAG);
+ 				}
+@@ -80,7 +125,7 @@ int FAST_FUNC udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd)
+ 			if (vendor[OPT_LEN - 2] == (uint8_t)(sizeof("MSFT 98")-1)
+ 			 && memcmp(vendor, "MSFT 98", sizeof("MSFT 98")-1) == 0
+ 			) {
+-				DEBUG("broken client (%s), forcing broadcast replies", "MSFT 98");
++				log1("Broken client (%s), forcing broadcast replies", "MSFT 98");
+ 				packet->flags |= htons(BROADCAST_FLAG);
+ 			}
+ #endif
+@@ -90,11 +135,10 @@ int FAST_FUNC udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd)
+ 	return bytes;
+ }
+ 
+-
+ uint16_t FAST_FUNC udhcp_checksum(void *addr, int count)
+ {
+ 	/* Compute Internet Checksum for "count" bytes
+-	 *         beginning at location "addr".
++	 * beginning at location "addr".
+ 	 */
+ 	int32_t sum = 0;
+ 	uint16_t *source = (uint16_t *) addr;
+@@ -120,9 +164,8 @@ uint16_t FAST_FUNC udhcp_checksum(void *addr, int count)
+ 	return ~sum;
+ }
+ 
+-
+ /* Construct a ip/udp header for a packet, send packet */
+-int FAST_FUNC udhcp_send_raw_packet(struct dhcpMessage *payload,
++int FAST_FUNC udhcp_send_raw_packet(struct dhcpMessage *dhcp_pkt,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port, const uint8_t *dest_arp,
+ 		int ifindex)
+@@ -146,7 +189,7 @@ int FAST_FUNC udhcp_send_raw_packet(struct dhcpMessage *payload,
+ 
+ 	memset(&dest, 0, sizeof(dest));
+ 	memset(&packet, 0, sizeof(packet));
+-	packet.data = *payload; /* struct copy */
++	packet.data = *dhcp_pkt; /* struct copy */
+ 
+ 	dest.sll_family = AF_PACKET;
+ 	dest.sll_protocol = htons(ETH_P_IP);
+@@ -179,6 +222,7 @@ int FAST_FUNC udhcp_send_raw_packet(struct dhcpMessage *payload,
+ 	 * If you need to change this: last byte of the packet is
+ 	 * packet.data.options[end_option(packet.data.options)]
+ 	 */
++	udhcp_dump_packet(dhcp_pkt);
+ 	result = sendto(fd, &packet, IP_UPD_DHCP_SIZE, 0,
+ 				(struct sockaddr *) &dest, sizeof(dest));
+ 	msg = "sendto";
+@@ -191,9 +235,8 @@ int FAST_FUNC udhcp_send_raw_packet(struct dhcpMessage *payload,
+ 	return result;
+ }
+ 
+-
+ /* Let the kernel do all the work for packet generation */
+-int FAST_FUNC udhcp_send_kernel_packet(struct dhcpMessage *payload,
++int FAST_FUNC udhcp_send_kernel_packet(struct dhcpMessage *dhcp_pkt,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port)
+ {
+@@ -232,7 +275,8 @@ int FAST_FUNC udhcp_send_kernel_packet(struct dhcpMessage *payload,
+ 	}
+ 
+ 	/* Currently we send full-sized DHCP packets (see above) */
+-	result = safe_write(fd, payload, DHCP_SIZE);
++	udhcp_dump_packet(dhcp_pkt);
++	result = safe_write(fd, dhcp_pkt, DHCP_SIZE);
+ 	msg = "write";
+  ret_close:
+ 	close(fd);
+diff --git a/networking/udhcp/script.c b/networking/udhcp/script.c
+index 97c1d30..22780d8 100644
+--- a/networking/udhcp/script.c
++++ b/networking/udhcp/script.c
+@@ -218,7 +218,7 @@ void FAST_FUNC udhcp_run_script(struct dhcpMessage *packet, const char *name)
+ 	if (client_config.script == NULL)
+ 		return;
+ 
+-	DEBUG("vfork'ing and exec'ing %s", client_config.script);
++	log1("Executing %s", client_config.script);
+ 
+ 	envp = fill_envp(packet);
+ 
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index d9c5ce3..831165d 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -27,48 +27,48 @@
+ 
+ 
+ /* send a packet to gateway_nip using the kernel ip stack */
+-static int send_packet_to_relay(struct dhcpMessage *payload)
++static int send_packet_to_relay(struct dhcpMessage *dhcp_pkt)
+ {
+-	DEBUG("Forwarding packet to relay");
++	log1("Forwarding packet to relay");
+ 
+-	return udhcp_send_kernel_packet(payload,
++	return udhcp_send_kernel_packet(dhcp_pkt,
+ 			server_config.server_nip, SERVER_PORT,
+-			payload->gateway_nip, SERVER_PORT);
++			dhcp_pkt->gateway_nip, SERVER_PORT);
+ }
+ 
+ 
+ /* send a packet to a specific mac address and ip address by creating our own ip packet */
+-static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcast)
++static int send_packet_to_client(struct dhcpMessage *dhcp_pkt, int force_broadcast)
+ {
+ 	const uint8_t *chaddr;
+ 	uint32_t ciaddr;
+ 
+ 	// Was:
+ 	//if (force_broadcast) { /* broadcast */ }
+-	//else if (payload->ciaddr) { /* unicast to payload->ciaddr */ }
+-	//else if (payload->flags & htons(BROADCAST_FLAG)) { /* broadcast */ }
+-	//else { /* unicast to payload->yiaddr */ }
++	//else if (dhcp_pkt->ciaddr) { /* unicast to dhcp_pkt->ciaddr */ }
++	//else if (dhcp_pkt->flags & htons(BROADCAST_FLAG)) { /* broadcast */ }
++	//else { /* unicast to dhcp_pkt->yiaddr */ }
+ 	// But this is wrong: yiaddr is _our_ idea what client's IP is
+ 	// (for example, from lease file). Client may not know that,
+ 	// and may not have UDP socket listening on that IP!
+-	// We should never unicast to payload->yiaddr!
+-	// payload->ciaddr, OTOH, comes from client's request packet,
++	// We should never unicast to dhcp_pkt->yiaddr!
++	// dhcp_pkt->ciaddr, OTOH, comes from client's request packet,
+ 	// and can be used.
+ 
+ 	if (force_broadcast
+-	 || (payload->flags & htons(BROADCAST_FLAG))
+-	 || !payload->ciaddr
++	 || (dhcp_pkt->flags & htons(BROADCAST_FLAG))
++	 || !dhcp_pkt->ciaddr
+ 	) {
+-		DEBUG("broadcasting packet to client");
++		log1("Broadcasting packet to client");
+ 		ciaddr = INADDR_BROADCAST;
+ 		chaddr = MAC_BCAST_ADDR;
+ 	} else {
+-		DEBUG("unicasting packet to client ciaddr");
+-		ciaddr = payload->ciaddr;
+-		chaddr = payload->chaddr;
++		log1("Unicasting packet to client ciaddr");
++		ciaddr = dhcp_pkt->ciaddr;
++		chaddr = dhcp_pkt->chaddr;
+ 	}
+ 
+-	return udhcp_send_raw_packet(payload,
++	return udhcp_send_raw_packet(dhcp_pkt,
+ 		/*src*/ server_config.server_nip, SERVER_PORT,
+ 		/*dst*/ ciaddr, CLIENT_PORT, chaddr,
+ 		server_config.ifindex);
+@@ -76,11 +76,11 @@ static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcas
+ 
+ 
+ /* send a dhcp packet, if force broadcast is set, the packet will be broadcast to the client */
+-static int send_packet(struct dhcpMessage *payload, int force_broadcast)
++static int send_packet(struct dhcpMessage *dhcp_pkt, int force_broadcast)
+ {
+-	if (payload->gateway_nip)
+-		return send_packet_to_relay(payload);
+-	return send_packet_to_client(payload, force_broadcast);
++	if (dhcp_pkt->gateway_nip)
++		return send_packet_to_relay(dhcp_pkt);
++	return send_packet_to_client(dhcp_pkt, force_broadcast);
+ }
+ 
+ 
+@@ -201,7 +201,7 @@ int FAST_FUNC send_NAK(struct dhcpMessage *oldpacket)
+ 
+ 	init_packet(&packet, oldpacket, DHCPNAK);
+ 
+-	DEBUG("Sending NAK");
++	log1("Sending NAK");
+ 	return send_packet(&packet, 1);
+ }
+ 
+diff --git a/networking/udhcp/socket.c b/networking/udhcp/socket.c
+index de494ca..6b15766 100644
+--- a/networking/udhcp/socket.c
++++ b/networking/udhcp/socket.c
+@@ -57,7 +57,7 @@ int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t
+ 		}
+ 		our_ip = (struct sockaddr_in *) &ifr.ifr_addr;
+ 		*nip = our_ip->sin_addr.s_addr;
+-		DEBUG("ip of %s = %s", interface, inet_ntoa(our_ip->sin_addr));
++		log1("IP %s", inet_ntoa(our_ip->sin_addr));
+ 	}
+ 
+ 	if (ifindex) {
+@@ -65,7 +65,7 @@ int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t
+ 			close(fd);
+ 			return -1;
+ 		}
+-		DEBUG("adapter index %d", ifr.ifr_ifindex);
++		log1("Adapter index %d", ifr.ifr_ifindex);
+ 		*ifindex = ifr.ifr_ifindex;
+ 	}
+ 
+@@ -75,7 +75,7 @@ int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t
+ 			return -1;
+ 		}
+ 		memcpy(mac, ifr.ifr_hwaddr.sa_data, 6);
+-		DEBUG("adapter hardware address %02x:%02x:%02x:%02x:%02x:%02x",
++		log1("MAC %02x:%02x:%02x:%02x:%02x:%02x",
+ 			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+ 	}
+ 
+@@ -90,7 +90,7 @@ int FAST_FUNC udhcp_listen_socket(/*uint32_t ip,*/ int port, const char *inf)
+ 	int fd;
+ 	struct sockaddr_in addr;
+ 
+-	DEBUG("Opening listen socket on *:%d %s", port, inf);
++	log1("Opening listen socket on *:%d %s", port, inf);
+ 	fd = xsocket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+ 
+ 	setsockopt_reuseaddr(fd);

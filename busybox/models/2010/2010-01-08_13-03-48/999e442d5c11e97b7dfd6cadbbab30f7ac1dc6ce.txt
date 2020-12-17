@@ -1,0 +1,14 @@
+2010-01-08 13:03:48 +0100
+diff --git a/include/usage.h b/include/usage.h
+index 05ee6ad..8c11ac4 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1825,7 +1825,7 @@
+      "\n	-i IFACE	Interface" \
+      "\n	-f/-F		Treat link detection error as link down/link up" \
+      "\n			(otherwise exit on error)" \
+-     "\n	-a		Don't up interface automatically" \
++     "\n	-a		Don't up interface at each link probe" \
+      "\n	-M		Monitor creation/destruction of interface" \
+      "\n			(otherwise it must exist)" \
+      "\n	-r PROG		Script to run" \

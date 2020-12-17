@@ -1,0 +1,167 @@
+2008-05-27 10:55:34 +0000
+diff --git a/modutils/Config.in b/modutils/Config.in
+index 44b1d91..c69e1b3 100644
+--- a/modutils/Config.in
++++ b/modutils/Config.in
+@@ -136,7 +136,7 @@ config FEATURE_MODPROBE_BLACKLIST
+ 	  buffer drivers etc.
+ 
+ comment "Options common to multiple modutils"
+-	depends on INSMOD || RMMOD || MODPROBE || LSMOD
++	depends on INSMOD || RMMOD || MODPROBE || LSMOD || DEPMOD
+ 
+ config FEATURE_CHECK_TAINTED_MODULE
+ 	# Simulate indentation
+@@ -168,6 +168,23 @@ config FEATURE_2_6_MODULES
+ 	help
+ 	  Support module loading for newer 2.6.x Linux kernels.
+ 
++config DEFAULT_MODULES_DIR
++	# Simulate indentation
++	string "default directory containing modules"
++	default "/lib/modules"
++	depends on INSMOD || RMMOD || MODPROBE || DEPMOD
++	help
++	  Directory that contains kernel modules.
++	  Defaults to "/lib/modules"
++
++config DEFAULT_DEPMOD_FILE
++	# Simulate indentation
++	string "default name of modules.dep"
++	default "modules.dep"
++	depends on INSMOD || RMMOD || MODPROBE || DEPMOD
++	help
++	  Filename that contains kernel modules dependencies.
++	  Defaults to "modules.dep"
+ 
+ config FEATURE_QUERY_MODULE_INTERFACE
+ 	bool
+diff --git a/modutils/depmod.c b/modutils/depmod.c
+index 34483dc..9faf9c3 100644
+--- a/modutils/depmod.c
++++ b/modutils/depmod.c
+@@ -11,12 +11,6 @@
+ #include <libbb.h>
+ #include <sys/utsname.h> /* uname() */
+ 
+-#ifndef DEFAULT_MODULES_DIR
+-#define DEFAULT_MODULES_DIR "/lib/modules"
+-#endif
+-#ifndef DEFAULT_DEPMOD_FILE
+-#define DEFAULT_DEPMOD_FILE "modules.dep"
+-#endif
+ /*
+  * Theory of operation:
+  * - iterate over all modules and record their full path
+@@ -138,7 +132,7 @@ int depmod_main(int ATTRIBUTE_UNUSED argc, char **argv)
+ 	/* if no modules are given on the command-line, -a is on per default */
+ 	option_mask32 |= *argv == NULL;
+ 
+-	moddir = concat_path_file(DEFAULT_MODULES_DIR, chp);
++	moddir = concat_path_file(CONFIG_DEFAULT_MODULES_DIR, chp);
+ //	if (ENABLE_FEATURE_CLEAN_UP)
+ //		free(chp);
+ 	if (option_mask32 & ARG_b) {
+@@ -149,7 +143,7 @@ int depmod_main(int ATTRIBUTE_UNUSED argc, char **argv)
+ 	}
+ 
+ 	if (!(option_mask32 & ARG_n)) { /* --dry-run */
+-		chp = concat_path_file(moddir, DEFAULT_DEPMOD_FILE);
++		chp = concat_path_file(moddir, CONFIG_DEFAULT_DEPMOD_FILE);
+ 		filedes = xfopen(chp, "w");
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			free(chp);
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 30d471b..9242e08 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -673,8 +673,6 @@ static int obj_gpl_license(struct obj_file *f, const char **license);
+ #define SPFX	""
+ #endif
+ 
+-
+-#define _PATH_MODULES	"/lib/modules"
+ enum { STRVERSIONLEN = 64 };
+ 
+ /*======================================================================*/
+@@ -3999,7 +3997,7 @@ int insmod_main(int argc, char **argv)
+ 			char *module_dir;
+ 			char *tmdn;
+ 
+-			tmdn = concat_path_file(_PATH_MODULES, myuname.release);
++			tmdn = concat_path_file(CONFIG_DEFAULT_MODULES_DIR, myuname.release);
+ 			/* Jump through hoops in case /lib/modules/`uname -r`
+ 			 * is a symlink.  We do not want recursive_action to
+ 			 * follow symlinks, but we do want to follow the
+@@ -4021,9 +4019,9 @@ int insmod_main(int argc, char **argv)
+ 
+ 			free(m_filename);
+ 			m_filename = NULL;
+-			module_dir = xmalloc_readlink(_PATH_MODULES);
++			module_dir = xmalloc_readlink(CONFIG_DEFAULT_MODULES_DIR);
+ 			if (!module_dir)
+-				module_dir = xstrdup(_PATH_MODULES);
++				module_dir = xstrdup(CONFIG_DEFAULT_MODULES_DIR);
+ 			/* No module found under /lib/modules/`uname -r`, this
+ 			 * time cast the net a bit wider.  Search /lib/modules/ */
+ 			r = recursive_action(module_dir, ACTION_RECURSE,
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index b790346..3a89d98 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -364,15 +364,15 @@ static struct dep_t *build_dep(void)
+ 		k_version = un.release[2] - '0';
+ 	}
+ 
+-	filename = xasprintf("/lib/modules/%s/modules.dep", un.release);
++	filename = xasprintf(CONFIG_DEFAULT_MODULES_DIR"/%s/"CONFIG_DEFAULT_DEPMOD_FILE, un.release);
+ 	fd = open(filename, O_RDONLY);
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		free(filename);
+ 	if (fd < 0) {
+ 		/* Ok, that didn't work.  Fall back to looking in /lib/modules */
+-		fd = open("/lib/modules/modules.dep", O_RDONLY);
++		fd = open(CONFIG_DEFAULT_MODULES_DIR"/"CONFIG_DEFAULT_DEPMOD_FILE, O_RDONLY);
+ 		if (fd < 0) {
+-			bb_error_msg_and_die("cannot parse modules.dep");
++			bb_error_msg_and_die("cannot parse " CONFIG_DEFAULT_DEPMOD_FILE);
+ 		}
+ 	}
+ 
+@@ -522,11 +522,11 @@ static struct dep_t *build_dep(void)
+ 	/* Only 2.6 has a modules.alias file */
+ 	if (ENABLE_FEATURE_2_6_MODULES) {
+ 		/* Parse kernel-declared module aliases */
+-		filename = xasprintf("/lib/modules/%s/modules.alias", un.release);
++		filename = xasprintf(CONFIG_DEFAULT_MODULES_DIR"/%s/modules.alias", un.release);
+ 		fd = open(filename, O_RDONLY);
+ 		if (fd < 0) {
+ 			/* Ok, that didn't work.  Fall back to looking in /lib/modules */
+-			fd = open("/lib/modules/modules.alias", O_RDONLY);
++			fd = open(CONFIG_DEFAULT_MODULES_DIR"/modules.alias", O_RDONLY);
+ 		}
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			free(filename);
+@@ -537,11 +537,11 @@ static struct dep_t *build_dep(void)
+ 		}
+ 
+ 		/* Parse kernel-declared symbol aliases */
+-		filename = xasprintf("/lib/modules/%s/modules.symbols", un.release);
++		filename = xasprintf(CONFIG_DEFAULT_MODULES_DIR"/%s/modules.symbols", un.release);
+ 		fd = open(filename, O_RDONLY);
+ 		if (fd < 0) {
+ 			/* Ok, that didn't work.  Fall back to looking in /lib/modules */
+-			fd = open("/lib/modules/modules.symbols", O_RDONLY);
++			fd = open(CONFIG_DEFAULT_MODULES_DIR"/modules.symbols", O_RDONLY);
+ 		}
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			free(filename);
+@@ -895,7 +895,7 @@ int modprobe_main(int argc, char **argv)
+ 	depend = build_dep();
+ 
+ 	if (!depend)
+-		bb_error_msg_and_die("cannot parse modules.dep");
++		bb_error_msg_and_die("cannot parse "CONFIG_DEFAULT_DEPMOD_FILE);
+ 
+ 	if (remove_opt) {
+ 		do {

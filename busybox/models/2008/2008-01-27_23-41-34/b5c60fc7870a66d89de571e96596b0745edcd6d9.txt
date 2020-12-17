@@ -1,0 +1,62 @@
+2008-01-27 23:41:34 +0000
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 25c36bd..445e077 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -475,6 +475,7 @@ void xsetuid(uid_t uid)
+ }
+ 
+ // Return how long the file at fd is, if there's any way to determine it.
++#ifdef UNUSED
+ off_t fdlength(int fd)
+ {
+ 	off_t bottom = 0, top = 0, pos;
+@@ -513,6 +514,7 @@ off_t fdlength(int fd)
+ 
+ 	return pos + 1;
+ }
++#endif
+ 
+ int bb_putchar(int ch)
+ {
+diff --git a/miscutils/readahead.c b/miscutils/readahead.c
+index 7b375cf..fb71ce8 100644
+--- a/miscutils/readahead.c
++++ b/miscutils/readahead.c
+@@ -22,9 +22,16 @@ int readahead_main(int argc, char **argv)
+ 	while (*++argv) {
+ 		int fd = open_or_warn(*argv, O_RDONLY);
+ 		if (fd >= 0) {
+-			int r = readahead(fd, 0, fdlength(fd));
++			off_t len;
++			int r;
++
++			/* fdlength was reported to be unreliable - use seek */
++			len = xlseek(fd, 0, SEEK_END);
++			xlseek(fd, 0, SEEK_SET);
++			r = readahead(fd, 0, len);
+ 			close(fd);
+-			if (r >= 0) continue;
++			if (r >= 0)
++				continue;
+ 		}
+ 		retval = EXIT_FAILURE;
+ 	}
+diff --git a/util-linux/mkswap.c b/util-linux/mkswap.c
+index 8e1fbc3..f047cce 100644
+--- a/util-linux/mkswap.c
++++ b/util-linux/mkswap.c
+@@ -64,9 +64,11 @@ int mkswap_main(int argc, char **argv)
+ 	// Figure out how big the device is and announce our intentions.
+ 
+ 	fd = xopen(argv[1], O_RDWR);
+-	len = fdlength(fd);
++	/* fdlength was reported to be unreliable - use seek */
++	len = xlseek(fd, 0, SEEK_END);
++	xlseek(fd, 0, SEEK_SET);
+ 	pagesize = getpagesize();
+-	printf("Setting up swapspace version 1, size = %"OFF_FMT"d bytes\n",
++	printf("Setting up swapspace version 1, size = %"OFF_FMT"u bytes\n",
+ 			len - pagesize);
+ 	mkswap_selinux_setcontext(fd, argv[1]);
+ 

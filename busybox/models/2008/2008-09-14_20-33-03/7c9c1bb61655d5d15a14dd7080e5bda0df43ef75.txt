@@ -1,0 +1,14 @@
+2008-09-14 20:33:03 +0000
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index e2bf828..8e765b2 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -600,7 +600,7 @@ static void process_module(char *name, const char *cmdline_options)
+ 	free(deps);
+ 
+ 	/* modprobe -> load it */
+-	if (!is_rmmod && !strstr(options, "blacklist")) {
++	if (!is_rmmod && (options && !strstr(options, "blacklist"))) {
+ 		errno = 0;
+ 		if (load_module(info->pathname, options) != 0) {
+ 			if (EEXIST != errno) {

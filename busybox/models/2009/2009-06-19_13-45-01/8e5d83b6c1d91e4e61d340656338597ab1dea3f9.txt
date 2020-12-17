@@ -1,0 +1,46 @@
+2009-06-19 13:45:01 +0200
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index 9c3e864..6714307 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -494,7 +494,6 @@ CONFIG_FEATURE_MDEV_RENAME_REGEXP=y
+ CONFIG_FEATURE_MDEV_EXEC=y
+ CONFIG_FEATURE_MDEV_LOAD_FIRMWARE=y
+ CONFIG_MKSWAP=y
+-CONFIG_FEATURE_MKSWAP_V0=y
+ CONFIG_MORE=y
+ CONFIG_FEATURE_USE_TERMIOS=y
+ CONFIG_VOLUMEID=y
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 078b864..f8b7eac 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -502,7 +502,6 @@ CONFIG_FEATURE_MDEV_RENAME_REGEXP=y
+ CONFIG_FEATURE_MDEV_EXEC=y
+ CONFIG_FEATURE_MDEV_LOAD_FIRMWARE=y
+ CONFIG_MKSWAP=y
+-CONFIG_FEATURE_MKSWAP_V0=y
+ CONFIG_MORE=y
+ CONFIG_FEATURE_USE_TERMIOS=y
+ CONFIG_VOLUMEID=y
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index b97be8b..559e4c1 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -406,16 +406,6 @@ config MKSWAP
+ 	  Once you have created swap space using 'mkswap' you need to enable
+ 	  the swap space using the 'swapon' utility.
+ 
+-config FEATURE_MKSWAP_V0
+-	bool "Version 0 support"
+-	default n
+-	depends on MKSWAP
+-#	depends on MKSWAP && DEPRECATED
+-	help
+-	  Enable support for the old v0 style.
+-	  If your kernel is older than 2.1.117, then v0 support is the
+-	  only option.
+-
+ config FEATURE_MKSWAP_UUID
+ 	bool "UUID support"
+ 	default n

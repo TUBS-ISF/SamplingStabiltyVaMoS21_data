@@ -1,0 +1,15 @@
+2010-03-18 14:38:21 +0100
+diff --git a/libbb/loop.c b/libbb/loop.c
+index 7a551a4..abf05dc 100644
+--- a/libbb/loop.c
++++ b/libbb/loop.c
+@@ -13,7 +13,8 @@
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+ 
+ /* For 2.6, use the cleaned up header to get the 64 bit API. */
+-# include "fix_u32.h" /* some old toolchains need __u64 for linux/loop.h */
++// Commented out per Rob's request
++//# include "fix_u32.h" /* some old toolchains need __u64 for linux/loop.h */
+ # include <linux/loop.h>
+ typedef struct loop_info64 bb_loop_info;
+ # define BB_LOOP_SET_STATUS LOOP_SET_STATUS64

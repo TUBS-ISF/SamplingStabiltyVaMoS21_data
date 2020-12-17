@@ -1,0 +1,14 @@
+2007-10-06 20:47:53 +0000
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 02e13ed..bd53f93 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -633,7 +633,7 @@ static const struct method_t *get_method(const struct address_family_t *af, char
+ 
+ 	if (!name)
+ 		return NULL;
+-
++	/* TODO: use index_in_str_array() */
+ 	for (i = 0; i < af->n_methods; i++) {
+ 		if (strcmp(af->method[i].name, name) == 0) {
+ 			return &af->method[i];

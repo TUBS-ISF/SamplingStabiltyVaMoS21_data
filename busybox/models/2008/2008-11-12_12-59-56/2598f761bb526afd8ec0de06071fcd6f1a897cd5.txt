@@ -1,0 +1,77 @@
+2008-11-12 12:59:56 +0000
+diff --git a/coreutils/seq.c b/coreutils/seq.c
+index 01d71f2..899cd69 100644
+--- a/coreutils/seq.c
++++ b/coreutils/seq.c
+@@ -16,23 +16,30 @@ int seq_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int seq_main(int argc, char **argv)
+ {
+ 	double last, increment, i;
++	enum { OPT_w = 1 };
++	unsigned opt = getopt32(argv, "+w");
++	unsigned width = 0;
+ 
++	argc -= optind;
++	argv += optind;
+ 	i = increment = 1;
+ 	switch (argc) {
+-		case 4:
+-			increment = atof(argv[2]);
+ 		case 3:
+-			i = atof(argv[1]);
++			increment = atof(argv[1]);
+ 		case 2:
++			i = atof(*argv);
++		case 1:
+ 			last = atof(argv[argc-1]);
+ 			break;
+ 		default:
+ 			bb_show_usage();
+ 	}
++	if (opt & OPT_w) /* Pad to length of start or last */
++		width = MAX(strlen(*argv), strlen(argv[argc-1]));
+ 
+ 	/* You should note that this is pos-5.0.91 semantics, -- FK. */
+ 	while ((increment > 0 && i <= last) || (increment < 0 && i >= last)) {
+-		printf("%g\n", i);
++		printf("%0*g\n", width, i);
+ 		i += increment;
+ 	}
+ 
+diff --git a/include/usage.h b/include/usage.h
+index 71f2218..4360edb 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3594,11 +3594,12 @@
+      "\nOther options are silently ignored; -oi is implied" \
+ 
+ #define seq_trivial_usage \
+-       "[first [increment]] last"
++       "[-w] [first [increment]] last"
+ #define seq_full_usage "\n\n" \
+        "Print numbers from FIRST to LAST, in steps of INCREMENT.\n" \
+        "FIRST, INCREMENT default to 1\n" \
+      "\nArguments:" \
++     "\n       -w          Pad to last with leading zeros" \
+      "\n	LAST" \
+      "\n	FIRST LAST" \
+      "\n	FIRST INCREMENT LAST" \
+diff --git a/testsuite/seq.tests b/testsuite/seq.tests
+index ebb44e7..cea4eef 100755
+--- a/testsuite/seq.tests
++++ b/testsuite/seq.tests
+@@ -29,8 +29,13 @@ testing "seq count up by 2" "seq 4 2 8" "4\n6\n8\n" "" ""
+ testing "seq count down by 2" "seq 8 -2 4" "8\n6\n4\n" "" ""
+ testing "seq count wrong way #1" "seq 4 -2 8" "" "" ""
+ testing "seq count wrong way #2" "seq 8 2 4" "" "" ""
+-testing "seq count by .3" "seq 3 .3 4" "3\n3.3\n3.6\n3.9\n" "" ""
++testing "seq count by .3" "seq 3 .3 4" "3.0\n3.3\n3.6\n3.9\n" "" ""
+ testing "seq count by -.9" "seq .7 -.9 -2.2" "0.7\n-0.2\n-1.1\n-2\n" "" ""
+ testing "seq count by zero" "seq 4 0 8 | head -n 10" "" "" ""
+ 
++testing "seq one argument with padding" "seq -w 003" "001\n002\n003\n" "" ""
++testing "seq two arguments with padding" "seq -w 005 7" "005\n006\n007\n" "" ""
++testing "seq count down by 3 with padding" "seq -w 8 -3 04" "08\n05\n" "" ""
++testing "seq count by .3 with padding" "seq -w 03 .3 0004" "003.0\n003.3\n003.6\n003.9\n" "" ""
++
+ exit $FAILCOUNT

@@ -1,0 +1,36 @@
+2009-10-08 14:54:18 +0200
+diff --git a/archival/lzop.c b/archival/lzop.c
+index 5f2744d..46aa2d3 100644
+--- a/archival/lzop.c
++++ b/archival/lzop.c
+@@ -598,7 +598,7 @@ static int lzo_get_method(header_t *h)
+ /**********************************************************************/
+ // compress a file
+ /**********************************************************************/
+-static smallint lzo_compress(const header_t *h)
++static NOINLINE smallint lzo_compress(const header_t *h)
+ {
+ 	unsigned block_size = LZO_BLOCK_SIZE;
+ 	int r = 0; /* LZO_E_OK */
+@@ -706,7 +706,7 @@ static void lzo_check(uint32_t FAST_FUNC (*fn)(uint32_t, const uint8_t*, unsigne
+ /**********************************************************************/
+ // decompress a file
+ /**********************************************************************/
+-static smallint lzo_decompress(const header_t *h)
++static NOINLINE smallint lzo_decompress(const header_t *h)
+ {
+ 	unsigned block_size = LZO_BLOCK_SIZE;
+ 	int r;
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index 358d0a8..6e497c6 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -269,7 +269,7 @@ static void setfbmode(struct fb_var_screeninfo *base,
+ 		base->bits_per_pixel = set->bits_per_pixel;
+ }
+ 
+-static void showmode(struct fb_var_screeninfo *v)
++static NOINLINE void showmode(struct fb_var_screeninfo *v)
+ {
+ 	double drate = 0, hrate = 0, vrate = 0;
+ 

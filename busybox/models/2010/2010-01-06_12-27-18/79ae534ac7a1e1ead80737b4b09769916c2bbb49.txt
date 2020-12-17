@@ -1,0 +1,90 @@
+2010-01-06 12:27:18 +0100
+diff --git a/include/usage.h b/include/usage.h
+index 4254e15..8c5a2db 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -130,7 +130,7 @@
+        "Options:" \
+      "\n	-v VAR=VAL	Set variable" \
+      "\n	-F SEP		Use SEP as field separator" \
+-     "\n	-f FILE		Read program from file" \
++     "\n	-f FILE		Read program from FILE" \
+ 
+ #define basename_trivial_usage \
+        "FILE [SUFFIX]"
+@@ -291,7 +291,7 @@
+        "chat '' ATZ OK ATD123456 CONNECT '' ogin: pppuser word: ppppass '~'" \
+ 
+ #define chattr_trivial_usage \
+-       "[-R] [-+=AacDdijsStTu] [-v version] files..."
++       "[-R] [-+=AacDdijsStTu] [-v VERSION] [FILE]..."
+ #define chattr_full_usage "\n\n" \
+        "Change file attributes on an ext2 fs\n" \
+      "\nModifiers:" \
+@@ -4777,9 +4777,9 @@
+      "\n	-H,-h,--hostname=HOSTNAME	Client hostname" \
+      "\n	-c,--clientid=CLIENTID	Client identifier" \
+      "\n	-C,--clientid-none	Suppress default client identifier" \
+-     "\n	-p,--pidfile=file	Create pidfile" \
++     "\n	-p,--pidfile=FILE	Create pidfile" \
+      "\n	-r,--request=IP		IP address to request" \
+-     "\n	-s,--script=file	Run file at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT")" \
++     "\n	-s,--script=FILE	Run FILE at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT")" \
+      "\n	-t,--retries=N		Send up to N discover packets" \
+      "\n	-T,--timeout=N		Pause between packets (default 3 seconds)" \
+      "\n	-A,--tryagain=N		Wait N seconds (default 20) after failure" \
+@@ -4806,9 +4806,9 @@
+      "\n	-H,-h HOSTNAME	Client hostname" \
+      "\n	-c CLIENTID	Client identifier" \
+      "\n	-C		Suppress default client identifier" \
+-     "\n	-p file		Create pidfile" \
++     "\n	-p FILE		Create pidfile" \
+      "\n	-r IP		IP address to request" \
+-     "\n	-s file		Run file at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT")" \
++     "\n	-s FILE		Run FILE at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT")" \
+      "\n	-t N		Send up to N request packets" \
+      "\n	-T N		Try to get a lease for N seconds (default 3)" \
+      "\n	-A N		Wait N seconds (default 20) after failure" \
+diff --git a/networking/ifplugd.c b/networking/ifplugd.c
+index 6efad22..4585530 100644
+--- a/networking/ifplugd.c
++++ b/networking/ifplugd.c
+@@ -119,29 +119,23 @@ struct globals {
+ 
+ static int run_script(const char *action)
+ {
+-	pid_t pid;
++	char *argv[5];
+ 	int r;
+ 
+ 	bb_error_msg("executing '%s %s %s'", G.script_name, G.iface, action);
+ 
+ #if 1
+-	pid = vfork();
+-	if (pid < 0) {
+-		bb_perror_msg("fork");
+-		return -1;
+-	}
+ 
+-	if (pid == 0) {
+-		/* child */
+-		execlp(G.script_name, G.script_name, G.iface, action, G.extra_arg, NULL);
+-		bb_perror_msg_and_die("can't execute '%s'", G.script_name);
+-	}
++	argv[0] = (char*) G.script_name;
++	argv[1] = (char*) G.iface;
++	argv[2] = (char*) action;
++	argv[3] = (char*) G.extra_arg;
++	argv[4] = NULL;
+ 
+-	/* parent */
+-	wait(&r);
+-	r = WEXITSTATUS(r);
++	/* r < 0 - can't exec, 0 <= r < 1000 - exited, >1000 - killed by sig (r-1000) */
++	r = wait4pid(spawn(argv));
+ 
+-	bb_error_msg("exit code: %u", r);
++	bb_error_msg("exit code: %d", r);
+ 	return (option_mask32 & FLAG_IGNORE_RETVAL) ? 0 : r;
+ 
+ #else /* insanity */

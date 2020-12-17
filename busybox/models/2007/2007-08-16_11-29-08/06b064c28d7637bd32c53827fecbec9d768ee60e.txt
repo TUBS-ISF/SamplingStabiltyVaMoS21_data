@@ -1,0 +1,27 @@
+2007-08-16 11:29:08 +0000
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/bitops.h b/e2fsprogs/old_e2fsprogs/ext2fs/bitops.h
+index 6dd3086..b34bd98 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/bitops.h
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/bitops.h
+@@ -15,7 +15,7 @@
+  */
+ 
+ #include <string.h>
+-#include <strings.h>
++//#include <strings.h>
+ 
+ extern int ext2fs_set_bit(unsigned int nr,void * addr);
+ extern int ext2fs_clear_bit(unsigned int nr, void * addr);
+diff --git a/include/libbb.h b/include/libbb.h
+index 6c6bec7..7b456a9 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -26,7 +26,7 @@
+ #include <stdarg.h>
+ #include <stddef.h>
+ #include <string.h>
+-#include <strings.h>
++/* #include <strings.h> - said to be obsolete */
+ #include <sys/ioctl.h>
+ #include <sys/mman.h>
+ #include <sys/socket.h>

@@ -1,0 +1,352 @@
+2010-03-20 18:06:23 +0100
+diff --git a/examples/udhcp/udhcpd.conf b/examples/udhcp/udhcpd.conf
+index 7fc37ab..0ad982b 100644
+--- a/examples/udhcp/udhcpd.conf
++++ b/examples/udhcp/udhcpd.conf
+@@ -20,18 +20,18 @@ interface	eth0
+ #auto_time	7200
+ 
+ # The amount of time that an IP will be reserved (leased to nobody)
+-# if a DHCP decline message is received (seconds).
++# if a DHCP decline message is received (seconds)
+ #decline_time	3600
+ 
+ # The amount of time that an IP will be reserved
+-# if an ARP conflict occurs (seconds).
++# if an ARP conflict occurs (seconds)
+ #conflict_time	3600
+ 
+-# How long an offered address is reserved (seconds).
++# How long an offered address is reserved (seconds)
+ #offer_time	60
+ 
+ # If client asks for lease below this value, it will be rounded up
+-# to this value (seconds).
++# to this value (seconds)
+ #min_lease	60
+ 
+ # The location of the leases file
+@@ -40,15 +40,19 @@ interface	eth0
+ # The location of the pid file
+ #pidfile	/var/run/udhcpd.pid
+ 
+-# Every time udhcpd writes a leases file, the below script will be called.
++# Every time udhcpd writes a leases file, the below script will be called
+ #notify_file			# default: no script
+ #notify_file	dumpleases	# useful for debugging
+ 
+-# The following are bootp specific options, settable by udhcpd.
++# The following are bootp specific options
+ #siaddr		192.168.0.22		#default: 0.0.0.0
+ #sname		zorak			#default: none
+ #boot_file	/var/nfs_root		#default: none
+ 
++# Static leases map
++#static_lease 00:60:08:11:CE:4E 192.168.0.54
++#static_lease 00:60:08:11:CE:3E 192.168.0.44
++
+ # The remainder of options are DHCP options and can be specified with the
+ # keyword 'opt' or 'option'. If an option can take multiple items, such
+ # as the dns option, they can be listed on the same line, or multiple
+@@ -60,7 +64,7 @@ opt	router	192.168.10.2
+ opt	wins	192.168.10.10
+ option	dns	129.219.13.81	# appended to above DNS servers for a total of 3
+ option	domain	local
+-option	lease	864000		# 10 days of seconds
++option	lease	864000		# 10 days
+ 
+ # Currently supported options (for more info, see options.c):
+ #opt lease      NUM
+@@ -92,7 +96,3 @@ option	lease	864000		# 10 days of seconds
+ #opt swapsrv    IP
+ #opt timesrv    IP_LIST
+ #opt ntpsrv     IP_LIST
+-
+-# Static leases map
+-#static_lease 00:60:08:11:CE:4E 192.168.0.54
+-#static_lease 00:60:08:11:CE:3E 192.168.0.44
+diff --git a/include/usage.h b/include/usage.h
+index 093efc8..a7855cd 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4810,66 +4810,68 @@
+        "Adjust filesystem options on ext[23] filesystems"
+ 
+ #define udhcpc_trivial_usage \
+-       "[-Cfbnqtvo] [-c CID] [-V VCLS] [-H HOSTNAME] [-i INTERFACE]\n" \
+-       "	[-p pidfile] [-r IP] [-s script] [-O dhcp-option]..." IF_FEATURE_UDHCP_PORT(" [-P N]")
+-#define udhcpc_full_usage "\n\n" \
++       "[-fbnqvoCR] [-i IFACE] [-r IP] [-s PROG] [-p PIDFILE]\n" \
++       "	[-H HOSTNAME] [-c CID] [-V VENDOR] [-O DHCP_OPT]..." IF_FEATURE_UDHCP_PORT(" [-P N]")
++#define udhcpc_full_usage "\n" \
+ 	IF_LONG_OPTS( \
+-       "	-V,--vendorclass=CLASSID	Vendor class identifier" \
+-     "\n	-i,--interface=INTERFACE	Interface to use (default eth0)" \
+-     "\n	-H,-h,--hostname=HOSTNAME	Client hostname" \
+-     "\n	-c,--clientid=CLIENTID	Client identifier" \
+-     "\n	-C,--clientid-none	Suppress default client identifier" \
+-     "\n	-p,--pidfile=FILE	Create pidfile" \
+-     "\n	-r,--request=IP		IP address to request" \
+-     "\n	-s,--script=FILE	Run FILE at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT")" \
+-     "\n	-t,--retries=N		Send up to N discover packets" \
+-     "\n	-T,--timeout=N		Pause between packets (default 3 seconds)" \
+-     "\n	-A,--tryagain=N		Wait N seconds (default 20) after failure" \
+-     "\n	-O,--request-option=OPT	Request DHCP option OPT (cumulative)" \
+-     "\n	-o,--no-default-options	Don't request any options (unless -O is also given)" \
+-     "\n	-f,--foreground	Run in foreground" \
++     "\n	-i,--interface IFACE	Interface to use (default eth0)" \
++     "\n	-p,--pidfile FILE	Create pidfile" \
++     "\n	-r,--request IP		IP address to request" \
++     "\n	-s,--script PROG	Run PROG at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT")" \
++     "\n	-t,--retries N		Send up to N discover packets" \
++     "\n	-T,--timeout N		Pause between packets (default 3 seconds)" \
++     "\n	-A,--tryagain N		Wait N seconds (default 20) after failure" \
++     "\n	-O,--request-option OPT	Request DHCP option OPT (cumulative)" \
++     "\n	-o,--no-default-options	Don't request any options (unless -O is given)" \
++     "\n	-f,--foreground		Run in foreground" \
+ 	USE_FOR_MMU( \
+-     "\n	-b,--background	Background if lease is not immediately obtained" \
++     "\n	-b,--background		Background if lease is not obtained" \
+ 	) \
+-     "\n	-S,--syslog	Log to syslog too" \
+-     "\n	-n,--now	Exit with failure if lease is not immediately obtained" \
+-     "\n	-q,--quit	Quit after obtaining lease" \
+-     "\n	-R,--release	Release IP on quit" \
++     "\n	-S,--syslog		Log to syslog too" \
++     "\n	-n,--now		Exit if lease is not obtained" \
++     "\n	-q,--quit		Exit after obtaining lease" \
++     "\n	-R,--release		Release IP on exit" \
+ 	IF_FEATURE_UDHCP_PORT( \
+-     "\n	-P,--client-port N  Use port N instead of default 68" \
++     "\n	-P,--client-port N	Use port N (default 68)" \
+ 	) \
+ 	IF_FEATURE_UDHCPC_ARPING( \
+-     "\n	-a,--arping	Use arping to validate offered address" \
++     "\n	-a,--arping		Use arping to validate offered address" \
+ 	) \
++     "\n	-F,--fqdn NAME		Ask server to update DNS mapping for NAME" \
++     "\n	-H,-h,--hostname NAME	Send NAME as client hostname (default none)" \
++     "\n	-V,--vendorclass VENDOR	Vendor identifier (default 'udhcp VERSION')" \
++     "\n	-c,--clientid CLIENTID	Client identifier (default own MAC)" \
++     "\n	-C,--clientid-none	Don't send client identifier" \
+ 	) \
+ 	IF_NOT_LONG_OPTS( \
+-       "	-V CLASSID	Vendor class identifier" \
+-     "\n	-i INTERFACE	Interface to use (default: eth0)" \
+-     "\n	-H,-h HOSTNAME	Client hostname" \
+-     "\n	-c CLIENTID	Client identifier" \
+-     "\n	-C		Suppress default client identifier" \
++     "\n	-i IFACE	Interface to use (default eth0)" \
+      "\n	-p FILE		Create pidfile" \
+      "\n	-r IP		IP address to request" \
+-     "\n	-s FILE		Run FILE at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT")" \
+-     "\n	-t N		Send up to N request packets" \
+-     "\n	-T N		Try to get a lease for N seconds (default 3)" \
++     "\n	-s PROG		Run PROG at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT")" \
++     "\n	-t N		Send up to N discover packets" \
++     "\n	-T N		Pause between packets (default 3 seconds)" \
+      "\n	-A N		Wait N seconds (default 20) after failure" \
+      "\n	-O OPT		Request DHCP option OPT (cumulative)" \
+-     "\n	-o		Don't request any options (unless -O is also given)" \
++     "\n	-o		Don't request any options (unless -O is given)" \
+      "\n	-f		Run in foreground" \
+ 	USE_FOR_MMU( \
+-     "\n	-b		Background if lease is not immediately obtained" \
++     "\n	-b		Background if lease is not obtained" \
+ 	) \
+      "\n	-S		Log to syslog too" \
+-     "\n	-n		Exit with failure if lease is not immediately obtained" \
+-     "\n	-q		Quit after obtaining lease" \
+-     "\n	-R		Release IP on quit" \
++     "\n	-n		Exit if lease is not obtained" \
++     "\n	-q		Exit after obtaining lease" \
++     "\n	-R		Release IP on exit" \
+ 	IF_FEATURE_UDHCP_PORT( \
+-     "\n	-P N		Use port N instead of default 68" \
++     "\n	-P N		Use port N (default 68)" \
+ 	) \
+ 	IF_FEATURE_UDHCPC_ARPING( \
+      "\n	-a		Use arping to validate offered address" \
+ 	) \
++     "\n	-F NAME		Ask server to update DNS mapping for NAME" \
++     "\n	-H,-h NAME	Send NAME as client hostname (default none)" \
++     "\n	-V VENDOR	Vendor identifier (default 'udhcp VERSION')" \
++     "\n	-c CLIENTID	Client identifier (default own MAC)" \
++     "\n	-C		Don't send client identifier" \
+ 	)
+ 
+ #define udhcpd_trivial_usage \
+@@ -4880,7 +4882,7 @@
+      "\n	-f	Run in foreground" \
+      "\n	-S	Log to syslog too" \
+ 	IF_FEATURE_UDHCP_PORT( \
+-     "\n	-P N	Use port N instead of default 67" \
++     "\n	-P N	Use port N (default 67)" \
+ 	)
+ 
+ #define umount_trivial_usage \
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index f091d80..a255d6e 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -47,8 +47,12 @@ static void init_packet(struct dhcp_packet *packet, char type)
+ 		add_option_string(packet->options, client_config.hostname);
+ 	if (client_config.fqdn)
+ 		add_option_string(packet->options, client_config.fqdn);
+-	if ((type != DHCPDECLINE) && (type != DHCPRELEASE))
++	if (type != DHCPDECLINE
++	 && type != DHCPRELEASE
++	 && client_config.vendorclass
++	) {
+ 		add_option_string(packet->options, client_config.vendorclass);
++	}
+ }
+ 
+ 
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 9a2fe35..3e2cd12 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -125,8 +125,7 @@ static void client_background(void)
+ static uint8_t* alloc_dhcp_option(int code, const char *str, int extra)
+ {
+ 	uint8_t *storage;
+-	int len = strlen(str);
+-	if (len > 255) len = 255;
++	int len = strnlen(str, 255);
+ 	storage = xzalloc(len + extra + OPT_DATA);
+ 	storage[OPT_CODE] = code;
+ 	storage[OPT_LEN] = len + extra;
+@@ -139,7 +138,7 @@ int udhcpc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	uint8_t *temp, *message;
+-	char *str_c, *str_V, *str_h, *str_F, *str_r;
++	const char *str_c, *str_V, *str_h, *str_F, *str_r;
+ 	IF_FEATURE_UDHCP_PORT(char *str_P;)
+ 	llist_t *list_O = NULL;
+ 	int tryagain_timeout = 20;
+@@ -222,6 +221,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 	IF_FEATURE_UDHCP_PORT(CLIENT_PORT = 68;)
+ 	client_config.interface = "eth0";
+ 	client_config.script = DEFAULT_SCRIPT;
++	str_V = "udhcp "BB_VER;
+ 
+ 	/* Parse command line */
+ 	/* Cc: mutually exclusive; O: list; -T,-t,-A take numeric param */
+@@ -246,23 +246,22 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		, &dhcp_verbose
+ #endif
+ 		);
+-	if (opt & OPT_c)
+-		client_config.clientid = alloc_dhcp_option(DHCP_CLIENT_ID, str_c, 0);
+-	if (opt & OPT_V)
+-		client_config.vendorclass = alloc_dhcp_option(DHCP_VENDOR, str_V, 0);
+ 	if (opt & (OPT_h|OPT_H))
+ 		client_config.hostname = alloc_dhcp_option(DHCP_HOST_NAME, str_h, 0);
+ 	if (opt & OPT_F) {
++		/* FQDN option format: [0x51][len][flags][0][0]<fqdn> */
+ 		client_config.fqdn = alloc_dhcp_option(DHCP_FQDN, str_F, 3);
+-		/* Flags: 0000NEOS
+-		S: 1 => Client requests Server to update A RR in DNS as well as PTR
+-		O: 1 => Server indicates to client that DNS has been updated regardless
+-		E: 1 => Name data is DNS format, i.e. <4>host<6>domain<3>com<0> not "host.domain.com"
+-		N: 1 => Client requests Server to not update DNS
+-		*/
++		/* Flag bits: 0000NEOS
++		 * S: 1 = Client requests server to update A RR in DNS as well as PTR
++		 * O: 1 = Server indicates to client that DNS has been updated regardless
++		 * E: 1 = Name is in DNS format, i.e. <4>host<6>domain<3>com<0>,
++		 *    not "host.domain.com". Format 0 is obsolete.
++		 * N: 1 = Client requests server to not update DNS (S must be 0 then)
++		 * Two [0] bytes which follow are deprecated and must be 0.
++		 */
+ 		client_config.fqdn[OPT_DATA + 0] = 0x1;
+-		/* client_config.fqdn[OPT_DATA + 1] = 0; - redundant */
+-		/* client_config.fqdn[OPT_DATA + 2] = 0; - redundant */
++		/*client_config.fqdn[OPT_DATA + 1] = 0; - xzalloc did it */
++		/*client_config.fqdn[OPT_DATA + 2] = 0; */
+ 	}
+ 	if (opt & OPT_r)
+ 		requested_ip = inet_addr(str_r);
+@@ -291,6 +290,16 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		return 1;
+ 	}
+ 
++	if (opt & OPT_c) {
++		client_config.clientid = alloc_dhcp_option(DHCP_CLIENT_ID, str_c, 0);
++	} else if (!(opt & OPT_C)) {
++		/* not set and not suppressed, set the default client ID */
++		client_config.clientid = alloc_dhcp_option(DHCP_CLIENT_ID, "", 7);
++		client_config.clientid[OPT_DATA] = 1; /* type: ethernet */
++		memcpy(client_config.clientid + OPT_DATA+1, client_config.client_mac, 6);
++	}
++	if (str_V[0] != '\0')
++		client_config.vendorclass = alloc_dhcp_option(DHCP_VENDOR, str_V, 0);
+ #if !BB_MMU
+ 	/* on NOMMU reexec (i.e., background) early */
+ 	if (!(opt & OPT_f)) {
+@@ -314,16 +323,6 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 	/* Goes to stdout (unless NOMMU) and possibly syslog */
+ 	bb_info_msg("%s (v"BB_VER") started", applet_name);
+ 
+-	/* If not set, and not suppressed, set up the default client ID */
+-	if (!client_config.clientid && !(opt & OPT_C)) {
+-		client_config.clientid = alloc_dhcp_option(DHCP_CLIENT_ID, "", 7);
+-		client_config.clientid[OPT_DATA] = 1;
+-		memcpy(client_config.clientid + OPT_DATA+1, client_config.client_mac, 6);
+-	}
+-
+-	if (!client_config.vendorclass)
+-		client_config.vendorclass = alloc_dhcp_option(DHCP_VENDOR, "udhcp "BB_VER, 0);
+-
+ 	/* Set up the signal pipe */
+ 	udhcp_sp_setup();
+ 
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index c2a2305..09d31c6 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -13,6 +13,7 @@
+ 
+ /* Supported options are easily added here.
+  * See RFC2132 for more options.
++ * OPTION_REQ: these options are requested by udhcpc (unless -o).
+  */
+ const struct dhcp_option dhcp_options[] = {
+ 	/* flags                                    code */
+diff --git a/networking/udhcp/options.h b/networking/udhcp/options.h
+index 2d9c15f..75087fa 100644
+--- a/networking/udhcp/options.h
++++ b/networking/udhcp/options.h
+@@ -46,9 +46,9 @@ enum {
+ #define DHCP_LOG_SERVER         0x07
+ //#define DHCP_COOKIE_SERVER    0x08 /* "quote of the day" server */
+ #define DHCP_LPR_SERVER         0x09
+-#define DHCP_HOST_NAME          0x0c
++#define DHCP_HOST_NAME          0x0c /* either client informs server or server gives name to client */
+ #define DHCP_BOOT_SIZE          0x0d
+-#define DHCP_DOMAIN_NAME        0x0f
++#define DHCP_DOMAIN_NAME        0x0f /* server gives domain suffix */
+ #define DHCP_SWAP_SERVER        0x10
+ #define DHCP_ROOT_PATH          0x11
+ #define DHCP_IP_TTL             0x17
+@@ -61,14 +61,14 @@ enum {
+ #define DHCP_OPTION_OVERLOAD    0x34
+ #define DHCP_MESSAGE_TYPE       0x35
+ #define DHCP_SERVER_ID          0x36 /* by default server's IP */
+-#define DHCP_PARAM_REQ          0x37
++#define DHCP_PARAM_REQ          0x37 /* list of options client wants */
+ #define DHCP_MESSAGE            0x38 /* error message when sending NAK etc */
+ #define DHCP_MAX_SIZE           0x39
+ //#define DHCP_T1               0x3a
+ //#define DHCP_T2               0x3b
+-#define DHCP_VENDOR             0x3c /* client's vendor */
+-#define DHCP_CLIENT_ID          0x3d /* by default client's MAC addr */
+-#define DHCP_FQDN               0x51
++#define DHCP_VENDOR             0x3c /* client's vendor (a string) */
++#define DHCP_CLIENT_ID          0x3d /* by default client's MAC addr, but may be arbitrarily long */
++#define DHCP_FQDN               0x51 /* client asks to update DNS to map its FQDN to its new IP */
+ #define DHCP_STATIC_ROUTES      0x79
+ #define DHCP_END                0xFF
+ /* Offsets in option byte sequence */

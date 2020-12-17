@@ -1,0 +1,94 @@
+2007-08-15 20:05:37 +0000
+diff --git a/Config.in b/Config.in
+index 54bcd9d..24e461e 100644
+--- a/Config.in
++++ b/Config.in
+@@ -144,7 +144,7 @@ config FEATURE_PIDFILE
+ 	bool "Support writing pidfiles"
+ 	default n
+ 	help
+-	  This option makes some applets (crond, syslogd and inetd) write
++	  This option makes some applets (e.g. crond, syslogd, inetd) write
+ 	  a pidfile in /var/run. Some applications rely on them.
+ 
+ config FEATURE_SUID
+diff --git a/include/libbb.h b/include/libbb.h
+index fc0a0ae..d60b410 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -622,12 +622,14 @@ llist_t *llist_rev(llist_t *list);
+ /* start_stop_daemon and udhcpc are special - they want
+  * to create pidfiles regardless of FEATURE_PIDFILE */
+ #if ENABLE_FEATURE_PIDFILE || defined(WANT_PIDFILE)
+-int write_pidfile(const char *path);
+-#define remove_pidfile(f) ((void)unlink(f))
++/* True only if we created pidfile which is *file*, not /dev/null etc */
++extern smallint wrote_pidfile;
++void write_pidfile(const char *path);
++#define remove_pidfile(path) do { if (wrote_pidfile) unlink(path); } while (0)
+ #else
+-/* Why? #defining it to 1 gives "warning: statement with no effect"... */
+-static ALWAYS_INLINE int write_pidfile(const char *path) { return 1; }
+-#define remove_pidfile(f) ((void)0)
++enum { wrote_pidfile = 0 };
++#define write_pidfile(path)  ((void)0)
++#define remove_pidfile(path) ((void)0)
+ #endif
+ 
+ enum {
+diff --git a/libbb/pidfile.c b/libbb/pidfile.c
+index 64e67c3..cafa789 100644
+--- a/libbb/pidfile.c
++++ b/libbb/pidfile.c
+@@ -11,22 +11,30 @@
+ #define WANT_PIDFILE 1
+ #include "libbb.h"
+ 
+-int write_pidfile(const char *path)
++smallint wrote_pidfile;
++
++void write_pidfile(const char *path)
+ {
+ 	int pid_fd;
+ 	char *end;
+ 	char buf[sizeof(int)*3 + 2];
++	struct stat sb;
+ 
+ 	if (!path)
+-		return 1;
++		return;
+ 	/* we will overwrite stale pidfile */
+ 	pid_fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, 0666);
+ 	if (pid_fd < 0)
+-		return 0;
+-	/* few bytes larger, but doesn't use stdio */
+-	end = utoa_to_buf(getpid(), buf, sizeof(buf));
+-	*end = '\n';
+-	full_write(pid_fd, buf, end - buf + 1);
++		return;
++
++	/* path can be "/dev/null"! Test for such cases */
++	wrote_pidfile = (fstat(pid_fd, &sb) == 0) && S_ISREG(sb.st_mode);
++
++	if (wrote_pidfile) {
++		/* few bytes larger, but doesn't use stdio */
++		end = utoa_to_buf(getpid(), buf, sizeof(buf));
++		*end = '\n';
++		full_write(pid_fd, buf, end - buf + 1);
++	}
+ 	close(pid_fd);
+-	return 1;
+ }
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 7cb1dfe..7d38742 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -546,7 +546,7 @@ int udhcpc_main(int argc, char **argv)
+  ret0:
+ 	retval = 0;
+  ret:
+-	if (client_config.pidfile)
++	/*if (client_config.pidfile) - remove_pidfile has it's own check */
+ 		remove_pidfile(client_config.pidfile);
+ 	return retval;
+ }

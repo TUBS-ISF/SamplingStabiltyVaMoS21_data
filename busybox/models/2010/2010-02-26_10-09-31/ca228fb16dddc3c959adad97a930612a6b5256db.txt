@@ -1,0 +1,47 @@
+2010-02-26 10:09:31 +0100
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index ebd4812..e3714df 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -292,9 +292,9 @@ static void ChangeUser(struct passwd *pas)
+ 	/* careful: we're after vfork! */
+ 	change_identity(pas); /* - initgroups, setgid, setuid */
+ 	if (chdir(pas->pw_dir) < 0) {
+-		crondlog(WARN9 "can't chdir(%s)", pas->pw_dir);
++		crondlog(WARN9 "chdir(%s)", pas->pw_dir);
+ 		if (chdir(TMPDIR) < 0) {
+-			crondlog(DIE9 "can't chdir(%s)", TMPDIR); /* exits */
++			crondlog(DIE9 "chdir(%s)", TMPDIR); /* exits */
+ 		}
+ 	}
+ }
+@@ -575,14 +575,14 @@ static void SynchronizeDir(void)
+ 	 */
+ 	unlink(CRONUPDATE);
+ 	if (chdir(CDir) < 0) {
+-		crondlog(DIE9 "can't chdir(%s)", CDir);
++		crondlog(DIE9 "chdir(%s)", CDir);
+ 	}
+ 	{
+ 		DIR *dir = opendir(".");
+ 		struct dirent *den;
+ 
+ 		if (!dir)
+-			crondlog(DIE9 "can't chdir(%s)", "."); /* exits */
++			crondlog(DIE9 "chdir(%s)", "."); /* exits */
+ 		while ((den = readdir(dir)) != NULL) {
+ 			if (strchr(den->d_name, '.') != NULL) {
+ 				continue;
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 227803a..5bbc7ee 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1432,7 +1432,7 @@ static void send_cgi_and_exit(
+ 		if (script != url) { /* paranoia */
+ 			*script = '\0';
+ 			if (chdir(url + 1) != 0) {
+-				bb_perror_msg("chdir %s", url + 1);
++				bb_perror_msg("chdir(%s)", url + 1);
+ 				goto error_execing_cgi;
+ 			}
+ 			// not needed: *script = '/';

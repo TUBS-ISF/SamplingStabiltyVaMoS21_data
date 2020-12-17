@@ -1,0 +1,315 @@
+2008-06-07 15:10:29 +0000
+diff --git a/e2fsprogs/e2fs_lib.c b/e2fsprogs/e2fs_lib.c
+index 89e0500..839109e 100644
+--- a/e2fsprogs/e2fs_lib.c
++++ b/e2fsprogs/e2fs_lib.c
+@@ -192,7 +192,7 @@ static const char e2attr_flags_lname[] =
+ 	"Top_of_Directory_Hierarchies" "\0"
+ 	/* Another trailing NUL is added by compiler */;
+ 
+-void print_flags(FILE *f, unsigned long flags, unsigned options)
++void print_e2flags(FILE *f, unsigned long flags, unsigned options)
+ {
+ 	const uint32_t *fv;
+ 	const char *fn;
+diff --git a/e2fsprogs/e2fs_lib.h b/e2fsprogs/e2fs_lib.h
+index 40bbd1c..e21a0f9 100644
+--- a/e2fsprogs/e2fs_lib.h
++++ b/e2fsprogs/e2fs_lib.h
+@@ -31,7 +31,7 @@ int fgetsetflags(const char *name, unsigned long *get_flags, unsigned long set_f
+ /* Must be 1 for compatibility with `int long_format'. */
+ #define PFOPT_LONG  1
+ /* Print file attributes on an ext2 file system */
+-void print_flags(FILE *f, unsigned long flags, unsigned options);
++void print_e2flags(FILE *f, unsigned long flags, unsigned options);
+ 
+ extern const uint32_t e2attr_flags_value[];
+ extern const char e2attr_flags_sname[];
+diff --git a/e2fsprogs/lsattr.c b/e2fsprogs/lsattr.c
+index 13eeb35..066af86 100644
+--- a/e2fsprogs/lsattr.c
++++ b/e2fsprogs/lsattr.c
+@@ -45,10 +45,10 @@ static void list_attributes(const char *name)
+ 
+ 	if (option_mask32 & OPT_PF_LONG) {
+ 		printf("%-28s ", name);
+-		print_flags(stdout, fsflags, PFOPT_LONG);
++		print_e2flags(stdout, fsflags, PFOPT_LONG);
+ 		bb_putchar('\n');
+ 	} else {
+-		print_flags(stdout, fsflags, 0);
++		print_e2flags(stdout, fsflags, 0);
+ 		printf(" %s\n", name);
+ 	}
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/e2p/e2p.h b/e2fsprogs/old_e2fsprogs/e2p/e2p.h
+index cae28f1..4524700 100644
+--- a/e2fsprogs/old_e2fsprogs/e2p/e2p.h
++++ b/e2fsprogs/old_e2fsprogs/e2p/e2p.h
+@@ -13,7 +13,7 @@
+ #define EXT3_FEATURE_INCOMPAT_EXTENTS           0x0040
+ #endif
+ 
+-/* `options' for print_flags() */
++/* `options' for print_e2flags() */
+ 
+ #define PFOPT_LONG  1 /* Must be 1 for compatibility with `int long_format'. */
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/lsattr.c b/e2fsprogs/old_e2fsprogs/lsattr.c
+index 277ec7c..294bf2f 100644
+--- a/e2fsprogs/old_e2fsprogs/lsattr.c
++++ b/e2fsprogs/old_e2fsprogs/lsattr.c
+@@ -56,10 +56,10 @@ static void list_attributes(const char *name)
+ 
+ 	if (flags & OPT_PF_LONG) {
+ 		printf("%-28s ", name);
+-		print_flags(stdout, fsflags, PFOPT_LONG);
++		print_e2flags(stdout, fsflags, PFOPT_LONG);
+ 		bb_putchar('\n');
+ 	} else {
+-		print_flags(stdout, fsflags, 0);
++		print_e2flags(stdout, fsflags, 0);
+ 		printf(" %s\n", name);
+ 	}
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index c4d802f..97aae0b 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1304,6 +1304,14 @@ extern const char bb_default_login_shell[];
+ /* "sh" */
+ #define DEFAULT_SHELL_SHORT_NAME     (bb_default_login_shell+6)
+ 
++typedef struct masks_labels_t {
++	const char *labels;
++	const int masks[];
++} masks_labels_t;
++
++int print_flags_separated(const int *masks, const char *labels,
++		int flags, const char *separator);
++extern int print_flags(const masks_labels_t *ml, int flags);
+ 
+ #if ENABLE_FEATURE_DEVFS
+ # define CURRENT_VC "/dev/vc/0"
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 201d795..7bb0f3b 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -68,6 +68,7 @@ lib-y += perror_nomsg.o
+ lib-y += perror_nomsg_and_die.o
+ lib-y += pidfile.o
+ lib-y += printable.o
++lib-y += print_flags.o
+ lib-y += process_escape_sequence.o
+ lib-y += procps.o
+ lib-y += ptr_to_globals.o
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index aa95b89..983de6d 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -1228,54 +1228,46 @@ static void dump_identity(const struct hd_driveid *id)
+ 		if (id->tPIO >= 2) printf("pio2 ");
+ 	}
+ 	if (id->field_valid & 2) {
+-		if (id->eide_pio_modes & 1) printf("pio3 ");
+-		if (id->eide_pio_modes & 2) printf("pio4 ");
+-		if (id->eide_pio_modes &~3) printf("pio? ");
++		static const masks_labels_t pio_modes = {
++			.masks = { 1, 2, ~3 },
++			.labels = "pio3 \0""pio4 \0""pio? \0",
++		};
++		print_flags(&pio_modes, id->eide_pio_modes);
+ 	}
+ 	if (id->capability & 1) {
+ 		if (id->dma_1word | id->dma_mword) {
++			static const int dma_wmode_masks[] = { 0x100, 1, 0x200, 2, 0x400, 4, 0xf800, 0xf8 };
+ 			printf("\n DMA modes:  ");
+-			if (id->dma_1word & 0x100) bb_putchar('*');
+-			if (id->dma_1word & 1) printf("sdma0 ");
+-			if (id->dma_1word & 0x200) bb_putchar('*');
+-			if (id->dma_1word & 2) printf("sdma1 ");
+-			if (id->dma_1word & 0x400) bb_putchar('*');
+-			if (id->dma_1word & 4) printf("sdma2 ");
+-			if (id->dma_1word & 0xf800) bb_putchar('*');
+-			if (id->dma_1word & 0xf8) printf("sdma? ");
+-			if (id->dma_mword & 0x100) bb_putchar('*');
+-			if (id->dma_mword & 1) printf("mdma0 ");
+-			if (id->dma_mword & 0x200) bb_putchar('*');
+-			if (id->dma_mword & 2) printf("mdma1 ");
+-			if (id->dma_mword & 0x400) bb_putchar('*');
+-			if (id->dma_mword & 4) printf("mdma2 ");
+-			if (id->dma_mword & 0xf800) bb_putchar('*');
+-			if (id->dma_mword & 0xf8) printf("mdma? ");
++			print_flags_separated(dma_wmode_masks,
++				"*\0""sdma0 \0""*\0""sdma1 \0""*\0""sdma2 \0""*\0""sdma? \0",
++				id->dma_1word, NULL);
++			print_flags_separated(dma_wmode_masks,
++				"*\0""mdma0\0""*\0""mdma1\0""*\0""mdma2\0""*\0""mdma?\0",
++				id->dma_mword, NULL);
+ 		}
+ 	}
+ 	if (((id->capability & 8) || (id->field_valid & 2)) && id->field_valid & 4) {
++		static const masks_labels_t ultra_modes1 = {
++			.masks = { 0x100, 0x001, 0x200, 0x002, 0x400, 0x004 },
++			.labels = "*\0""udma0 \0""*\0""udma1 \0""*\0""udma2 \0",
++		};
++			
+ 		printf("\n UDMA modes: ");
+-		if (id->dma_ultra & 0x100) bb_putchar('*');
+-		if (id->dma_ultra & 0x001) printf("udma0 ");
+-		if (id->dma_ultra & 0x200) bb_putchar('*');
+-		if (id->dma_ultra & 0x002) printf("udma1 ");
+-		if (id->dma_ultra & 0x400) bb_putchar('*');
+-		if (id->dma_ultra & 0x004) printf("udma2 ");
++		print_flags(&ultra_modes1, id->dma_ultra);
+ #ifdef __NEW_HD_DRIVE_ID
+ 		if (id->hw_config & 0x2000) {
+ #else /* !__NEW_HD_DRIVE_ID */
+ 		if (id->word93 & 0x2000) {
+ #endif /* __NEW_HD_DRIVE_ID */
+-			if (id->dma_ultra & 0x0800) bb_putchar('*');
+-			if (id->dma_ultra & 0x0008) printf("udma3 ");
+-			if (id->dma_ultra & 0x1000) bb_putchar('*');
+-			if (id->dma_ultra & 0x0010) printf("udma4 ");
+-			if (id->dma_ultra & 0x2000) bb_putchar('*');
+-			if (id->dma_ultra & 0x0020) printf("udma5 ");
+-			if (id->dma_ultra & 0x4000) bb_putchar('*');
+-			if (id->dma_ultra & 0x0040) printf("udma6 ");
+-			if (id->dma_ultra & 0x8000) bb_putchar('*');
+-			if (id->dma_ultra & 0x0080) printf("udma7 ");
++			static const masks_labels_t ultra_modes2 = {
++				.masks = { 0x0800, 0x0008, 0x1000, 0x0010,
++					0x2000, 0x0020, 0x4000, 0x0040,
++					0x8000, 0x0080 },
++				.labels = "*\0""udma3 \0""*\0""udma4 \0"
++					"*\0""udma5 \0""*\0""udma6 \0"
++					"*\0""udma7 \0"
++			};
++			print_flags(&ultra_modes2, id->dma_ultra);
+ 		}
+ 	}
+ 	printf("\n AdvancedPM=%s", (!(id_regs[83] & 8)) ? "no" : "yes");
+diff --git a/networking/arp.c b/networking/arp.c
+index f42e09f..f85a910 100644
+--- a/networking/arp.c
++++ b/networking/arp.c
+@@ -313,6 +313,26 @@ static void
+ arp_disp(const char *name, char *ip, int type, int arp_flags,
+ 		 char *hwa, char *mask, char *dev)
+ {
++	static const int arp_masks[] = {
++		ATF_PERM, ATF_PUBL, 
++#ifdef HAVE_ATF_MAGIC
++		ATF_MAGIC,
++#endif
++#ifdef HAVE_ATF_DONTPUB
++		ATF_DONTPUB,
++#endif
++		ATF_USETRAILERS,
++	};
++	static const char arp_labels[] ALIGN1 = "PERM\0""PUP\0"
++#ifdef HAVE_ATF_MAGIC
++		"AUTO\0"
++#endif
++#ifdef HAVE_ATF_DONTPUB
++		"DONTPUB\0"
++#endif
++		"TRAIL\0"
++	;
++
+ 	const struct hwtype *xhw;
+ 
+ 	xhw = get_hwntype(type);
+@@ -333,22 +353,8 @@ arp_disp(const char *name, char *ip, int type, int arp_flags,
+ 	if (arp_flags & ATF_NETMASK)
+ 		printf("netmask %s ", mask);
+ 
+-	if (arp_flags & ATF_PERM)
+-		printf("PERM ");
+-	if (arp_flags & ATF_PUBL)
+-		printf("PUP ");
+-#ifdef HAVE_ATF_MAGIC
+-	if (arp_flags & ATF_MAGIC)
+-		printf("AUTO ");
+-#endif
+-#ifdef HAVE_ATF_DONTPUB
+-	if (arp_flags & ATF_DONTPUB)
+-		printf("DONTPUB ");
+-#endif
+-	if (arp_flags & ATF_USETRAILERS)
+-		printf("TRAIL ");
+-
+-	printf("on %s\n", dev);
++	print_flags_separated(arp_masks, arp_labels, arp_flags, " ");
++	printf(" on %s\n", dev);
+ }
+ 
+ /* Display the contents of the ARP cache in the kernel. */
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index 07b2787..faa3f2d 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -45,16 +45,15 @@ typedef struct filter_t {
+ 
+ static void print_link_flags(unsigned flags, unsigned mdown)
+ {
++	static const int flag_masks[] = {
++		IFF_LOOPBACK, IFF_BROADCAST, IFF_POINTOPOINT,
++		IFF_MULTICAST, IFF_NOARP, IFF_UP, IFF_LOWER_UP };
++	static const char flag_labels[] ALIGN1 =
++		"LOOPBACK\0""BROADCAST\0""POINTOPOINT\0"
++		"MULTICAST\0""NOARP\0""UP\0""LOWER_UP\0";
++
+ 	bb_putchar('<');
+ 	flags &= ~IFF_RUNNING;
+-#define _PF(f) if (flags & IFF_##f) { \
+-		  flags &= ~IFF_##f; \
+-		  printf(#f "%s", flags ? "," : ""); }
+-	_PF(LOOPBACK);
+-	_PF(BROADCAST);
+-	_PF(POINTOPOINT);
+-	_PF(MULTICAST);
+-	_PF(NOARP);
+ #if 0
+ 	_PF(ALLMULTI);
+ 	_PF(PROMISC);
+@@ -66,9 +65,7 @@ static void print_link_flags(unsigned flags, unsigned mdown)
+ 	_PF(PORTSEL);
+ 	_PF(NOTRAILERS);
+ #endif
+-	_PF(UP);
+-	_PF(LOWER_UP);
+-#undef _PF
++	flags = print_flags_separated(flag_masks, flag_labels, flags, ",");
+ 	if (flags)
+ 		printf("%x", flags);
+ 	if (mdown)
+diff --git a/util-linux/fdisk_osf.c b/util-linux/fdisk_osf.c
+index e281ea5..30c4255 100644
+--- a/util-linux/fdisk_osf.c
++++ b/util-linux/fdisk_osf.c
+@@ -502,6 +502,8 @@ xbsd_print_disklabel(int show_all)
+ 	int i, j;
+ 
+ 	if (show_all) {
++		static const int d_masks[] = { BSD_D_REMOVABLE, BSD_D_ECC, BSD_D_BADSECT };
++
+ #if defined(__alpha__)
+ 		printf("# %s:\n", disk_device);
+ #else
+@@ -513,13 +515,8 @@ xbsd_print_disklabel(int show_all)
+ 			printf("type: %d\n", lp->d_type);
+ 		printf("disk: %.*s\n", (int) sizeof(lp->d_typename), lp->d_typename);
+ 		printf("label: %.*s\n", (int) sizeof(lp->d_packname), lp->d_packname);
+-		printf("flags:");
+-		if (lp->d_flags & BSD_D_REMOVABLE)
+-			printf(" removable");
+-		if (lp->d_flags & BSD_D_ECC)
+-			printf(" ecc");
+-		if (lp->d_flags & BSD_D_BADSECT)
+-			printf(" badsect");
++		printf("flags: ");
++		print_flags_separated(d_masks, "removable\0""ecc\0""badsect\0", lp->d_flags, " "); 
+ 		bb_putchar('\n');
+ 		/* On various machines the fields of *lp are short/int/long */
+ 		/* In order to avoid problems, we cast them all to long. */

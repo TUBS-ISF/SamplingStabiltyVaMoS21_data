@@ -1,0 +1,2088 @@
+2007-08-18 15:32:12 +0000
+diff --git a/archival/ar.c b/archival/ar.c
+index 7b16c2b..db23c2b 100644
+--- a/archival/ar.c
++++ b/archival/ar.c
+@@ -52,7 +52,7 @@ int ar_main(int argc, char **argv)
+ 
+ 	/* Prepend '-' to the first argument if required */
+ 	opt_complementary = "--:p:t:x:-1:p--tx:t--px:x--pt";
+-	opt = getopt32(argc, argv, "ptxovcr");
++	opt = getopt32(argv, "ptxovcr");
+ 
+ 	if (opt & AR_CTX_PRINT) {
+ 		archive_handle->action_data = data_extract_to_stdout;
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index f824fcf..56c742a 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -161,7 +161,7 @@ USE_DESKTOP(long long) int unpack_bunzip2(void)
+ int bunzip2_main(int argc, char **argv);
+ int bunzip2_main(int argc, char **argv)
+ {
+-	getopt32(argc, argv, "cf");
++	getopt32(argv, "cf");
+ 	argv += optind;
+ 	if (applet_name[2] == 'c')
+ 		option_mask32 |= OPT_STDOUT;
+@@ -260,7 +260,7 @@ USE_DESKTOP(long long) int unpack_gunzip(void)
+ int gunzip_main(int argc, char **argv);
+ int gunzip_main(int argc, char **argv)
+ {
+-	getopt32(argc, argv, "cfvdt");
++	getopt32(argv, "cfvdt");
+ 	argv += optind;
+ 	/* if called as zcat */
+ 	if (applet_name[1] == 'c')
+@@ -298,7 +298,7 @@ USE_DESKTOP(long long) int unpack_unlzma(void)
+ int unlzma_main(int argc, char **argv);
+ int unlzma_main(int argc, char **argv)
+ {
+-	getopt32(argc, argv, "c");
++	getopt32(argv, "c");
+ 	argv += optind;
+ 	/* lzmacat? */
+ 	if (applet_name[4] == 'c')
+@@ -340,7 +340,7 @@ USE_DESKTOP(long long) int unpack_uncompress(void)
+ int uncompress_main(int argc, char **argv);
+ int uncompress_main(int argc, char **argv)
+ {
+-	getopt32(argc, argv, "cf");
++	getopt32(argv, "cf");
+ 	argv += optind;
+ 
+ 	return bbunpack(argv, make_new_name_uncompress, unpack_uncompress);
+diff --git a/archival/cpio.c b/archival/cpio.c
+index 72d31c3..9188e09 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -35,7 +35,7 @@ int cpio_main(int argc, char **argv)
+ 	archive_handle->seek = seek_by_read;
+ 	archive_handle->flags = ARCHIVE_EXTRACT_NEWER | ARCHIVE_PRESERVE_DATE;
+ 
+-	opt = getopt32(argc, argv, "ituvF:dm", &cpio_filename);
++	opt = getopt32(argv, "ituvF:dm", &cpio_filename);
+ 
+ 	/* One of either extract or test options must be given */
+ 	if ((opt & (CPIO_OPT_TEST | CPIO_OPT_EXTRACT)) == 0) {
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index b5fc06d..337576c 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -1579,7 +1579,7 @@ int dpkg_main(int argc, char **argv)
+ 		OPT_unpack = 0x40,
+ 	};
+ 
+-	opt = getopt32(argc, argv, "CF:ilPru", &str_f);
++	opt = getopt32(argv, "CF:ilPru", &str_f);
+ 	//if (opt & OPT_configure) ... // -C
+ 	if (opt & OPT_force_ignore_depends) { // -F (--force in official dpkg)
+ 		if (strcmp(str_f, "depends"))
+diff --git a/archival/dpkg_deb.c b/archival/dpkg_deb.c
+index 6dd8171..9781b54 100644
+--- a/archival/dpkg_deb.c
++++ b/archival/dpkg_deb.c
+@@ -42,7 +42,7 @@ int dpkg_deb_main(int argc, char **argv)
+ #endif
+ 
+ 	opt_complementary = "?c--efXx:e--cfXx:f--ceXx:X--cefx:x--cefX";
+-	opt = getopt32(argc, argv, "cefXx");
++	opt = getopt32(argv, "cefXx");
+ 
+ 	if (opt & DPKG_DEB_OPT_CONTENTS) {
+ 		tar_archive->action_header = header_verbose_list;
+diff --git a/archival/gzip.c b/archival/gzip.c
+index 83d78e4..bda4ae1 100644
+--- a/archival/gzip.c
++++ b/archival/gzip.c
+@@ -2031,7 +2031,7 @@ int gzip_main(int argc, char **argv)
+ 	unsigned opt;
+ 
+ 	/* Must match bbunzip's constants OPT_STDOUT, OPT_FORCE! */
+-	opt = getopt32(argc, argv, "cfv" USE_GUNZIP("d") "q123456789" );
++	opt = getopt32(argv, "cfv" USE_GUNZIP("d") "q123456789" );
+ 	option_mask32 &= 0x7; /* Clear -d, ignore -q, -0..9 */
+ 	//if (opt & 0x1) // -c
+ 	//if (opt & 0x2) // -f
+diff --git a/archival/tar.c b/archival/tar.c
+index bed8cf2..9bf9058 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -788,7 +788,7 @@ int tar_main(int argc, char **argv)
+ #if ENABLE_FEATURE_TAR_LONG_OPTIONS
+ 	applet_long_options = tar_longopts;
+ #endif
+-	opt = getopt32(argc, argv,
++	opt = getopt32(argv,
+ 		"txC:f:Opvk"
+ 		USE_FEATURE_TAR_CREATE(  "ch"  )
+ 		USE_FEATURE_TAR_BZIP2(   "j"   )
+diff --git a/console-tools/setconsole.c b/console-tools/setconsole.c
+index a9bbc78..32218ae 100644
+--- a/console-tools/setconsole.c
++++ b/console-tools/setconsole.c
+@@ -27,7 +27,7 @@ int setconsole_main(int argc, char **argv)
+ #if ENABLE_FEATURE_SETCONSOLE_LONG_OPTIONS
+ 	applet_long_options = setconsole_longopts;
+ #endif
+-	flags = getopt32(argc, argv, "r");
++	flags = getopt32(argv, "r");
+ 
+ 	if (argc - optind > 1)
+ 		bb_show_usage();
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index 3170993..35a5631 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -86,7 +86,7 @@ int cal_main(int argc, char **argv)
+ 	char day_headings[28];	/* 28 for julian, 21 for nonjulian */
+ 	char buf[40];
+ 
+-	flags = getopt32(argc, argv, "jy");
++	flags = getopt32(argv, "jy");
+ 	julian = flags & 1;
+ 	month = 0;
+ 	argv += optind;
+diff --git a/coreutils/cat.c b/coreutils/cat.c
+index 64e697e..cd52778 100644
+--- a/coreutils/cat.c
++++ b/coreutils/cat.c
+@@ -46,7 +46,7 @@ int bb_cat(char **argv)
+ int cat_main(int argc, char **argv);
+ int cat_main(int argc, char **argv)
+ {
+-	getopt32(argc, argv, "u");
++	getopt32(argv, "u");
+ 	argv += optind;
+ 	return bb_cat(argv);
+ }
+diff --git a/coreutils/catv.c b/coreutils/catv.c
+index 0ca73a0..ce92746 100644
+--- a/coreutils/catv.c
++++ b/coreutils/catv.c
+@@ -19,7 +19,7 @@ int catv_main(int argc, char **argv)
+ 	int fd;
+ 	unsigned flags;
+ 
+-	flags = getopt32(argc, argv, "etv");
++	flags = getopt32(argv, "etv");
+ #define CATV_OPT_e (1<<0)
+ #define CATV_OPT_t (1<<1)
+ #define CATV_OPT_v (1<<2)
+diff --git a/coreutils/chmod.c b/coreutils/chmod.c
+index 52cc40d..8b21499 100644
+--- a/coreutils/chmod.c
++++ b/coreutils/chmod.c
+@@ -93,7 +93,7 @@ int chmod_main(int argc, char **argv)
+ 
+ 	/* Parse options */
+ 	opt_complementary = "-2";
+-	getopt32(argc, argv, ("-"OPT_STR) + 1); /* Reuse string */
++	getopt32(argv, ("-"OPT_STR) + 1); /* Reuse string */
+ 	argv += optind;
+ 
+ 	/* Restore option-like mode if needed */
+diff --git a/coreutils/chown.c b/coreutils/chown.c
+index eb8d8c4..cfd3734 100644
+--- a/coreutils/chown.c
++++ b/coreutils/chown.c
+@@ -69,7 +69,7 @@ int chown_main(int argc, char **argv)
+ 	chown_fptr chown_func;
+ 
+ 	opt_complementary = "-2";
+-	getopt32(argc, argv, OPT_STR);
++	getopt32(argv, OPT_STR);
+ 	argv += optind;
+ 
+ 	/* This matches coreutils behavior (almost - see below) */
+diff --git a/coreutils/comm.c b/coreutils/comm.c
+index 3be6760..a4ab148 100644
+--- a/coreutils/comm.c
++++ b/coreutils/comm.c
+@@ -47,7 +47,7 @@ int comm_main(int argc, char **argv)
+ 	unsigned flags;
+ 
+ 	opt_complementary = "=2";
+-	flags = getopt32(argc, argv, "123");
++	flags = getopt32(argv, "123");
+ 	argv += optind;
+ 
+ 	for (i = 0; i < 2; ++i) {
+diff --git a/coreutils/cp.c b/coreutils/cp.c
+index 78bd73c..884fbf7 100644
+--- a/coreutils/cp.c
++++ b/coreutils/cp.c
+@@ -45,7 +45,7 @@ int cp_main(int argc, char **argv)
+ 	// -r and -R are the same
+ 	// -a = -pdR
+ 	opt_complementary = "l--s:s--l:Pd:rR:apdR";
+-	flags = getopt32(argc, argv, FILEUTILS_CP_OPTSTR "arPHL");
++	flags = getopt32(argv, FILEUTILS_CP_OPTSTR "arPHL");
+ 	/* Default behavior of cp is to dereference, so we don't have to do
+ 	 * anything special when we are given -L.
+ 	 * The behavior of -H is *almost* like -L, but not quite, so let's
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index 2598a9a..1cf49c2 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -171,7 +171,7 @@ int cut_main(int argc, char **argv)
+ 	char *sopt, *ltok;
+ 
+ 	opt_complementary = "b--bcf:c--bcf:f--bcf";
+-	getopt32(argc, argv, optstring, &sopt, &sopt, &sopt, &ltok);
++	getopt32(argv, optstring, &sopt, &sopt, &sopt, &ltok);
+ //	argc -= optind;
+ 	argv += optind;
+ 	if (!(option_mask32 & (CUT_OPT_BYTE_FLGS | CUT_OPT_CHAR_FLGS | CUT_OPT_FIELDS_FLGS)))
+diff --git a/coreutils/date.c b/coreutils/date.c
+index 5ee70f7..e33a977 100644
+--- a/coreutils/date.c
++++ b/coreutils/date.c
+@@ -53,7 +53,7 @@ int date_main(int argc, char **argv)
+ 
+ 	opt_complementary = "d--s:s--d"
+ 		USE_FEATURE_DATE_ISOFMT(":R--I:I--R");
+-	opt = getopt32(argc, argv, "Rs:ud:r:"
++	opt = getopt32(argv, "Rs:ud:r:"
+ 			USE_FEATURE_DATE_ISOFMT("I::D:"),
+ 			&date_str, &date_str, &filename
+ 			USE_FEATURE_DATE_ISOFMT(, &isofmt_arg, &hintfmt_arg));
+diff --git a/coreutils/df.c b/coreutils/df.c
+index fba59e7..7eb82cd 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -47,7 +47,7 @@ int df_main(int argc, char **argv)
+ 
+ #if ENABLE_FEATURE_HUMAN_READABLE
+ 	opt_complementary = "h-km:k-hm:m-hk";
+-	opt = getopt32(argc, argv, "hmk");
++	opt = getopt32(argv, "hmk");
+ 	if (opt & 1) {
+ 		df_disp_hr = 0;
+ 		disp_units_hdr = "     Size";
+@@ -57,7 +57,7 @@ int df_main(int argc, char **argv)
+ 		disp_units_hdr = "1M-blocks";
+ 	}
+ #else
+-	opt = getopt32(argc, argv, "k");
++	opt = getopt32(argv, "k");
+ #endif
+ 
+ 	printf("Filesystem%11s%-15sUsed Available Use%% Mounted on\n",
+diff --git a/coreutils/dos2unix.c b/coreutils/dos2unix.c
+index 1bfdf0c..2811098 100644
+--- a/coreutils/dos2unix.c
++++ b/coreutils/dos2unix.c
+@@ -92,7 +92,7 @@ int dos2unix_main(int argc, char **argv)
+ 
+ 	/* -u convert to unix, -d convert to dos */
+ 	opt_complementary = "u--d:d--u"; /* mutually exclusive */
+-	o = getopt32(argc, argv, "du");
++	o = getopt32(argv, "du");
+ 
+ 	/* Do the conversion requested by an argument else do the default
+ 	 * conversion depending on our name.  */
+diff --git a/coreutils/du.c b/coreutils/du.c
+index 1974871..757fa14 100644
+--- a/coreutils/du.c
++++ b/coreutils/du.c
+@@ -170,7 +170,7 @@ int du_main(int argc, char **argv)
+ 	 */
+ #if ENABLE_FEATURE_HUMAN_READABLE
+ 	opt_complementary = "h-km:k-hm:m-hk:H-L:L-H:s-d:d-s";
+-	opt = getopt32(argc, argv, "aHkLsx" "d:" "lc" "hm", &smax_print_depth);
++	opt = getopt32(argv, "aHkLsx" "d:" "lc" "hm", &smax_print_depth);
+ 	if (opt & (1 << 9)) {
+ 		/* -h opt */
+ 		disp_hr = 0;
+@@ -185,7 +185,7 @@ int du_main(int argc, char **argv)
+ 	}
+ #else
+ 	opt_complementary = "H-L:L-H:s-d:d-s";
+-	opt = getopt32(argc, argv, "aHkLsx" "d:" "lc", &smax_print_depth);
++	opt = getopt32(argv, "aHkLsx" "d:" "lc", &smax_print_depth);
+ #if !ENABLE_FEATURE_DU_DEFAULT_BLOCKSIZE_1K
+ 	if (opt & (1 << 2)) {
+ 		/* -k opt */
+diff --git a/coreutils/env.c b/coreutils/env.c
+index dc86671..8d2d881 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -54,7 +54,7 @@ int env_main(int argc, char** argv)
+ #if ENABLE_FEATURE_ENV_LONG_OPTIONS
+ 	applet_long_options = env_longopts;
+ #endif
+-	opt = getopt32(argc, argv, "+iu:", &unset_env);
++	opt = getopt32(argv, "+iu:", &unset_env);
+ 	argv += optind;
+ 	if (*argv && LONE_DASH(argv[0])) {
+ 		opt |= 1;
+diff --git a/coreutils/expand.c b/coreutils/expand.c
+index 4b5fa10..274753f 100644
+--- a/coreutils/expand.c
++++ b/coreutils/expand.c
+@@ -153,12 +153,12 @@ int expand_main(int argc, char **argv)
+ 
+ 	if (ENABLE_EXPAND && (!ENABLE_UNEXPAND || applet_name[0] == 'e')) {
+ 		USE_FEATURE_EXPAND_LONG_OPTIONS(applet_long_options = expand_longopts);
+-		opt = getopt32(argc, argv, "it:", &opt_t);
++		opt = getopt32(argv, "it:", &opt_t);
+ 	} else if (ENABLE_UNEXPAND) {
+ 		USE_FEATURE_UNEXPAND_LONG_OPTIONS(applet_long_options = unexpand_longopts);
+ 		/* -t NUM sets also -a */
+ 		opt_complementary = "ta";
+-		opt = getopt32(argc, argv, "ft:a", &opt_t);
++		opt = getopt32(argv, "ft:a", &opt_t);
+ 		/* -f --first-only is the default */
+ 		if (!(opt & OPT_ALL)) opt |= OPT_INITIAL;
+ 	}
+diff --git a/coreutils/fold.c b/coreutils/fold.c
+index 11b8809..0184961 100644
+--- a/coreutils/fold.c
++++ b/coreutils/fold.c
+@@ -63,7 +63,7 @@ int fold_main(int argc, char **argv)
+ 		}
+ 	}
+ 
+-	flags = getopt32(argc, argv, "bsw:", &w_opt);
++	flags = getopt32(argv, "bsw:", &w_opt);
+ 	if (flags & FLAG_WIDTH)
+ 		width = xatoul_range(w_opt, 1, 10000);
+ 
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 614d6d0..1cc8c4d 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -50,7 +50,7 @@ int id_main(int argc, char **argv)
+ 	/* Don't allow -n -r -nr -ug -rug -nug -rnug */
+ 	/* Don't allow more than one username */
+ 	opt_complementary = "?1:u--g:g--u:r?ug:n?ug" USE_SELINUX(":u--Z:Z--u:g--Z:Z--g");
+-	flags = getopt32(argc, argv, "rnug" USE_SELINUX("Z"));
++	flags = getopt32(argv, "rnug" USE_SELINUX("Z"));
+ 
+ 	/* This values could be overwritten later */
+ 	uid = geteuid();
+diff --git a/coreutils/install.c b/coreutils/install.c
+index 79cd020..cf62a00 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -101,7 +101,7 @@ int install_main(int argc, char **argv)
+ 	opt_complementary = "s--d:d--s" USE_SELINUX(":Z--\xff:\xff--Z");
+ 	/* -c exists for backwards compatibility, it's needed */
+ 
+-	flags = getopt32(argc, argv, "cdpsg:m:o:" USE_SELINUX("Z:"),
++	flags = getopt32(argv, "cdpsg:m:o:" USE_SELINUX("Z:"),
+ 			&gid_str, &mode_str, &uid_str USE_SELINUX(, &scontext));
+ 
+ #if ENABLE_SELINUX
+diff --git a/coreutils/libcoreutils/getopt_mk_fifo_nod.c b/coreutils/libcoreutils/getopt_mk_fifo_nod.c
+index 6fd2de7..3776215 100644
+--- a/coreutils/libcoreutils/getopt_mk_fifo_nod.c
++++ b/coreutils/libcoreutils/getopt_mk_fifo_nod.c
+@@ -31,7 +31,7 @@ mode_t getopt_mk_fifo_nod(int argc, char **argv)
+ 	security_context_t scontext;
+ #endif
+ 	int opt;
+-	opt = getopt32(argc, argv, "m:" USE_SELINUX("Z:"), &smode USE_SELINUX(,&scontext));
++	opt = getopt32(argv, "m:" USE_SELINUX("Z:"), &smode USE_SELINUX(,&scontext));
+ 	if (opt & 1) {
+ 		if (bb_parse_mode(smode, &mode))
+ 			umask(0);
+diff --git a/coreutils/ln.c b/coreutils/ln.c
+index cffd4fd..a649903 100644
+--- a/coreutils/ln.c
++++ b/coreutils/ln.c
+@@ -34,7 +34,7 @@ int ln_main(int argc, char **argv)
+ 	struct stat statbuf;
+ 	int (*link_func)(const char *, const char *);
+ 
+-	flag = getopt32(argc, argv, "sfnbS:", &suffix);
++	flag = getopt32(argv, "sfnbS:", &suffix);
+ 
+ 	if (argc == optind) {
+ 		bb_show_usage();
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 2b29255..4adf523 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -820,14 +820,14 @@ int ls_main(int argc, char **argv)
+ 	/* process options */
+ 	USE_FEATURE_LS_COLOR(applet_long_options = ls_color_opt;)
+ #if ENABLE_FEATURE_AUTOWIDTH
+-	opt = getopt32(argc, argv, ls_options, &tabstops_str, &terminal_width_str
++	opt = getopt32(argv, ls_options, &tabstops_str, &terminal_width_str
+ 				USE_FEATURE_LS_COLOR(, &color_opt));
+ 	if (tabstops_str)
+ 		tabstops = xatou(tabstops_str);
+ 	if (terminal_width_str)
+ 		terminal_width = xatou(terminal_width_str);
+ #else
+-	opt = getopt32(argc, argv, ls_options USE_FEATURE_LS_COLOR(, &color_opt));
++	opt = getopt32(argv, ls_options USE_FEATURE_LS_COLOR(, &color_opt));
+ #endif
+ 	for (i = 0; opt_flags[i] != (1U<<31); i++) {
+ 		if (opt & (1 << i)) {
+diff --git a/coreutils/md5_sha1_sum.c b/coreutils/md5_sha1_sum.c
+index 8bc2034..7f8b084 100644
+--- a/coreutils/md5_sha1_sum.c
++++ b/coreutils/md5_sha1_sum.c
+@@ -88,7 +88,7 @@ int md5_sha1_sum_main(int argc, char **argv)
+ 		: HASH_SHA1;
+ 
+ 	if (ENABLE_FEATURE_MD5_SHA1_SUM_CHECK)
+-		flags = getopt32(argc, argv, "scw");
++		flags = getopt32(argv, "scw");
+ 	else optind = 1;
+ 
+ 	if (ENABLE_FEATURE_MD5_SHA1_SUM_CHECK && !(flags & FLAG_CHECK)) {
+diff --git a/coreutils/mkdir.c b/coreutils/mkdir.c
+index 22a070c..d1a4380 100644
+--- a/coreutils/mkdir.c
++++ b/coreutils/mkdir.c
+@@ -49,7 +49,7 @@ int mkdir_main(int argc, char **argv)
+ #if ENABLE_FEATURE_MKDIR_LONG_OPTIONS
+ 	applet_long_options = mkdir_longopts;
+ #endif
+-	opt = getopt32(argc, argv, "m:p" USE_SELINUX("Z:"), &smode USE_SELINUX(,&scontext));
++	opt = getopt32(argv, "m:p" USE_SELINUX("Z:"), &smode USE_SELINUX(,&scontext));
+ 	if (opt & 1) {
+ 		mode = 0777;
+ 		if (!bb_parse_mode(smode, &mode)) {
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index 4cd0fcf..553bb6e 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -48,7 +48,7 @@ int mv_main(int argc, char **argv)
+ 	applet_long_options = mv_longopts;
+ #endif
+ 	opt_complementary = "f-i:i-f";
+-	flags = getopt32(argc, argv, "fi");
++	flags = getopt32(argv, "fi");
+ 	if (optind + 2 > argc) {
+ 		bb_show_usage();
+ 	}
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index d3c9f9a..8174ab6 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -1259,7 +1259,7 @@ int od_main(int argc, char **argv)
+ #if ENABLE_GETOPT_LONG
+ 	applet_long_options = od_longopts;
+ #endif
+-	opt = getopt32(argc, argv, "A:N:abcdfhij:lot:vxsS:"
++	opt = getopt32(argv, "A:N:abcdfhij:lot:vxsS:"
+ 		"w::", // -w with optional param
+ 		// -S was -s and also had optional parameter
+ 		// but in coreutils 6.3 it was renamed and now has
+diff --git a/coreutils/readlink.c b/coreutils/readlink.c
+index d454cbf..39edc05 100644
+--- a/coreutils/readlink.c
++++ b/coreutils/readlink.c
+@@ -21,7 +21,7 @@ int readlink_main(int argc, char **argv)
+ 		unsigned opt;
+ 		/* We need exactly one non-option argument.  */
+ 		opt_complementary = "=1";
+-		opt = getopt32(argc, argv, "f");
++		opt = getopt32(argv, "f");
+ 		fname = argv[optind];
+ 	)
+ 	SKIP_FEATURE_READLINK_FOLLOW(
+diff --git a/coreutils/rm.c b/coreutils/rm.c
+index cc22647..ba37762 100644
+--- a/coreutils/rm.c
++++ b/coreutils/rm.c
+@@ -27,7 +27,7 @@ int rm_main(int argc, char **argv)
+ 	unsigned opt;
+ 
+ 	opt_complementary = "f-i:i-f";
+-	opt = getopt32(argc, argv, "fiRr");
++	opt = getopt32(argv, "fiRr");
+ 	argv += optind;
+ 	if (opt & 1)
+ 		flags |= FILEUTILS_FORCE;
+diff --git a/coreutils/rmdir.c b/coreutils/rmdir.c
+index c1b89e4..315401e 100644
+--- a/coreutils/rmdir.c
++++ b/coreutils/rmdir.c
+@@ -24,7 +24,7 @@ int rmdir_main(int argc, char **argv)
+ 	int do_dot;
+ 	char *path;
+ 
+-	flags = getopt32(argc, argv, "p");
++	flags = getopt32(argv, "p");
+ 	argv += optind;
+ 
+ 	if (!*argv) {
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index 98c1bc3..311c774 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -290,7 +290,7 @@ int sort_main(int argc, char **argv)
+ 	/* -o and -t can be given at most once */
+ 	opt_complementary = "o--o:t--t:" /* -t, -o: maximum one of each */
+ 			"k::"; /* -k takes list */
+-	getopt32(argc, argv, OPT_STR, &str_ignored, &str_ignored, &str_o, &lst_k, &str_t);
++	getopt32(argv, OPT_STR, &str_ignored, &str_ignored, &str_o, &lst_k, &str_t);
+ #if ENABLE_FEATURE_SORT_BIG
+ 	if (option_mask32 & FLAG_o) outfile = xfopen(str_o, "w");
+ 	if (option_mask32 & FLAG_t) {
+diff --git a/coreutils/split.c b/coreutils/split.c
+index d1eb829..3ec539a 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -69,7 +69,7 @@ int split_main(int argc, char **argv)
+ 	char *src;
+ 
+ 	opt_complementary = "?2";
+-	opt = getopt32(argc, argv, "l:b:a:", &count_p, &count_p, &sfx);
++	opt = getopt32(argv, "l:b:a:", &count_p, &count_p, &sfx);
+ 
+ 	if (opt & SPLIT_OPT_l)
+ 		cnt = xatoul(count_p);
+diff --git a/coreutils/stat.c b/coreutils/stat.c
+index 0fddea2..18e8e07 100644
+--- a/coreutils/stat.c
++++ b/coreutils/stat.c
+@@ -614,7 +614,7 @@ int stat_main(int argc, char **argv)
+ 	int ok = 1;
+ 	bool (*statfunc)(char const *, char const *) = do_stat;
+ 
+-	getopt32(argc, argv, "ftL"
++	getopt32(argv, "ftL"
+ 		USE_SELINUX("Z")
+ 		USE_FEATURE_STAT_FORMAT("c:", &format)
+ 	);
+diff --git a/coreutils/sum.c b/coreutils/sum.c
+index 5799d14..4a3760b 100644
+--- a/coreutils/sum.c
++++ b/coreutils/sum.c
+@@ -80,7 +80,7 @@ int sum_main(int argc, char **argv)
+ 	unsigned n;
+ 	unsigned type = SUM_BSD;
+ 
+-	n = getopt32(argc, argv, "sr");
++	n = getopt32(argv, "sr");
+ 	if (n & 1) type = SUM_SYSV;
+ 	/* give the bsd priority over sysv func */
+ 	if (n & 2) type = SUM_BSD;
+diff --git a/coreutils/tail.c b/coreutils/tail.c
+index ec21c42..74e1423 100644
+--- a/coreutils/tail.c
++++ b/coreutils/tail.c
+@@ -107,7 +107,7 @@ int tail_main(int argc, char **argv)
+ 	}
+ #endif
+ 
+-	opt = getopt32(argc, argv, "fc:n:" USE_FEATURE_FANCY_TAIL("qs:v"),
++	opt = getopt32(argv, "fc:n:" USE_FEATURE_FANCY_TAIL("qs:v"),
+ 			&str_c, &str_n USE_FEATURE_FANCY_TAIL(,&str_s));
+ #define FOLLOW (opt & 0x1)
+ #define COUNT_BYTES (opt & 0x2)
+diff --git a/coreutils/tee.c b/coreutils/tee.c
+index 2160141..d253028 100644
+--- a/coreutils/tee.c
++++ b/coreutils/tee.c
+@@ -28,7 +28,7 @@ int tee_main(int argc, char **argv)
+ #else
+ 	int c;
+ #endif
+-	retval = getopt32(argc, argv, "ia");	/* 'a' must be 2nd */
++	retval = getopt32(argv, "ia");	/* 'a' must be 2nd */
+ 	argc -= optind;
+ 	argv += optind;
+ 
+diff --git a/coreutils/touch.c b/coreutils/touch.c
+index 7b82339..7a1dd35 100644
+--- a/coreutils/touch.c
++++ b/coreutils/touch.c
+@@ -26,7 +26,7 @@ int touch_main(int argc, char **argv)
+ {
+ 	int fd;
+ 	int status = EXIT_SUCCESS;
+-	int flags = getopt32(argc, argv, "c");
++	int flags = getopt32(argv, "c");
+ 
+ 	argv += optind;
+ 
+diff --git a/coreutils/tty.c b/coreutils/tty.c
+index 2c77c99..d8ce78c 100644
+--- a/coreutils/tty.c
++++ b/coreutils/tty.c
+@@ -21,7 +21,7 @@ int tty_main(int argc, char **argv)
+ 
+ 	xfunc_error_retval = 2;	/* SUSv3 requires > 1 for error. */
+ 
+-	USE_INCLUDE_SUSv2(silent = getopt32(argc, argv, "s");)
++	USE_INCLUDE_SUSv2(silent = getopt32(argv, "s");)
+ 
+ 	/* gnu tty outputs a warning that it is ignoring all args. */
+ 	bb_warn_ignoring_args(argc - optind);
+diff --git a/coreutils/uname.c b/coreutils/uname.c
+index 8f07f19..e4724c8 100644
+--- a/coreutils/uname.c
++++ b/coreutils/uname.c
+@@ -58,7 +58,7 @@ int uname_main(int argc, char **argv)
+ 	const unsigned short int *delta;
+ 	char toprint;
+ 
+-	toprint = getopt32(argc, argv, options);
++	toprint = getopt32(argv, options);
+ 
+ 	if (argc != optind) {
+ 		bb_show_usage();
+diff --git a/coreutils/uniq.c b/coreutils/uniq.c
+index a7caef9..719bbb5 100644
+--- a/coreutils/uniq.c
++++ b/coreutils/uniq.c
+@@ -45,7 +45,7 @@ int uniq_main(int argc, char **argv)
+ 
+ 	skip_fields = skip_chars = 0;
+ 
+-	opt = getopt32(argc, argv, "cduf:s:", &s0, &s1);
++	opt = getopt32(argv, "cduf:s:", &s0, &s1);
+ 	if (opt & OPT_f)
+ 		skip_fields = xatoul(s0);
+ 	if (opt & OPT_s)
+diff --git a/coreutils/uudecode.c b/coreutils/uudecode.c
+index 2dd8f94..4c918ff 100644
+--- a/coreutils/uudecode.c
++++ b/coreutils/uudecode.c
+@@ -134,7 +134,7 @@ int uudecode_main(int argc, char **argv)
+ 	char *line;
+ 
+ 	opt_complementary = "?1"; /* 1 argument max */
+-	getopt32(argc, argv, "o:", &outname);
++	getopt32(argv, "o:", &outname);
+ 	argv += optind;
+ 
+ 	if (argv[0])
+diff --git a/coreutils/uuencode.c b/coreutils/uuencode.c
+index c1458f7..56d6882 100644
+--- a/coreutils/uuencode.c
++++ b/coreutils/uuencode.c
+@@ -28,7 +28,7 @@ int uuencode_main(int argc, char **argv)
+ 	tbl = bb_uuenc_tbl_std;
+ 	mode = 0666 & ~umask(0666);
+ 	opt_complementary = "-1:?2"; /* must have 1 or 2 args */
+-	if (getopt32(argc, argv, "m")) {
++	if (getopt32(argv, "m")) {
+ 		tbl = bb_uuenc_tbl_base64;
+ 	}
+ 	argv += optind;
+diff --git a/coreutils/wc.c b/coreutils/wc.c
+index 627267d..e86b7d4 100644
+--- a/coreutils/wc.c
++++ b/coreutils/wc.c
+@@ -86,7 +86,7 @@ int wc_main(int argc, char **argv)
+ 	smallint in_word;
+ 	unsigned print_type;
+ 
+-	print_type = getopt32(argc, argv, "lwcL");
++	print_type = getopt32(argv, "lwcL");
+ 
+ 	if (print_type == 0) {
+ 		print_type = (1 << WC_LINES) | (1 << WC_WORDS) | (1 << WC_CHARS);
+diff --git a/debianutils/mktemp.c b/debianutils/mktemp.c
+index 9e7ef7b..1c71c2e 100644
+--- a/debianutils/mktemp.c
++++ b/debianutils/mktemp.c
+@@ -14,7 +14,7 @@
+ int mktemp_main(int argc, char **argv);
+ int mktemp_main(int argc, char **argv)
+ {
+-	unsigned long flags = getopt32(argc, argv, "dqt");
++	unsigned long flags = getopt32(argv, "dqt");
+ 	char *chp;
+ 
+ 	if (optind + 1 != argc)
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index 5066742..0104eb1 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -121,7 +121,7 @@ int run_parts_main(int argc, char **argv)
+ #if ENABLE_FEATURE_RUN_PARTS_LONG_OPTIONS
+ 	applet_long_options = runparts_longopts;
+ #endif
+-	tmp = getopt32(argc, argv, "a:u:t"USE_FEATURE_RUN_PARTS_FANCY("l"), &arg_list, &umask_p);
++	tmp = getopt32(argv, "a:u:t"USE_FEATURE_RUN_PARTS_FANCY("l"), &arg_list, &umask_p);
+ 	G.mode = tmp &~ (RUN_PARTS_OPT_a|RUN_PARTS_OPT_u);
+ 	if (tmp & RUN_PARTS_OPT_u) {
+ 		/* Check and set the umask of the program executed.
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index f24168e..7633cb0 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -252,7 +252,7 @@ int start_stop_daemon_main(int argc, char **argv)
+ 
+ 	/* Check required one context option was given */
+ 	opt_complementary = "K:S:K--S:S--K:m?p:K?xpun:S?xa";
+-	opt = getopt32(argc, argv, "KSbqma:n:s:u:c:x:p:"
++	opt = getopt32(argv, "KSbqma:n:s:u:c:x:p:"
+ 		USE_FEATURE_START_STOP_DAEMON_FANCY("ovN:"),
+ //		USE_FEATURE_START_STOP_DAEMON_FANCY("ovN:R:"),
+ 		&startas, &cmdname, &signame, &userspec, &chuid, &execname, &pidfile
+diff --git a/e2fsprogs/lsattr.c b/e2fsprogs/lsattr.c
+index fbfbea2..dd6efc8 100644
+--- a/e2fsprogs/lsattr.c
++++ b/e2fsprogs/lsattr.c
+@@ -98,7 +98,7 @@ static void lsattr_args(const char *name)
+ int lsattr_main(int argc, char **argv);
+ int lsattr_main(int argc, char **argv)
+ {
+-	getopt32(argc, argv, "Radlv");
++	getopt32(argv, "Radlv");
+ 	argv += optind;
+ 
+ 	if (!*argv)
+diff --git a/e2fsprogs/old_e2fsprogs/lsattr.c b/e2fsprogs/old_e2fsprogs/lsattr.c
+index b418f6b..9201464 100644
+--- a/e2fsprogs/old_e2fsprogs/lsattr.c
++++ b/e2fsprogs/old_e2fsprogs/lsattr.c
+@@ -117,7 +117,7 @@ int lsattr_main(int argc, char **argv)
+ {
+ 	int i;
+ 
+-	flags = getopt32(argc, argv, "Radlv");
++	flags = getopt32(argv, "Radlv");
+ 
+ 	if (optind > argc - 1)
+ 		lsattr_args(".");
+diff --git a/editors/awk.c b/editors/awk.c
+index 4ec3d46..a820c7a 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -2817,7 +2817,7 @@ int awk_main(int argc, char **argv)
+ 		}
+ 	}
+ 	opt_complementary = "v::";
+-	opt = getopt32(argc, argv, "F:v:f:W:", &opt_F, &opt_v, &g_progname, &opt_W);
++	opt = getopt32(argv, "F:v:f:W:", &opt_F, &opt_v, &g_progname, &opt_W);
+ 	argv += optind;
+ 	argc -= optind;
+ 	if (opt & 0x1)
+diff --git a/editors/cmp.c b/editors/cmp.c
+index ffdfb91..34a0de5 100644
+--- a/editors/cmp.c
++++ b/editors/cmp.c
+@@ -61,7 +61,7 @@ int cmp_main(int argc, char **argv)
+ 			USE_DESKTOP(":?4")
+ 			SKIP_DESKTOP(":?2")
+ 			":l--s:s--l";
+-	opt = getopt32(argc, argv, opt_chars);
++	opt = getopt32(argv, opt_chars);
+ 	argv += optind;
+ 
+ 	filename1 = *argv;
+diff --git a/editors/diff.c b/editors/diff.c
+index 41808b1..3a694e0 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -1219,7 +1219,7 @@ int diff_main(int argc, char **argv)
+ 
+ 	/* exactly 2 params; collect multiple -L <label> */
+ 	opt_complementary = "=2:L::";
+-	getopt32(argc, argv, "abdiL:NqrsS:tTU:wu"
++	getopt32(argv, "abdiL:NqrsS:tTU:wu"
+ 			"p" /* ignored (for compatibility) */,
+ 			&L_arg, &start, &U_opt);
+ 	/*argc -= optind;*/
+diff --git a/editors/patch.c b/editors/patch.c
+index f071a08..94f6641 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -87,7 +87,7 @@ int patch_main(int argc, char **argv)
+ 
+ 	{
+ 		char *p, *i;
+-		ret = getopt32(argc, argv, "p:i:", &p, &i);
++		ret = getopt32(argv, "p:i:", &p, &i);
+ 		if (ret & 1)
+ 			patch_level = xatol_range(p, -1, USHRT_MAX);
+ 		if (ret & 2) {
+diff --git a/editors/sed.c b/editors/sed.c
+index 01ef93c..26fdeaf 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1248,7 +1248,7 @@ int sed_main(int argc, char **argv)
+ 	opt_e = opt_f = NULL;
+ 	opt_complementary = "e::f::" /* can occur multiple times */
+ 	                    "nn"; /* count -n */
+-	opt = getopt32(argc, argv, "irne:f:", &opt_e, &opt_f,
++	opt = getopt32(argv, "irne:f:", &opt_e, &opt_f,
+ 			    &G.be_quiet); /* counter for -n */
+ 	argc -= optind;
+ 	argv += optind;
+diff --git a/findutils/grep.c b/findutils/grep.c
+index e543ee0..c45d0ed 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -389,7 +389,7 @@ int grep_main(int argc, char **argv)
+ 	char *Copt;
+ 
+ 	opt_complementary = "H-h:e::f::C-AB";
+-	getopt32(argc, argv,
++	getopt32(argv,
+ 		OPTSTR_GREP,
+ 		&pattern_head, &fopt, &mopt,
+ 		&slines_after, &slines_before, &Copt);
+@@ -419,7 +419,7 @@ int grep_main(int argc, char **argv)
+ #else
+ 	/* with auto sanity checks */
+ 	opt_complementary = "H-h:e::f::c-n:q-n:l-n";
+-	getopt32(argc, argv, OPTSTR_GREP,
++	getopt32(argv, OPTSTR_GREP,
+ 		&pattern_head, &fopt, &mopt);
+ #endif
+ 	if (option_mask32 & OPT_m) {
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index 4ca9563..7a88996 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -394,7 +394,7 @@ int xargs_main(int argc, char **argv)
+ #define read_args process_stdin
+ #endif
+ 
+-	opt = getopt32(argc, argv, OPTION_STR, &max_args, &max_chars, &eof_str);
++	opt = getopt32(argv, OPTION_STR, &max_args, &max_chars, &eof_str);
+ 
+ 	if (opt & OPT_ZEROTERM)
+ 		USE_FEATURE_XARGS_SUPPORT_ZERO_TERM(read_args = process0_stdin);
+diff --git a/init/halt.c b/init/halt.c
+index ca5c153..e21ad57 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -35,7 +35,7 @@ RB_AUTOBOOT
+ 	for (which = 0; "hpr"[which] != *applet_name; which++);
+ 
+ 	/* Parse and handle arguments */
+-	flags = getopt32(argc, argv, "d:nf", &delay);
++	flags = getopt32(argv, "d:nf", &delay);
+ 	if (flags & 1) sleep(xatou(delay));
+ 	if (!(flags & 2)) sync();
+ 
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index e46b3c6..b5c35cc 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -152,12 +152,12 @@ int tcpudpsvd_main(int argc, char **argv)
+ 	/* 3+ args, -i at most once, -p implies -h, -v is counter */
+ 	opt_complementary = "-3:i--i:ph:vv";
+ #ifdef SSLSVD
+-	getopt32(argc, argv, "+c:C:i:x:u:l:Eb:hpt:vU:/:Z:K:",
++	getopt32(argv, "+c:C:i:x:u:l:Eb:hpt:vU:/:Z:K:",
+ 		&str_c, &str_C, &instructs, &instructs, &user, &local_hostname,
+ 		&str_b, &str_t, &ssluser, &root, &cert, &key, &verbose
+ 	);
+ #else
+-	getopt32(argc, argv, "+c:C:i:x:u:l:Eb:hpt:v",
++	getopt32(argv, "+c:C:i:x:u:l:Eb:hpt:v",
+ 		&str_c, &str_C, &instructs, &instructs, &user, &local_hostname,
+ 		&str_b, &str_t, &verbose
+ 	);
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 3e1299f..3033bf1 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -13,12 +13,12 @@
+ /*      Documentation
+ 
+ uint32_t
+-getopt32(int argc, char **argv, const char *applet_opts, ...)
++getopt32(char **argv, const char *applet_opts, ...)
+ 
+         The command line options must be declared in const char
+         *applet_opts as a string of chars, for example:
+ 
+-        flags = getopt32(argc, argv, "rnug");
++        flags = getopt32(argv, "rnug");
+ 
+         If one of the given options is found, a flag value is added to
+         the return value (an unsigned long).
+@@ -26,7 +26,7 @@ getopt32(int argc, char **argv, const char *applet_opts, ...)
+         The flag value is determined by the position of the char in
+         applet_opts string.  For example, in the above case:
+ 
+-        flags = getopt32(argc, argv, "rnug");
++        flags = getopt32(argv, "rnug");
+ 
+         "r" will add 1    (bit 0)
+         "n" will add 2    (bit 1)
+@@ -52,7 +52,7 @@ getopt32(int argc, char **argv, const char *applet_opts, ...)
+         char *pointer_to_arg_for_c;
+         char *pointer_to_arg_for_d;
+ 
+-        flags = getopt32(argc, argv, "a:b:c:d:",
++        flags = getopt32(argv, "a:b:c:d:",
+                         &pointer_to_arg_for_a, &pointer_to_arg_for_b,
+                         &pointer_to_arg_for_c, &pointer_to_arg_for_d);
+ 
+@@ -105,7 +105,7 @@ const char *opt_complementary
+         if they are not specifed on the command line.  For example:
+ 
+         opt_complementary = "abc";
+-        flags = getopt32(argc, argv, "abcd")
++        flags = getopt32(argv, "abcd")
+ 
+         If getopt() finds "-a" on the command line, then
+         getopt32's return value will be as if "-a -b -c" were
+@@ -119,7 +119,7 @@ const char *opt_complementary
+ 
+         int w_counter = 0;
+         opt_complementary = "ww";
+-        getopt32(argc, argv, "w", &w_counter);
++        getopt32(argv, "w", &w_counter);
+         if (w_counter)
+                 width = (w_counter == 1) ? 132 : INT_MAX;
+         else
+@@ -135,7 +135,7 @@ const char *opt_complementary
+         llist_t *my_b = NULL;
+         int verbose_level = 0;
+         opt_complementary = "vv:b::b-c:c-b";
+-        f = getopt32(argc, argv, "vb:c", &my_b, &verbose_level);
++        f = getopt32(argv, "vb:c", &my_b, &verbose_level);
+         if (f & 2)       // -c after -b unsets -b flag
+                 while (my_b) { dosomething_with(my_b->data); my_b = my_b->link; }
+         if (my_b)        // but llist is stored if -b is specified
+@@ -150,7 +150,7 @@ Special characters:
+         use ':' or end of line. For example:
+ 
+         opt_complementary = "-:w-x:x-w";
+-        getopt32(argc, argv, "wx");
++        getopt32(argv, "wx");
+ 
+         Allows any arguments to be given without a dash (./program w x)
+         as well as with a dash (./program -x).
+@@ -197,7 +197,7 @@ Special characters:
+         char *smax_print_depth;
+ 
+         opt_complementary = "s-d:d-s:x-x";
+-        opt = getopt32(argc, argv, "sd:x", &smax_print_depth);
++        opt = getopt32(argv, "sd:x", &smax_print_depth);
+ 
+         if (opt & 2)
+                 max_print_depth = atoi(smax_print_depth);
+@@ -235,7 +235,7 @@ Special characters:
+ 
+         opt_complementary = "e::";
+ 
+-        getopt32(argc, argv, "e:", &patterns);
++        getopt32(argv, "e:", &patterns);
+         $ grep -e user -e root /etc/passwd
+         root:x:0:0:root:/root:/bin/bash
+         user:x:500:500::/home/user:/bin/bash
+@@ -248,7 +248,7 @@ Special characters:
+ 
+         // Don't allow -n -r -rn -ug -rug -nug -rnug
+         opt_complementary = "r?ug:n?ug:?u--g:g--u";
+-        flags = getopt32(argc, argv, "rnug");
++        flags = getopt32(argv, "rnug");
+ 
+         This example allowed only:
+         $ id; id -u; id -g; id -ru; id -nu; id -rg; id -ng; id -rnu; id -rng
+@@ -260,7 +260,7 @@ Special characters:
+ 
+         // Don't allow -KS -SK, but -S or -K is required
+         opt_complementary = "K:S:?K--S:S--K";
+-        flags = getopt32(argc, argv, "KS...);
++        flags = getopt32(argv, "KS...);
+ 
+ 
+         Don't forget to use ':'. For example, "?322-22-23X-x-a"
+@@ -296,8 +296,9 @@ const char *applet_long_options;
+ uint32_t option_mask32;
+ 
+ uint32_t
+-getopt32(int argc, char **argv, const char *applet_opts, ...)
++getopt32(char **argv, const char *applet_opts, ...)
+ {
++	int argc;
+ 	unsigned flags = 0;
+ 	unsigned requires = 0;
+ 	t_complementary complementary[33];
+@@ -320,6 +321,10 @@ getopt32(int argc, char **argv, const char *applet_opts, ...)
+ #define FREE_FIRST_ARGV_IS_OPT  8
+ 	int spec_flgs = 0;
+ 
++	argc = 0;
++	while (argv[argc])
++		argc++;
++
+ 	va_start(p, applet_opts);
+ 
+ 	c = 0;
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index cf7cca9..b213074 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -139,7 +139,7 @@ int addgroup_main(int argc, char **argv)
+ 	 *  addgroup user group
+ 	 * Check for min, max and missing args */
+ 	opt_complementary = "-1:?2";
+-	if (getopt32(argc, argv, "g:", &group)) {
++	if (getopt32(argv, "g:", &group)) {
+ 		gid = xatoul_range(group, 0, ((unsigned long)(gid_t)ULONG_MAX) >> 1);
+ 	}
+ 	/* move past the commandline options */
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index 79cd2f4..eee4a00 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -182,7 +182,7 @@ int adduser_main(int argc, char **argv)
+ 
+ 	/* exactly one non-option arg */
+ 	opt_complementary = "=1";
+-	getopt32(argc, argv, "h:g:s:G:DSH", &pw.pw_dir, &pw.pw_gecos, &pw.pw_shell, &usegroup);
++	getopt32(argv, "h:g:s:G:DSH", &pw.pw_dir, &pw.pw_gecos, &pw.pw_shell, &usegroup);
+ 	argv += optind;
+ 
+ 	/* create a passwd struct */
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index e2a717a..61f9b89 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -33,7 +33,7 @@ int chpasswd_main(int argc, char **argv)
+ 
+ 	opt_complementary = "m--e:e--m";
+ 	USE_GETOPT_LONG(applet_long_options = chpasswd_longopts;)
+-	opt = getopt32(argc, argv, "em");
++	opt = getopt32(argv, "em");
+ 
+ 	while ((name = xmalloc_getline(stdin)) != NULL) {
+ 		pass = strchr(name, ':');
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index 1c30591..0847857 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -12,7 +12,7 @@ int cryptpw_main(int argc, char **argv)
+ {
+ 	char salt[sizeof("$N$XXXXXXXX")];
+ 
+-	if (!getopt32(argc, argv, "a:", NULL) || argv[optind - 1][0] != 'd') {
++	if (!getopt32(argv, "a:", NULL) || argv[optind - 1][0] != 'd') {
+ 		strcpy(salt, "$1$");
+ 		/* Too ugly, and needs even more magic to handle endianness: */
+ 		//((uint32_t*)&salt)[0] = '$' + '1'*0x100 + '$'*0x10000;
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 8b78856..0c00066 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -180,7 +180,7 @@ static void parse_args(int argc, char **argv, struct options *op)
+ {
+ 	char *ts;
+ 
+-	op->flags = getopt32(argc, argv, opt_string,
++	op->flags = getopt32(argv, opt_string,
+ 		&(op->initstring), &fakehost, &(op->issue),
+ 		&(op->login), &ts);
+ 	if (op->flags & F_INITSTRING) {
+diff --git a/loginutils/login.c b/loginutils/login.c
+index d69e3ce..7b60fd0 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -239,7 +239,7 @@ int login_main(int argc, char **argv)
+ 	 * (The name of the function is misleading. Not daemonizing here.) */
+ 	bb_daemonize_or_rexec(DAEMON_ONLY_SANITIZE | DAEMON_CLOSE_EXTRA_FDS, NULL);
+ 
+-	opt = getopt32(argc, argv, "f:h:p", &opt_user, &opt_host);
++	opt = getopt32(argv, "f:h:p", &opt_user, &opt_host);
+ 	if (opt & LOGIN_OPT_f) {
+ 		if (!amroot)
+ 			bb_error_msg_and_die("-f is for root only");
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index 4f7094a..ce333b4 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -103,7 +103,7 @@ int passwd_main(int argc, char **argv)
+ 
+ 	logmode = LOGMODE_BOTH;
+ 	openlog(applet_name, LOG_NOWAIT, LOG_AUTH);
+-	opt = getopt32(argc, argv, "a:lud", &opt_a);
++	opt = getopt32(argv, "a:lud", &opt_a);
+ 	//argc -= optind;
+ 	argv += optind;
+ 
+diff --git a/loginutils/su.c b/loginutils/su.c
+index fd17319..b4681fb 100644
+--- a/loginutils/su.c
++++ b/loginutils/su.c
+@@ -23,7 +23,7 @@ int su_main(int argc, char **argv)
+ 	const char *tty;
+ 	char *old_user;
+ 
+-	flags = getopt32(argc, argv, "mplc:s:", &opt_command, &opt_shell);
++	flags = getopt32(argv, "mplc:s:", &opt_command, &opt_shell);
+ 	argc -= optind;
+ 	argv += optind;
+ 
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index 5638c4b..5f0a408 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -53,7 +53,7 @@ int sulogin_main(int argc, char **argv)
+ 	logmode = LOGMODE_BOTH;
+ 	openlog(applet_name, 0, LOG_AUTH);
+ 
+-	if (getopt32(argc, argv, "t:", &timeout_arg)) {
++	if (getopt32(argv, "t:", &timeout_arg)) {
+ 		timeout = xatoi_u(timeout_arg);
+ 	}
+ 
+diff --git a/loginutils/vlock.c b/loginutils/vlock.c
+index 665ebd8..d18a9f2 100644
+--- a/loginutils/vlock.c
++++ b/loginutils/vlock.c
+@@ -58,7 +58,7 @@ int vlock_main(int argc, char **argv)
+ 		bb_show_usage();
+ 	}
+ 
+-	o_lock_all = getopt32(argc, argv, "a");
++	o_lock_all = getopt32(argv, "a");
+ 
+ 	vfd = xopen(CURRENT_TTY, O_RDWR);
+ 
+diff --git a/miscutils/adjtimex.c b/miscutils/adjtimex.c
+index 1e6d15f..b11807d 100644
+--- a/miscutils/adjtimex.c
++++ b/miscutils/adjtimex.c
+@@ -56,7 +56,7 @@ int adjtimex_main(int argc, char **argv)
+ 	const char *descript;
+ 	txc.modes=0;
+ 
+-	opt = getopt32(argc, argv, "qo:f:p:t:",
++	opt = getopt32(argv, "qo:f:p:t:",
+ 			&opt_o, &opt_f, &opt_p, &opt_t);
+ 	//if (opt & 0x1) // -q
+ 	if (opt & 0x2) { // -o
+diff --git a/miscutils/chrt.c b/miscutils/chrt.c
+index d549708..98399ce 100644
+--- a/miscutils/chrt.c
++++ b/miscutils/chrt.c
+@@ -52,7 +52,7 @@ int chrt_main(int argc, char** argv)
+ 	int prio = 0, policy = SCHED_RR;
+ 
+ 	opt_complementary = "r--fo:f--ro:r--fo"; /* only one policy accepted */
+-	opt = getopt32(argc, argv, "+mp:rfo", &p_opt);
++	opt = getopt32(argv, "+mp:rfo", &p_opt);
+ 	if (opt & OPT_r)
+ 		policy = SCHED_RR;
+ 	if (opt & OPT_f)
+diff --git a/miscutils/eject.c b/miscutils/eject.c
+index 8d062d1..e66d74e 100644
+--- a/miscutils/eject.c
++++ b/miscutils/eject.c
+@@ -33,7 +33,7 @@ int eject_main(int argc, char **argv)
+ 	int dev, cmd;
+ 
+ 	opt_complementary = "?1:t--T:T--t";
+-	flags = getopt32(argc, argv, "tT");
++	flags = getopt32(argv, "tT");
+ 	device = argv[optind] ? : "/dev/cdrom";
+ 
+ 	// We used to do "umount <device>" here, but it was buggy
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 046a3c4..a2221cf 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -1321,7 +1321,7 @@ int less_main(int argc, char **argv)
+ 	/* TODO: -x: do not interpret backspace, -xx: tab also */
+ 	/* -xxx: newline also */
+ 	/* -w N: assume width N (-xxx -w 32: hex viewer of sorts) */
+-	getopt32(argc, argv, "EMmN~");
++	getopt32(argv, "EMmN~");
+ 	argc -= optind;
+ 	argv += optind;
+ 	num_files = argc;
+diff --git a/miscutils/makedevs.c b/miscutils/makedevs.c
+index 6a3e808..d36c695 100644
+--- a/miscutils/makedevs.c
++++ b/miscutils/makedevs.c
+@@ -78,7 +78,7 @@ int makedevs_main(int argc, char **argv)
+ 	int linenum = 0;
+ 	int ret = EXIT_SUCCESS;
+ 
+-	getopt32(argc, argv, "d:", &line);
++	getopt32(argv, "d:", &line);
+ 	if (line)
+ 		table = xfopen(line, "r");
+ 
+diff --git a/miscutils/mountpoint.c b/miscutils/mountpoint.c
+index b5ce35c..1f17ada 100644
+--- a/miscutils/mountpoint.c
++++ b/miscutils/mountpoint.c
+@@ -16,7 +16,7 @@ int mountpoint_main(int argc, char **argv)
+ {
+ 	struct stat st;
+ 	char *arg;
+-	int opt = getopt32(argc, argv, "qdx");
++	int opt = getopt32(argv, "qdx");
+ #define OPT_q (1)
+ #define OPT_d (2)
+ #define OPT_x (4)
+diff --git a/miscutils/strings.c b/miscutils/strings.c
+index f0ef2a2..8358802 100644
+--- a/miscutils/strings.c
++++ b/miscutils/strings.c
+@@ -28,7 +28,7 @@ int strings_main(int argc, char **argv)
+ 	const char *fmt = "%s: ";
+ 	const char *n_arg = "4";
+ 
+-	opt = getopt32(argc, argv, "afon:", &n_arg);
++	opt = getopt32(argv, "afon:", &n_arg);
+ 	/* -a is our default behaviour */
+ 	/*argc -= optind;*/
+ 	argv += optind;
+diff --git a/miscutils/taskset.c b/miscutils/taskset.c
+index cd8ffc8..0c4bad7 100644
+--- a/miscutils/taskset.c
++++ b/miscutils/taskset.c
+@@ -50,7 +50,7 @@ int taskset_main(int argc, char** argv)
+ 	const char *state = "current\0new";
+ 	char *p_opt = NULL, *aff = NULL;
+ 
+-	opt = getopt32(argc, argv, "+p:", &p_opt);
++	opt = getopt32(argv, "+p:", &p_opt);
+ 
+ 	if (opt & OPT_p) {
+ 		if (argc == optind+1) { /* -p <aff> <pid> */
+diff --git a/miscutils/watchdog.c b/miscutils/watchdog.c
+index b64291b..aa367d5 100644
+--- a/miscutils/watchdog.c
++++ b/miscutils/watchdog.c
+@@ -30,7 +30,7 @@ int watchdog_main(int argc, char **argv)
+ 	char *t_arg;
+ 
+ 	opt_complementary = "=1"; /* must have 1 argument */
+-	opts = getopt32(argc, argv, "Ft:", &t_arg);
++	opts = getopt32(argv, "Ft:", &t_arg);
+ 
+ 	if (opts & OPT_TIMER)
+ 		timer_duration = xatou(t_arg);
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index c0bc0eb..5033672 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -3980,7 +3980,7 @@ int insmod_main( int argc, char **argv)
+ 	struct utsname myuname;
+ 
+ 	/* Parse any options */
+-	getopt32(argc, argv, OPTION_STR, &opt_o);
++	getopt32(argv, OPTION_STR, &opt_o);
+ 	arg1 = argv[optind];
+ 	if (option_mask32 & OPT_o) { // -o /* name the output module */
+ 		free(m_name);
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index fe399ac..36a3c35 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -868,7 +868,7 @@ int modprobe_main(int argc, char** argv)
+ 	char *unused;
+ 
+ 	opt_complementary = "?V-:q-v:v-q";
+-	main_opts = getopt32(argc, argv, "acdklnqrst:vVC:",
++	main_opts = getopt32(argv, "acdklnqrst:vVC:",
+ 							&unused, &unused);
+ 	if (main_opts & (DUMP_CONF_EXIT | LIST_ALL))
+ 		return EXIT_SUCCESS;
+diff --git a/modutils/rmmod.c b/modutils/rmmod.c
+index 26bad7d..4a38e35 100644
+--- a/modutils/rmmod.c
++++ b/modutils/rmmod.c
+@@ -47,7 +47,7 @@ int rmmod_main(int argc, char **argv)
+ #define misc_buf bb_common_bufsiz1
+ 
+ 	/* Parse command line. */
+-	n = getopt32(argc, argv, "wfa");
++	n = getopt32(argv, "wfa");
+ 	if (n & 1)	// --wait
+ 		flags &= ~O_NONBLOCK;
+ 	if (n & 2)	// --force
+diff --git a/networking/arp.c b/networking/arp.c
+index a5a7373..8cdee18 100644
+--- a/networking/arp.c
++++ b/networking/arp.c
+@@ -445,7 +445,7 @@ int arp_main(int argc, char **argv)
+ 	if (!ap)
+ 		bb_error_msg_and_die("%s: %s not supported", DFLT_AF, "address family");
+ 
+-	getopt32(argc, argv, "A:p:H:t:i:adnDsv", &protocol, &protocol,
++	getopt32(argv, "A:p:H:t:i:adnDsv", &protocol, &protocol,
+ 				 &hw_type, &hw_type, &device);
+ 	argv += optind;
+ 	if (option_mask32 & ARP_OPT_A || option_mask32 & ARP_OPT_p) {
+diff --git a/networking/arping.c b/networking/arping.c
+index 8e457b1..a2c4c22 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -249,7 +249,7 @@ int arping_main(int argc, char **argv)
+ 		 * Advert also sets unsolicited.
+ 		 */
+ 		opt_complementary = "=1:Df:AU";
+-		opt = getopt32(argc, argv, "DUAqfbc:w:I:s:",
++		opt = getopt32(argv, "DUAqfbc:w:I:s:",
+ 				&str_count, &str_timeout, &device, &source);
+ 		if (opt & 0x40) /* -c: count */
+ 			count = xatou(str_count);
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index 672b729..c906de3 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -338,7 +338,7 @@ int dnsd_main(int argc, char **argv)
+ 	uint16_t port = 53;
+ 	uint8_t buf[MAX_PACK_LEN];
+ 
+-	getopt32(argc, argv, "i:c:t:p:dv", &listen_interface, &fileconf, &sttl, &sport);
++	getopt32(argv, "i:c:t:p:dv", &listen_interface, &fileconf, &sttl, &sport);
+ 	//if (option_mask32 & 0x1) // -i
+ 	//if (option_mask32 & 0x2) // -c
+ 	if (option_mask32 & 0x4) // -t
+diff --git a/networking/ether-wake.c b/networking/ether-wake.c
+index b67e1b5..3671383 100644
+--- a/networking/ether-wake.c
++++ b/networking/ether-wake.c
+@@ -195,7 +195,7 @@ int ether_wake_main(int argc, char **argv)
+ 
+ 	/* handle misc user options */
+ 	opt_complementary = "=1";
+-	flags = getopt32(argc, argv, "bi:p:", &ifname, &pass);
++	flags = getopt32(argv, "bi:p:", &ifname, &pass);
+ 	if (flags & 4) /* -p */
+ 		wol_passwd_sz = get_wol_pw(pass, wol_passwd);
+ 	flags &= 1; /* we further interested only in -b [bcast] flag */
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index 255e413..d7e2bfa 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -331,7 +331,7 @@ int ftpgetput_main(int argc, char **argv)
+ 	applet_long_options = ftpgetput_longopts;
+ #endif
+ 	opt_complementary = "=3"; /* must have 3 params */
+-	opt = getopt32(argc, argv, "cvu:p:P:", &server->user, &server->password, &port);
++	opt = getopt32(argv, "cvu:p:P:", &server->user, &server->password, &port);
+ 	argv += optind;
+ 
+ 	/* Process the non-option command line arguments */
+diff --git a/networking/hostname.c b/networking/hostname.c
+index 862bbdf..95dc451 100644
+--- a/networking/hostname.c
++++ b/networking/hostname.c
+@@ -60,7 +60,7 @@ int hostname_main(int argc, char **argv)
+ 	if (argc < 1)
+ 		bb_show_usage();
+ 
+-	getopt32(argc, argv, "dfisF:", &hostname_str);
++	getopt32(argv, "dfisF:", &hostname_str);
+ 
+ 	/* Output in desired format */
+ 	if (option_mask32 & OPT_dfis) {
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 0727144..c837d67 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1975,7 +1975,7 @@ int httpd_main(int argc, char **argv)
+ 	/* We do not "absolutize" path given by -h (home) opt.
+ 	 * If user gives relative path in -h, $SCRIPT_FILENAME can end up
+ 	 * relative too. */
+-	opt = getopt32(argc, argv, "c:d:h:"
++	opt = getopt32(argv, "c:d:h:"
+ 			USE_FEATURE_HTTPD_ENCODE_URL_STR("e:")
+ 			USE_FEATURE_HTTPD_BASIC_AUTH("r:")
+ 			USE_FEATURE_HTTPD_AUTH_MD5("m:")
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index e1c1e65..128cc37 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -1148,7 +1148,7 @@ int ifupdown_main(int argc, char **argv)
+ 		cmds = iface_up;
+ 	}
+ 
+-	getopt32(argc, argv, OPTION_STR, &interfaces);
++	getopt32(argv, OPTION_STR, &interfaces);
+ 	if (argc - optind > 0) {
+ 		if (DO_ALL) bb_show_usage();
+ 	} else {
+diff --git a/networking/inetd.c b/networking/inetd.c
+index a7517eb..e4e9f95 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1278,7 +1278,7 @@ int inetd_main(int argc, char **argv)
+ 	if (uid != 0)
+ 		config_filename = NULL;
+ 
+-	opt = getopt32(argc, argv, "R:f", &stoomany);
++	opt = getopt32(argv, "R:f", &stoomany);
+ 	if (opt & 1)
+ 		toomany = xatoi_u(stoomany);
+ 	argv += optind;
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index 3f99b75..7597043 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -87,7 +87,7 @@ int ipcalc_main(int argc, char **argv)
+ #if ENABLE_FEATURE_IPCALC_LONG_OPTIONS
+ 	applet_long_options = ipcalc_longopts;
+ #endif
+-	opt = getopt32(argc, argv, "mbn" USE_FEATURE_IPCALC_FANCY("phs"));
++	opt = getopt32(argv, "mbn" USE_FEATURE_IPCALC_FANCY("phs"));
+ 	argc -= optind;
+ 	argv += optind;
+ 	if (opt & (BROADCAST | NETWORK | NETPREFIX)) {
+diff --git a/networking/isrv_identd.c b/networking/isrv_identd.c
+index 84cf6da..23f6758 100644
+--- a/networking/isrv_identd.c
++++ b/networking/isrv_identd.c
+@@ -107,7 +107,7 @@ int fakeidentd_main(int argc, char **argv)
+ 	unsigned opt;
+ 	int fd;
+ 
+-	opt = getopt32(argc, argv, "fiwb:", &bind_address);
++	opt = getopt32(argv, "fiwb:", &bind_address);
+ 	strcpy(bogouser, "nobody");
+ 	if (argv[optind])
+ 		strncpy(bogouser, argv[optind], sizeof(bogouser));
+diff --git a/networking/nameif.c b/networking/nameif.c
+index fd081fd..daac191 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -66,7 +66,7 @@ int nameif_main(int argc, char **argv)
+ 	int if_index = 1;
+ 	mactable_t *ch;
+ 
+-	if (1 & getopt32(argc, argv, "sc:", &fname)) {
++	if (1 & getopt32(argv, "sc:", &fname)) {
+ 		openlog(applet_name, 0, LOG_LOCAL0);
+ 		logmode = LOGMODE_SYSLOG;
+ 	}
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 30abb3c..ab82465 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -706,7 +706,7 @@ int nc_main(int argc, char **argv)
+ 
+ 	// -g -G -t -r deleted, unimplemented -a deleted too
+ 	opt_complementary = "?2:vv"; /* max 2 params, -v is a counter */
+-	getopt32(argc, argv, "hnp:s:uvw:" USE_NC_SERVER("l")
++	getopt32(argv, "hnp:s:uvw:" USE_NC_SERVER("l")
+ 			USE_NC_EXTRA("i:o:z"),
+ 			&str_p, &str_s, &str_w
+ 			USE_NC_EXTRA(, &str_i, &str_o, &o_verbose));
+diff --git a/networking/netstat.c b/networking/netstat.c
+index 9fd3d2f..5bacb47 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -497,7 +497,7 @@ int netstat_main(int argc, char **argv)
+ #endif
+ 
+ 	/* Option string must match NETSTAT_xxx constants */
+-	opt = getopt32(argc, argv, NETSTAT_OPTS);
++	opt = getopt32(argv, NETSTAT_OPTS);
+ 	if (opt & 0x1) { // -l
+ 		flags &= ~NETSTAT_CONNECTED;
+ 		flags |= NETSTAT_LISTENING;
+diff --git a/networking/ping.c b/networking/ping.c
+index d1a413d..5d61cd7 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -689,7 +689,7 @@ int ping_main(int argc, char **argv)
+ 
+ 	/* exactly one argument needed, -v and -q don't mix */
+ 	opt_complementary = "=1:q--v:v--q";
+-	getopt32(argc, argv, OPT_STRING, &opt_c, &opt_s, &opt_I);
++	getopt32(argv, OPT_STRING, &opt_c, &opt_s, &opt_I);
+ 	if (option_mask32 & OPT_c) pingcount = xatoul(opt_c); // -c
+ 	if (option_mask32 & OPT_s) datalen = xatou16(opt_s); // -s
+ 	if (option_mask32 & OPT_I) { // -I
+diff --git a/networking/pscan.c b/networking/pscan.c
+index 9eda168..5ae3e61 100644
+--- a/networking/pscan.c
++++ b/networking/pscan.c
+@@ -54,7 +54,7 @@ int pscan_main(int argc, char **argv)
+ 	unsigned start;
+ 
+ 	opt_complementary = "=1"; /* exactly one non-option */
+-	getopt32(argc, argv, "p:P:t:T:", &opt_min_port, &opt_max_port, &opt_timeout, &opt_min_rtt);
++	getopt32(argv, "p:P:t:T:", &opt_min_port, &opt_max_port, &opt_timeout, &opt_min_rtt);
+ 	argv += optind;
+ 	max_port = xatou_range(opt_max_port, 1, 65535);
+ 	port = xatou_range(opt_min_port, 1, max_port);
+diff --git a/networking/route.c b/networking/route.c
+index bfa58da..55a6c21 100644
+--- a/networking/route.c
++++ b/networking/route.c
+@@ -656,7 +656,7 @@ int route_main(int argc, char **argv)
+ 		}
+ 	}
+ 
+-	opt = getopt32(argc, argv, "A:ne", &family);
++	opt = getopt32(argv, "A:ne", &family);
+ 
+ 	if ((opt & ROUTE_OPT_A) && strcmp(family, "inet") != 0) {
+ #if ENABLE_FEATURE_IPV6
+diff --git a/networking/slattach.c b/networking/slattach.c
+index f78c88e..ce6d705 100644
+--- a/networking/slattach.c
++++ b/networking/slattach.c
+@@ -152,7 +152,7 @@ int slattach_main(int argc, char **argv)
+ 	INIT_G();
+ 
+ 	/* Parse command line options */
+-	opt = getopt32(argc, argv, "p:s:c:ehmLF", &proto, &baud_str, &extcmd);
++	opt = getopt32(argv, "p:s:c:ehmLF", &proto, &baud_str, &extcmd);
+ 	/*argc -= optind;*/
+ 	argv += optind;
+ 
+diff --git a/networking/telnet.c b/networking/telnet.c
+index 4e8b27b..ae526fa 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -583,7 +583,7 @@ int telnet_main(int argc, char** argv)
+ 		bb_show_usage();
+ 
+ #if ENABLE_FEATURE_TELNET_AUTOLOGIN
+-	if (1 & getopt32(argc, argv, "al:", &G.autologin))
++	if (1 & getopt32(argv, "al:", &G.autologin))
+ 		G.autologin = getenv("USER");
+ 	argv += optind;
+ #else
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 9246f70..b219912 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -386,7 +386,7 @@ int telnetd_main(int argc, char **argv)
+ 		OPT_INETD = 0x20 * ENABLE_FEATURE_TELNETD_STANDALONE,
+ 	};
+ 
+-	opt = getopt32(argc, argv, "f:l:" USE_FEATURE_TELNETD_STANDALONE("p:b:Fi"),
++	opt = getopt32(argv, "f:l:" USE_FEATURE_TELNETD_STANDALONE("p:b:Fi"),
+ 			&issuefile, &loginpath
+ 			USE_FEATURE_TELNETD_STANDALONE(, &opt_portnbr, &opt_bindaddr));
+ 	/* Redirect log to syslog early, if needed */
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 030c011..6be265b 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -405,7 +405,7 @@ int tftp_main(int argc, char **argv)
+ 	opt_complementary = "" USE_FEATURE_TFTP_GET("g:") USE_FEATURE_TFTP_PUT("p:")
+ 			USE_GETPUT("?g--p:p--g");
+ 
+-	USE_GETPUT(cmd =) getopt32(argc, argv,
++	USE_GETPUT(cmd =) getopt32(argv,
+ 			USE_FEATURE_TFTP_GET("g") USE_FEATURE_TFTP_PUT("p")
+ 				"l:r:" USE_FEATURE_TFTP_BLOCKSIZE("b:"),
+ 			&localfile, &remotefile
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 0923d97..236ddbd 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -941,7 +941,7 @@ int traceroute_main(int argc, char **argv)
+ 	opt_complementary = "x-x";
+ #endif
+ 
+-	op = getopt32(argc, argv, "FIlnrdvxt:i:m:p:q:s:w:z:f:"
++	op = getopt32(argv, "FIlnrdvxt:i:m:p:q:s:w:z:f:"
+ #if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
+ 					"g:"
+ #endif
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index f0a3351..961a171 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -215,7 +215,7 @@ int udhcpc_main(int argc, char **argv)
+ #if ENABLE_GETOPT_LONG
+ 	applet_long_options = udhcpc_longopts;
+ #endif
+-	opt = getopt32(argc, argv, "c:CV:fbH:h:F:i:np:qRr:s:T:t:vS",
++	opt = getopt32(argv, "c:CV:fbH:h:F:i:np:qRr:s:T:t:vS",
+ 		&str_c, &str_V, &str_h, &str_h, &str_F,
+ 		&client_config.interface, &client_config.pidfile, &str_r,
+ 		&client_config.script, &str_T, &str_t
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 2fd16ce..e722833 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -36,7 +36,7 @@ int udhcpd_main(int argc, char **argv)
+ 	struct option_set *option;
+ 	struct dhcpOfferedAddr *lease, static_lease;
+ 
+-	opt = getopt32(argc, argv, "fS");
++	opt = getopt32(argv, "fS");
+ 	argv += optind;
+ 
+ 	if (!(opt & 1)) { /* no -f */
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index a0765be..3e931c0 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -33,7 +33,7 @@ int dumpleases_main(int argc, char **argv)
+ 	applet_long_options = dumpleases_longopts;
+ #endif
+ 	opt_complementary = "=0:a--r:r--a";
+-	opt = getopt32(argc, argv, "arf:", &file);
++	opt = getopt32(argv, "arf:", &file);
+ 
+ 	fd = xopen(file, O_RDONLY);
+ 
+diff --git a/networking/wget.c b/networking/wget.c
+index 3e61ea6..8af7a33 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -147,7 +147,7 @@ int wget_main(int argc, char **argv)
+ #endif
+ 	/* server.allocated = target.allocated = NULL; */
+ 	opt_complementary = "-1" USE_FEATURE_WGET_LONG_OPTIONS(":\xfe::");
+-	opt = getopt32(argc, argv, "csqO:P:Y:U:",
++	opt = getopt32(argv, "csqO:P:Y:U:",
+ 				&fname_out, &dir_prefix,
+ 				&proxy_flag, &user_agent
+ 				USE_FEATURE_WGET_LONG_OPTIONS(, &headers_llist)
+diff --git a/networking/zcip.c b/networking/zcip.c
+index 0b5bebe..2f0b5a7 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -203,7 +203,7 @@ int zcip_main(int argc, char **argv)
+ 	// parse commandline: prog [options] ifname script
+ 	// exactly 2 args; -v accumulates and implies -f
+ 	opt_complementary = "=2:vv:vf";
+-	opts = getopt32(argc, argv, "fqr:v", &r_opt, &verbose);
++	opts = getopt32(argv, "fqr:v", &r_opt, &verbose);
+ 	if (!FOREGROUND) {
+ 		/* Do it early, before all bb_xx_msg calls */
+ 		openlog(applet_name, 0, LOG_DAEMON);
+diff --git a/procps/pidof.c b/procps/pidof.c
+index 01e587c..c989076 100644
+--- a/procps/pidof.c
++++ b/procps/pidof.c
+@@ -28,7 +28,7 @@ int pidof_main(int argc, char **argv)
+ #endif
+ 
+ 	/* do unconditional option parsing */
+-	opt = getopt32(argc, argv, ""
++	opt = getopt32(argv, ""
+ 			USE_FEATURE_PIDOF_SINGLE ("s")
+ 			USE_FEATURE_PIDOF_OMIT("o:", &omits));
+ 
+diff --git a/procps/ps.c b/procps/ps.c
+index 5150a08..805fe06 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -297,7 +297,7 @@ int ps_main(int argc, char **argv)
+ 	//     Select which columns to display
+ 	/* We allow (and ignore) most of the above. FIXME */
+ 	opt_complementary = "o::";
+-	USE_SELINUX(opt =) getopt32(argc, argv, "Zo:aAdefl", &opt_o);
++	USE_SELINUX(opt =) getopt32(argv, "Zo:aAdefl", &opt_o);
+ 	if (opt_o) {
+ 		do {
+ 			parse_o(opt_o->data);
+@@ -357,7 +357,7 @@ int ps_main(int argc, char **argv)
+ #if ENABLE_FEATURE_PS_WIDE || ENABLE_SELINUX
+ #if ENABLE_FEATURE_PS_WIDE
+ 	opt_complementary = "-:ww";
+-	USE_SELINUX(i =) getopt32(argc, argv, USE_SELINUX("Z") "w", &w_count);
++	USE_SELINUX(i =) getopt32(argv, USE_SELINUX("Z") "w", &w_count);
+ 	/* if w is given once, GNU ps sets the width to 132,
+ 	 * if w is given more than once, it is "unlimited"
+ 	 */
+@@ -370,7 +370,7 @@ int ps_main(int argc, char **argv)
+ 			terminal_width = MAX_WIDTH;
+ 	}
+ #else /* only ENABLE_SELINUX */
+-	i = getopt32(argc, argv, "Z");
++	i = getopt32(argv, "Z");
+ #endif
+ #if ENABLE_SELINUX
+ 	if ((i & 1) && is_selinux_enabled())
+diff --git a/procps/top.c b/procps/top.c
+index 85699b0..494509c 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -535,7 +535,7 @@ int top_main(int argc, char **argv)
+ 
+ 	/* do normal option parsing */
+ 	opt_complementary = "-";
+-	getopt32(argc, argv, "d:n:b", &sinterval, &siterations);
++	getopt32(argv, "d:n:b", &sinterval, &siterations);
+ 	if (option_mask32 & 0x1) interval = xatou(sinterval); // -d
+ 	if (option_mask32 & 0x2) iterations = xatou(siterations); // -n
+ 	//if (option_mask32 & 0x4) // -b
+diff --git a/procps/watch.c b/procps/watch.c
+index b2adcd5..3d18105 100644
+--- a/procps/watch.c
++++ b/procps/watch.c
+@@ -35,7 +35,7 @@ int watch_main(int argc, char **argv)
+ 	char **p;
+ 
+ 	opt_complementary = "-1"; // at least one param please
+-	opt = getopt32(argc, argv, "+dtn:", &tmp);
++	opt = getopt32(argv, "+dtn:", &tmp);
+ 	//if (opt & 0x1) // -d (ignore)
+ 	//if (opt & 0x2) // -t
+ 	if (opt & 0x4) period = xatou(tmp);
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 8eb1e8a..87cd8e0 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -266,7 +266,7 @@ int chpst_main(int argc, char **argv)
+ 
+ 	{
+ 		char *m,*d,*o,*p,*f,*c,*r,*t,*n;
+-		getopt32(argc, argv, "+u:U:e:m:d:o:p:f:c:r:t:/:n:vP012",
++		getopt32(argv, "+u:U:e:m:d:o:p:f:c:r:t:/:n:vP012",
+ 				&set_user,&env_user,&env_dir,
+ 				&m,&d,&o,&p,&f,&c,&r,&t,&root,&n);
+ 		// if (option_mask32 & 0x1) // -u
+@@ -353,7 +353,7 @@ static void envdir(int argc, char **argv)
+ static void softlimit(int argc, char **argv)
+ {
+ 	char *a,*c,*d,*f,*l,*m,*o,*p,*r,*s,*t;
+-	getopt32(argc, argv, "+a:c:d:f:l:m:o:p:r:s:t:",
++	getopt32(argv, "+a:c:d:f:l:m:o:p:r:s:t:",
+ 			&a,&c,&d,&f,&l,&m,&o,&p,&r,&s,&t);
+ 	if (option_mask32 & 0x001) limita = xatoul(a); // -a
+ 	if (option_mask32 & 0x002) limitc = xatoul(c); // -c
+diff --git a/runit/sv.c b/runit/sv.c
+index 9181fff..e9bfc75 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -427,7 +427,7 @@ int sv_main(int argc, char **argv)
+ 	x = getenv("SVWAIT");
+ 	if (x) waitsec = xatoul(x);
+ 
+-	opt = getopt32(argc, argv, "w:v", &x);
++	opt = getopt32(argv, "w:v", &x);
+ 	if (opt & 1) waitsec = xatoul(x); // -w
+ 	if (opt & 2) verbose = 1; // -v
+ 	argc -= optind;
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index e16043e..4678451 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -759,7 +759,7 @@ int svlogd_main(int argc, char **argv)
+ #define line bb_common_bufsiz1
+ 
+ 	opt_complementary = "tt:vv";
+-	opt = getopt32(argc, argv, "r:R:l:b:tv",
++	opt = getopt32(argv, "r:R:l:b:tv",
+ 			&r, &replace, &l, &b, &timestamp, &verbose);
+ 	if (opt & 1) { // -r
+ 		repl = r[0];
+diff --git a/selinux/chcon.c b/selinux/chcon.c
+index a955228..f0590b5 100644
+--- a/selinux/chcon.c
++++ b/selinux/chcon.c
+@@ -136,7 +136,7 @@ int chcon_main(int argc, char **argv)
+ 		":\xff--urtl:u--\xff:r--\xff:t--\xff:l--\xff"
+ #endif
+ 		":f--v:v--f";  /* 'verbose' and 'quiet' are exclusive */
+-	getopt32(argc, argv, "Rchf:u:r:t:l:v",
++	getopt32(argv, "Rchf:u:r:t:l:v",
+ 		&user, &role, &type, &range, &reference_file);
+ 	argv += optind;
+ 
+diff --git a/selinux/getsebool.c b/selinux/getsebool.c
+index b059003..06a2980 100644
+--- a/selinux/getsebool.c
++++ b/selinux/getsebool.c
+@@ -16,7 +16,7 @@ int getsebool_main(int argc, char **argv)
+ 	unsigned opt;
+ 
+ 	selinux_or_die();
+-	opt = getopt32(argc, argv, "a");
++	opt = getopt32(argv, "a");
+ 
+ 	if (opt) { /* -a */
+ 		if (argc > 2)
+diff --git a/selinux/matchpathcon.c b/selinux/matchpathcon.c
+index 8d681d0..2bc0a33 100644
+--- a/selinux/matchpathcon.c
++++ b/selinux/matchpathcon.c
+@@ -38,7 +38,7 @@ int matchpathcon_main(int argc, char **argv)
+ 
+ 	opt_complementary = "-1" /* at least one param reqd */
+ 		":?:f--p:p--f"; /* mutually exclusive */
+-	opts = getopt32(argc, argv, "nNf:p:V", &fcontext, &prefix);
++	opts = getopt32(argv, "nNf:p:V", &fcontext, &prefix);
+ 	argv += optind;
+ 
+ 	if (opts & OPT_NOT_TRANS) {
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index 015a233..37ac5d1 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -104,7 +104,7 @@ int runcon_main(int argc, char **argv)
+ 	applet_long_options = runcon_longopts;
+ #endif
+ 	opt_complementary = "-1";
+-	opts = getopt32(argc, argv, "r:t:u:l:ch", &role, &type, &user, &range);
++	opts = getopt32(argv, "r:t:u:l:ch", &role, &type, &user, &range);
+ 	argv += optind;
+ 
+ 	if (!(opts & OPTS_CONTEXT_COMPONENT)) {
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index 08b911a..174d4ce 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -537,10 +537,10 @@ int setfiles_main(int argc, char **argv)
+ 	opt_complementary = "e::vv:v--p:p--v:v--q:q--v";
+ 	/* Option order must match OPT_x definitions! */
+ 	if (applet_name[0] == 'r') { /* restorecon */
+-		flags = getopt32(argc, argv, "de:f:ilnpqrsvo:FWR",
++		flags = getopt32(argv, "de:f:ilnpqrsvo:FWR",
+ 			&exclude_dir, &input_filename, &out_filename, &verbose);
+ 	} else { /* setfiles */
+-		flags = getopt32(argc, argv, "de:f:ilnpqr:svo:FW"
++		flags = getopt32(argv, "de:f:ilnpqr:svo:FW"
+ 				USE_FEATURE_SETFILES_CHECK_OPTION("c:"),
+ 			&exclude_dir, &input_filename, &rootpath, &out_filename,
+ 				 USE_FEATURE_SETFILES_CHECK_OPTION(&policyfile,)
+diff --git a/shell/bbsh.c b/shell/bbsh.c
+index 4fd0714..09c4bd9 100644
+--- a/shell/bbsh.c
++++ b/shell/bbsh.c
+@@ -204,7 +204,7 @@ int bbsh_main(int argc, char **argv)
+ 	char *command=NULL;
+ 	FILE *f;
+ 
+-	getopt32(argc, argv, "c:", &command);
++	getopt32(argv, "c:", &command);
+ 
+ 	f = argv[optind] ? xfopen(argv[optind],"r") : NULL;
+ 	if (command) handle(command);
+diff --git a/sysklogd/klogd.c b/sysklogd/klogd.c
+index fcc5746..2af4105 100644
+--- a/sysklogd/klogd.c
++++ b/sysklogd/klogd.c
+@@ -42,7 +42,7 @@ int klogd_main(int argc, char **argv)
+ 	char *start;
+ 
+ 	/* do normal option parsing */
+-	getopt32(argc, argv, "c:n", &start);
++	getopt32(argv, "c:n", &start);
+ 
+ 	if (option_mask32 & OPT_LEVEL) {
+ 		/* Valid levels are between 1 and 8 */
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index 3f67aff..df5d8ff 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -93,7 +93,7 @@ int logger_main(int argc, char **argv)
+ 	str_t = name;
+ 
+ 	/* Parse any options */
+-	getopt32(argc, argv, "p:st:", &str_p, &str_t);
++	getopt32(argv, "p:st:", &str_p, &str_t);
+ 
+ 	if (option_mask32 & 0x2) /* -s */
+ 		i |= LOG_PERROR;
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index 597e285..69a084f 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -59,7 +59,7 @@ int logread_main(int argc, char **argv)
+ 	int cur;
+ 	int log_semid; /* ipc semaphore id */
+ 	int log_shmid; /* ipc shared memory id */
+-	smallint follow = getopt32(argc, argv, "f");
++	smallint follow = getopt32(argv, "f");
+ 
+ 	log_shmid = shmget(KEY_ID, 0, 0);
+ 	if (log_shmid == -1)
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 72ecc6d..5b153f5 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -573,7 +573,7 @@ int syslogd_main(int argc, char **argv)
+ 
+ 	/* do normal option parsing */
+ 	opt_complementary = "=0"; /* no non-option params */
+-	getopt32(argc, argv, OPTION_STR, OPTION_PARAM);
++	getopt32(argv, OPTION_STR, OPTION_PARAM);
+ #ifdef SYSLOGD_MARK
+ 	if (option_mask32 & OPT_mark) // -m
+ 		G.markInterval = xatou_range(opt_m, 0, INT_MAX/60) * 60;
+diff --git a/util-linux/dmesg.c b/util-linux/dmesg.c
+index 0c1c6fa..909cbd2 100644
+--- a/util-linux/dmesg.c
++++ b/util-linux/dmesg.c
+@@ -16,7 +16,7 @@ int dmesg_main(int argc, char **argv);
+ int dmesg_main(int argc, char **argv)
+ {
+ 	char *size, *level;
+-	int flags = getopt32(argc, argv, "cs:n:", &size, &level);
++	int flags = getopt32(argv, "cs:n:", &size, &level);
+ 
+ 	if (flags & 4) {
+ 		if (klogctl(8, NULL, xatoul_range(level, 0, 10)))
+diff --git a/util-linux/fdformat.c b/util-linux/fdformat.c
+index 5e253ef..dc45e23 100644
+--- a/util-linux/fdformat.c
++++ b/util-linux/fdformat.c
+@@ -57,7 +57,7 @@ int fdformat_main(int argc,char **argv)
+ 	if (argc < 2) {
+ 		bb_show_usage();
+ 	}
+-	verify = !getopt32(argc, argv, "n");
++	verify = !getopt32(argv, "n");
+ 	argv += optind;
+ 
+ 	xstat(*argv, &st);
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 2933db4..2a91a8f 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -2752,7 +2752,7 @@ int fdisk_main(int argc, char **argv)
+ 
+ 	PTR_TO_GLOBALS = xzalloc(sizeof(G));
+ 
+-	opt = getopt32(argc, argv, "b:C:H:lS:u" USE_FEATURE_FDISK_BLKSIZE("s"),
++	opt = getopt32(argv, "b:C:H:lS:u" USE_FEATURE_FDISK_BLKSIZE("s"),
+ 				&str_b, &str_C, &str_H, &str_S);
+ 	argc -= optind;
+ 	argv += optind;
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 2460170..94fb457 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -314,11 +314,11 @@ int getopt_main(int argc, char *argv[])
+ 	}
+ 
+ #if !ENABLE_GETOPT_LONG
+-	opt = getopt32(argc, argv, "+o:n:qQs:Tu", &optstr, &name, &s_arg);
++	opt = getopt32(argv, "+o:n:qQs:Tu", &optstr, &name, &s_arg);
+ #else
+ 	applet_long_options = getopt_longopts;
+ 	opt_complementary = "l::";
+-	opt = getopt32(argc, argv, "+o:n:qQs:Tual:",
++	opt = getopt32(argv, "+o:n:qQs:Tual:",
+ 					&optstr, &name, &s_arg, &l_arg);
+ 	/* Effectuate the read options for the applet itself */
+ 	while (l_arg) {
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index fcb7308..09b09eb 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -189,7 +189,7 @@ int hwclock_main(int argc, char **argv)
+ 	applet_long_options = hwclock_longopts;
+ #endif
+ 	opt_complementary = "r--ws:w--rs:s--wr:l--u:u--l";
+-	opt = getopt32(argc, argv, "lurswf:", &rtcname);
++	opt = getopt32(argv, "lurswf:", &rtcname);
+ 
+ 	/* If -u or -l wasn't given check if we are using utc */
+ 	if (opt & (HWCLOCK_OPT_UTC | HWCLOCK_OPT_LOCALTIME))
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index d7d9019..e11c2de 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -574,7 +574,7 @@ int ipcs_main(int argc, char **argv)
+ #define flag_sem	(1<<2)
+ #define flag_shm	(1<<3)
+ 
+-	opt = getopt32(argc, argv, "i:aqsmtcplu", &opt_i);
++	opt = getopt32(argv, "i:aqsmtcplu", &opt_i);
+ 	if (opt & 0x1) { // -i
+ 		id = xatoi(opt_i);
+ 		flags |= flag_print;
+diff --git a/util-linux/losetup.c b/util-linux/losetup.c
+index e2d4e4d..9409cdf 100644
+--- a/util-linux/losetup.c
++++ b/util-linux/losetup.c
+@@ -18,7 +18,7 @@ int losetup_main(int argc, char **argv)
+ 	char *opt_o;
+ 	unsigned long long offset = 0;
+ 
+-	opt = getopt32(argc, argv, "do:", &opt_o);
++	opt = getopt32(argv, "do:", &opt_o);
+ 	argc -= optind;
+ 	argv += optind;
+ 
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 34a4a91..2b0697a 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -626,7 +626,7 @@ int mkfs_minix_main(int argc, char **argv)
+ 		bb_error_msg_and_die("bad inode size");
+ #endif
+ 
+-	opt = getopt32(argc, argv, "ci:l:n:v", &str_i, &listfile, &str_n);
++	opt = getopt32(argv, "ci:l:n:v", &str_i, &listfile, &str_n);
+ 	argv += optind;
+ 	//if (opt & 1) -c
+ 	if (opt & 2) G.req_nr_inodes = xatoul(str_i); // -i
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index bd7ecc2..e9bf2a8 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -1554,7 +1554,7 @@ int mount_main(int argc, char **argv)
+ 
+ 	// Parse remaining options
+ 
+-	opt = getopt32(argc, argv, "o:t:rwanfvs", &opt_o, &fstype);
++	opt = getopt32(argv, "o:t:rwanfvs", &opt_o, &fstype);
+ 	if (opt & 0x1) append_mount_options(&cmdopts, opt_o); // -o
+ 	//if (opt & 0x2) // -t
+ 	if (opt & 0x4) append_mount_options(&cmdopts, "ro"); // -r
+diff --git a/util-linux/rdate.c b/util-linux/rdate.c
+index 9166546..4387f04 100644
+--- a/util-linux/rdate.c
++++ b/util-linux/rdate.c
+@@ -49,7 +49,7 @@ int rdate_main(int argc, char **argv)
+ 	unsigned long flags;
+ 
+ 	opt_complementary = "-1";
+-	flags = getopt32(argc, argv, "sp");
++	flags = getopt32(argv, "sp");
+ 
+ 	remote_time = askremotedate(argv[optind]);
+ 
+diff --git a/util-linux/readprofile.c b/util-linux/readprofile.c
+index 347621c..1521376 100644
+--- a/util-linux/readprofile.c
++++ b/util-linux/readprofile.c
+@@ -67,7 +67,7 @@ int readprofile_main(int argc, char **argv)
+ 	mapFile = defaultmap;
+ 
+ 	opt_complementary = "nn:aa:bb:ss:ii:rr:vv";
+-	getopt32(argc, argv, "M:m:p:nabsirv",
++	getopt32(argv, "M:m:p:nabsirv",
+ 			&mult, &mapFile, &proFile,
+ 			&optNative, &optAll, &optBins, &optSub,
+ 			&optInfo, &optReset, &optVerbose);
+diff --git a/util-linux/swaponoff.c b/util-linux/swaponoff.c
+index cb1bbe9..73fe105 100644
+--- a/util-linux/swaponoff.c
++++ b/util-linux/swaponoff.c
+@@ -66,7 +66,7 @@ int swap_on_off_main(int argc, char **argv)
+ 	if (argc == 1)
+ 		bb_show_usage();
+ 
+-	ret = getopt32(argc, argv, "a");
++	ret = getopt32(argv, "a");
+ 	if (ret)
+ 		return do_em_all();
+ 
+diff --git a/util-linux/switch_root.c b/util-linux/switch_root.c
+index 72a2f46..e4e9e21 100644
+--- a/util-linux/switch_root.c
++++ b/util-linux/switch_root.c
+@@ -74,7 +74,7 @@ int switch_root_main(int argc, char **argv)
+ 	// Parse args (-c console)
+ 
+ 	opt_complementary = "-2";
+-	getopt32(argc, argv, "c:", &console);
++	getopt32(argv, "c:", &console);
+ 	argv += optind;
+ 
+ 	// Change to new root directory and verify it's a different fs.
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index 7063a47..16d3dfb 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -38,7 +38,7 @@ int umount_main(int argc, char **argv)
+ 
+ 	/* Parse any options */
+ 
+-	opt = getopt32(argc, argv, OPTION_STRING, &fstype);
++	opt = getopt32(argv, OPTION_STRING, &fstype);
+ 
+ 	argc -= optind;
+ 	argv += optind;

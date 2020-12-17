@@ -1,0 +1,14 @@
+2008-02-09 06:29:32 +0000
+diff --git a/include/usage.h b/include/usage.h
+index a65e249..98d3f3c 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2339,7 +2339,7 @@ USE_FEATURE_BRCTL_FANCY("\n" \
+        "	block-count	Number of block to use (default is entire partition)"
+ 
+ #define mktemp_trivial_usage \
+-       "[-dqt] [-p dir] TEMPLATE"
++       "[-dt] [-p DIR] TEMPLATE"
+ #define mktemp_full_usage \
+        "Create a temporary file with its name based on TEMPLATE.\n" \
+        "TEMPLATE is any name with six 'Xs' (i.e., /tmp/temp.XXXXXX)." \

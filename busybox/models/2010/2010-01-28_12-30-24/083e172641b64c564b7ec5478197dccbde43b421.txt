@@ -1,0 +1,119 @@
+2010-01-28 12:30:24 +0100
+diff --git a/archival/gzip.c b/archival/gzip.c
+index f9c8e4d..a327d54 100644
+--- a/archival/gzip.c
++++ b/archival/gzip.c
+@@ -964,7 +964,7 @@ static void compress_block(ct_data * ltree, ct_data * dtree);
+ #else
+ #  define SEND_CODE(c, tree) \
+ { \
+-	if (verbose > 1) bb_error_msg("\ncd %3d ",(c)); \
++	if (verbose > 1) bb_error_msg("\ncd %3d ", (c)); \
+ 	send_bits(tree[c].Code, tree[c].Len); \
+ }
+ #endif
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/namei.c b/e2fsprogs/old_e2fsprogs/ext2fs/namei.c
+index 9889670..4d4e378 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/namei.c
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/namei.c
+@@ -48,7 +48,7 @@ static errcode_t follow_link(ext2_filsys fs, ext2_ino_t root, ext2_ino_t dir,
+ 	if (link_count++ > 5) {
+ 		return EXT2_ET_SYMLINK_LOOP;
+ 	}
+-	if (ext2fs_inode_data_blocks(fs,&ei)) {
++	if (ext2fs_inode_data_blocks(fs, &ei)) {
+ 		retval = ext2fs_get_mem(fs->blocksize, &buffer);
+ 		if (retval)
+ 			return retval;
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 5e3ee23..62f5de8 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -637,7 +637,7 @@ static int do_servicing(int fd, unsigned long event_mask)
+ 	xioctl(fd, DEVFSDIOC_SET_EVENT_MASK, (void*)event_mask);
+ 	while (!caught_signal) {
+ 		errno = 0;
+-		bytes = read(fd,(char *) &info, sizeof info);
++		bytes = read(fd, (char *) &info, sizeof info);
+ 		if (caught_signal)
+ 			break;      /*  Must test for this first     */
+ 		if (errno == EINTR)
+@@ -941,10 +941,10 @@ static void restore(char *spath, struct stat source_stat, int rootlen)
+ 	lstat(dpath, &dest_stat);
+ 	free(dpath);
+ 	if (S_ISLNK(source_stat.st_mode) || (source_stat.st_mode & S_ISVTX))
+-		copy_inode(dpath, &dest_stat,(source_stat.st_mode & ~S_ISVTX) , spath, &source_stat);
++		copy_inode(dpath, &dest_stat, (source_stat.st_mode & ~S_ISVTX), spath, &source_stat);
+ 
+ 	if (S_ISDIR(source_stat.st_mode))
+-		dir_operation(RESTORE, spath, rootlen,NULL);
++		dir_operation(RESTORE, spath, rootlen, NULL);
+ }
+ 
+ 
+@@ -995,7 +995,7 @@ static int copy_inode(const char *destpath, const struct stat *dest_stat,
+ 				break;
+ 			un_addr.sun_family = AF_UNIX;
+ 			snprintf(un_addr.sun_path, sizeof(un_addr.sun_path), "%s", destpath);
+-			val = bind(fd,(struct sockaddr *) &un_addr,(int) sizeof un_addr);
++			val = bind(fd, (struct sockaddr *) &un_addr, (int) sizeof un_addr);
+ 			close(fd);
+ 			if (val != 0 || chmod(destpath, new_mode & ~S_IFMT) != 0)
+ 				break;
+@@ -1432,7 +1432,7 @@ const char *get_old_name(const char *devname, unsigned int namelen,
+ 
+ 	/* 2 ==scsi/disc, 4 == scsi/part */
+ 	if (i == 2 || i == 4)
+-		compat_name = write_old_sd_name(buffer, major, minor,((i == 2) ? "" : (ptr + 4)));
++		compat_name = write_old_sd_name(buffer, major, minor, ((i == 2) ? "" : (ptr + 4)));
+ 
+ 	/* 5 == scsi/mt */
+ 	if (i == 5) {
+@@ -1652,7 +1652,7 @@ static const char *expand_variable(char *buffer, unsigned int length,
+ 	ch = input[0];
+ 	if (ch == '$') {
+ 		/*  Special case for "$$": PID  */
+-		sprintf(tmp, "%d",(int) getpid());
++		sprintf(tmp, "%d", (int) getpid());
+ 		len = strlen(tmp);
+ 		if (len + *out_pos >= length)
+ 			goto expand_variable_out;
+diff --git a/modutils/modutils-24.c b/modutils/modutils-24.c
+index 4ede01f..442e80f 100644
+--- a/modutils/modutils-24.c
++++ b/modutils/modutils-24.c
+@@ -1570,7 +1570,7 @@ arch_apply_relocation(struct obj_file *f,
+ #endif
+ 
+ 		default:
+-			printf("Warning: unhandled reloc %d\n",(int)ELF_R_TYPE(rel->r_info));
++			printf("Warning: unhandled reloc %d\n", (int)ELF_R_TYPE(rel->r_info));
+ 			ret = obj_reloc_unhandled;
+ 			break;
+ 
+diff --git a/shell/msh_unused.c b/shell/msh_unused.c
+index 5468022..fe2cca8 100644
+--- a/shell/msh_unused.c
++++ b/shell/msh_unused.c
+@@ -464,7 +464,7 @@ static void ioecho(char c);
+  * IO control
+  */
+ static void pushio(struct ioarg *argp, int (*f) (struct ioarg *));
+-#define PUSHIO(what,arg,gen) ((temparg.what = (arg)), pushio(&temparg,(gen)))
++#define PUSHIO(what,arg,gen) ((temparg.what = (arg)), pushio(&temparg, (gen)))
+ static int remap(int fd);
+ static int openpipe(int *pv);
+ static void closepipe(int *pv);
+diff --git a/util-linux/fdisk_sun.c b/util-linux/fdisk_sun.c
+index fa6f7e4..463082f 100644
+--- a/util-linux/fdisk_sun.c
++++ b/util-linux/fdisk_sun.c
+@@ -480,7 +480,7 @@ add_sun_partition(int n, int sys)
+ 		return;
+ 	}
+ 
+-	fetch_sun(starts,lens,&start,&stop);
++	fetch_sun(starts, lens, &start, &stop);
+ 	if (stop <= start) {
+ 		if (n == 2)
+ 			whole_disk = 1;

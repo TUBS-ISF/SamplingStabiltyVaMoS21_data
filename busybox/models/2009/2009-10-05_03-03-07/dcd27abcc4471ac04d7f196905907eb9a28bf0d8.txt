@@ -1,0 +1,61 @@
+2009-10-05 03:03:07 +0200
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index d25f509..d6625e4 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -98,6 +98,7 @@ int FAST_FUNC bbunpack(char **argv,
+ 		status = unpacker(&info);
+ 		if (status < 0)
+ 			exitcode = 1;
++		xclose(STDOUT_FILENO); /* with error check! */
+ 
+ 		if (filename) {
+ 			char *del = new_name;
+@@ -108,12 +109,11 @@ int FAST_FUNC bbunpack(char **argv,
+ 
+ 					times.actime = info.mtime;
+ 					times.modtime = info.mtime;
+-					/* Close first.
++					/* Note: we closed it first.
+ 					 * On some systems calling utime
+-					 * then closing resets the mtime. */
+-					close(STDOUT_FILENO);
+-					/* Ignoring errors */
+-					utime(new_name, &times);
++					 * then closing resets the mtime
++					 * back to current time. */
++					utime(new_name, &times); /* ignoring errors */
+ 				}
+ 
+ 				/* Delete _compressed_ file */
+diff --git a/include/libbb.h b/include/libbb.h
+index a02355c..dca14b4 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -631,6 +631,9 @@ extern void xwrite(int fd, const void *buf, size_t count) FAST_FUNC;
+ extern void xwrite_str(int fd, const char *str) FAST_FUNC;
+ extern void xopen_xwrite_close(const char* file, const char *str) FAST_FUNC;
+ 
++/* Close fd, but check for failures (some types of write errors) */
++extern void xclose(int fd) FAST_FUNC;
++
+ /* Reads and prints to stdout till eof, then closes FILE. Exits on error: */
+ extern void xprint_and_close_file(FILE *file) FAST_FUNC;
+ 
+diff --git a/libbb/xfuncs_printf.c b/libbb/xfuncs_printf.c
+index 5f56b36..aaf9989 100644
+--- a/libbb/xfuncs_printf.c
++++ b/libbb/xfuncs_printf.c
+@@ -213,6 +213,12 @@ void FAST_FUNC xwrite_str(int fd, const char *str)
+ 	xwrite(fd, str, strlen(str));
+ }
+ 
++void FAST_FUNC xclose(int fd)
++{
++	if (close(fd))
++		bb_perror_msg_and_die("close failed");
++}
++
+ // Die with an error message if we can't lseek to the right spot.
+ off_t FAST_FUNC xlseek(int fd, off_t offset, int whence)
+ {

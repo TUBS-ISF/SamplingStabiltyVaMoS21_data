@@ -1,0 +1,14 @@
+2007-06-19 23:04:17 +0000
+diff --git a/coreutils/echo.c b/coreutils/echo.c
+index 11507b4..085e851 100644
+--- a/coreutils/echo.c
++++ b/coreutils/echo.c
+@@ -33,7 +33,7 @@ int bb_echo(char **argv)
+ 		eflag = '\\',
+ 		nflag = 1,  /* 1 -- print '\n' */
+ 	};
+-	arg = ++argv;
++	arg = *++argv;
+ 	if (!arg)
+ 		goto newline_ret;
+ #else

@@ -1,0 +1,472 @@
+2007-06-12 20:54:54 +0000
+diff --git a/archival/libunarchive/decompress_unlzma.c b/archival/libunarchive/decompress_unlzma.c
+index 907e44e..2800a7e 100644
+--- a/archival/libunarchive/decompress_unlzma.c
++++ b/archival/libunarchive/decompress_unlzma.c
+@@ -13,7 +13,7 @@
+ #include "unarchive.h"
+ 
+ #ifdef CONFIG_FEATURE_LZMA_FAST
+-#  define speed_inline ATTRIBUTE_ALWAYS_INLINE
++#  define speed_inline ALWAYS_INLINE
+ #else
+ #  define speed_inline
+ #endif
+@@ -78,7 +78,7 @@ static rc_t* rc_init(int fd) /*, int buffer_size) */
+ }
+ 
+ /* Called once  */
+-static ATTRIBUTE_ALWAYS_INLINE void rc_free(rc_t * rc)
++static ALWAYS_INLINE void rc_free(rc_t * rc)
+ {
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		free(rc);
+@@ -92,7 +92,7 @@ static void rc_do_normalize(rc_t * rc)
+ 	rc->range <<= 8;
+ 	rc->code = (rc->code << 8) | *rc->ptr++;
+ }
+-static ATTRIBUTE_ALWAYS_INLINE void rc_normalize(rc_t * rc)
++static ALWAYS_INLINE void rc_normalize(rc_t * rc)
+ {
+ 	if (rc->range < (1 << RC_TOP_BITS)) {
+ 		rc_do_normalize(rc);
+@@ -109,7 +109,7 @@ static speed_inline uint32_t rc_is_bit_0_helper(rc_t * rc, uint16_t * p)
+ 	rc->bound = *p * (rc->range >> RC_MODEL_TOTAL_BITS);
+ 	return rc->bound;
+ }
+-static ATTRIBUTE_ALWAYS_INLINE int rc_is_bit_0(rc_t * rc, uint16_t * p)
++static ALWAYS_INLINE int rc_is_bit_0(rc_t * rc, uint16_t * p)
+ {
+ 	uint32_t t = rc_is_bit_0_helper(rc, p);
+ 	return rc->code < t;
+@@ -143,7 +143,7 @@ static int rc_get_bit(rc_t * rc, uint16_t * p, int *symbol)
+ }
+ 
+ /* Called once */
+-static ATTRIBUTE_ALWAYS_INLINE int rc_direct_bit(rc_t * rc)
++static ALWAYS_INLINE int rc_direct_bit(rc_t * rc)
+ {
+ 	rc_normalize(rc);
+ 	rc->range >>= 1;
+diff --git a/editors/awk.c b/editors/awk.c
+index 9d306bf..90ba643 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -677,7 +677,7 @@ static char nextchar(char **s)
+ 	return c;
+ }
+ 
+-static int ATTRIBUTE_ALWAYS_INLINE isalnum_(int c)
++static int ALWAYS_INLINE isalnum_(int c)
+ {
+ 	return (isalnum(c) || c == '_');
+ }
+diff --git a/editors/diff.c b/editors/diff.c
+index 830c15e..ef39623 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -65,6 +65,8 @@
+ #define FLAG_U	(1<<12)
+ #define	FLAG_w	(1<<13)
+ 
++#define g_read_buf bb_common_bufsiz1
++
+ struct cand {
+ 	int x;
+ 	int y;
+@@ -208,14 +210,14 @@ static void print_status(int val, char *path1, char *path2, char *entry)
+ 		free(_path2);
+ 	}
+ }
+-static void fiddle_sum(int *sum, int t)
++static ALWAYS_INLINE int fiddle_sum(int sum, int t)
+ {
+-	*sum = (int)(*sum * 127 + t);
++	return sum * 127 + t;
+ }
+ /*
+  * Hash function taken from Robert Sedgewick, Algorithms in C, 3d ed., p 578.
+  */
+-static int readhash(FILE * f)
++static int readhash(FILE *fp)
+ {
+ 	int i, t, space;
+ 	int sum;
+@@ -223,17 +225,17 @@ static int readhash(FILE * f)
+ 	sum = 1;
+ 	space = 0;
+ 	if (!(option_mask32 & (FLAG_b | FLAG_w))) {
+-		for (i = 0; (t = getc(f)) != '\n'; i++) {
++		for (i = 0; (t = getc(fp)) != '\n'; i++) {
+ 			if (t == EOF) {
+ 				if (i == 0)
+ 					return 0;
+ 				break;
+ 			}
+-			fiddle_sum(&sum, t);
++			sum = fiddle_sum(sum, t);
+ 		}
+ 	} else {
+ 		for (i = 0;;) {
+-			switch (t = getc(f)) {
++			switch (t = getc(fp)) {
+ 			case '\t':
+ 			case '\r':
+ 			case '\v':
+@@ -246,7 +248,7 @@ static int readhash(FILE * f)
+ 					i++;
+ 					space = 0;
+ 				}
+-				fiddle_sum(&sum, t);
++				sum = fiddle_sum(sum, t);
+ 				i++;
+ 				continue;
+ 			case EOF:
+@@ -271,7 +273,7 @@ static int readhash(FILE * f)
+  * Check to see if the given files differ.
+  * Returns 0 if they are the same, 1 if different, and -1 on error.
+  */
+-static int files_differ(FILE * f1, FILE * f2, int flags)
++static int files_differ(FILE *f1, FILE *f2, int flags)
+ {
+ 	size_t i, j;
+ 
+@@ -281,37 +283,37 @@ static int files_differ(FILE * f1, FILE * f2, int flags)
+ 		return 1;
+ 	}
+ 	while (1) {
+-		i = fread(bb_common_bufsiz1,            1, BUFSIZ/2, f1);
+-		j = fread(bb_common_bufsiz1 + BUFSIZ/2, 1, BUFSIZ/2, f2);
++		i = fread(g_read_buf,                    1, COMMON_BUFSIZE/2, f1);
++		j = fread(g_read_buf + COMMON_BUFSIZE/2, 1, COMMON_BUFSIZE/2, f2);
+ 		if (i != j)
+ 			return 1;
+ 		if (i == 0)
+ 			return (ferror(f1) || ferror(f2));
+-		if (memcmp(bb_common_bufsiz1,
+-		           bb_common_bufsiz1 + BUFSIZ/2, i) != 0)
++		if (memcmp(g_read_buf,
++		           g_read_buf + COMMON_BUFSIZE/2, i) != 0)
+ 			return 1;
+ 	}
+ }
+ 
+ 
+-static void prepare(int i, FILE * fd, off_t filesize)
++static void prepare(int i, FILE *fp /*, off_t filesize*/)
+ {
+ 	struct line *p;
+ 	int h;
+ 	size_t j, sz;
+ 
+-	rewind(fd);
++	rewind(fp);
+ 
+-	sz = (filesize <= FSIZE_MAX ? filesize : FSIZE_MAX) / 25;
+-	if (sz < 100)
+-		sz = 100;
++	/*sz = (filesize <= FSIZE_MAX ? filesize : FSIZE_MAX) / 25;*/
++	/*if (sz < 100)*/
++	sz = 100;
+ 
+-	p = xmalloc((sz + 3) * sizeof(struct line));
++	p = xmalloc((sz + 3) * sizeof(p[0]));
+ 	j = 0;
+-	while ((h = readhash(fd))) {
++	while ((h = readhash(fp))) {
+ 		if (j == sz) {
+ 			sz = sz * 3 / 2;
+-			p = xrealloc(p, (sz + 3) * sizeof(struct line));
++			p = xrealloc(p, (sz + 3) * sizeof(p[0]));
+ 		}
+ 		p[++j].value = h;
+ 	}
+@@ -694,10 +696,10 @@ static int asciifile(FILE * f)
+ 
+ #if ENABLE_FEATURE_DIFF_BINARY
+ 	rewind(f);
+-	cnt = fread(bb_common_bufsiz1, 1, BUFSIZ, f);
++	cnt = fread(g_read_buf, 1, COMMON_BUFSIZE, f);
+ 	for (i = 0; i < cnt; i++) {
+-		if (!isprint(bb_common_bufsiz1[i])
+-		 && !isspace(bb_common_bufsiz1[i])) {
++		if (!isprint(g_read_buf[i])
++		 && !isspace(g_read_buf[i])) {
+ 			return 0;
+ 		}
+ 	}
+@@ -937,7 +939,7 @@ static void output(char *file1, FILE * f1, char *file2, FILE * f2)
+  * 3*(number of k-candidates installed),  typically about
+  * 6n words for files of length n.
+  */
+-static unsigned diffreg(char * ofile1, char * ofile2, int flags)
++static unsigned diffreg(char *ofile1, char *ofile2, int flags)
+ {
+ 	char *file1 = ofile1;
+ 	char *file2 = ofile2;
+@@ -987,8 +989,8 @@ static unsigned diffreg(char * ofile1, char * ofile2, int flags)
+ 		goto closem;
+ 	}
+ 
+-	prepare(0, f1, stb1.st_size);
+-	prepare(1, f2, stb2.st_size);
++	prepare(0, f1 /*, stb1.st_size*/);
++	prepare(1, f2 /*, stb2.st_size*/);
+ 	prune();
+ 	sort(sfile[0], slen[0]);
+ 	sort(sfile[1], slen[1]);
+diff --git a/include/libbb.h b/include/libbb.h
+index d42ce5f..c4743cf 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -379,9 +379,9 @@ extern char *safe_strncpy(char *dst, const char *src, size_t size);
+ extern char *xasprintf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+ // gcc-4.1.1 still isn't good enough at optimizing it
+ // (+200 bytes compared to macro)
+-//static ATTRIBUTE_ALWAYS_INLINE
++//static ALWAYS_INLINE
+ //int LONE_DASH(const char *s) { return s[0] == '-' && !s[1]; }
+-//static ATTRIBUTE_ALWAYS_INLINE
++//static ALWAYS_INLINE
+ //int NOT_LONE_DASH(const char *s) { return s[0] != '-' || s[1]; }
+ #define LONE_DASH(s)     ((s)[0] == '-' && !(s)[1])
+ #define NOT_LONE_DASH(s) ((s)[0] != '-' || (s)[1])
+@@ -611,7 +611,7 @@ int write_pidfile(const char *path);
+ #define remove_pidfile(f) ((void)unlink(f))
+ #else
+ /* Why? #defining it to 1 gives "warning: statement with no effect"... */
+-static ATTRIBUTE_ALWAYS_INLINE int write_pidfile(const char *path) { return 1; }
++static ALWAYS_INLINE int write_pidfile(const char *path) { return 1; }
+ #define remove_pidfile(f) ((void)0)
+ #endif
+ 
+diff --git a/include/platform.h b/include/platform.h
+index c2013b3..9c93efb 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -53,14 +53,14 @@
+ # define ATTRIBUTE_PACKED __attribute__ ((__packed__))
+ # define ATTRIBUTE_ALIGNED(m) __attribute__ ((__aligned__(m)))
+ # if __GNUC_PREREQ (3,0)
+-#  define ATTRIBUTE_ALWAYS_INLINE __attribute__ ((always_inline)) inline
++#  define ALWAYS_INLINE __attribute__ ((always_inline)) inline
+ #  if !ENABLE_WERROR
+ #   define ATTRIBUTE_DEPRECATED __attribute__ ((__deprecated__))
+ #  else
+ #   define ATTRIBUTE_DEPRECATED /* n/a */
+ #  endif
+ # else
+-#  define ATTRIBUTE_ALWAYS_INLINE inline
++#  define ALWAYS_INLINE inline
+ #  define ATTRIBUTE_DEPRECATED /* n/a */
+ # endif
+ 
+@@ -238,7 +238,7 @@ typedef unsigned smalluint;
+ #endif
+ 
+ #if defined(__dietlibc__)
+-static ATTRIBUTE_ALWAYS_INLINE char* strchrnul(const char *s, char c)
++static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+ {
+ 	while (*s && *s != c) ++s;
+ 	return (char*)s;
+diff --git a/include/xatonum.h b/include/xatonum.h
+index cf088a4..e613fce 100644
+--- a/include/xatonum.h
++++ b/include/xatonum.h
+@@ -33,46 +33,46 @@ DECLARE_STR_CONV(long long, ll, ull)
+ /* (useful for mapping them to the type of the same width) */
+ #define DEFINE_EQUIV_STR_CONV(narrow, N, W, UN, UW) \
+ \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ unsigned narrow xstrto##UN##_range_sfx(const char *str, int b, unsigned narrow l, unsigned narrow u, const struct suffix_mult *sfx) \
+ { return xstrto##UW##_range_sfx(str, b, l, u, sfx); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ unsigned narrow xstrto##UN##_range(const char *str, int b, unsigned narrow l, unsigned narrow u) \
+ { return xstrto##UW##_range(str, b, l, u); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ unsigned narrow xstrto##UN##_sfx(const char *str, int b, const struct suffix_mult *sfx) \
+ { return xstrto##UW##_sfx(str, b, sfx); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ unsigned narrow xstrto##UN(const char *str, int b) \
+ { return xstrto##UW(str, b); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ unsigned narrow xato##UN##_range_sfx(const char *str, unsigned narrow l, unsigned narrow u, const struct suffix_mult *sfx) \
+ { return xato##UW##_range_sfx(str, l, u, sfx); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ unsigned narrow xato##UN##_range(const char *str, unsigned narrow l, unsigned narrow u) \
+ { return xato##UW##_range(str, l, u); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ unsigned narrow xato##UN##_sfx(const char *str, const struct suffix_mult *sfx) \
+ { return xato##UW##_sfx(str, sfx); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ unsigned narrow xato##UN(const char *str) \
+ { return xato##UW(str); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ narrow xstrto##N##_range_sfx(const char *str, int b, narrow l, narrow u, const struct suffix_mult *sfx) \
+ { return xstrto##W##_range_sfx(str, b, l, u, sfx); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ narrow xstrto##N##_range(const char *str, int b, narrow l, narrow u) \
+ { return xstrto##W##_range(str, b, l, u); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ narrow xato##N##_range_sfx(const char *str, narrow l, narrow u, const struct suffix_mult *sfx) \
+ { return xato##W##_range_sfx(str, l, u, sfx); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ narrow xato##N##_range(const char *str, narrow l, narrow u) \
+ { return xato##W##_range(str, l, u); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ narrow xato##N##_sfx(const char *str, const struct suffix_mult *sfx) \
+ { return xato##W##_sfx(str, sfx); } \
+-static ATTRIBUTE_ALWAYS_INLINE \
++static ALWAYS_INLINE \
+ narrow xato##N(const char *str) \
+ { return xato##W(str); } \
+ 
+@@ -96,7 +96,7 @@ DECLARE_STR_CONV(int, i, u)
+ /* Specialized */
+ 
+ int BUG_xatou32_unimplemented(void);
+-static ATTRIBUTE_ALWAYS_INLINE uint32_t xatou32(const char *numstr)
++static ALWAYS_INLINE uint32_t xatou32(const char *numstr)
+ {
+ 	if (UINT_MAX == 0xffffffff)
+ 		return xatou(numstr);
+@@ -111,10 +111,10 @@ unsigned long long bb_strtoull(const char *arg, char **endp, int base);
+ long long bb_strtoll(const char *arg, char **endp, int base);
+ 
+ #if ULONG_MAX == ULLONG_MAX
+-static ATTRIBUTE_ALWAYS_INLINE
++static ALWAYS_INLINE
+ unsigned long bb_strtoul(const char *arg, char **endp, int base)
+ { return bb_strtoull(arg, endp, base); }
+-static ATTRIBUTE_ALWAYS_INLINE
++static ALWAYS_INLINE
+ long bb_strtol(const char *arg, char **endp, int base)
+ { return bb_strtoll(arg, endp, base); }
+ #else
+@@ -123,17 +123,17 @@ long bb_strtol(const char *arg, char **endp, int base);
+ #endif
+ 
+ #if UINT_MAX == ULLONG_MAX
+-static ATTRIBUTE_ALWAYS_INLINE
++static ALWAYS_INLINE
+ unsigned bb_strtou(const char *arg, char **endp, int base)
+ { return bb_strtoull(arg, endp, base); }
+-static ATTRIBUTE_ALWAYS_INLINE
++static ALWAYS_INLINE
+ int bb_strtoi(const char *arg, char **endp, int base)
+ { return bb_strtoll(arg, endp, base); }
+ #elif UINT_MAX == ULONG_MAX
+-static ATTRIBUTE_ALWAYS_INLINE
++static ALWAYS_INLINE
+ unsigned bb_strtou(const char *arg, char **endp, int base)
+ { return bb_strtoul(arg, endp, base); }
+-static ATTRIBUTE_ALWAYS_INLINE
++static ALWAYS_INLINE
+ int bb_strtoi(const char *arg, char **endp, int base)
+ { return bb_strtol(arg, endp, base); }
+ #else
+@@ -142,7 +142,7 @@ int bb_strtoi(const char *arg, char **endp, int base);
+ #endif
+ 
+ int BUG_bb_strtou32_unimplemented(void);
+-static ATTRIBUTE_ALWAYS_INLINE
++static ALWAYS_INLINE
+ uint32_t bb_strtou32(const char *arg, char **endp, int base)
+ {
+ 	if (sizeof(uint32_t) == sizeof(unsigned))
+diff --git a/libbb/xatonum.c b/libbb/xatonum.c
+index dec3c2d..a410ae9 100644
+--- a/libbb/xatonum.c
++++ b/libbb/xatonum.c
+@@ -34,7 +34,7 @@
+ #endif
+ 
+ #if UINT_MAX != ULONG_MAX
+-static ATTRIBUTE_ALWAYS_INLINE
++static ALWAYS_INLINE
+ unsigned bb_strtoui(const char *str, char **end, int b)
+ {
+ 	unsigned long v = strtoul(str, end, b);
+diff --git a/networking/zcip.c b/networking/zcip.c
+index 3b67a03..eb0a7ba 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -149,7 +149,7 @@ static int run(char *argv[3], const char *intf, struct in_addr *ip)
+ /**
+  * Return milliseconds of random delay, up to "secs" seconds.
+  */
+-static unsigned ATTRIBUTE_ALWAYS_INLINE ms_rdelay(unsigned secs)
++static unsigned ALWAYS_INLINE ms_rdelay(unsigned secs)
+ {
+ 	return lrand48() % (secs * 1000);
+ }
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index ed5abe9..4ecbadf 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -402,14 +402,14 @@ set_all_unchanged(void)
+ 		ptes[i].changed = 0;
+ }
+ 
+-static ATTRIBUTE_ALWAYS_INLINE void
++static ALWAYS_INLINE void
+ set_changed(int i)
+ {
+ 	ptes[i].changed = 1;
+ }
+ #endif /* FEATURE_FDISK_WRITABLE */
+ 
+-static ATTRIBUTE_ALWAYS_INLINE struct partition *
++static ALWAYS_INLINE struct partition *
+ get_part_table(int i)
+ {
+ 	return ptes[i].part_table;
+@@ -430,7 +430,7 @@ valid_part_table_flag(const char *mbuffer)
+ }
+ 
+ #if ENABLE_FEATURE_FDISK_WRITABLE
+-static ATTRIBUTE_ALWAYS_INLINE void
++static ALWAYS_INLINE void
+ write_part_table_flag(char *b)
+ {
+ 	b[510] = 0x55;
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index d35a25a..955d66f 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -159,7 +159,7 @@ static struct {
+ #define MAGIC     (Super.s_magic)
+ 
+ /* gcc likes this more (code is smaller) than macro variant */
+-static ATTRIBUTE_ALWAYS_INLINE unsigned div_roundup(unsigned size, unsigned n)
++static ALWAYS_INLINE unsigned div_roundup(unsigned size, unsigned n)
+ {
+ 	return (size + n-1) / n;
+ }
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 9707ba3..ffdb214 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -121,7 +121,7 @@ struct globals {
+ 
+ #define G (*ptr_to_globals)
+ 
+-static ATTRIBUTE_ALWAYS_INLINE unsigned div_roundup(unsigned size, unsigned n)
++static ALWAYS_INLINE unsigned div_roundup(unsigned size, unsigned n)
+ {
+ 	return (size + n-1) / n;
+ }

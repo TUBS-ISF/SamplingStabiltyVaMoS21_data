@@ -1,0 +1,686 @@
+2009-09-16 00:58:11 +0200
+diff --git a/archival/libunarchive/decompress_unlzma.c b/archival/libunarchive/decompress_unlzma.c
+index 4478cd2..ecda174 100644
+--- a/archival/libunarchive/decompress_unlzma.c
++++ b/archival/libunarchive/decompress_unlzma.c
+@@ -156,7 +156,7 @@ typedef struct {
+ 	uint8_t pos;
+ 	uint32_t dict_size;
+ 	uint64_t dst_size;
+-} __attribute__ ((packed)) lzma_header_t;
++} PACKED lzma_header_t;
+ 
+ 
+ /* #defines will force compiler to compute/optimize each one with each usage.
+diff --git a/archival/libunarchive/decompress_unzip.c b/archival/libunarchive/decompress_unzip.c
+index b090f26..c571ab4 100644
+--- a/archival/libunarchive/decompress_unzip.c
++++ b/archival/libunarchive/decompress_unzip.c
+@@ -1117,7 +1117,7 @@ static int check_header_gzip(STATE_PARAM unpack_info_t *info)
+ 			uint32_t mtime;
+ 			uint8_t xtra_flags_UNUSED;
+ 			uint8_t os_flags_UNUSED;
+-		} __attribute__((packed)) formatted;
++		} PACKED formatted;
+ 	} header;
+ 	struct BUG_header {
+ 		char BUG_header[sizeof(header) == 8 ? 1 : -1];
+diff --git a/util-linux/mkfs_vfat.c b/util-linux/mkfs_vfat.c
+index bdd4dd8..10de2af 100644
+--- a/util-linux/mkfs_vfat.c
++++ b/util-linux/mkfs_vfat.c
+@@ -79,7 +79,7 @@ struct msdos_dir_entry {
+ 	uint16_t date;           /* 018 date */
+ 	uint16_t start;          /* 01a first cluster */
+ 	uint32_t size;           /* 01c file size in bytes */
+-} __attribute__ ((packed));
++} PACKED;
+ 
+ /* Example of boot sector's beginning:
+ 0000  eb 58 90 4d 53 57 49 4e  34 2e 31 00 02 08 26 00  |...MSWIN4.1...&.|
+@@ -96,7 +96,7 @@ struct msdos_volume_info { /* (offsets are relative to start of boot sector) */
+ 	uint32_t volume_id32;     /* 043 volume ID number */
+ 	char     volume_label[11];/* 047 volume label */
+ 	char     fs_type[8];      /* 052 typically "FATnn" */
+-} __attribute__ ((packed));       /* 05a end. Total size 26 (0x1a) bytes */
++} PACKED;                         /* 05a end. Total size 26 (0x1a) bytes */
+ 
+ struct msdos_boot_sector {
+ 	char     boot_jump[3];       /* 000 short or near jump instruction */
+@@ -124,7 +124,7 @@ struct msdos_boot_sector {
+ 	char     boot_code[0x200 - 0x5a - 2]; /* 05a */
+ #define BOOT_SIGN 0xAA55
+ 	uint16_t boot_sign;          /* 1fe */
+-} __attribute__ ((packed));
++} PACKED;
+ 
+ #define FAT_FSINFO_SIG1 0x41615252
+ #define FAT_FSINFO_SIG2 0x61417272
+@@ -137,7 +137,7 @@ struct fat32_fsinfo {
+ 	uint32_t reserved2[3];
+ 	uint16_t reserved3;          /* 1fc */
+ 	uint16_t boot_sign;          /* 1fe */
+-} __attribute__ ((packed));
++} PACKED;
+ 
+ struct bug_check {
+ 	char BUG1[sizeof(struct msdos_dir_entry  ) == 0x20 ? 1 : -1];
+diff --git a/util-linux/volume_id/cramfs.c b/util-linux/volume_id/cramfs.c
+index dd939e4..37b9911 100644
+--- a/util-linux/volume_id/cramfs.c
++++ b/util-linux/volume_id/cramfs.c
+@@ -31,9 +31,9 @@ struct cramfs_super {
+ 		uint32_t	edition;
+ 		uint32_t	blocks;
+ 		uint32_t	files;
+-	} __attribute__((__packed__)) info;
++	} PACKED info;
+ 	uint8_t		name[16];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ int volume_id_probe_cramfs(struct volume_id *id /*,uint64_t off*/)
+ {
+diff --git a/util-linux/volume_id/ext.c b/util-linux/volume_id/ext.c
+index b052e04..e409773 100644
+--- a/util-linux/volume_id/ext.c
++++ b/util-linux/volume_id/ext.c
+@@ -37,7 +37,7 @@ struct ext2_super_block {
+ 	uint32_t	feature_ro_compat;
+ 	uint8_t	uuid[16];
+ 	uint8_t	volume_name[16];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define EXT3_FEATURE_COMPAT_HAS_JOURNAL		0x00000004
+ #define EXT3_FEATURE_INCOMPAT_JOURNAL_DEV	0x00000008
+diff --git a/util-linux/volume_id/fat.c b/util-linux/volume_id/fat.c
+index 352040f..8cf429e 100644
+--- a/util-linux/volume_id/fat.c
++++ b/util-linux/volume_id/fat.c
+@@ -54,7 +54,7 @@ struct vfat_super_block {
+ 			uint8_t		magic[8];
+ 			uint8_t		dummy2[192];
+ 			uint8_t		pmagic[2];
+-		} __attribute__((__packed__)) fat;
++		} PACKED fat;
+ 		struct fat32_super_block {
+ 			uint32_t	fat32_length;
+ 			uint16_t	flags;
+@@ -69,9 +69,9 @@ struct vfat_super_block {
+ 			uint8_t		magic[8];
+ 			uint8_t		dummy2[164];
+ 			uint8_t		pmagic[2];
+-		} __attribute__((__packed__)) fat32;
+-	} __attribute__((__packed__)) type;
+-} __attribute__((__packed__));
++		} PACKED fat32;
++	} PACKED type;
++} PACKED;
+ 
+ struct vfat_dir_entry {
+ 	uint8_t		name[11];
+@@ -85,7 +85,7 @@ struct vfat_dir_entry {
+ 	uint16_t	date_write;
+ 	uint16_t	cluster_low;
+ 	uint32_t	size;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ static uint8_t *get_attr_volume_id(struct vfat_dir_entry *dir, int count)
+ {
+diff --git a/util-linux/volume_id/hfs.c b/util-linux/volume_id/hfs.c
+index f99b895..71a5e8b 100644
+--- a/util-linux/volume_id/hfs.c
++++ b/util-linux/volume_id/hfs.c
+@@ -28,7 +28,7 @@ struct hfs_finder_info{
+ 	uint32_t	reserved;
+ 	uint32_t	osx_folder;
+ 	uint8_t		id[8];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct hfs_mdb {
+ 	uint8_t		signature[2];
+@@ -58,7 +58,7 @@ struct hfs_mdb {
+ 	uint8_t		embed_sig[2];
+ 	uint16_t	embed_startblock;
+ 	uint16_t	embed_blockcount;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct hfsplus_bnode_descriptor {
+ 	uint32_t	next;
+@@ -67,7 +67,7 @@ struct hfsplus_bnode_descriptor {
+ 	uint8_t		height;
+ 	uint16_t	num_recs;
+ 	uint16_t	reserved;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct hfsplus_bheader_record {
+ 	uint16_t	depth;
+@@ -76,19 +76,19 @@ struct hfsplus_bheader_record {
+ 	uint32_t	leaf_head;
+ 	uint32_t	leaf_tail;
+ 	uint16_t	node_size;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct hfsplus_catalog_key {
+ 	uint16_t	key_len;
+ 	uint32_t	parent_id;
+ 	uint16_t	unicode_len;
+ 	uint8_t		unicode[255 * 2];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct hfsplus_extent {
+ 	uint32_t	start_block;
+ 	uint32_t	block_count;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define HFSPLUS_EXTENT_COUNT		8
+ struct hfsplus_fork {
+@@ -96,7 +96,7 @@ struct hfsplus_fork {
+ 	uint32_t	clump_size;
+ 	uint32_t	total_blocks;
+ 	struct hfsplus_extent extents[HFSPLUS_EXTENT_COUNT];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct hfsplus_vol_header {
+ 	uint8_t		signature[2];
+@@ -125,7 +125,7 @@ struct hfsplus_vol_header {
+ 	struct hfsplus_fork cat_file;
+ 	struct hfsplus_fork attr_file;
+ 	struct hfsplus_fork start_file;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define HFS_SUPERBLOCK_OFFSET		0x400
+ #define HFS_NODE_LEAF			0xff
+diff --git a/util-linux/volume_id/iso9660.c b/util-linux/volume_id/iso9660.c
+index 82f5e48..76fa546 100644
+--- a/util-linux/volume_id/iso9660.c
++++ b/util-linux/volume_id/iso9660.c
+@@ -38,14 +38,14 @@ struct iso_volume_descriptor {
+ 	uint8_t		unused[8];
+ 	uint8_t		space_size[8];
+ 	uint8_t		escape_sequences[8];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct high_sierra_volume_descriptor {
+ 	uint8_t		foo[8];
+ 	uint8_t		type;
+ 	uint8_t		id[4];
+ 	uint8_t		version;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ int volume_id_probe_iso9660(struct volume_id *id /*,uint64_t off*/)
+ {
+diff --git a/util-linux/volume_id/jfs.c b/util-linux/volume_id/jfs.c
+index 4c39e53..eb6008f 100644
+--- a/util-linux/volume_id/jfs.c
++++ b/util-linux/volume_id/jfs.c
+@@ -31,7 +31,7 @@ struct jfs_super_block {
+ 	uint8_t		uuid[16];
+ 	uint8_t		label[16];
+ 	uint8_t		loguuid[16];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define JFS_SUPERBLOCK_OFFSET			0x8000
+ 
+diff --git a/util-linux/volume_id/linux_raid.c b/util-linux/volume_id/linux_raid.c
+index cc02469..b691f20 100644
+--- a/util-linux/volume_id/linux_raid.c
++++ b/util-linux/volume_id/linux_raid.c
+@@ -37,7 +37,7 @@ struct mdp_super_block {
+ 	uint32_t	set_uuid1;
+ 	uint32_t	set_uuid2;
+ 	uint32_t	set_uuid3;
+-} __attribute__((packed));
++} PACKED;
+ 
+ #define MD_RESERVED_BYTES		0x10000
+ #define MD_MAGIC			0xa92b4efc
+diff --git a/util-linux/volume_id/linux_swap.c b/util-linux/volume_id/linux_swap.c
+index c9b62e9..7ae4516 100644
+--- a/util-linux/volume_id/linux_swap.c
++++ b/util-linux/volume_id/linux_swap.c
+@@ -27,7 +27,7 @@ struct swap_header_v1_2 {
+ 	uint32_t	nr_badpages;
+ 	uint8_t		uuid[16];
+ 	uint8_t		volume_name[16];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define LARGEST_PAGESIZE			0x4000
+ 
+diff --git a/util-linux/volume_id/ntfs.c b/util-linux/volume_id/ntfs.c
+index 6e8f1dd..3b3e973 100644
+--- a/util-linux/volume_id/ntfs.c
++++ b/util-linux/volume_id/ntfs.c
+@@ -45,7 +45,7 @@ struct ntfs_super_block {
+ 	uint8_t		reserved2[3];
+ 	uint8_t		volume_serial[8];
+ 	uint16_t	checksum;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct master_file_table_record {
+ 	uint8_t		magic[4];
+@@ -58,7 +58,7 @@ struct master_file_table_record {
+ 	uint16_t	flags;
+ 	uint32_t	bytes_in_use;
+ 	uint32_t	bytes_allocated;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct file_attribute {
+ 	uint32_t	type;
+@@ -70,13 +70,13 @@ struct file_attribute {
+ 	uint16_t	instance;
+ 	uint32_t	value_len;
+ 	uint16_t	value_offset;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct volume_info {
+ 	uint64_t	reserved;
+ 	uint8_t		major_ver;
+ 	uint8_t		minor_ver;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define MFT_RECORD_VOLUME			3
+ #define MFT_RECORD_ATTR_VOLUME_NAME		0x60
+diff --git a/util-linux/volume_id/ocfs2.c b/util-linux/volume_id/ocfs2.c
+index 8417d91..14573ca 100644
+--- a/util-linux/volume_id/ocfs2.c
++++ b/util-linux/volume_id/ocfs2.c
+@@ -78,7 +78,7 @@ struct ocfs2_super_block {
+ 	uint64_t	s_first_cluster_group;		/* Block offset of 1st cluster group header */
+ 	uint8_t		s_label[OCFS2_MAX_VOL_LABEL_LEN];	/* Label for mounting, etc. */
+ 	uint8_t		s_uuid[OCFS2_VOL_UUID_LEN];	/* 128-bit uuid */
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ int volume_id_probe_ocfs2(struct volume_id *id /*,uint64_t off*/)
+ {
+diff --git a/util-linux/volume_id/reiserfs.c b/util-linux/volume_id/reiserfs.c
+index b8cdc98..1298f86 100644
+--- a/util-linux/volume_id/reiserfs.c
++++ b/util-linux/volume_id/reiserfs.c
+@@ -35,7 +35,7 @@ struct reiserfs_super_block {
+ 	uint32_t	dummy4[5];
+ 	uint8_t		uuid[16];
+ 	uint8_t		label[16];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct reiser4_super_block {
+ 	uint8_t		magic[16];
+@@ -43,7 +43,7 @@ struct reiser4_super_block {
+ 	uint8_t		uuid[16];
+ 	uint8_t		label[16];
+ 	uint64_t	dummy2;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define REISERFS1_SUPERBLOCK_OFFSET		0x2000
+ #define REISERFS_SUPERBLOCK_OFFSET		0x10000
+diff --git a/util-linux/volume_id/romfs.c b/util-linux/volume_id/romfs.c
+index 2c061bd..4ed1319 100644
+--- a/util-linux/volume_id/romfs.c
++++ b/util-linux/volume_id/romfs.c
+@@ -25,7 +25,7 @@ struct romfs_super {
+ 	uint32_t size;
+ 	uint32_t checksum;
+ 	uint8_t name[0];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ int volume_id_probe_romfs(struct volume_id *id /*,uint64_t off*/)
+ {
+diff --git a/util-linux/volume_id/sysv.c b/util-linux/volume_id/sysv.c
+index 7a99cd6..0e65072 100644
+--- a/util-linux/volume_id/sysv.c
++++ b/util-linux/volume_id/sysv.c
+@@ -48,7 +48,7 @@ struct sysv_super {
+ 	uint32_t	s_state;
+ 	uint32_t	s_magic;
+ 	uint32_t	s_type;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define XENIX_NICINOD				100
+ #define XENIX_NICFREE				100
+@@ -74,7 +74,7 @@ struct xenix_super {
+ 	uint8_t		s_fill[371];
+ 	uint32_t	s_magic;
+ 	uint32_t	s_type;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define SYSV_SUPERBLOCK_BLOCK			0x01
+ #define SYSV_MAGIC				0xfd187e20
+diff --git a/util-linux/volume_id/udf.c b/util-linux/volume_id/udf.c
+index e272e19..a6e719a 100644
+--- a/util-linux/volume_id/udf.c
++++ b/util-linux/volume_id/udf.c
+@@ -30,28 +30,28 @@ struct volume_descriptor {
+ 		uint16_t	crc;
+ 		uint16_t	crc_len;
+ 		uint32_t	location;
+-	} __attribute__((__packed__)) tag;
++	} PACKED tag;
+ 	union {
+ 		struct anchor_descriptor {
+ 			uint32_t	length;
+ 			uint32_t	location;
+-		} __attribute__((__packed__)) anchor;
++		} PACKED anchor;
+ 		struct primary_descriptor {
+ 			uint32_t	seq_num;
+ 			uint32_t	desc_num;
+ 			struct dstring {
+ 				uint8_t	clen;
+ 				uint8_t	c[31];
+-			} __attribute__((__packed__)) ident;
+-		} __attribute__((__packed__)) primary;
+-	} __attribute__((__packed__)) type;
+-} __attribute__((__packed__));
++			} PACKED ident;
++		} PACKED primary;
++	} PACKED type;
++} PACKED;
+ 
+ struct volume_structure_descriptor {
+ 	uint8_t		type;
+ 	uint8_t		id[5];
+ 	uint8_t		version;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define UDF_VSD_OFFSET			0x8000
+ 
+diff --git a/util-linux/volume_id/unused_highpoint.c b/util-linux/volume_id/unused_highpoint.c
+index 57c5cad..6fd58b7 100644
+--- a/util-linux/volume_id/unused_highpoint.c
++++ b/util-linux/volume_id/unused_highpoint.c
+@@ -23,11 +23,11 @@
+ struct hpt37x_meta {
+ 	uint8_t		filler1[32];
+ 	uint32_t	magic;
+-} __attribute__((packed));
++} PACKED;
+ 
+ struct hpt45x_meta {
+ 	uint32_t	magic;
+-} __attribute__((packed));
++} PACKED;
+ 
+ #define HPT37X_CONFIG_OFF		0x1200
+ #define HPT37X_MAGIC_OK			0x5a7816f0
+diff --git a/util-linux/volume_id/unused_hpfs.c b/util-linux/volume_id/unused_hpfs.c
+index 9d5244f..8c7897a 100644
+--- a/util-linux/volume_id/unused_hpfs.c
++++ b/util-linux/volume_id/unused_hpfs.c
+@@ -23,7 +23,7 @@
+ struct hpfs_super {
+ 	uint8_t		magic[4];
+ 	uint8_t		version;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define HPFS_SUPERBLOCK_OFFSET			0x2000
+ 
+diff --git a/util-linux/volume_id/unused_isw_raid.c b/util-linux/volume_id/unused_isw_raid.c
+index d928245..b31a124 100644
+--- a/util-linux/volume_id/unused_isw_raid.c
++++ b/util-linux/volume_id/unused_isw_raid.c
+@@ -26,7 +26,7 @@ struct isw_meta {
+ 	uint32_t	mpb_size;
+ 	uint32_t	family_num;
+ 	uint32_t	generation_num;
+-} __attribute__((packed));
++} PACKED;
+ 
+ #define ISW_SIGNATURE		"Intel Raid ISM Cfg Sig. "
+ 
+diff --git a/util-linux/volume_id/unused_lsi_raid.c b/util-linux/volume_id/unused_lsi_raid.c
+index 730a313..6899900 100644
+--- a/util-linux/volume_id/unused_lsi_raid.c
++++ b/util-linux/volume_id/unused_lsi_raid.c
+@@ -22,7 +22,7 @@
+ 
+ struct lsi_meta {
+ 	uint8_t		sig[6];
+-} __attribute__((packed));
++} PACKED;
+ 
+ #define LSI_SIGNATURE		"$XIDE$"
+ 
+diff --git a/util-linux/volume_id/unused_lvm.c b/util-linux/volume_id/unused_lvm.c
+index caee04b..c327068 100644
+--- a/util-linux/volume_id/unused_lvm.c
++++ b/util-linux/volume_id/unused_lvm.c
+@@ -22,7 +22,7 @@
+ 
+ struct lvm1_super_block {
+ 	uint8_t	id[2];
+-} __attribute__((packed));
++} PACKED;
+ 
+ struct lvm2_super_block {
+ 	uint8_t		id[8];
+@@ -30,7 +30,7 @@ struct lvm2_super_block {
+ 	uint32_t	crc_xl;
+ 	uint32_t	offset_xl;
+ 	uint8_t		type[8];
+-} __attribute__((packed));
++} PACKED;
+ 
+ #define LVM1_SB_OFF			0x400
+ 
+diff --git a/util-linux/volume_id/unused_mac.c b/util-linux/volume_id/unused_mac.c
+index 8eaa173..c4732ee 100644
+--- a/util-linux/volume_id/unused_mac.c
++++ b/util-linux/volume_id/unused_mac.c
+@@ -24,7 +24,7 @@ struct mac_driver_desc {
+ 	uint8_t		signature[2];
+ 	uint16_t	block_size;
+ 	uint32_t	block_count;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ struct mac_partition {
+ 	uint8_t		signature[2];
+@@ -34,7 +34,7 @@ struct mac_partition {
+ 	uint32_t	block_count;
+ 	uint8_t		name[32];
+ 	uint8_t		type[32];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ int volume_id_probe_mac_partition_map(struct volume_id *id, uint64_t off)
+ {
+diff --git a/util-linux/volume_id/unused_minix.c b/util-linux/volume_id/unused_minix.c
+index 2f52093..4f4f8a7 100644
+--- a/util-linux/volume_id/unused_minix.c
++++ b/util-linux/volume_id/unused_minix.c
+@@ -31,7 +31,7 @@ struct minix_super_block {
+ 	uint16_t	s_magic;
+ 	uint16_t	s_state;
+ 	uint32_t	s_zones;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define MINIX_SUPERBLOCK_OFFSET			0x400
+ 
+diff --git a/util-linux/volume_id/unused_msdos.c b/util-linux/volume_id/unused_msdos.c
+index 097ee67..465f22d 100644
+--- a/util-linux/volume_id/unused_msdos.c
++++ b/util-linux/volume_id/unused_msdos.c
+@@ -31,7 +31,7 @@ struct msdos_partition_entry {
+ 	uint8_t		end_cyl;
+ 	uint32_t	start_sect;
+ 	uint32_t	nr_sects;
+-} __attribute__((packed));
++} PACKED;
+ 
+ #define MSDOS_PARTTABLE_OFFSET		0x1be
+ #define MSDOS_SIG_OFF			0x1fe
+diff --git a/util-linux/volume_id/unused_nvidia_raid.c b/util-linux/volume_id/unused_nvidia_raid.c
+index 692aad1..b65cec4 100644
+--- a/util-linux/volume_id/unused_nvidia_raid.c
++++ b/util-linux/volume_id/unused_nvidia_raid.c
+@@ -25,7 +25,7 @@ struct nvidia_meta {
+ 	uint32_t	size;
+ 	uint32_t	chksum;
+ 	uint16_t	version;
+-} __attribute__((packed));
++} PACKED;
+ 
+ #define NVIDIA_SIGNATURE		"NVIDIA"
+ 
+diff --git a/util-linux/volume_id/unused_promise_raid.c b/util-linux/volume_id/unused_promise_raid.c
+index 75c6f89..4a15dda 100644
+--- a/util-linux/volume_id/unused_promise_raid.c
++++ b/util-linux/volume_id/unused_promise_raid.c
+@@ -22,7 +22,7 @@
+ 
+ struct promise_meta {
+ 	uint8_t	sig[24];
+-} __attribute__((packed));
++} PACKED;
+ 
+ #define PDC_CONFIG_OFF		0x1200
+ #define PDC_SIGNATURE		"Promise Technology, Inc."
+diff --git a/util-linux/volume_id/unused_silicon_raid.c b/util-linux/volume_id/unused_silicon_raid.c
+index 5143112..6ce4037 100644
+--- a/util-linux/volume_id/unused_silicon_raid.c
++++ b/util-linux/volume_id/unused_silicon_raid.c
+@@ -37,7 +37,7 @@ struct silicon_meta {
+ 	uint16_t	vendor_id;
+ 	uint16_t	minor_ver;
+ 	uint16_t	major_ver;
+-} __attribute__((packed));
++} PACKED;
+ 
+ #define SILICON_MAGIC		0x2F000000
+ 
+diff --git a/util-linux/volume_id/unused_ufs.c b/util-linux/volume_id/unused_ufs.c
+index 8693758..e05e933 100644
+--- a/util-linux/volume_id/unused_ufs.c
++++ b/util-linux/volume_id/unused_ufs.c
+@@ -73,7 +73,7 @@ struct ufs_super_block {
+ 		uint32_t	cs_nbfree;
+ 		uint32_t	cs_nifree;
+ 		uint32_t	cs_nffree;
+-	} __attribute__((__packed__)) fs_cstotal;
++	} PACKED fs_cstotal;
+ 	int8_t		fs_fmod;
+ 	int8_t		fs_clean;
+ 	int8_t		fs_ronly;
+@@ -86,7 +86,7 @@ struct ufs_super_block {
+ 			uint32_t	fs_maxcluster;
+ 			uint32_t	fs_cpc;
+ 			uint16_t	fs_opostbl[16][8];
+-		} __attribute__((__packed__)) fs_u1;
++		} PACKED fs_u1;
+ 		struct {
+ 			int8_t		fs_fsmnt[468];
+ 			uint8_t		fs_volname[32];
+@@ -109,17 +109,17 @@ struct ufs_super_block {
+ 				uint64_t	cs_nffree;
+ 				uint64_t	cs_numclusters;
+ 				uint64_t	cs_spare[3];
+-			} __attribute__((__packed__)) fs_cstotal;
++			} PACKED fs_cstotal;
+ 			struct ufs_timeval {
+ 				int32_t		tv_sec;
+ 				int32_t		tv_usec;
+-			} __attribute__((__packed__)) fs_time;
++			} PACKED fs_time;
+ 			int64_t		fs_size;
+ 			int64_t		fs_dsize;
+ 			uint64_t	fs_csaddr;
+ 			int64_t		fs_pendingblocks;
+ 			int32_t		fs_pendinginodes;
+-		} __attribute__((__packed__)) fs_u2;
++		} PACKED fs_u2;
+ 	}  fs_u11;
+ 	union {
+ 		struct {
+@@ -129,7 +129,7 @@ struct ufs_super_block {
+ 			int32_t		fs_state;
+ 			uint32_t	fs_qbmask[2];
+ 			uint32_t	fs_qfmask[2];
+-		} __attribute__((__packed__)) fs_sun;
++		} PACKED fs_sun;
+ 		struct {
+ 			int32_t		fs_sparecon[53];
+ 			int32_t		fs_reclaim;
+@@ -137,7 +137,7 @@ struct ufs_super_block {
+ 			uint32_t	fs_npsect;
+ 			uint32_t	fs_qbmask[2];
+ 			uint32_t	fs_qfmask[2];
+-		} __attribute__((__packed__)) fs_sunx86;
++		} PACKED fs_sunx86;
+ 		struct {
+ 			int32_t		fs_sparecon[50];
+ 			int32_t		fs_contigsumsize;
+@@ -147,7 +147,7 @@ struct ufs_super_block {
+ 			uint32_t	fs_qbmask[2];
+ 			uint32_t	fs_qfmask[2];
+ 			int32_t		fs_state;
+-		} __attribute__((__packed__)) fs_44;
++		} PACKED fs_44;
+ 	} fs_u2;
+ 	int32_t		fs_postblformat;
+ 	int32_t		fs_nrpos;
+@@ -155,7 +155,7 @@ struct ufs_super_block {
+ 	int32_t		fs_rotbloff;
+ 	uint32_t	fs_magic;
+ 	uint8_t		fs_space[1];
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ #define UFS_MAGIC			0x00011954
+ #define UFS2_MAGIC			0x19540119
+diff --git a/util-linux/volume_id/unused_via_raid.c b/util-linux/volume_id/unused_via_raid.c
+index 4332946..21ed315 100644
+--- a/util-linux/volume_id/unused_via_raid.c
++++ b/util-linux/volume_id/unused_via_raid.c
+@@ -29,10 +29,10 @@ struct via_meta {
+ 		uint32_t	capacity_low;
+ 		uint32_t	capacity_high;
+ 		uint32_t	serial_checksum;
+-	} __attribute((packed)) array;
++	} PACKED array;
+ 	uint32_t	serial_checksum[8];
+ 	uint8_t		checksum;
+-} __attribute__((packed));
++} PACKED;
+ 
+ #define VIA_SIGNATURE		0xAA55
+ 
+diff --git a/util-linux/volume_id/xfs.c b/util-linux/volume_id/xfs.c
+index 646c81d..389074c 100644
+--- a/util-linux/volume_id/xfs.c
++++ b/util-linux/volume_id/xfs.c
+@@ -33,7 +33,7 @@ struct xfs_super_block {
+ 	uint64_t	icount;
+ 	uint64_t	ifree;
+ 	uint64_t	fdblocks;
+-} __attribute__((__packed__));
++} PACKED;
+ 
+ int volume_id_probe_xfs(struct volume_id *id /*,uint64_t off*/)
+ {

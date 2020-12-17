@@ -1,0 +1,23 @@
+2008-07-13 20:39:23 +0000
+diff --git a/shell/ash.c b/shell/ash.c
+index 08bdfc3..7a63fce 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -1656,12 +1656,12 @@ struct shparam {
+ static void
+ freeparam(volatile struct shparam *param)
+ {
+-	char **ap;
+-
+ 	if (param->malloced) {
+-		for (ap = param->p; *ap; ap++)
+-			free(*ap);
+-		free(param->p);
++		char **ap, **ap1;
++		ap = ap1 = param->p;
++		while (*ap)
++			free(*ap++);
++		free(ap1);
+ 	}
+ }
+ 

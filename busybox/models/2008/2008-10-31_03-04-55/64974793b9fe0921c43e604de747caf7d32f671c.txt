@@ -1,0 +1,28 @@
+2008-10-31 03:04:55 +0000
+diff --git a/miscutils/less.c b/miscutils/less.c
+index b5d225a..6c793ad 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -853,12 +853,16 @@ static ssize_t getch_nowait(void)
+ 	/* We have kbd_fd in O_NONBLOCK mode, read inside read_key()
+ 	 * would not block even if there is no input available */
+ 	rd = read_key(kbd_fd, NULL, input);
+-	if (rd == -1 && errno == EAGAIN) {
+-		/* No keyboard input available. Since poll() did return,
+-		 * we should have input on stdin */
+-		read_lines();
+-		buffer_fill_and_print();
+-		goto again;
++	if (rd == -1) {
++		if (errno == EAGAIN) {
++			/* No keyboard input available. Since poll() did return,
++			 * we should have input on stdin */
++			read_lines();
++			buffer_fill_and_print();
++			goto again;
++		}
++		/* EOF/error (ssh session got killed etc) */
++		less_exit(0);
+ 	}
+ 	set_tty_cooked();
+ 	return rd;

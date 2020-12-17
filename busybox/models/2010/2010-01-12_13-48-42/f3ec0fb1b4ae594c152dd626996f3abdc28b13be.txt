@@ -1,0 +1,14 @@
+2010-01-12 13:48:42 +0100
+diff --git a/scripts/basic/docproc.c b/scripts/basic/docproc.c
+index e178d72..dc7a0fc 100644
+--- a/scripts/basic/docproc.c
++++ b/scripts/basic/docproc.c
+@@ -249,7 +249,7 @@ void intfunc(char * filename) {	docfunctions(filename, NOFUNCTION); }
+ void extfunc(char * filename) { docfunctions(filename, FUNCTION);   }
+ 
+ /*
+- * Document spåecific function(s) in a file.
++ * Document specific function(s) in a file.
+  * Call kernel-doc with the following parameters:
+  * kernel-doc -docbook -function function1 [-function function2]
+  */

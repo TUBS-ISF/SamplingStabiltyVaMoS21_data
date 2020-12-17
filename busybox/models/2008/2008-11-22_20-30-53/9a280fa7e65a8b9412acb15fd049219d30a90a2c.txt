@@ -1,0 +1,14 @@
+2008-11-22 20:30:53 +0000
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 4d211f5..2c7f647 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -19,7 +19,7 @@ int insmod_main(int argc UNUSED_PARAM, char **argv)
+ 	/* Compat note:
+ 	 * 2.6 style insmod has no options and required filename
+ 	 * (not module name - .ko can't be omitted).
+-	 * 2.4 style insmod can take module name without .ko
++	 * 2.4 style insmod can take module name without .o
+ 	 * and performs module search in default directories
+ 	 * or in $MODPATH.
+ 	 */

@@ -1,0 +1,14 @@
+2009-08-29 20:24:12 +0200
+diff --git a/shell/ash.c b/shell/ash.c
+index f9c89f1..1690c46 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -5817,7 +5817,7 @@ argstr(char *p, int flag, struct strlist *var_str_list)
+ 	};
+ 	const char *reject = spclchars;
+ 	int c;
+-	int quotes = flag & (EXP_FULL | EXP_CASE);      /* do CTLESC */
++	int quotes = flag & (EXP_FULL | EXP_CASE | EXP_REDIR); /* do CTLESC */
+ 	int breakall = flag & EXP_WORD;
+ 	int inquotes;
+ 	size_t length;

@@ -1,0 +1,326 @@
+2009-04-22 21:35:52 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 9294e89..7b88a2a 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -39,6 +39,7 @@
+        "Add a group " IF_FEATURE_ADDUSER_TO_GROUP("or add a user to a group") "\n" \
+      "\nOptions:" \
+      "\n	-g GID	Group id" \
++     "\n	-S	Create a system group" \
+ 
+ #define adduser_trivial_usage \
+        "[OPTIONS] user_name"
+@@ -52,6 +53,7 @@
+      "\n	-S		Create a system user" \
+      "\n	-D		Do not assign a password" \
+      "\n	-H		Do not create home directory" \
++     "\n	-u UID		User id" \
+ 
+ #define adjtimex_trivial_usage \
+        "[-q] [-o offset] [-f frequency] [-p timeconstant] [-t tick]"
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index ddd0c80..9430bfa 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -97,6 +97,13 @@ config ADDGROUP
+ 	help
+ 	  Utility for creating a new group account.
+ 
++config FEATURE_ADDGROUP_LONG_OPTIONS
++	bool "Enable long options"
++	default n
++	depends on ADDGROUP && GETOPT_LONG
++	help
++	  Support long options for the addgroup applet.
++
+ config FEATURE_ADDUSER_TO_GROUP
+ 	bool "Support for adding users to groups"
+ 	default n
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index 5a0cf3f..cb83929 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -11,34 +11,50 @@
+  */
+ #include "libbb.h"
+ 
++#define OPT_GID                       (1 << 0)
++#define OPT_SYSTEM_ACCOUNT            (1 << 1)
++
++/* We assume GID_T_MAX == INT_MAX */
+ static void xgroup_study(struct group *g)
+ {
++	unsigned max = INT_MAX;
++
+ 	/* Make sure gr_name is unused */
+ 	if (getgrnam(g->gr_name)) {
+-		goto error;
++		bb_error_msg_and_die("%s '%s' in use", "group", g->gr_name);
++		/* these format strings are reused in adduser and addgroup */
+ 	}
+ 
++	/* if a specific gid is requested, the --system switch and */
++	/* min and max values are overriden, and the range of valid */
++	/* gid values is set to [0, INT_MAX] */
++	if (!(option_mask32 & OPT_GID)) {
++		if (option_mask32 & OPT_SYSTEM_ACCOUNT) {
++			g->gr_gid = 100; /* FIRST_SYSTEM_GID */
++			max = 999;       /* LAST_SYSTEM_GID */
++		} else {
++			g->gr_gid = 1000; /* FIRST_GID */
++			max = 64999;      /* LAST_GID */
++		}
++	}
+ 	/* Check if the desired gid is free
+ 	 * or find the first free one */
+ 	while (1) {
+ 		if (!getgrgid(g->gr_gid)) {
+ 			return; /* found free group: return */
+ 		}
+-		if (option_mask32) {
++		if (option_mask32 & OPT_GID) {
+ 			/* -g N, cannot pick gid other than N: error */
+-			g->gr_name = itoa(g->gr_gid);
+-			goto error;
++			bb_error_msg_and_die("%s '%s' in use", "gid", itoa(g->gr_gid));
++			/* this format strings is reused in adduser and addgroup */
+ 		}
+-		g->gr_gid++;
+-		if (g->gr_gid <= 0) {
++		if (g->gr_gid == max) {
+ 			/* overflowed: error */
+-			bb_error_msg_and_die("no gids left");
++			bb_error_msg_and_die("no %cids left", 'g');
++			/* this format string is reused in adduser and addgroup */
+ 		}
++		g->gr_gid++;
+ 	}
+-
+- error:
+-	/* exit */
+-	bb_error_msg_and_die("group %s already exists", g->gr_name);
+ }
+ 
+ /* append a new user to the passwd file */
+@@ -53,7 +69,7 @@ static void new_group(char *group, gid_t gid)
+ 	xgroup_study(&gr);
+ 
+ 	/* add entry to group */
+-	p = xasprintf("x:%u:", gr.gr_gid);
++	p = xasprintf("x:%u:", (unsigned) gr.gr_gid);
+ 	if (update_passwd(bb_path_group_file, group, p, NULL) < 0)
+ 		exit(EXIT_FAILURE);
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+@@ -64,6 +80,13 @@ static void new_group(char *group, gid_t gid)
+ #endif
+ }
+ 
++#if ENABLE_FEATURE_ADDGROUP_LONG_OPTIONS
++static const char addgroup_longopts[] ALIGN1 =
++		"gid\0"                 Required_argument "g"
++		"system\0"              No_argument       "S"
++		;
++#endif
++
+ /*
+  * addgroup will take a login_name as its first parameter.
+  *
+@@ -74,23 +97,23 @@ static void new_group(char *group, gid_t gid)
+ int addgroup_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int addgroup_main(int argc UNUSED_PARAM, char **argv)
+ {
+-	char *group;
+-	gid_t gid = 0;
++	unsigned opts;
++	unsigned gid = 0;
+ 
+ 	/* need to be root */
+ 	if (geteuid()) {
+ 		bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+ 	}
+-
++#if ENABLE_FEATURE_ADDGROUP_LONG_OPTIONS
++	applet_long_options = addgroup_longopts;
++#endif
+ 	/* Syntax:
+ 	 *  addgroup group
+ 	 *  addgroup -g num group
+ 	 *  addgroup user group
+ 	 * Check for min, max and missing args */
+-	opt_complementary = "-1:?2";
+-	if (getopt32(argv, "g:", &group)) {
+-		gid = xatoul_range(group, 0, ((unsigned long)(gid_t)ULONG_MAX) >> 1);
+-	}
++	opt_complementary = "-1:?2:g+";
++	opts = getopt32(argv, "g:S", &gid);
+ 	/* move past the commandline options */
+ 	argv += optind;
+ 	//argc -= optind;
+@@ -99,7 +122,7 @@ int addgroup_main(int argc UNUSED_PARAM, char **argv)
+ 	if (argv[1]) {
+ 		struct group *gr;
+ 
+-		if (option_mask32) {
++		if (opts & OPT_GID) {
+ 			/* -g was there, but "addgroup -g num user group"
+ 			 * is a no-no */
+ 			bb_show_usage();
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index df4fad6..a399d9e 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -9,38 +9,55 @@
+  */
+ #include "libbb.h"
+ 
++/* #define OPT_HOME           (1 << 0) */ /* unused */
++/* #define OPT_GECOS          (1 << 1) */ /* unused */
++#define OPT_SHELL          (1 << 2)
++#define OPT_GID            (1 << 3)
+ #define OPT_DONT_SET_PASS  (1 << 4)
+ #define OPT_SYSTEM_ACCOUNT (1 << 5)
+ #define OPT_DONT_MAKE_HOME (1 << 6)
++#define OPT_UID            (1 << 7)
+ 
++/* We assume UID_T_MAX == INT_MAX */
+ /* remix */
+ /* recoded such that the uid may be passed in *p */
+ static void passwd_study(struct passwd *p)
+ {
+-	int max;
++	int max = UINT_MAX;
+ 
+-	if (getpwnam(p->pw_name))
+-		bb_error_msg_and_die("login '%s' is in use", p->pw_name);
+-
+-	if (option_mask32 & OPT_SYSTEM_ACCOUNT) {
+-		p->pw_uid = 0;
+-		max = 999;
+-	} else {
+-		p->pw_uid = 1000;
+-		max = 64999;
++	if (getpwnam(p->pw_name)) {
++		bb_error_msg_and_die("%s '%s' in use", "user", p->pw_name);
++		/* this format string is reused in adduser and addgroup */
+ 	}
+ 
++	if (!(option_mask32 & OPT_UID)) {
++		if (option_mask32 & OPT_SYSTEM_ACCOUNT) {
++			p->pw_uid = 100; /* FIRST_SYSTEM_UID */
++			max = 999;       /* LAST_SYSTEM_UID */
++		} else {
++			p->pw_uid = 1000; /* FIRST_UID */
++			max = 64999;      /* LAST_UID */
++		}
++	}
+ 	/* check for a free uid (and maybe gid) */
+ 	while (getpwuid(p->pw_uid) || (p->pw_gid == (gid_t)-1 && getgrgid(p->pw_uid))) {
++		if (option_mask32 & OPT_UID) {
++			/* -u N, cannot pick uid other than N: error */
++			bb_error_msg_and_die("%s '%s' in use", "uid", itoa(p->pw_uid));
++			/* this format string is reused in adduser and addgroup */
++		}
++		if (p->pw_uid == max) {
++			bb_error_msg_and_die("no %cids left", 'u');
++		}
+ 		p->pw_uid++;
+-		if (p->pw_uid > max)
+-			bb_error_msg_and_die("no free uids left");
+ 	}
+ 
+ 	if (p->pw_gid == (gid_t)-1) {
+ 		p->pw_gid = p->pw_uid; /* new gid = uid */
+-		if (getgrnam(p->pw_name))
+-			bb_error_msg_and_die("group name '%s' is in use", p->pw_name);
++		if (getgrnam(p->pw_name)) {
++			bb_error_msg_and_die("%s '%s' in use", "group", p->pw_name);
++			/* this format string is reused in adduser and addgroup */
++		}
+ 	}
+ }
+ 
+@@ -73,6 +90,7 @@ static const char adduser_longopts[] ALIGN1 =
+ 		"empty-password\0"      No_argument       "D"
+ 		"system\0"              No_argument       "S"
+ 		"no-create-home\0"      No_argument       "H"
++		"uid\0"                 Required_argument "u"
+ 		;
+ #endif
+ 
+@@ -87,6 +105,7 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ 	struct passwd pw;
+ 	const char *usegroup = NULL;
+ 	char *p;
++	unsigned opts;
+ 
+ #if ENABLE_FEATURE_ADDUSER_LONG_OPTIONS
+ 	applet_long_options = adduser_longopts;
+@@ -102,8 +121,17 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ 	pw.pw_dir = NULL;
+ 
+ 	/* exactly one non-option arg */
+-	opt_complementary = "=1";
+-	getopt32(argv, "h:g:s:G:DSH", &pw.pw_dir, &pw.pw_gecos, &pw.pw_shell, &usegroup);
++	/* disable interactive passwd for system accounts */
++	opt_complementary = "=1:SD:u+";
++	if (sizeof(pw.pw_uid) == sizeof(int)) {
++		opts = getopt32(argv, "h:g:s:G:DSHu:", &pw.pw_dir, &pw.pw_gecos, &pw.pw_shell, &usegroup, &pw.pw_uid);
++	} else {
++		unsigned uid;
++		opts = getopt32(argv, "h:g:s:G:DSHu:", &pw.pw_dir, &pw.pw_gecos, &pw.pw_shell, &usegroup, &uid);
++		if (opts & OPT_UID) {
++			pw.pw_uid = uid;
++		}
++	}
+ 	argv += optind;
+ 
+ 	/* fill in the passwd struct */
+@@ -114,12 +142,22 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ 		pw.pw_dir = xasprintf("/home/%s", argv[0]);
+ 	}
+ 	pw.pw_passwd = (char *)"x";
++	if (opts & OPT_SYSTEM_ACCOUNT) {
++		if (!usegroup) {
++			usegroup = "nogroup";
++		}
++		if (!(opts & OPT_SHELL)) {
++			pw.pw_shell = (char *) "/bin/false";
++		}
++	}
+ 	pw.pw_gid = usegroup ? xgroup2gid(usegroup) : -1; /* exits on failure */
+ 
+ 	/* make sure everything is kosher and setup uid && maybe gid */
+ 	passwd_study(&pw);
+ 
+-	p = xasprintf("x:%u:%u:%s:%s:%s", pw.pw_uid, pw.pw_gid, pw.pw_gecos, pw.pw_dir, pw.pw_shell);
++	p = xasprintf("x:%u:%u:%s:%s:%s",
++			(unsigned) pw.pw_uid, (unsigned) pw.pw_gid,
++			pw.pw_gecos, pw.pw_dir, pw.pw_shell);
+ 	if (update_passwd(bb_path_passwd_file, pw.pw_name, p, NULL) < 0) {
+ 		return EXIT_FAILURE;
+ 	}
+@@ -143,10 +181,10 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ 	/* clear the umask for this process so it doesn't
+ 	 * screw up the permissions on the mkdir and chown. */
+ 	umask(0);
+-	if (!(option_mask32 & OPT_DONT_MAKE_HOME)) {
+-		/* Set the owner and group so it is owned by the new user,
+-		   then fix up the permissions to 2755. Can't do it before
+-		   since chown will clear the setgid bit */
++	if (!(opts & OPT_DONT_MAKE_HOME)) {
++		/* set the owner and group so it is owned by the new user,
++		 * then fix up the permissions to 2755. Can't do it before
++		 * since chown will clear the setgid bit */
+ 		if (mkdir(pw.pw_dir, 0755)
+ 		 || chown(pw.pw_dir, pw.pw_uid, pw.pw_gid)
+ 		 || chmod(pw.pw_dir, 02755) /* set setgid bit on homedir */
+@@ -155,7 +193,7 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ 		}
+ 	}
+ 
+-	if (!(option_mask32 & OPT_DONT_SET_PASS)) {
++	if (!(opts & OPT_DONT_SET_PASS)) {
+ 		/* interactively set passwd */
+ 		passwd_wrapper(pw.pw_name);
+ 	}

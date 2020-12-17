@@ -1,0 +1,50 @@
+2009-04-03 21:13:31 +0000
+diff --git a/shell/math.c b/shell/math.c
+index 9a46a93..8a44c8e 100644
+--- a/shell/math.c
++++ b/shell/math.c
+@@ -414,14 +414,14 @@ arith_apply(operator op, v_n_t *numstack, v_n_t **numstackptr, a_e_h_t *math_hoo
+ 			rez %= numptr_val;
+ 	}
+ 	if (tok_have_assign(op)) {
+-		char buf[sizeof(arith_t_type)*3 + 2];
++		char buf[sizeof(arith_t)*3 + 2];
+ 
+ 		if (numptr_m1->var == NULL) {
+ 			/* Hmm, 1=2 ? */
+ 			goto err;
+ 		}
+ 		/* save to shell variable */
+-		snprintf(buf, sizeof(buf), arith_t_fmt, (arith_t_type) rez);
++		sprintf(buf, arith_t_fmt, rez);
+ 		setvar(numptr_m1->var, buf, 0);
+ 		/* after saving, make previous value for v++ or v-- */
+ 		if (op == TOK_POST_INC)
+@@ -668,7 +668,7 @@ arith(const char *expr, int *perrcode, a_e_h_t *math_hooks)
+ 	} /* while */
+ }
+ 
+-/*-
++/*
+  * Copyright (c) 1989, 1991, 1993, 1994
+  *      The Regents of the University of California.  All rights reserved.
+  *
+diff --git a/shell/math.h b/shell/math.h
+index a526809..195fc20 100644
+--- a/shell/math.h
++++ b/shell/math.h
+@@ -76,13 +76,11 @@
+ #define _SHELL_MATH_
+ 
+ #if ENABLE_SH_MATH_SUPPORT_64
+-typedef int64_t arith_t;
+-#define arith_t_type long long
++typedef long long arith_t;
+ #define arith_t_fmt "%lld"
+ #define strto_arith_t strtoll
+ #else
+ typedef long arith_t;
+-#define arith_t_type long
+ #define arith_t_fmt "%ld"
+ #define strto_arith_t strtol
+ #endif

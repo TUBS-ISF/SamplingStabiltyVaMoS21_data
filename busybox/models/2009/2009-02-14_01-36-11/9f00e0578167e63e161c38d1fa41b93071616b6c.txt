@@ -1,0 +1,46 @@
+2009-02-14 01:36:11 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 0403281..eefc132 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1281,7 +1281,13 @@ enum {
+ 	PSSCAN_UTIME    = 1 << 13,
+ 	PSSCAN_TTY      = 1 << 14,
+ 	PSSCAN_SMAPS	= (1 << 15) * ENABLE_FEATURE_TOPMEM,
+-	PSSCAN_ARGVN    = (1 << 16) * (ENABLE_PGREP || ENABLE_PKILL || ENABLE_PIDOF),
++	/* NB: used by find_pid_by_name(). Any applet using it
++	 * needs to be mentioned here. */
++	PSSCAN_ARGVN    = (1 << 16) * (ENABLE_KILLALL
++				|| ENABLE_PGREP || ENABLE_PKILL
++				|| ENABLE_PIDOF
++				|| ENABLE_SESTATUS 
++				),
+ 	USE_SELINUX(PSSCAN_CONTEXT = 1 << 17,)
+ 	PSSCAN_START_TIME = 1 << 18,
+ 	PSSCAN_CPU      = 1 << 19,
+diff --git a/libbb/find_pid_by_name.c b/libbb/find_pid_by_name.c
+index 92d6d02..600d4e1 100644
+--- a/libbb/find_pid_by_name.c
++++ b/libbb/find_pid_by_name.c
+@@ -67,15 +67,14 @@ static int comm_match(procps_status_t *p, const char *procName)
+ 	return 1;
+ }
+ 
+-/* find_pid_by_name()
++/* This finds the pid of the specified process.
++ * Currently, it's implemented by rummaging through
++ * the proc filesystem.
+  *
+- *  Modified by Vladimir Oleynik for use with libbb/procps.c
+- *  This finds the pid of the specified process.
+- *  Currently, it's implemented by rummaging through
+- *  the proc filesystem.
++ * Returns a list of all matching PIDs
++ * It is the caller's duty to free the returned pidlist.
+  *
+- *  Returns a list of all matching PIDs
+- *  It is the caller's duty to free the returned pidlist.
++ * Modified by Vladimir Oleynik for use with libbb/procps.c
+  */
+ pid_t* FAST_FUNC find_pid_by_name(const char *procName)
+ {

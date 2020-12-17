@@ -1,0 +1,19 @@
+2008-08-28 22:59:23 +0000
+diff --git a/editors/awk.c b/editors/awk.c
+index 571d681..19f4840 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -973,7 +973,12 @@ static uint32_t next_token(uint32_t expected)
+ 
+ 		} else if (*p == '.' || isdigit(*p)) {
+ 			/* it's a number */
+-			t_double = strtod(p, &p);
++#if ENABLE_DESKTOP
++			if (p[0] == '0' && (p[1] | 0x20) == 'x')
++				t_double = strtoll(p, &p, 0);
++			else
++#endif
++				t_double = strtod(p, &p);
+ 			if (*p == '.')
+ 				syntax_error(EMSG_UNEXP_TOKEN);
+ 			tc = TC_NUMBER;

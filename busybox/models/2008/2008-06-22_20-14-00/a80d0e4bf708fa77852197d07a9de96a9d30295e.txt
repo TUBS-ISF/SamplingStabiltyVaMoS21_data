@@ -1,0 +1,22 @@
+2008-06-22 20:14:00 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 4fba0e3..df89580 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -690,13 +690,10 @@
+ #define deluser_trivial_usage \
+        "USER"
+ #define deluser_full_usage "\n\n" \
+-       "Delete user USER from the system"
++       "Delete USER from the system"
+ 
+-#define depmod_trivial_usage \
+-       ""
+-#define depmod_full_usage \
+-       "\n" \
+-       "\n"
++#define depmod_trivial_usage NOUSAGE_STR
++#define depmod_full_usage ""
+ 
+ #define devfsd_trivial_usage \
+        "mntpnt [-v]" USE_DEVFSD_FG_NP("[-fg][-np]")

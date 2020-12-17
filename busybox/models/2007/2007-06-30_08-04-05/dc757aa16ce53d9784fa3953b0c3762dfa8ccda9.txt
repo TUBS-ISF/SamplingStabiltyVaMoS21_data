@@ -1,0 +1,389 @@
+2007-06-30 08:04:05 +0000
+diff --git a/applets/applets.c b/applets/applets.c
+index 57c972f..89dea3e 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -639,8 +639,6 @@ int *const bb_errno __attribute__ ((section (".data")));
+ 
+ int main(int argc, char **argv)
+ {
+-	const char *s;
+-
+ #ifdef __GLIBC__
+ 	(*(int **)&bb_errno) = __errno_location();
+ #endif
+@@ -655,9 +653,7 @@ int main(int argc, char **argv)
+ 	applet_name = argv[0];
+ 	if (applet_name[0] == '-')
+ 		applet_name++;
+-	s = strrchr(applet_name, '/');
+-	if (s)
+-		applet_name = s + 1;
++	applet_name = bb_basename(applet_name);
+ 
+ 	parse_config_file(); /* ...maybe, if FEATURE_SUID_CONFIG */
+ 
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index e2ed3ee..a5bd0e3 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -132,8 +132,8 @@ enum { show_color = 0 };
+  * a directory entry and its stat info are stored here
+  */
+ struct dnode {                  /* the basic node */
+-	char *name;             /* the dir entry name */
+-	char *fullname;         /* the dir entry name */
++	const char *name;             /* the dir entry name */
++	const char *fullname;         /* the dir entry name */
+ 	int   allocated;
+ 	struct stat dstat;      /* the file stat info */
+ 	USE_SELINUX(security_context_t sid;)
+@@ -159,7 +159,7 @@ enum {
+ 
+ static int status = EXIT_SUCCESS;
+ 
+-static struct dnode *my_stat(char *fullname, char *name, int force_follow)
++static struct dnode *my_stat(const char *fullname, const char *name, int force_follow)
+ {
+ 	struct stat dstat;
+ 	struct dnode *cur;
+@@ -241,7 +241,7 @@ static int count_dirs(struct dnode **dn, int nfiles, int notsubdirs)
+ 		return 0;
+ 	dirs = 0;
+ 	for (i = 0; i < nfiles; i++) {
+-		char *name;
++		const char *name;
+ 		if (!S_ISDIR(dn[i]->dstat.st_mode))
+ 			continue;
+ 		name = dn[i]->name;
+@@ -288,7 +288,7 @@ static void dfree(struct dnode **dnp, int nfiles)
+ 	for (i = 0; i < nfiles; i++) {
+ 		struct dnode *cur = dnp[i];
+ 		if (cur->allocated)
+-			free(cur->fullname);	/* free the filename */
++			free((char*)cur->fullname);	/* free the filename */
+ 		free(cur);		/* free the dnode */
+ 	}
+ 	free(dnp);			/* free the array holding the dnode pointers */
+@@ -320,7 +320,7 @@ static struct dnode **splitdnarray(struct dnode **dn, int nfiles, int which)
+ 	/* copy the entrys into the file or dir array */
+ 	for (d = i = 0; i < nfiles; i++) {
+ 		if (S_ISDIR(dn[i]->dstat.st_mode)) {
+-			char *name;
++			const char *name;
+ 			if (!(which & (SPLIT_DIR|SPLIT_SUBDIR)))
+ 				continue;
+ 			name = dn[i]->name;
+@@ -513,7 +513,7 @@ static struct dnode **list_dir(const char *path)
+ 				continue;
+ 		}
+ 		fullname = concat_path_file(path, entry->d_name);
+-		cur = my_stat(fullname, strrchr(fullname, '/') + 1, 0);
++		cur = my_stat(fullname, bb_basename(fullname), 0);
+ 		if (!cur) {
+ 			free(fullname);
+ 			continue;
+diff --git a/coreutils/test.c b/coreutils/test.c
+index 7b87a42..82d2664 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -181,11 +181,10 @@ static void initialize_group_array(void);
+ int test_main(int argc, char **argv)
+ {
+ 	int res;
+-	char *arg0;
++	const char *arg0;
+ 	bool _off;
+ 
+-	arg0 = strrchr(argv[0], '/');
+-	if (!arg0++) arg0 = argv[0];
++	arg0 = bb_basename(argv[0]);
+ 	if (arg0[0] == '[') {
+ 		--argc;
+ 		if (!arg0[1]) { /* "[" ? */
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index cb4a4e4..42170bc 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -60,10 +60,7 @@ struct globals {
+  */
+ static bool invalid_name(const char *c)
+ {
+-	const char *base_name = strrchr(c, '/');
+-
+-	if (base_name)
+-		c = base_name + 1;
++	c = bb_basename(c);
+ 
+ 	while (*c && (isalnum(*c) || *c == '_' || *c == '-'))
+ 		c++;
+diff --git a/findutils/find.c b/findutils/find.c
+index aa22441..07cae97 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -180,18 +180,13 @@ static int exec_actions(action ***appp, const char *fileName, struct stat *statb
+ 
+ ACTF(name)
+ {
+-	const char *tmp = strrchr(fileName, '/');
+-	if (tmp == NULL)
+-		tmp = fileName;
+-	else {
+-		tmp++;
+-		if (!*tmp) { /* "foo/bar/". Oh no... go back to 'b' */
+-			tmp--;
+-			while (tmp != fileName && *--tmp != '/')
+-				continue;
+-			if (*tmp == '/')
+-				tmp++;
+-		}
++	const char *tmp = bb_basename(fileName);
++	if (tmp != fileName && !*tmp) { /* "foo/bar/". Oh no... go back to 'b' */
++		tmp--;
++		while (tmp != fileName && *--tmp != '/')
++			continue;
++		if (*tmp == '/')
++			tmp++;
+ 	}
+ 	return fnmatch(ap->pattern, tmp, FNM_PERIOD) == 0;
+ }
+diff --git a/include/libbb.h b/include/libbb.h
+index e80e764..6a699a7 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -736,6 +736,7 @@ extern int bb_parse_mode(const char* s, mode_t* theMode);
+ 
+ char *concat_path_file(const char *path, const char *filename);
+ char *concat_subpath_file(const char *path, const char *filename);
++const char *bb_basename(const char *name);
+ /* NB: can violate const-ness (similarly to strchr) */
+ char *last_char_is(const char *s, int c);
+ 
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 693f609..ecd50a6 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -8,6 +8,7 @@ lib-y:=
+ 
+ lib-y += ask_confirmation.o
+ lib-y += bb_askpass.o
++lib-y += bb_basename.o
+ lib-y += bb_do_delay.o
+ lib-y += bb_pwd.o
+ lib-y += bb_strtonum.o
+diff --git a/libbb/find_pid_by_name.c b/libbb/find_pid_by_name.c
+index cfc5b34..1fafec8 100644
+--- a/libbb/find_pid_by_name.c
++++ b/libbb/find_pid_by_name.c
+@@ -38,14 +38,6 @@ execXXX("/proc/self/exe", applet_name, params....)
+ and therefore comm field contains "exe".
+ */
+ 
+-static const char *bb_basename(const char *name)
+-{
+-	const char *cp = strrchr(name, '/');
+-	if (cp)
+-		return cp + 1;
+-	return name;
+-}
+-
+ /* find_pid_by_name()
+  *
+  *  Modified by Vladimir Oleynik for use with libbb/procps.c
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 1f2e6a5..62f8949 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1156,7 +1156,7 @@ static void parse_prompt(const char *prmt_ptr)
+ #endif
+ 				case 'W':
+ 					pbuf = pwd_buf;
+-					cp = strrchr(pbuf,'/');
++					cp = strrchr(pbuf, '/');
+ 					if (cp != NULL && cp != pbuf)
+ 						pbuf += (cp-pbuf) + 1;
+ 					break;
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index dfb616a..9daf4e1 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -240,8 +240,8 @@ static void do_ioctl_and_die(int fd, int request, unsigned long event_mask_flag)
+ static void fork_and_execute(int die, char *arg0, char **arg);
+ static int get_uid_gid(int, const char *);
+ static void safe_memcpy(char * dest, const char * src, int len);
+-static unsigned int scan_dev_name_common(const char *d, unsigned int n, int addendum, char *ptr);
+-static unsigned int scan_dev_name(const char *d, unsigned int n, char *ptr);
++static unsigned int scan_dev_name_common(const char *d, unsigned int n, int addendum, const char *ptr);
++static unsigned int scan_dev_name(const char *d, unsigned int n, const char *ptr);
+ 
+ /* Structs and vars */
+ static struct config_entry_struct *first_config = NULL;
+@@ -369,7 +369,7 @@ static void safe_memcpy(char *dest, const char *src, int len)
+ 	dest[len] = '\0';
+ }
+ 
+-static unsigned int scan_dev_name_common(const char *d, unsigned int n, int addendum, char *ptr)
++static unsigned int scan_dev_name_common(const char *d, unsigned int n, int addendum, const char *ptr)
+ {
+ 	if (d[n - 4] == 'd' && d[n - 3] == 'i' && d[n - 2] == 's' && d[n - 1] == 'c')
+ 		return 2 + addendum;
+@@ -382,7 +382,7 @@ static unsigned int scan_dev_name_common(const char *d, unsigned int n, int adde
+ 	return 0;
+ }
+ 
+-static unsigned int scan_dev_name(const char *d, unsigned int n, char *ptr)
++static unsigned int scan_dev_name(const char *d, unsigned int n, const char *ptr)
+ {
+ 	if (d[0] == 's' && d[1] == 'c' && d[2] == 's' && d[3] == 'i' && d[4] == '/') {
+ 		if (d[n - 7] == 'g' && d[n - 6] == 'e' && d[n - 5] == 'n'
+@@ -926,7 +926,7 @@ static void action_compat(const struct devfsd_notify_struct *info, unsigned int
+ 	int ret;
+ 	const char *compat_name = NULL;
+ 	const char *dest_name = info->devname;
+-	char *ptr=NULL;
++	const char *ptr;
+ 	char compat_buf[STRING_LENGTH], dest_buf[STRING_LENGTH];
+ 	int mode, host, bus, target, lun;
+ 	unsigned int i;
+@@ -954,7 +954,7 @@ static void action_compat(const struct devfsd_notify_struct *info, unsigned int
+ 			break;
+ 		case AC_MKNEWCOMPAT:
+ 		case AC_RMNEWCOMPAT:
+-			ptr = strrchr(info->devname, '/') + 1;
++			ptr = bb_basename(info->devname);
+ 			i = scan_dev_name(info->devname, info->namelen, ptr);
+ 
+ 			/* nothing found */
+@@ -1460,7 +1460,7 @@ const char *get_old_name(const char *devname, unsigned int namelen,
+ */
+ {
+ 	const char *compat_name = NULL;
+-	char *ptr;
++	const char *ptr;
+ 	struct translate_struct *trans;
+ 	unsigned int i;
+ 	char mode;
+@@ -1497,7 +1497,7 @@ const char *get_old_name(const char *devname, unsigned int namelen,
+ 		}
+ 	}
+ 
+-	ptr = (strrchr(devname, '/') + 1);
++	ptr = bb_basename(devname);
+ 	i = scan_dev_name(devname, namelen, ptr);
+ 
+ 	if (i > 0 && i < 13)
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index dbed4ea..3861dd1 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -376,18 +376,13 @@ static struct dep_t *build_dep(void)
+ 
+ 			if (col) {
+ 				/* This line is a dep description */
+-				char *mods;
++				const char *mods;
+ 				char *modpath;
+ 				char *mod;
+ 
+ 				/* Find the beginning of the module file name */
+ 				*col = 0;
+-				mods = strrchr(buffer, '/');
+-
+-				if (!mods)
+-					mods = buffer; /* no path for this module */
+-				else
+-					mods++; /* there was a path for this module... */
++				mods = bb_basename(buffer);
+ 
+ 				/* find the path of the module */
+ 				modpath = strchr(buffer, '/'); /* ... and this is the path */
+@@ -433,7 +428,7 @@ static struct dep_t *build_dep(void)
+ 		/* p points to the first dependable module; if NULL, no dependable module */
+ 		if (p && *p) {
+ 			char *end = &buffer[l-1];
+-			char *deps;
++			const char *deps;
+ 			char *dep;
+ 			char *next;
+ 			int ext = 0;
+@@ -451,15 +446,11 @@ static struct dep_t *build_dep(void)
+ 					next = end;
+ 
+ 				/* find the beginning of the module file name */
+-				deps = strrchr(p, '/');
+-
+-				if (!deps || (deps < p)) {
+-					deps = p;
+-
++				deps = bb_basename(p);
++				if (deps == p) {
+ 					while (isblank(*deps))
+ 						deps++;
+-				} else
+-					deps++;
++				}
+ 
+ 				/* find the end of the module name in the file name */
+ 				if (ENABLE_FEATURE_2_6_MODULES
+diff --git a/modutils/rmmod.c b/modutils/rmmod.c
+index f78f96c..13f5ec2 100644
+--- a/modutils/rmmod.c
++++ b/modutils/rmmod.c
+@@ -81,12 +81,7 @@ int rmmod_main(int argc, char **argv)
+ 
+ 	for (n = optind; n < argc; n++) {
+ 		if (ENABLE_FEATURE_2_6_MODULES) {
+-			const char *afterslash;
+-
+-			afterslash = strrchr(argv[n], '/');
+-			if (!afterslash) afterslash = argv[n];
+-			else afterslash++;
+-			filename2modname(misc_buf, afterslash);
++			filename2modname(misc_buf, bb_basename(argv[n]));
+ 		}
+ 
+ 		if (syscall(__NR_delete_module, ENABLE_FEATURE_2_6_MODULES ? misc_buf : argv[n], flags)) {
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 383a006..8c5e29f 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1125,7 +1125,7 @@ static int sendCgi(const char *url,
+ 			setenv1("HTTP_REFERER", referer);
+ 
+ 		/* set execve argp[0] without path */
+-		argp[0] = strrchr(purl, '/') + 1;
++		argp[0] = (char*)bb_basename(purl);
+ 		/* but script argp[0] must have absolute path and chdiring to this */
+ 		script = strrchr(fullpath, '/');
+ 		if (!script)
+@@ -1713,7 +1713,7 @@ static void handleIncoming(void)
+ 		if (alarm_signaled)
+ 			break;
+ 
+-		if (strcmp(strrchr(url, '/') + 1, httpd_conf) == 0 || ip_allowed == 0) {
++		if (strcmp(bb_basename(url), httpd_conf) == 0 || ip_allowed == 0) {
+ 			/* protect listing [/path]/httpd_conf or IP deny */
+ #if ENABLE_FEATURE_HTTPD_CGI
+  FORBIDDEN:		/* protect listing /cgi-bin */
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 22005aa..17e5e88 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -24,7 +24,7 @@ struct globals {
+ /* mknod in /dev based on a path like "/sys/block/hda/hda1" */
+ static void make_device(char *path, int delete)
+ {
+-	char *device_name;
++	const char *device_name;
+ 	int major, minor, type, len;
+ 	int mode = 0660;
+ 	uid_t uid = 0;
+@@ -46,7 +46,7 @@ static void make_device(char *path, int delete)
+ 
+ 	/* Determine device name, type, major and minor */
+ 
+-	device_name = strrchr(path, '/') + 1;
++	device_name = bb_basename(path);
+ 	type = path[5]=='c' ? S_IFCHR : S_IFBLK;
+ 
+ 	/* If we have a config file, look up permissions for this device */

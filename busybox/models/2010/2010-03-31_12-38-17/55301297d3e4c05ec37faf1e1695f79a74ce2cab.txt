@@ -1,0 +1,136 @@
+2010-03-31 12:38:17 +0200
+diff --git a/include/grp_.h b/include/grp_.h
+index deaf9e6..7a95f88 100644
+--- a/include/grp_.h
++++ b/include/grp_.h
+@@ -55,6 +55,7 @@ extern void setgrent(void);
+ /* Close the group-file stream.  */
+ extern void endgrent(void);
+ 
++#ifdef UNUSED_SINCE_WE_AVOID_STATIC_BUFS
+ /* Read an entry from the group-file stream, opening it if necessary.  */
+ extern struct group *getgrent(void);
+ 
+@@ -64,6 +65,7 @@ extern struct group *fgetgrent(FILE *__stream);
+ /* Write the given entry onto the given stream.  */
+ extern int putgrent(const struct group *__restrict __p,
+ 		     FILE *__restrict __f);
++#endif
+ 
+ /* Search for an entry with a matching group ID.  */
+ extern struct group *getgrgid(gid_t __gid);
+diff --git a/include/pwd_.h b/include/pwd_.h
+index f52445c..aa63ac9 100644
+--- a/include/pwd_.h
++++ b/include/pwd_.h
+@@ -42,7 +42,6 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ #define getpwuid_r  bb_internal_getpwuid_r
+ #define getpwnam_r  bb_internal_getpwnam_r
+ #define fgetpwent_r bb_internal_fgetpwent_r
+-//#define getpw       bb_internal_getpw
+ 
+ 
+ /* All function names below should be remapped by #defines above
+@@ -55,6 +54,7 @@ extern void setpwent(void);
+ /* Close the password-file stream.  */
+ extern void endpwent(void);
+ 
++#ifdef UNUSED_SINCE_WE_AVOID_STATIC_BUFS
+ /* Read an entry from the password-file stream, opening it if necessary.  */
+ extern struct passwd *getpwent(void);
+ 
+@@ -64,6 +64,7 @@ extern struct passwd *fgetpwent(FILE *__stream);
+ /* Write the given entry onto the given stream.  */
+ extern int putpwent(const struct passwd *__restrict __p,
+ 		     FILE *__restrict __f);
++#endif
+ 
+ /* Search for an entry with a matching user ID.  */
+ extern struct passwd *getpwuid(uid_t __uid);
+@@ -100,11 +101,6 @@ extern int fgetpwent_r(FILE *__restrict __stream,
+ 			char *__restrict __buffer, size_t __buflen,
+ 			struct passwd **__restrict __result);
+ 
+-/* Re-construct the password-file line for the given uid
+-   in the given buffer.  This knows the format that the caller
+-   will expect, but this need not be the format of the password file.  */
+-/* UNUSED extern int getpw(uid_t __uid, char *__buffer); */
+-
+ POP_SAVED_FUNCTION_VISIBILITY
+ 
+-#endif /* pwd.h  */
++#endif
+diff --git a/libpwdgrp/pwd_grp.c b/libpwdgrp/pwd_grp.c
+index 26e8ff4..5c61e56 100644
+--- a/libpwdgrp/pwd_grp.c
++++ b/libpwdgrp/pwd_grp.c
+@@ -187,7 +187,7 @@ int fgetspent_r(FILE *__restrict stream, struct spwd *__restrict resultbuf,
+  * TODO: audit & stop using these in bbox, they pull in static buffers */
+ /**********************************************************************/
+ 
+-#if 0
++#ifdef UNUSED_SINCE_WE_AVOID_STATIC_BUFS
+ struct passwd *fgetpwent(FILE *stream)
+ {
+ 	struct statics *S;
+@@ -399,35 +399,6 @@ struct spwd *getspnam(const char *name)
+ }
+ #endif
+ 
+-#ifdef THIS_ONE_IS_UNUSED
+-/* This one doesn't use static buffers */
+-int getpw(uid_t uid, char *buf)
+-{
+-	struct passwd resultbuf;
+-	struct passwd *result;
+-	char buffer[PWD_BUFFER_SIZE];
+-
+-	if (!buf) {
+-		errno = EINVAL;
+-		return -1;
+-	}
+-
+-	if (!getpwuid_r(uid, &resultbuf, buffer, sizeof(buffer), &result)) {
+-		if (sprintf(buf, "%s:%s:%lu:%lu:%s:%s:%s\n",
+-					resultbuf.pw_name, resultbuf.pw_passwd,
+-					(unsigned long)(resultbuf.pw_uid),
+-					(unsigned long)(resultbuf.pw_gid),
+-					resultbuf.pw_gecos, resultbuf.pw_dir,
+-					resultbuf.pw_shell) >= 0
+-		) {
+-			return 0;
+-		}
+-	}
+-
+-	return -1;
+-}
+-#endif
+-
+ /**********************************************************************/
+ 
+ /* FIXME: we don't have such CONFIG_xx - ?! */
+@@ -584,7 +555,7 @@ int getspent_r(struct spwd *resultbuf, char *buffer,
+ }
+ #endif
+ 
+-#if 0
++#ifdef UNUSED_SINCE_WE_AVOID_STATIC_BUFS
+ struct passwd *getpwent(void)
+ {
+ 	static char line_buff[PWD_BUFFER_SIZE];
+@@ -687,6 +658,7 @@ int getgrouplist(const char *user, gid_t gid, gid_t *groups, int *ngroups)
+ 	return ngroups_old;
+ }
+ 
++#ifdef UNUSED_SINCE_WE_AVOID_STATIC_BUFS
+ int putpwent(const struct passwd *__restrict p, FILE *__restrict f)
+ {
+ 	int rv = -1;
+@@ -749,6 +721,7 @@ int putgrent(const struct group *__restrict p, FILE *__restrict f)
+ 
+ 	return rv;
+ }
++#endif
+ 
+ #if ENABLE_USE_BB_SHADOW
+ static const unsigned char put_sp_off[] ALIGN1 = {

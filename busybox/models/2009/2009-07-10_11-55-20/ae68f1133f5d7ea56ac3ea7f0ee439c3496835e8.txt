@@ -1,0 +1,56 @@
+2009-07-10 11:55:20 +0200
+diff --git a/editors/sed.c b/editors/sed.c
+index 2127301..ed12e43 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -894,12 +894,13 @@ static void process_files(void)
+ 			|| (!sed_cmd->beg_line && !sed_cmd->end_line
+ 				&& !sed_cmd->beg_match && !sed_cmd->end_match)
+ 			/* Or did we match the start of a numerical range? */
+-			|| (sed_cmd->beg_line > 0 && (sed_cmd->beg_line == linenum
+-							/* "shadowed beginning" case: "1d;1,ENDp" - p still matches at line 2
+-							 * even though 1d skipped line 1 which is a start line for p */
+-							|| (sed_cmd->end_line && sed_cmd->beg_line < linenum && sed_cmd->end_line >= linenum)
+-							|| (sed_cmd->end_match && sed_cmd->beg_line < linenum)
+-						)
++			|| (sed_cmd->beg_line > 0
++			    && (sed_cmd->beg_line == linenum
++			       /* GNU sed compat:
++			        * "shadowed beginning" case: "1d;1,ENDp" - p still matches at line 2
++			        * even though 1d skipped line 1 which is a start line for p */
++			       || (sed_cmd->beg_line < linenum && (sed_cmd->end_line > 0 || sed_cmd->end_match))
++			       )
+ 			)
+ 			/* Or does this line match our begin address regex? */
+ 			|| (beg_match(sed_cmd, pattern_space))
+@@ -928,12 +929,10 @@ static void process_files(void)
+ 				     && (regexec(sed_cmd->end_match,
+ 				                 pattern_space, 0, NULL, 0) == 0)
+ 				);
+-				if (n && sed_cmd->beg_line > 0) {
+-					/* Once matched, "n,regex" range is dead, disabling it */
+-					regfree(sed_cmd->end_match);
+-					free(sed_cmd->end_match);
+-					sed_cmd->end_match = NULL;
+-				}
++			}
++			if (n && sed_cmd->beg_line > 0) {
++				/* once matched, "n,xxx" range is dead, disabling it */
++				sed_cmd->beg_line = -2;
+ 			}
+ 			sed_cmd->in_match = !n;
+ 		}
+diff --git a/testsuite/sed.tests b/testsuite/sed.tests
+index 8af156a..677303b 100755
+--- a/testsuite/sed.tests
++++ b/testsuite/sed.tests
+@@ -220,4 +220,9 @@ testing "sed d does not break n,regex matching #2" \
+ 	"second2\nthird2\n" "" \
+ 	"first\nsecond\nthird\nfourth\n""first2\nsecond2\nthird2\nfourth2\n"
+ 
++testing "sed 2d;2,1p (gnu compat)" \
++	"sed -n '2d;2,1p'" \
++	"third\n" "" \
++	"first\nsecond\nthird\nfourth\n"
++
+ exit $FAILCOUNT

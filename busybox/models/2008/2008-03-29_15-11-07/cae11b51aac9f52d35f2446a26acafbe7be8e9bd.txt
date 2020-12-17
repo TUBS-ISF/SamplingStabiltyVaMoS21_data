@@ -1,0 +1,104 @@
+2008-03-29 15:11:07 +0000
+diff --git a/testsuite/mdev.tests b/testsuite/mdev.tests
+index 1ee7628..777c5c5 100755
+--- a/testsuite/mdev.tests
++++ b/testsuite/mdev.tests
+@@ -8,6 +8,8 @@
+ # sed: (1) "maj, min" -> "maj,min" (2) coalesce spaces
+ # cut: remove date
+ FILTER_LS="sed -e 's/,  */,/g' -e 's/  */ /g' | cut -d' ' -f 1-5,9-"
++# cut: remove size+date
++FILTER_LS2="sed -e 's/,  */,/g' -e 's/  */ /g' | cut -d' ' -f 1-4,9-"
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+@@ -31,7 +33,7 @@ brw-rw---- 1 0 0 8,0 sda
+ 	"" ""
+ 
+ # continuing to use directory structure from prev test
+-rm mdev.testdir/dev/sda
++rm -rf mdev.testdir/dev/*
+ echo ".* 1:1 666" >mdev.testdir/etc/mdev.conf
+ echo "sda 2:2 444" >>mdev.testdir/etc/mdev.conf
+ testing "mdev stops on first rule" \
+@@ -42,6 +44,38 @@ brw-rw-rw- 1 1 1 8,0 sda
+ " \
+ 	"" ""
+ 
++# continuing to use directory structure from prev test
++rm -rf mdev.testdir/dev/*
++echo "sda 0:0 444 >disk/scsiA" >mdev.testdir/etc/mdev.conf
++testing "mdev move/symlink rule '>bar/baz'" \
++	"env - ACTION=add DEVPATH=/block/sda chroot mdev.testdir /mdev 2>&1;
++	ls -lnR mdev.testdir/dev | $FILTER_LS2" \
++"\
++mdev.testdir/dev:
++drwxr-xr-x 2 0 0 disk
++lrwxrwxrwx 1 0 0 sda -> disk/scsiA
++
++mdev.testdir/dev/disk:
++br--r--r-- 1 0 0 scsiA
++" \
++	"" ""
++
++# continuing to use directory structure from prev test
++rm -rf mdev.testdir/dev/*
++echo "sda 0:0 444 >disk/" >mdev.testdir/etc/mdev.conf
++testing "mdev move/symlink rule '>bar/'" \
++	"env - ACTION=add DEVPATH=/block/sda chroot mdev.testdir /mdev 2>&1;
++	ls -lnR mdev.testdir/dev | $FILTER_LS2" \
++"\
++mdev.testdir/dev:
++drwxr-xr-x 2 0 0 disk
++lrwxrwxrwx 1 0 0 sda -> disk/sda
++
++mdev.testdir/dev/disk:
++br--r--r-- 1 0 0 sda
++" \
++	"" ""
++
+ # clean up
+ rm -rf mdev.testdir
+ 
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index a286605..c4c4350 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -203,21 +203,26 @@ static void make_device(char *path, int delete)
+ 			if (ENABLE_FEATURE_MDEV_RENAME && alias) {
+ 				char *dest;
+ 
++				/* ">bar/": rename to bar/device_name */
++				/* ">bar[/]baz": rename to bar[/]baz */
+ 				dest = strrchr(alias, '/');
+-				if (dest) {
+-					if (dest[1] != '\0')
+-						/* given a file name, so rename it */
+-						*dest = '\0';
++				if (dest) { /* ">bar/[baz]" ? */
++					*dest = '\0'; /* mkdir bar */
+ 					bb_make_directory(alias, 0755, FILEUTILS_RECUR);
+-					dest = concat_path_file(alias, device_name);
+-					free(alias);
+-				} else
+-					dest = alias;
++					*dest = '/';
++					if (dest[1] == '\0') { /* ">bar/" => ">bar/device_name" */
++						dest = alias;
++						alias = concat_path_file(alias, device_name);
++						free(dest);
++					}
++				}
+ 
+-				rename(device_name, dest);
+-				symlink(dest, device_name);
++				/* recreate device_name as a symlink to moved device node */
++				if (rename(device_name, alias) == 0) {
++					symlink(alias, device_name);
++				}
+ 
+-				free(dest);
++				free(alias);
+ 			}
+ 		}
+ 	}

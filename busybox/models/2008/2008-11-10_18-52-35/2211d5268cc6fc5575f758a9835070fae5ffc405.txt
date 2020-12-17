@@ -1,0 +1,470 @@
+2008-11-10 18:52:35 +0000
+diff --git a/coreutils/Kbuild b/coreutils/Kbuild
+index a5a2d4c..67c5658 100644
+--- a/coreutils/Kbuild
++++ b/coreutils/Kbuild
+@@ -62,6 +62,8 @@ lib-$(CONFIG_RM)        += rm.o
+ lib-$(CONFIG_RMDIR)     += rmdir.o
+ lib-$(CONFIG_SEQ)       += seq.o
+ lib-$(CONFIG_SHA1SUM)   += md5_sha1_sum.o
++lib-$(CONFIG_SHA256SUM) += md5_sha1_sum.o
++lib-$(CONFIG_SHA512SUM) += md5_sha1_sum.o
+ lib-$(CONFIG_SLEEP)     += sleep.o
+ lib-$(CONFIG_SPLIT)     += split.o
+ lib-$(CONFIG_SORT)      += sort.o
+diff --git a/include/usage.h b/include/usage.h
+index 75b44a2..71f2218 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -557,8 +557,13 @@
+      "\n	-r	Delete crontab" \
+      "\n	FILE	Replace crontab by FILE ('-': stdin)" \
+ 
++#if !ENABLE_USE_BB_CRYPT || ENABLE_USE_BB_CRYPT_SHA
++#define cryptpw_trivial_usage \
++       "[-a des|md5|sha256/512] [string]"
++#else
+ #define cryptpw_trivial_usage \
+        "[-a des|md5] [string]"
++#endif
+ #define cryptpw_full_usage "\n\n" \
+        "Output crypted string.\n" \
+        "If string isn't supplied on cmdline, read it from stdin.\n" \
+diff --git a/libbb/pw_encrypt.c b/libbb/pw_encrypt.c
+index 0b826f4..572591e 100644
+--- a/libbb/pw_encrypt.c
++++ b/libbb/pw_encrypt.c
+@@ -15,16 +15,27 @@
+  * DES and MD5 crypt implementations are taken from uclibc.
+  * They were modified to not use static buffers.
+  */
+-/* Common for them */
++
++/* Used by pw_encrypt_XXX.c */
+ static const uint8_t ascii64[] = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
++static char*
++to64(char *s, unsigned v, int n)
++{
++	while (--n >= 0) {
++		*s++ = ascii64[v & 0x3f];
++		v >>= 6;
++	}
++	return s;
++}
++
+ #include "pw_encrypt_des.c"
+ #include "pw_encrypt_md5.c"
++#if ENABLE_USE_BB_CRYPT_SHA
++#include "pw_encrypt_sha.c"
++#endif
+ 
+-/* Other advanced crypt ids: */
++/* Other advanced crypt ids (TODO?): */
+ /* $2$ or $2a$: Blowfish */
+-/* $5$: SHA-256 */
+-/* $6$: SHA-512 */
+-/* TODO: implement SHA - http://people.redhat.com/drepper/SHA-crypt.txt */
+ 
+ static struct const_des_ctx *des_cctx;
+ static struct des_ctx *des_ctx;
+@@ -32,18 +43,20 @@ static struct des_ctx *des_ctx;
+ /* my_crypt returns malloc'ed data */
+ static char *my_crypt(const char *key, const char *salt)
+ {
+-	/* First, check if we are supposed to be using the MD5 replacement
+-	 * instead of DES...  */
+-	if (salt[0] == '$' && salt[1] == '1' && salt[2] == '$') {
+-		return md5_crypt(xzalloc(MD5_OUT_BUFSIZE), (unsigned char*)key, (unsigned char*)salt);
++	/* MD5 or SHA? */
++	if (salt[0] == '$' && salt[1] && salt[2] == '$') {
++		if (salt[1] == '1')
++			return md5_crypt(xzalloc(MD5_OUT_BUFSIZE), (unsigned char*)key, (unsigned char*)salt);
++#if ENABLE_USE_BB_CRYPT_SHA
++		if (salt[1] == '5' || salt[1] == '6')
++			return sha_crypt((char*)key, (char*)salt);
++#endif
+ 	}
+ 
+-	{
+-		if (!des_cctx)
+-			des_cctx = const_des_init();
+-		des_ctx = des_init(des_ctx, des_cctx);
+-		return des_crypt(des_ctx, xzalloc(DES_OUT_BUFSIZE), (unsigned char*)key, (unsigned char*)salt);
+-	}
++	if (!des_cctx)
++		des_cctx = const_des_init();
++	des_ctx = des_init(des_ctx, des_cctx);
++	return des_crypt(des_ctx, xzalloc(DES_OUT_BUFSIZE), (unsigned char*)key, (unsigned char*)salt);
+ }
+ 
+ /* So far nobody wants to have it public */
+diff --git a/libbb/pw_encrypt_md5.c b/libbb/pw_encrypt_md5.c
+index 8d0a516..b7478aa 100644
+--- a/libbb/pw_encrypt_md5.c
++++ b/libbb/pw_encrypt_md5.c
+@@ -494,16 +494,6 @@ static void __md5_Transform(uint32_t state[4], const unsigned char block[64])
+ }
+ 
+ 
+-static char*
+-__md5_to64(char *s, unsigned v, int n)
+-{
+-	while (--n >= 0) {
+-		*s++ = ascii64[v & 0x3f];
+-		v >>= 6;
+-	}
+-	return s;
+-}
+-
+ /*
+  * UNIX password
+  *
+@@ -605,9 +595,9 @@ md5_crypt(char passwd[MD5_OUT_BUFSIZE], const unsigned char *pw, const unsigned
+ 	final[16] = final[5];
+ 	for (i = 0; i < 5; i++) {
+ 		unsigned l = (final[i] << 16) | (final[i+6] << 8) | final[i+12];
+-		p = __md5_to64(p, l, 4);
++		p = to64(p, l, 4);
+ 	}
+-	p = __md5_to64(p, final[11], 2);
++	p = to64(p, final[11], 2);
+ 	*p = '\0';
+ 
+ 	/* Don't leave anything around in vm they could use. */
+diff --git a/libbb/pw_encrypt_sha.c b/libbb/pw_encrypt_sha.c
+new file mode 100644
+index 0000000..9acbabb
+--- /dev/null
++++ b/libbb/pw_encrypt_sha.c
+@@ -0,0 +1,251 @@
++/* SHA256 and SHA512-based Unix crypt implementation.
++ * Released into the Public Domain by Ulrich Drepper <drepper@redhat.com>.
++ */
++
++/* Prefix for optional rounds specification.  */
++static const char str_rounds[] = "rounds=%u$";
++
++/* Maximum salt string length.  */
++#define SALT_LEN_MAX 16
++/* Default number of rounds if not explicitly specified.  */
++#define ROUNDS_DEFAULT 5000
++/* Minimum number of rounds.  */
++#define ROUNDS_MIN 1000
++/* Maximum number of rounds.  */
++#define ROUNDS_MAX 999999999
++
++static char *
++NOINLINE
++sha_crypt(/*const*/ char *key_data, /*const*/ char *salt_data)
++{
++	void (*sha_begin)(void *ctx) FAST_FUNC;
++	void (*sha_hash)(const void *buffer, size_t len, void *ctx) FAST_FUNC;
++	void* (*sha_end)(void *resbuf, void *ctx) FAST_FUNC;
++	int _32or64;
++
++	char *result, *resptr;
++
++	/* btw, sha256 needs [32] and uint32_t only */
++	unsigned char alt_result[64] __attribute__((__aligned__(__alignof__(uint64_t))));
++	unsigned char temp_result[64] __attribute__((__aligned__(__alignof__(uint64_t))));
++	union {
++		sha256_ctx_t x;
++		sha512_ctx_t y;
++	} ctx;
++	union {
++		sha256_ctx_t x;
++		sha512_ctx_t y;
++	} alt_ctx;
++	unsigned salt_len;
++	unsigned key_len;
++	unsigned cnt;
++	unsigned rounds;
++	char *cp;
++	char is_sha512;
++
++	/* Analyze salt, construct already known part of result */
++	cnt = strlen(salt_data) + 1 + 43 + 1;
++	is_sha512 = salt_data[1];
++	if (is_sha512 == '6')
++		cnt += 43;
++	result = resptr = xzalloc(cnt); /* will provide NUL terminator */
++	*resptr++ = '$';
++	*resptr++ = is_sha512;
++	*resptr++ = '$';
++	rounds = ROUNDS_DEFAULT;
++	salt_data += 3;
++	if (strncmp(salt_data, str_rounds, 7) == 0) {
++		/* 7 == strlen("rounds=") */
++		char *endp;
++		unsigned srounds = bb_strtou(salt_data + 7, &endp, 10);
++		if (*endp == '$') {
++			salt_data = endp + 1;
++			rounds = srounds;
++			if (rounds < ROUNDS_MIN)
++				rounds = ROUNDS_MIN;
++			if (rounds > ROUNDS_MAX)
++				rounds = ROUNDS_MAX;
++		}
++	}
++	salt_len = strchrnul(salt_data, '$') - salt_data;
++	if (salt_len > SALT_LEN_MAX)
++		salt_len = SALT_LEN_MAX;
++	/* xstrdup assures suitable alignment; also we will use it
++	   as a scratch space later. */
++	salt_data = xstrndup(salt_data, salt_len);
++	if (rounds != ROUNDS_DEFAULT) /* add "rounds=NNNNN$" */
++		resptr += sprintf(resptr, str_rounds, rounds);
++	strcpy(resptr, salt_data);
++	resptr += salt_len;
++	*resptr++ = '$';
++	/* key data doesn't need much processing */
++	key_len = strlen(key_data);
++	key_data = xstrdup(key_data);
++
++	/* Which flavor of SHAnnn ops to use? */
++	sha_begin = (void*)sha256_begin;
++	sha_hash = (void*)sha256_hash;
++	sha_end = (void*)sha256_end;
++	_32or64 = 32;
++	if (is_sha512 == '6') {
++		sha_begin = (void*)sha512_begin;
++		sha_hash = (void*)sha512_hash;
++		sha_end = (void*)sha512_end;
++		_32or64 = 64;
++	}
++
++	/* Add KEY, SALT.  */
++	sha_begin(&ctx);
++	sha_hash(key_data, key_len, &ctx);
++	sha_hash(salt_data, salt_len, &ctx);
++
++	/* Compute alternate SHA sum with input KEY, SALT, and KEY.
++	   The final result will be added to the first context.  */
++	sha_begin(&alt_ctx);
++	sha_hash(key_data, key_len, &alt_ctx);
++	sha_hash(salt_data, salt_len, &alt_ctx);
++	sha_hash(key_data, key_len, &alt_ctx);
++	sha_end(alt_result, &alt_ctx);
++
++	/* Add result of this to the other context.  */
++	/* Add for any character in the key one byte of the alternate sum.  */
++	for (cnt = key_len; cnt > _32or64; cnt -= _32or64)
++		sha_hash(alt_result, _32or64, &ctx);
++	sha_hash(alt_result, cnt, &ctx);
++
++	/* Take the binary representation of the length of the key and for every
++	   1 add the alternate sum, for every 0 the key.  */
++	for (cnt = key_len; cnt != 0; cnt >>= 1)
++		if ((cnt & 1) != 0)
++			sha_hash(alt_result, _32or64, &ctx);
++		else
++			sha_hash(key_data, key_len, &ctx);
++
++	/* Create intermediate result.  */
++	sha_end(alt_result, &ctx);
++
++	/* Start computation of P byte sequence.  */
++	/* For every character in the password add the entire password.  */
++	sha_begin(&alt_ctx);
++	for (cnt = 0; cnt < key_len; ++cnt)
++		sha_hash(key_data, key_len, &alt_ctx);
++	sha_end(temp_result, &alt_ctx);
++
++	/* NB: past this point, raw key_data is not used anymore */
++
++	/* Create byte sequence P.  */
++#define p_bytes key_data /* reuse the buffer as it is of the key_len size */
++	cp = p_bytes; /* was: ... = alloca(key_len); */
++	for (cnt = key_len; cnt >= _32or64; cnt -= _32or64) {
++		cp = memcpy(cp, temp_result, _32or64);
++		cp += _32or64;
++	}
++	memcpy(cp, temp_result, cnt);
++
++	/* Start computation of S byte sequence.  */
++	/* For every character in the password add the entire password.  */
++	sha_begin(&alt_ctx);
++	for (cnt = 0; cnt < 16 + alt_result[0]; ++cnt)
++		sha_hash(salt_data, salt_len, &alt_ctx);
++	sha_end(temp_result, &alt_ctx);
++
++	/* NB: past this point, raw salt_data is not used anymore */
++
++	/* Create byte sequence S.  */
++#define s_bytes salt_data /* reuse the buffer as it is of the salt_len size */
++	cp = s_bytes; /* was: ... = alloca(salt_len); */
++	for (cnt = salt_len; cnt >= _32or64; cnt -= _32or64) {
++		cp = memcpy(cp, temp_result, _32or64);
++		cp += _32or64;
++	}
++	memcpy(cp, temp_result, cnt);
++
++	/* Repeatedly run the collected hash value through SHA to burn
++	   CPU cycles.  */
++	for (cnt = 0; cnt < rounds; ++cnt) {
++		sha_begin(&ctx);
++
++		/* Add key or last result.  */
++		if ((cnt & 1) != 0)
++			sha_hash(p_bytes, key_len, &ctx);
++		else
++			sha_hash(alt_result, _32or64, &ctx);
++		/* Add salt for numbers not divisible by 3.  */
++		if (cnt % 3 != 0)
++			sha_hash(s_bytes, salt_len, &ctx);
++		/* Add key for numbers not divisible by 7.  */
++		if (cnt % 7 != 0)
++			sha_hash(p_bytes, key_len, &ctx);
++		/* Add key or last result.  */
++		if ((cnt & 1) != 0)
++			sha_hash(alt_result, _32or64, &ctx);
++		else
++			sha_hash(p_bytes, key_len, &ctx);
++
++		sha_end(alt_result, &ctx);
++	}
++
++
++	/* Append encrypted password to result buffer */
++//TODO: replace with something like
++//	bb_uuencode(cp, src, length, bb_uuenc_tbl_XXXbase64);
++#define b64_from_24bit(B2, B1, B0, N) \
++do {							\
++	unsigned w = ((B2) << 16) | ((B1) << 8) | (B0);	\
++	resptr = to64(resptr, w, N);			\
++} while (0)
++	if (is_sha512 == '5') {
++		b64_from_24bit(alt_result[0], alt_result[10], alt_result[20], 4);
++		b64_from_24bit(alt_result[21], alt_result[1], alt_result[11], 4);
++		b64_from_24bit(alt_result[12], alt_result[22], alt_result[2], 4);
++		b64_from_24bit(alt_result[3], alt_result[13], alt_result[23], 4);
++		b64_from_24bit(alt_result[24], alt_result[4], alt_result[14], 4);
++		b64_from_24bit(alt_result[15], alt_result[25], alt_result[5], 4);
++		b64_from_24bit(alt_result[6], alt_result[16], alt_result[26], 4);
++		b64_from_24bit(alt_result[27], alt_result[7], alt_result[17], 4);
++		b64_from_24bit(alt_result[18], alt_result[28], alt_result[8], 4);
++		b64_from_24bit(alt_result[9], alt_result[19], alt_result[29], 4);
++		b64_from_24bit(0, alt_result[31], alt_result[30], 3);
++	} else {
++		b64_from_24bit(alt_result[0], alt_result[21], alt_result[42], 4);
++		b64_from_24bit(alt_result[22], alt_result[43], alt_result[1], 4);
++		b64_from_24bit(alt_result[44], alt_result[2], alt_result[23], 4);
++		b64_from_24bit(alt_result[3], alt_result[24], alt_result[45], 4);
++		b64_from_24bit(alt_result[25], alt_result[46], alt_result[4], 4);
++		b64_from_24bit(alt_result[47], alt_result[5], alt_result[26], 4);
++		b64_from_24bit(alt_result[6], alt_result[27], alt_result[48], 4);
++		b64_from_24bit(alt_result[28], alt_result[49], alt_result[7], 4);
++		b64_from_24bit(alt_result[50], alt_result[8], alt_result[29], 4);
++		b64_from_24bit(alt_result[9], alt_result[30], alt_result[51], 4);
++		b64_from_24bit(alt_result[31], alt_result[52], alt_result[10], 4);
++		b64_from_24bit(alt_result[53], alt_result[11], alt_result[32], 4);
++		b64_from_24bit(alt_result[12], alt_result[33], alt_result[54], 4);
++		b64_from_24bit(alt_result[34], alt_result[55], alt_result[13], 4);
++		b64_from_24bit(alt_result[56], alt_result[14], alt_result[35], 4);
++		b64_from_24bit(alt_result[15], alt_result[36], alt_result[57], 4);
++		b64_from_24bit(alt_result[37], alt_result[58], alt_result[16], 4);
++		b64_from_24bit(alt_result[59], alt_result[17], alt_result[38], 4);
++		b64_from_24bit(alt_result[18], alt_result[39], alt_result[60], 4);
++		b64_from_24bit(alt_result[40], alt_result[61], alt_result[19], 4);
++		b64_from_24bit(alt_result[62], alt_result[20], alt_result[41], 4);
++		b64_from_24bit(0, 0, alt_result[63], 2);
++	}
++	/* *resptr = '\0'; - xzalloc did it */
++#undef b64_from_24bit
++
++	/* Clear the buffer for the intermediate result so that people
++	   attaching to processes or reading core dumps cannot get any
++	   information.  */
++	memset(temp_result, 0, sizeof(temp_result));
++	memset(alt_result, 0, sizeof(alt_result));
++	memset(&ctx, 0, sizeof(ctx));
++	memset(&alt_ctx, 0, sizeof(alt_ctx));
++	memset(key_data, 0, key_len); /* also p_bytes */
++	memset(salt_data, 0, salt_len); /* also s_bytes */
++	free(key_data);
++	free(salt_data);
++#undef p_bytes
++#undef s_bytes
++
++	return result;
++}
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index bb1369c..5f66e86 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -58,7 +58,7 @@ config USE_BB_SHADOW
+ 	  password servers and whatnot.
+ 
+ config USE_BB_CRYPT
+-	bool "Use internal DES and MD5 crypt functions"
++	bool "Use internal crypt functions"
+ 	default y
+ 	help
+ 	  Busybox has internal DES and MD5 crypt functions.
+@@ -79,6 +79,18 @@ config USE_BB_CRYPT
+ 	  In static build, it makes code _smaller_ by about 1.2k,
+ 	  and likely many kilobytes less of bss.
+ 
++config USE_BB_CRYPT_SHA
++	bool "Enable SHA256/512 crypt functions"
++	default n
++	depends on USE_BB_CRYPT
++	help
++	  Enable this if you have passwords starting with "$5$" or "$6$"
++	  in your /etc/passwd or /etc/shadow files. These passwords
++	  are hashed using SHA256 and SHA512 algorithms. Support for them
++	  was added to glibc in 2008.
++	  With this option off, login will fail password check for any
++	  user which has password encrypted with these algorithms.
++
+ config ADDGROUP
+ 	bool "addgroup"
+ 	default n
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index db5d959..d76deac 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -34,22 +34,36 @@ done
+ int cryptpw_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cryptpw_main(int argc UNUSED_PARAM, char **argv)
+ {
+-	char salt[sizeof("$N$XXXXXXXX")];
++	char salt[sizeof("$N$") + 16];
+ 	char *opt_a;
++	int opts;
+ 
+-	if (!getopt32(argv, "a:", &opt_a) || opt_a[0] != 'd') {
++	opts = getopt32(argv, "a:", &opt_a);
++
++	if (opts && opt_a[0] == 'd') {
++		crypt_make_salt(salt, 2/2, 0);     /* des */
++#if TESTING
++		strcpy(salt, "a.");
++#endif
++	} else {
+ 		salt[0] = '$';
+ 		salt[1] = '1';
+ 		salt[2] = '$';
+-		crypt_make_salt(salt + 3, 4, 0); /* md5 */
++#if !ENABLE_USE_BB_CRYPT || ENABLE_USE_BB_CRYPT_SHA
++		if (opts && opt_a[0] == 's') {
++			salt[1] = '5' + (strcmp(opt_a, "sha512") == 0);
++			crypt_make_salt(salt + 3, 16/2, 0); /* sha */
+ #if TESTING
+-		strcpy(salt + 3, "ajg./bcf");
++			strcpy(salt, "$6$em7yVj./Mv5n1V5X");
+ #endif
+-	} else {
+-		crypt_make_salt(salt, 1, 0);     /* des */
++		} else
++#endif
++		{
++			crypt_make_salt(salt + 3, 8/2, 0); /* md5 */
+ #if TESTING
+-		strcpy(salt, "a.");
++			strcpy(salt + 3, "ajg./bcf");
+ #endif
++		}
+ 	}
+ 
+ 	puts(pw_encrypt(argv[optind] ? argv[optind] : xmalloc_fgetline(stdin), salt, 1));

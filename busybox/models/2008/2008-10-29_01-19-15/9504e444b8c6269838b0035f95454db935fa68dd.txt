@@ -1,0 +1,66 @@
+2008-10-29 01:19:15 +0000
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index aca85a1..9aa0abb 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -233,12 +233,12 @@ config CRYPTPW
+ 	  Applet for crypting a string.
+ 
+ config CHPASSWD
+-       bool "chpasswd"
+-       default n
+-       help
+-         chpasswd  reads  a  file  of user name and password pairs from
+-         standard input and uses this information to update a group of
+-         existing users.
++	bool "chpasswd"
++	default n
++	help
++	  chpasswd  reads  a  file  of user name and password pairs from
++	  standard input and uses this information to update a group of
++	  existing users.
+ 
+ config SU
+ 	bool "su"
+diff --git a/shell/hush.c b/shell/hush.c
+index 1e6df62..4212729 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1484,7 +1484,7 @@ static void pseudo_exec_argv(nommu_save_t *nommu_save, char **argv, int assignme
+ 	if (!argv[assignment_cnt])
+ 		_exit(EXIT_SUCCESS);
+ 
+-        new_env = expand_assignments(argv, assignment_cnt);
++	new_env = expand_assignments(argv, assignment_cnt);
+ #if BB_MMU
+ 	putenv_all(new_env);
+ 	free(new_env); /* optional */
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 4c9efd8..38ea3d7 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -364,7 +364,7 @@ static void log_locally(time_t now, char *msg)
+ 	}
+ 	G.curFileSize +=
+ #endif
+-	                full_write(G.logFD, msg, len);
++			full_write(G.logFD, msg, len);
+ 	fl.l_type = F_UNLCK;
+ 	fcntl(G.logFD, F_SETLKW, &fl);
+ }
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 5ac8015..34cabc9 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -101,9 +101,9 @@ static void make_device(char *path, int delete)
+ 	 * "/sys/block/..." is for block devices. "/sys/bus" etc is not.
+ 	 * But since 2.6.25 block devices are also in /sys/class/block.
+ 	 * We use strstr("/block/") to forestall future surprises. */
+-        type = S_IFCHR;
++	type = S_IFCHR;
+ 	if (strstr(path, "/block/"))
+-	        type = S_IFBLK;
++		type = S_IFBLK;
+ 
+ #if ENABLE_FEATURE_MDEV_CONF
+ 	parser = config_open2("/etc/mdev.conf", fopen_for_read);

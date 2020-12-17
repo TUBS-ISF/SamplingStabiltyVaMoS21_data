@@ -1,0 +1,29 @@
+2008-08-21 21:15:28 +0000
+diff --git a/Makefile b/Makefile
+index 1db69eb..5d65467 100644
+--- a/Makefile
++++ b/Makefile
+@@ -505,7 +505,7 @@ endif
+ # command line.
+ # This allow a user to issue only 'make' to build a kernel including modules
+ # Defaults busybox but it is usually overridden in the arch makefile
+-all: busybox
++all: busybox doc
+ 
+ -include $(srctree)/arch/$(ARCH)/Makefile
+ 
+diff --git a/Makefile.custom b/Makefile.custom
+index 58a979e..140ff45 100644
+--- a/Makefile.custom
++++ b/Makefile.custom
+@@ -105,6 +105,10 @@ bigdata: busybox_unstripped
+ .PHONY: doc
+ doc: docs/busybox.pod docs/BusyBox.txt docs/BusyBox.1 docs/BusyBox.html
+ 
++# FIXME: Doesn't belong here
++disp_doc = \
++  @$(if $(quiet),echo "  DOC     $(@F)")
++
+ docs/busybox.pod: $(srctree)/docs/busybox_header.pod \
+ 		$(srctree)/include/usage.h \
+ 		$(srctree)/docs/busybox_footer.pod \

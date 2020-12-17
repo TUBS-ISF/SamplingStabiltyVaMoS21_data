@@ -1,0 +1,54 @@
+2009-06-15 09:50:54 +0200
+diff --git a/coreutils/sleep.c b/coreutils/sleep.c
+index de18dd0..b16d03c 100644
+--- a/coreutils/sleep.c
++++ b/coreutils/sleep.c
+@@ -54,11 +54,13 @@ int sleep_main(int argc UNUSED_PARAM, char **argv)
+ 		char *arg = *argv;
+ 		if (strchr(arg, '.')) {
+ 			double d;
++			char *pp;
+ 			int len = strspn(arg, "0123456789.");
+ 			char sv = arg[len];
+ 			arg[len] = '\0';
+-			d = bb_strtod(arg, NULL);
+-			if (errno)
++			errno = 0;
++			d = strtod(arg, &pp);
++			if (errno || *pp)
+ 				bb_show_usage();
+ 			arg[len] = sv;
+ 			len--;
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 8fddabd..70dc48d 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -13,7 +13,7 @@ lib-y += bb_basename.o
+ lib-y += bb_do_delay.o
+ lib-y += bb_pwd.o
+ lib-y += bb_qsort.o
+-lib-y += bb_strtod.o
++#lib-y += bb_strtod.o
+ lib-y += bb_strtonum.o
+ lib-y += change_identity.o
+ lib-y += chomp.o
+diff --git a/libbb/bb_strtod.c b/libbb/bb_strtod.c
+index 39bdeb5..1e96710 100644
+--- a/libbb/bb_strtod.c
++++ b/libbb/bb_strtod.c
+@@ -12,6 +12,7 @@
+ 
+ #define NOT_DIGIT(a) (((unsigned char)(a-'0')) > 9)
+ 
++#if 0 // UNUSED
+ double FAST_FUNC bb_strtod(const char *arg, char **endp)
+ {
+ 	double v;
+@@ -36,6 +37,7 @@ double FAST_FUNC bb_strtod(const char *arg, char **endp)
+ 	}
+ 	return v;
+ }
++#endif
+ 
+ #if 0
+ /* String to timespec: "NNNN[.NNNNN]" -> struct timespec.

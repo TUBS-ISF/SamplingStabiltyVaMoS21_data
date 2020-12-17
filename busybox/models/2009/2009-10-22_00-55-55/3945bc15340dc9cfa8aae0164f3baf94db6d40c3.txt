@@ -1,0 +1,138 @@
+2009-10-22 00:55:55 +0200
+diff --git a/include/applets.h b/include/applets.h
+index 9ca8462..134f21e 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -396,7 +396,7 @@ IF_TRUE(APPLET_NOFORK(true, true, _BB_DIR_BIN, _BB_SUID_DROP, true))
+ IF_TTY(APPLET(tty, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_TTYSIZE(APPLET(ttysize, _BB_DIR_USR_BIN, _BB_SUID_DROP))
+ IF_TUNCTL(APPLET(tunctl, _BB_DIR_SBIN, _BB_SUID_DROP))
+-//IF_TUNE2FS(APPLET(tune2fs, _BB_DIR_SBIN, _BB_SUID_DROP))
++IF_MKFS_EXT2(APPLET(tune2fs, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_APP_UDHCPC(APPLET(udhcpc, _BB_DIR_SBIN, _BB_SUID_DROP))
+ IF_APP_UDHCPD(APPLET(udhcpd, _BB_DIR_USR_SBIN, _BB_SUID_DROP))
+ IF_UDPSVD(APPLET_ODDNAME(udpsvd, tcpudpsvd, _BB_DIR_USR_BIN, _BB_SUID_DROP, udpsvd))
+diff --git a/include/usage.h b/include/usage.h
+index 80111e5..9c0d29d 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4666,22 +4666,24 @@
+      "\n	-f name		tun device (/dev/net/tun)" \
+      "\n	-t name		Create iface 'name'" \
+      "\n	-d name		Delete iface 'name'" \
+-IF_FEATURE_TUNCTL_UG( \
++	IF_FEATURE_TUNCTL_UG( \
+      "\n	-u owner	Set iface owner" \
+      "\n	-g group	Set iface group" \
+      "\n	-b		Brief output" \
+-)
++	)
+ #define tunctl_example_usage \
+        "# tunctl\n" \
+        "# tunctl -d tun0\n"
+ 
+ #define tune2fs_trivial_usage \
+-       "[-c max-mounts-count] [-e errors-behavior] [-g group] " \
+-       "[-i interval[d|m|w]] [-j] [-J journal-options] [-l] [-s sparse-flag] " \
+-       "[-m reserved-blocks-percent] [-o [^]mount-options[,...]] " \
+-       "[-r reserved-blocks-count] [-u user] [-C mount-count] " \
+-       "[-L volume-label] [-M last-mounted-dir] [-O [^]feature[,...]] " \
+-       "[-T last-check-time] [-U UUID] device"
++/*     "[-c max-mounts-count] [-e errors-behavior] [-g group] " */ \
++/*     "[-i interval[d|m|w]] [-j] [-J journal-options] [-l] [-s sparse-flag] " */ \
++/*     "[-m reserved-blocks-percent] [-o [^]mount-options[,...]] " */ \
++/*     "[-r reserved-blocks-count] [-u user] [-C mount-count] " */ \
++       "[-L LABEL] " \
++/*     "[-M last-mounted-dir] [-O [^]feature[,...]] " */ \
++/*     "[-T last-check-time] [-U UUID] " */ \
++       "BLOCKDEV"
+ #define tune2fs_full_usage "\n\n" \
+        "Adjust filesystem options on ext[23] filesystems"
+ 
+diff --git a/util-linux/Kbuild b/util-linux/Kbuild
+index 7befe06..dc1d1f2 100644
+--- a/util-linux/Kbuild
++++ b/util-linux/Kbuild
+@@ -38,4 +38,5 @@ lib-$(CONFIG_SCRIPTREPLAY)      += scriptreplay.o
+ lib-$(CONFIG_SETARCH)           += setarch.o
+ lib-$(CONFIG_SWAPONOFF)         += swaponoff.o
+ lib-$(CONFIG_SWITCH_ROOT)       += switch_root.o
++lib-$(CONFIG_MKFS_EXT2)         += tune2fs.o
+ lib-$(CONFIG_UMOUNT)            += umount.o
+diff --git a/util-linux/tune2fs.c b/util-linux/tune2fs.c
+new file mode 100644
+index 0000000..3b8f3d8
+--- /dev/null
++++ b/util-linux/tune2fs.c
+@@ -0,0 +1,71 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * tune2fs: utility to modify EXT2 filesystem
++ *
++ * Busybox'ed (2009) by Vladimir Dronnikov <dronnikov@gmail.com>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
++#include "libbb.h"
++#include <linux/fs.h>
++#include <linux/ext2_fs.h>
++#include "volume_id/volume_id_internal.h"
++
++// storage helpers
++char BUG_wrong_field_size(void);
++#define STORE_LE(field, value) \
++do { \
++	if (sizeof(field) == 4) \
++		field = cpu_to_le32(value); \
++	else if (sizeof(field) == 2) \
++		field = cpu_to_le16(value); \
++	else if (sizeof(field) == 1) \
++		field = (value); \
++	else \
++		BUG_wrong_field_size(); \
++} while (0)
++
++#define FETCH_LE32(field) \
++	(sizeof(field) == 4 ? cpu_to_le32(field) : BUG_wrong_field_size())
++
++enum {
++	OPT_L = 1 << 0,	// label
++};
++
++int tune2fs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int tune2fs_main(int argc UNUSED_PARAM, char **argv)
++{
++	unsigned opts;
++	const char *label;
++	struct ext2_super_block *sb;
++	int fd;
++
++	opt_complementary = "=1";
++	opts = getopt32(argv, "L:", &label);
++	argv += optind; // argv[0] -- device
++
++	if (!opts)
++		bb_show_usage();
++
++	// read superblock
++	fd = xopen(argv[0], O_RDWR);
++	xlseek(fd, 1024, SEEK_SET);
++	sb = xzalloc(1024);
++	xread(fd, sb, 1024);
++
++	// mangle superblock
++	//STORE_LE(sb->s_wtime, time(NULL)); - why bother?
++	// set the label
++	if (1 /*opts & OPT_L*/)
++		safe_strncpy((char *)sb->s_volume_name, label, sizeof(sb->s_volume_name));
++	// write superblock
++	xlseek(fd, 1024, SEEK_SET);
++	xwrite(fd, sb, 1024);
++
++	if (ENABLE_FEATURE_CLEAN_UP) {
++		free(sb);
++	}
++
++	xclose(fd);
++	return EXIT_SUCCESS;
++}

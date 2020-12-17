@@ -1,0 +1,84 @@
+2008-07-20 17:50:58 +0000
+diff --git a/libbb/parse_config.c b/libbb/parse_config.c
+index 68caa2c..3174a64 100644
+--- a/libbb/parse_config.c
++++ b/libbb/parse_config.c
+@@ -199,7 +199,8 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 		} else {
+ 			// vanilla token. cut the line at the first delim
+ 			q = line + strcspn(line, delims);
+-			*q++ = '\0';
++			if (*q) // watch out: do not step past the line end!
++				*q++ = '\0';
+ 		}
+ 		// pin token
+ 		if ((flags & (PARSE_DONT_REDUCE|PARSE_DONT_TRIM)) || *line) {
+@@ -207,6 +208,7 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 			tokens[ii++] = line;
+ 		}
+ 		line = q;
++		//bb_info_msg("A[%s]", line);
+ 	}
+ 
+ 	if (ii < mintokens)
+diff --git a/testsuite/parse.tests b/testsuite/parse.tests
+index 1b43f9c..06be8d2 100755
+--- a/testsuite/parse.tests
++++ b/testsuite/parse.tests
+@@ -23,7 +23,7 @@ testing "notrim" \
+ 	"-" \
+ 	" sda 0:0 644 @echo @echo TEST \n"
+ 
+-FILE=__parse.fstab
++FILE=__parse
+ cat >$FILE <<EOF
+ #
+ # Device         Point               System                       Options
+@@ -59,6 +59,47 @@ testing "polluted fstab" \
+ 	"`cat $FILE.res`\n" \
+ 	"" \
+ 	""
++cp ../examples/inittab $FILE
++cat >$FILE.res <<EOF
++[][][sysinit][/etc/init.d/rcS]
++[][][askfirst][-/bin/sh]
++[tty2][][askfirst][-/bin/sh]
++[tty3][][askfirst][-/bin/sh]
++[tty4][][askfirst][-/bin/sh]
++[tty4][][respawn][/sbin/getty 38400 tty5]
++[tty5][][respawn][/sbin/getty 38400 tty6]
++[][][restart][/sbin/init]
++[][][ctrlaltdel][/sbin/reboot]
++[][][shutdown][/bin/umount -a -r]
++[][][shutdown][/sbin/swapoff -a]
++EOF
++
++testing "inittab from examples" \
++	"parse -n 4 -m 4 -f $(($GREEDY+$NO_TRIM)) -d'#:' $FILE" \
++	"`cat $FILE.res`\n" \
++	"" \
++	""
++
++cp ../examples/udhcp/udhcpd.conf $FILE
++cat >$FILE.res <<EOF
++[start][192.168.0.20]
++[end][192.168.0.254]
++[interface][eth0]
++[opt][dns][192.168.10.2][192.168.10.10]
++[option][subnet][255.255.255.0]
++[opt][router][192.168.10.2]
++[opt][wins][192.168.10.10]
++[option][dns][129.219.13.81]
++[option][domain][local]
++[option][lease][864000]
++EOF
++
++testing "udhcpd.conf from examples" \
++	"parse -n 127 $FILE" \
++	"`cat $FILE.res`\n" \
++	"" \
++	""
++
+ rm -f $FILE $FILE.res
+ 
+ exit $FAILCOUNT

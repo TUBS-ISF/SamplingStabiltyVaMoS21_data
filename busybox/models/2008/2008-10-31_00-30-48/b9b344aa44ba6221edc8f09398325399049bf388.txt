@@ -1,0 +1,70 @@
+2008-10-31 00:30:48 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 9e18ff6..ac62fbf 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2041,11 +2041,12 @@
+      "\n	-u	Unicode (utf-8)" \
+ 
+ #define kill_trivial_usage \
+-       "[-l] [-signal] process-id..."
++       "[-l] [-SIG] PID..."
+ #define kill_full_usage "\n\n" \
+-       "Send a signal (default is TERM) to the specified process(es)\n" \
++       "Send a signal (default is TERM) to given PIDs\n" \
+      "\nOptions:" \
+      "\n	-l	List all signal names and numbers" \
++/*   "\n	-s SIG	Yet another way of specifying SIG" */ \
+ 
+ #define kill_example_usage \
+        "$ ps | grep apache\n" \
+@@ -2058,22 +2059,24 @@
+        "$ kill 252\n"
+ 
+ #define killall_trivial_usage \
+-       "[-l] [-q] [-signal] process-name..."
++       "[-l] [-q] [-SIG] process-name..."
+ #define killall_full_usage "\n\n" \
+-       "Send a signal (default is TERM) to the specified process(es)\n" \
++       "Send a signal (default is TERM) to given processes\n" \
+      "\nOptions:" \
+      "\n	-l	List all signal names and numbers" \
++/*   "\n	-s SIG	Yet another way of specifying SIG" */ \
+      "\n	-q	Do not complain if no processes were killed" \
+ 
+ #define killall_example_usage \
+        "$ killall apache\n"
+ 
+ #define killall5_trivial_usage \
+-       "[-l] [-signal]"
++       "[-l] [-SIG]"
+ #define killall5_full_usage "\n\n" \
+        "Send a signal (default is TERM) to all processes outside current session\n" \
+      "\nOptions:" \
+      "\n	-l	List all signal names and numbers" \
++/*   "\n	-s SIG	Yet another way of specifying SIG" */ \
+ 
+ #define klogd_trivial_usage \
+        "[-c N] [-n]"
+diff --git a/procps/kill.c b/procps/kill.c
+index ed659af..1405500 100644
+--- a/procps/kill.c
++++ b/procps/kill.c
+@@ -96,10 +96,14 @@ int kill_main(int argc, char **argv)
+ 		if (arg[0] != '-') goto do_it_now;
+ 	}
+ 
+-	/* -SIG */
+-	signo = get_signum(&arg[1]);
++	arg++; /* skip '-' */
++	if (argc > 1 && arg[0] == 's' && arg[1] == '\0') { /* -s SIG? */
++		argc--;
++		arg = *++argv;
++	} /* else it must be -SIG */
++	signo = get_signum(arg);
+ 	if (signo < 0) { /* || signo > MAX_SIGNUM ? */
+-		bb_error_msg("bad signal name '%s'", &arg[1]);
++		bb_error_msg("bad signal name '%s'", arg);
+ 		return EXIT_FAILURE;
+ 	}
+ 	arg = *++argv;

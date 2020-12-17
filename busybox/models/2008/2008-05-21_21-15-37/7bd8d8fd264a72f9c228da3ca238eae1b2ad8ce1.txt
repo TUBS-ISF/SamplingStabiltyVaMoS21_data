@@ -1,0 +1,16 @@
+2008-05-21 21:15:37 +0000
+diff --git a/scripts/bloat-o-meter b/scripts/bloat-o-meter
+index 49f5527..76d342c 100755
+--- a/scripts/bloat-o-meter
++++ b/scripts/bloat-o-meter
+@@ -21,9 +21,8 @@ for f in sys.argv[1], sys.argv[2]:
+ def getsizes(file):
+     sym = {}
+     for l in os.popen("nm --size-sort " + file).readlines():
+-        l = l.strip()
+ 	# Skip empty lines
+-        if not len(l): continue
++        if not len(l.strip()): continue
+ 	# Skip archive members
+         if len(l.split()) == 1 and l.endswith(':'):
+           continue

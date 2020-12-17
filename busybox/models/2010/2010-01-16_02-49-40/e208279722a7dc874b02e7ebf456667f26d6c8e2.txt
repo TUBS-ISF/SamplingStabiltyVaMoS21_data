@@ -1,0 +1,43 @@
+2010-01-16 02:49:40 +0100
+diff --git a/testsuite/busybox.tests b/testsuite/busybox.tests
+index 7c44b1e..6eeb325 100755
+--- a/testsuite/busybox.tests
++++ b/testsuite/busybox.tests
+@@ -6,12 +6,12 @@
+ 
+ . ./testing.sh
+ 
+-HELPDUMP=`busybox`
++HELPDUMP=`true | busybox 2>&1 | cat`
+ 
+ # We need to test under calling the binary under other names.
+ 
+ 
+-testing "busybox --help busybox" "busybox --help busybox" "$HELPDUMP\n\n" "" ""
++testing "busybox --help busybox" "true | busybox --help busybox 2>&1 | cat" "$HELPDUMP\n\n" "" ""
+ 
+ ln -s `which busybox` busybox-suffix
+ for i in busybox ./busybox-suffix
+@@ -28,8 +28,8 @@ do
+ 
+ 	optional CAT
+ 	testing "" "$i cat" "moo" "" "moo"
+-	testing "$i --help cat" "$i --help cat 2>&1 | grep prints" \
+-		"Concatenates FILE(s) and prints them to stdout.\n" "" ""
++	testing "$i --help cat" "$i --help cat 2>&1 | grep print" \
++		"Concatenate FILEs and print them to stdout\n" "" ""
+ 	optional ""
+ 
+ 	testing "$i --help unknown" "$i --help unknown 2>&1" \
+diff --git a/testsuite/runtest b/testsuite/runtest
+index 3ff4b96..10563d7 100755
+--- a/testsuite/runtest
++++ b/testsuite/runtest
+@@ -92,6 +92,7 @@ if [ x"$1" = x"-v" ]; then
+ fi
+ 
+ implemented=$(
++	printf "busybox " # always implemented
+ 	"$bindir/busybox" 2>&1 |
+ 	while read line; do
+ 		if [ x"$line" = x"Currently defined functions:" ]; then

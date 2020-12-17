@@ -1,0 +1,131 @@
+2009-03-03 18:47:56 +0000
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index ad39be0..9454833 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -100,8 +100,7 @@ static int FAST_FUNC config_file_action(const char *filename,
+ 	}
+ 	config_close(p);
+ error:
+-	if (ENABLE_FEATURE_CLEAN_UP)
+-		RELEASE_CONFIG_BUFFER(modname);
++	RELEASE_CONFIG_BUFFER(modname);
+ 	return rc;
+ }
+ 
+@@ -141,8 +140,13 @@ static int do_modprobe(struct modprobe_conf *conf, const char *module)
+ 	int rc = -1;
+ 
+ 	p = config_open2(CONFIG_DEFAULT_DEPMOD_FILE, fopen_for_read);
++	/* Modprobe does not work at all without modprobe.dep,
++	 * even if the full module name is given. Returning error here
++	 * was making us later confuse user with this message:
++	 * "module /full/path/to/existing/file/module.ko not found".
++	 * It's better to die immediately, with good message: */
+ 	if (p == NULL)
+-		goto error;
++		bb_perror_msg_and_die("can't open '%s'", CONFIG_DEFAULT_DEPMOD_FILE);
+ 
+ 	while (config_read(p, tokens, 2, 1, "# \t", PARSE_NORMAL)) {
+ 		colon = last_char_is(tokens[0], ':');
+@@ -179,23 +183,21 @@ static int do_modprobe(struct modprobe_conf *conf, const char *module)
+ 			rc = bb_init_module(fn, options);
+ 			if (rc == 0)
+ 				llist_add_to(&loaded, xstrdup(modname));
+-			if (ENABLE_FEATURE_CLEAN_UP)
+-				free(options);
++			free(options);
+ 		}
+ 
+-		if (ENABLE_FEATURE_CLEAN_UP)
+-			free(fn);
++		free(fn);
+ 	}
+ 
+-error_not_found:
++ error_not_found:
+ 	config_close(p);
+-error:
+-	if (ENABLE_FEATURE_CLEAN_UP)
+-		RELEASE_CONFIG_BUFFER(modname);
++
+ 	if (rc > 0 && !(option_mask32 & INSMOD_OPT_SILENT))
+ 		bb_error_msg("failed to %sload module %s: %s",
+ 			     (option_mask32 & MODPROBE_OPT_REMOVE) ? "un" : "",
+ 			     module, moderror(rc));
++
++	RELEASE_CONFIG_BUFFER(modname);
+ 	return rc;
+ }
+ 
+@@ -278,8 +280,7 @@ int modprobe_main(int argc UNUSED_PARAM, char **argv)
+ 				char *realname = llist_pop(&conf->aliases);
+ 				if (check_blacklist(conf, realname))
+ 					do_modprobe(conf, realname);
+-				if (ENABLE_FEATURE_CLEAN_UP)
+-					free(realname);
++				free(realname);
+ 			}
+ 		}
+ 		argv++;
+diff --git a/procps/fuser.c b/procps/fuser.c
+index 7297bfe..dc3d01b 100644
+--- a/procps/fuser.c
++++ b/procps/fuser.c
+@@ -325,7 +325,7 @@ Find processes which use FILEs or PORTs
+ 			free(proto);
+ 		} else { /* FILE */
+ 			if (!file_to_dev_inode(*pp, &dev, &inode))
+-				bb_perror_msg_and_die("can't open %s", *pp);
++				bb_perror_msg_and_die("can't open '%s'", *pp);
+ 			ilist = add_inode(ilist, dev, inode);
+ 		}
+ 		pp++;
+diff --git a/shell/ash.c b/shell/ash.c
+index 3abca75..b333516 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -4540,7 +4540,7 @@ forkchild(struct job *jp, /*union node *n,*/ int mode)
+ 		if (jp->nprocs == 0) {
+ 			close(0);
+ 			if (open(bb_dev_null, O_RDONLY) != 0)
+-				ash_msg_and_raise_error("can't open %s", bb_dev_null);
++				ash_msg_and_raise_error("can't open '%s'", bb_dev_null);
+ 		}
+ 	}
+ 	if (!oldlvl) {
+@@ -9573,7 +9573,7 @@ setinputfile(const char *fname, int flags)
+ 	if (fd < 0) {
+ 		if (flags & INPUT_NOFILE_OK)
+ 			goto out;
+-		ash_msg_and_raise_error("can't open %s", fname);
++		ash_msg_and_raise_error("can't open '%s'", fname);
+ 	}
+ 	if (fd < 10) {
+ 		fd2 = copyfd(fd, 10);
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index b1f0b65..dc61e23 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -83,7 +83,7 @@ struct partition {
+ 	unsigned char size4[4];         /* nr of sectors in partition */
+ } PACKED;
+ 
+-static const char unable_to_open[] ALIGN1 = "can't open %s";
++static const char unable_to_open[] ALIGN1 = "can't open '%s'";
+ static const char unable_to_read[] ALIGN1 = "can't read from %s";
+ static const char unable_to_seek[] ALIGN1 = "can't seek on %s";
+ 
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index 0662cea..901c909 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -69,7 +69,7 @@ int umount_main(int argc UNUSED_PARAM, char **argv)
+ 	fp = setmntent(bb_path_mtab_file, "r");
+ 	if (!fp) {
+ 		if (opt & OPT_ALL)
+-			bb_error_msg_and_die("can't open %s", bb_path_mtab_file);
++			bb_error_msg_and_die("can't open '%s'", bb_path_mtab_file);
+ 	} else {
+ 		while (getmntent_r(fp, &me, path, PATH_MAX)) {
+ 			/* Match fstype if passed */

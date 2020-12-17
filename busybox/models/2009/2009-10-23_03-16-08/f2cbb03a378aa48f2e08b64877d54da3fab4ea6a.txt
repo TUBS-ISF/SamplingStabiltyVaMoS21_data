@@ -1,0 +1,195 @@
+2009-10-23 03:16:08 +0200
+diff --git a/archival/gzip.c b/archival/gzip.c
+index 1e56c9d..7150569 100644
+--- a/archival/gzip.c
++++ b/archival/gzip.c
+@@ -1173,7 +1173,7 @@ static void gen_codes(ct_data * tree, int max_code)
+ 
+ 		Tracec(tree != G2.static_ltree,
+ 			   (stderr, "\nn %3d %c l %2d c %4x (%x) ", n,
+-				(isgraph(n) ? n : ' '), len, tree[n].Code,
++				(n > ' ' ? n : ' '), len, tree[n].Code,
+ 				next_code[len] - 1));
+ 	}
+ }
+@@ -1541,7 +1541,7 @@ static void compress_block(ct_data * ltree, ct_data * dtree)
+ 		lc = G1.l_buf[lx++];
+ 		if ((flag & 1) == 0) {
+ 			SEND_CODE(lc, ltree);	/* send a literal byte */
+-			Tracecv(isgraph(lc), (stderr, " '%c' ", lc));
++			Tracecv(lc > ' ', (stderr, " '%c' ", lc));
+ 		} else {
+ 			/* Here, lc is the match length - MIN_MATCH */
+ 			code = G2.length_code[lc];
+diff --git a/coreutils/od.c b/coreutils/od.c
+index e4179a3..228db19 100644
+--- a/coreutils/od.c
++++ b/coreutils/od.c
+@@ -20,9 +20,6 @@
+ 
+ #include "dump.h"
+ 
+-#define isdecdigit(c) isdigit(c)
+-#define ishexdigit(c) (isxdigit)(c)
+-
+ static void
+ odoffset(dumper_t *dumper, int argc, char ***argvp)
+ {
+@@ -51,8 +48,8 @@ odoffset(dumper_t *dumper, int argc, char ***argvp)
+ 
+ 	if ((*p != '+')
+ 		&& (argc < 2
+-			|| (!isdecdigit(p[0])
+-				&& ((p[0] != 'x') || !ishexdigit(p[1])))))
++			|| (!isdigit(p[0])
++				&& ((p[0] != 'x') || !isxdigit(p[1])))))
+ 		return;
+ 
+ 	base = 0;
+@@ -62,7 +59,7 @@ odoffset(dumper_t *dumper, int argc, char ***argvp)
+ 	 */
+ 	if (p[0] == '+')
+ 		++p;
+-	if (p[0] == 'x' && ishexdigit(p[1])) {
++	if (p[0] == 'x' && isxdigit(p[1])) {
+ 		++p;
+ 		base = 16;
+ 	} else if (p[0] == '0' && p[1] == 'x') {
+@@ -72,10 +69,10 @@ odoffset(dumper_t *dumper, int argc, char ***argvp)
+ 
+ 	/* skip over the number */
+ 	if (base == 16)
+-		for (num = p; ishexdigit(*p); ++p)
++		for (num = p; isxdigit(*p); ++p)
+ 			continue;
+ 	else
+-		for (num = p; isdecdigit(*p); ++p)
++		for (num = p; isdigit(*p); ++p)
+ 			continue;
+ 
+ 	/* check for no number */
+diff --git a/include/libbb.h b/include/libbb.h
+index ad0d59d..8058463 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1566,8 +1566,11 @@ extern const char bb_default_login_shell[];
+ #define RB_POWER_OFF   0x4321fedc
+ #endif
+ 
+-/* Make sure we call functions instead of macros.  */
++/* Make sure we call functions instead of these macros */
+ #undef isalnum
++#undef ispunct
++#undef isxdigit
++/* and these we'll redefine */
+ #undef isalpha
+ #undef isascii
+ #undef isblank
+@@ -1575,25 +1578,32 @@ extern const char bb_default_login_shell[];
+ #undef isgraph
+ #undef islower
+ #undef isprint
+-#undef ispunct
+ #undef isupper
+-#undef isxdigit
++#undef isdigit
++#undef isspace
+ 
+ /* This one is more efficient - we save ~500 bytes.
+  * BTW, x86 likes (unsigned char) cast more than (unsigned). */
+-#undef isdigit
+ #define isdigit(a) ((unsigned char)((a) - '0') <= 9)
+ 
+-/* This one is more efficient too! ~200 bytes */
++#define isascii(a) ((unsigned char)(a) <= 0x7f)
++#define isgraph(a) ((unsigned char)(a) > ' ')
++#define isprint(a) ((unsigned char)(a) >= ' ')
++#define isupper(a) ((unsigned char)((a) - 'A') <= ('Z' - 'A'))
++#define islower(a) ((unsigned char)((a) - 'a') <= ('z' - 'a'))
++#define isalpha(a) ((unsigned char)(((a) | 0x20) - 'a') <= ('z' - 'a'))
++#define isblank(a) ({ unsigned char bb__isblank = (a); bb__isblank == ' ' || bb__isblank == '\t'; })
++#define iscntrl(a) ({ unsigned char bb__iscntrl = (a); bb__iscntrl < ' ' || bb__iscntrl == 0x7f; })
++
+ /* In POSIX/C locale (the only locale we care about: do we REALLY want
+  * to allow Unicode whitespace in, say, .conf files? nuts!)
+  * isspace is only these chars: "\t\n\v\f\r" and space.
+  * "\t\n\v\f\r" happen to have ASCII codes 9,10,11,12,13.
+  * Use that.
+  */
+-#undef isspace
+ #define isspace(a) ({ unsigned char bb__isspace = (a) - 9; bb__isspace == (' ' - 9) || bb__isspace <= (13 - 9); })
+ 
++
+ #define ARRAY_SIZE(x) ((unsigned)(sizeof(x) / sizeof((x)[0])))
+ 
+ 
+diff --git a/loginutils/login.c b/loginutils/login.c
+index ed2ab7f..70e8562 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -225,19 +225,22 @@ static void get_username_or_die(char *buf, int size_buf)
+ 	/* skip whitespace */
+ 	do {
+ 		c = getchar();
+-		if (c == EOF) exit(EXIT_FAILURE);
++		if (c == EOF)
++			exit(EXIT_FAILURE);
+ 		if (c == '\n') {
+-			if (!--cntdown) exit(EXIT_FAILURE);
++			if (!--cntdown)
++				exit(EXIT_FAILURE);
+ 			goto prompt;
+ 		}
+-	} while (isspace(c));
++	} while (isspace(c)); /* maybe isblank? */
+ 
+ 	*buf++ = c;
+ 	if (!fgets(buf, size_buf-2, stdin))
+ 		exit(EXIT_FAILURE);
+ 	if (!strchr(buf, '\n'))
+ 		exit(EXIT_FAILURE);
+-	while (isgraph(*buf)) buf++;
++	while ((unsigned char)*buf > ' ')
++		buf++;
+ 	*buf = '\0';
+ }
+ 
+diff --git a/shell/lash_unused.c b/shell/lash_unused.c
+index f71daf2..107ce88 100644
+--- a/shell/lash_unused.c
++++ b/shell/lash_unused.c
+@@ -841,7 +841,7 @@ static int expand_arguments(char *command)
+ 				num_skip_chars = 1;
+ 			} else {
+ 				src = dst + 1;
+-				while ((isalnum)(*src) || *src == '_') src++;
++				while (isalnum(*src) || *src == '_') src++;
+ 			}
+ 			if (src == NULL) {
+ 				src = dst+dstlen;
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 1bb3a9d..6a194fd 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -460,7 +460,7 @@ read_line(const char *prompt)
+ 		line_buffer[--sz] = '\0';
+ 
+ 	line_ptr = line_buffer;
+-	while (*line_ptr && !isgraph(*line_ptr))
++	while (*line_ptr != '\0' && (unsigned char)*line_ptr <= ' ')
+ 		line_ptr++;
+ 	return *line_ptr;
+ }
+diff --git a/util-linux/ipcrm.c b/util-linux/ipcrm.c
+index 5dcda85..5e18c28 100644
+--- a/util-linux/ipcrm.c
++++ b/util-linux/ipcrm.c
+@@ -122,7 +122,7 @@ int ipcrm_main(int argc, char **argv)
+ 	while ((c = getopt(argc, argv, "q:m:s:Q:M:S:h?")) != -1) {
+ 		int result;
+ 		int id = 0;
+-		int iskey = (isupper)(c);
++		int iskey = isupper(c);
+ 
+ 		/* needed to delete semaphores */
+ 		union semun arg;

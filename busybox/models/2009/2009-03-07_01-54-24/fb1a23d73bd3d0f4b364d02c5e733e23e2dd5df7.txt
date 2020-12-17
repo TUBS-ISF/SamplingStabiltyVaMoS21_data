@@ -1,0 +1,26 @@
+2009-03-07 01:54:24 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index eefc132..3e21cbf 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -887,7 +887,7 @@ extern void bb_error_msg_and_die(const char *s, ...) __attribute__ ((noreturn, f
+ extern void bb_perror_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2))) FAST_FUNC;
+ extern void bb_simple_perror_msg(const char *s) FAST_FUNC;
+ extern void bb_perror_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2))) FAST_FUNC;
+-extern void bb_simple_perror_msg_and_die(const char *s) __attribute__ ((noreturn)) FAST_FUNC;
++extern void bb_simple_perror_msg_and_die(const char *s) NORETURN FAST_FUNC;
+ extern void bb_herror_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2))) FAST_FUNC;
+ extern void bb_herror_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2))) FAST_FUNC;
+ extern void bb_perror_nomsg_and_die(void) NORETURN FAST_FUNC;
+diff --git a/init/halt.c b/init/halt.c
+index e852b87..62f93c5 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -95,6 +95,6 @@ int halt_main(int argc UNUSED_PARAM, char **argv)
+ 		rc = reboot(magic[which]);
+ 
+ 	if (rc)
+-		bb_error_msg("no");
++		bb_perror_nomsg_and_die();
+ 	return rc;
+ }

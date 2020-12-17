@@ -1,0 +1,15 @@
+2009-03-09 17:22:16 +0000
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index 2a7d800..29589d1 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -828,7 +828,8 @@ int ftpd_main(int argc, char **argv)
+ 		 * failure */
+ 	}
+ 
+-	openlog(applet_name, LOG_PID, LOG_DAEMON);
++	/* LOG_NDELAY is needed since we may chroot later */
++	openlog(applet_name, LOG_PID | LOG_NDELAY, LOG_DAEMON);
+ 	logmode |= LOGMODE_SYSLOG;
+ 	if (!(opts & OPT_v))
+ 		logmode = LOGMODE_SYSLOG;

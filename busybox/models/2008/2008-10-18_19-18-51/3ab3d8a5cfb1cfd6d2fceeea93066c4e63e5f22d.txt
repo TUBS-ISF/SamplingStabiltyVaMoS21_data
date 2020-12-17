@@ -1,0 +1,15 @@
+2008-10-18 19:18:51 +0000
+diff --git a/libbb/bb_strtod.c b/libbb/bb_strtod.c
+index 0515ff8..39bdeb5 100644
+--- a/libbb/bb_strtod.c
++++ b/libbb/bb_strtod.c
+@@ -17,7 +17,8 @@ double FAST_FUNC bb_strtod(const char *arg, char **endp)
+ 	double v;
+ 	char *endptr;
+ 
+-	if (arg[0] != '-' && NOT_DIGIT(arg[0]))
++	/* Allow .NN form. People want to use "sleep .15" etc */
++	if (arg[0] != '-' && arg[0] != '.' && NOT_DIGIT(arg[0]))
+ 		goto err;
+ 	errno = 0;
+ 	v = strtod(arg, &endptr);

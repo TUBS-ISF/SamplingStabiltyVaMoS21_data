@@ -1,0 +1,109 @@
+2009-05-05 09:05:30 -0400
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..1618712
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,27 @@
++#
++# Kbuild ignores
++#
++.*
++*.o
++*.o.*
++*.a
++*.s
++
++#
++# Never ignore these
++#
++!.gitignore
++
++#
++# Normal output
++#
++/busybox
++/busybox_unstripped*
++
++#
++# Backups / patches
++#
++*~
++*.orig
++*.rej
++/*.patch
+diff --git a/applets/.gitignore b/applets/.gitignore
+new file mode 100644
+index 0000000..cc932fc
+--- /dev/null
++++ b/applets/.gitignore
+@@ -0,0 +1,2 @@
++/applet_tables
++/usage
+diff --git a/docs/.gitignore b/docs/.gitignore
+new file mode 100644
+index 0000000..9d1b7c2
+--- /dev/null
++++ b/docs/.gitignore
+@@ -0,0 +1,4 @@
++/BusyBox.1
++/BusyBox.html
++/BusyBox.txt
++/busybox.pod
+diff --git a/include/.gitignore b/include/.gitignore
+new file mode 100644
+index 0000000..f0ce546
+--- /dev/null
++++ b/include/.gitignore
+@@ -0,0 +1,6 @@
++/config
++
++/applet_tables.h
++/autoconf.h
++/bbconfigopts.h
++/usage_compressed.h
+diff --git a/scripts/basic/.gitignore b/scripts/basic/.gitignore
+new file mode 100644
+index 0000000..d91e941
+--- /dev/null
++++ b/scripts/basic/.gitignore
+@@ -0,0 +1,4 @@
++hash
++fixdep
++docproc
++split-include
+diff --git a/scripts/kconfig/.gitignore b/scripts/kconfig/.gitignore
+new file mode 100644
+index 0000000..b49584c
+--- /dev/null
++++ b/scripts/kconfig/.gitignore
+@@ -0,0 +1,19 @@
++#
++# Generated files
++#
++config*
++lex.*.c
++*.tab.c
++*.tab.h
++zconf.hash.c
++*.moc
++lkc_defs.h
++
++#
++# configuration programs
++#
++conf
++mconf
++qconf
++gconf
++kxgettext
+diff --git a/scripts/kconfig/lxdialog/.gitignore b/scripts/kconfig/lxdialog/.gitignore
+new file mode 100644
+index 0000000..90b08ff
+--- /dev/null
++++ b/scripts/kconfig/lxdialog/.gitignore
+@@ -0,0 +1,4 @@
++#
++# Generated files
++#
++lxdialog

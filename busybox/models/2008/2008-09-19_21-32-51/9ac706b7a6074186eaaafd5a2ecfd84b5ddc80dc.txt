@@ -1,0 +1,17 @@
+2008-09-19 21:32:51 +0000
+diff --git a/findutils/grep.c b/findutils/grep.c
+index e0f01c9..9d38ef9 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -559,6 +559,11 @@ int grep_main(int argc, char **argv)
+ 	) {
+ 		reflags |= REG_EXTENDED;
+ 	}
++#if ENABLE_EXTRA_COMPAT
++	else {
++		reflags = RE_SYNTAX_GREP;
++	}
++#endif
+ 
+ 	if (option_mask32 & OPT_i) {
+ #if !ENABLE_EXTRA_COMPAT

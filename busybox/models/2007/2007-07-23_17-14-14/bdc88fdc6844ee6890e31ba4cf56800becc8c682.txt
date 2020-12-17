@@ -1,0 +1,923 @@
+2007-07-23 17:14:14 +0000
+diff --git a/archival/tar.c b/archival/tar.c
+index bcbb7a9..d03b18b 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -715,45 +715,44 @@ enum {
+ 	OPT_NOPRESERVE_PERM = 1 << OPTBIT_NOPRESERVE_PERM, // no-same-permissions
+ };
+ #if ENABLE_FEATURE_TAR_LONG_OPTIONS
+-static const struct option tar_long_options[] = {
+-	{ "list",               0,  NULL,   't' },
+-	{ "extract",            0,  NULL,   'x' },
+-	{ "directory",          1,  NULL,   'C' },
+-	{ "file",               1,  NULL,   'f' },
+-	{ "to-stdout",          0,  NULL,   'O' },
+-	{ "same-permissions",   0,  NULL,   'p' },
+-	{ "verbose",            0,  NULL,   'v' },
+-	{ "keep-old",           0,  NULL,   'k' },
++static const char tar_longopts[] =
++	"list\0"                No_argument       "t"
++	"extract\0"             No_argument       "x"
++	"directory\0"           Required_argument "C"
++	"file\0"                Required_argument "f"
++	"to-stdout\0"           No_argument       "O"
++	"same-permissions\0"    No_argument       "p"
++	"verbose\0"             No_argument       "v"
++	"keep-old\0"            No_argument       "k"
+ # if ENABLE_FEATURE_TAR_CREATE
+-	{ "create",             0,  NULL,   'c' },
+-	{ "dereference",        0,  NULL,   'h' },
++	"create\0"              No_argument       "c"
++	"dereference\0"         No_argument       "h"
+ # endif
+ # if ENABLE_FEATURE_TAR_BZIP2
+-	{ "bzip2",              0,  NULL,   'j' },
++	"bzip2\0"               No_argument       "j"
+ # endif
+ # if ENABLE_FEATURE_TAR_LZMA
+-	{ "lzma",               0,  NULL,   'a' },
++	"lzma\0"                No_argument       "a"
+ # endif
+ # if ENABLE_FEATURE_TAR_FROM
+-	{ "files-from",         1,  NULL,   'T' },
+-	{ "exclude-from",       1,  NULL,   'X' },
++	"files-from\0"          Required_argument "T"
++	"exclude-from\0"        Required_argument "X"
+ # endif
+ # if ENABLE_FEATURE_TAR_GZIP
+-	{ "gzip",               0,  NULL,   'z' },
++	"gzip\0"                No_argument       "z"
+ # endif
+ # if ENABLE_FEATURE_TAR_COMPRESS
+-	{ "compress",           0,  NULL,   'Z' },
++	"compress\0"            No_argument       "Z"
+ # endif
+-	{ "no-same-owner",      0,  NULL,   0xfd },
+-	{ "no-same-permissions",0,  NULL,   0xfe },
++	"no-same-owner\0"       No_argument       "\xfd"
++	"no-same-permissions\0" No_argument       "\xfe"
+ 	/* --exclude takes next bit position in option mask, */
+ 	/* therefore we have to either put it _after_ --no-same-perm */
+ 	/* or add OPT[BIT]_EXCLUDE before OPT[BIT]_NOPRESERVE_OWN */
+ # if ENABLE_FEATURE_TAR_FROM
+-	{ "exclude",            1,  NULL,   0xff },
++	"exclude\0"             Required_argument "\xff"
+ # endif
+-	{ 0,                    0, 0, 0 }
+-};
++	"\0";
+ #endif
+ 
+ int tar_main(int argc, char **argv);
+@@ -787,7 +786,7 @@ int tar_main(int argc, char **argv)
+ 		USE_FEATURE_TAR_CREATE("c--tx:t--cx:x--ct") // mutually exclusive
+ 		SKIP_FEATURE_TAR_CREATE("t--x:x--t"); // mutually exclusive
+ #if ENABLE_FEATURE_TAR_LONG_OPTIONS
+-	applet_long_options = tar_long_options;
++	applet_long_options = tar_longopts;
+ #endif
+ 	opt = getopt32(argc, argv,
+ 		"txC:f:Opvk"
+diff --git a/console-tools/setconsole.c b/console-tools/setconsole.c
+index 8745b3b..2e60c37 100644
+--- a/console-tools/setconsole.c
++++ b/console-tools/setconsole.c
+@@ -11,10 +11,9 @@
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_SETCONSOLE_LONG_OPTIONS
+-static const struct option setconsole_long_options[] = {
+-	{ "reset", 0, NULL, 'r' },
+-	{ 0, 0, 0, 0 }
+-};
++static const char setconsole_longopts[] =
++	"reset\0" No_argument "r"
++	"\0";
+ #endif
+ 
+ #define OPT_SETCONS_RESET 1
+@@ -26,7 +25,7 @@ int setconsole_main(int argc, char **argv)
+ 	const char *device = CURRENT_TTY;
+ 
+ #if ENABLE_FEATURE_SETCONSOLE_LONG_OPTIONS
+-	applet_long_options = setconsole_long_options;
++	applet_long_options = setconsole_longopts;
+ #endif
+ 	flags = getopt32(argc, argv, "r");
+ 
+diff --git a/coreutils/env.c b/coreutils/env.c
+index ad30f01..8d20eac 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -35,11 +35,10 @@ extern char **environ;
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_ENV_LONG_OPTIONS
+-static const struct option env_long_options[] = {
+-	{ "ignore-environment", 0, NULL, 'i' },
+-	{ "unset", 1, NULL, 'u' },
+-	{ 0, 0, 0, 0 }
+-};
++static const char env_longopts[] =
++	"ignore-environment\0" No_argument       "i"
++	"unset\0"              Required_argument "u"
++	"\0";
+ #endif
+ 
+ int env_main(int argc, char** argv);
+@@ -53,7 +52,7 @@ int env_main(int argc, char** argv)
+ 
+ 	opt_complementary = "u::";
+ #if ENABLE_FEATURE_ENV_LONG_OPTIONS
+-	applet_long_options = env_long_options;
++	applet_long_options = env_longopts;
+ #endif
+ 	opt = getopt32(argc, argv, "+iu:", &unset_env);
+ 	argv += optind;
+diff --git a/coreutils/install.c b/coreutils/install.c
+index 8d71fa0..8d54949 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -16,20 +16,19 @@
+ #include "libcoreutils/coreutils.h"
+ 
+ #if ENABLE_FEATURE_INSTALL_LONG_OPTIONS
+-static const struct option install_long_options[] = {
+-	{ "directory",           0, NULL, 'd' },
+-	{ "preserve-timestamps", 0, NULL, 'p' },
+-	{ "strip",               0, NULL, 's' },
+-	{ "group",               0, NULL, 'g' },
+-	{ "mode",                0, NULL, 'm' },
+-	{ "owner",               0, NULL, 'o' },
++static const char install_longopts[] =
++	"directory\0"           No_argument       "d"
++	"preserve-timestamps\0" No_argument       "p"
++	"strip\0"               No_argument       "s"
++	"group\0"               No_argument       "g"
++	"mode\0"                No_argument       "m"
++	"owner\0"               No_argument       "o"
+ #if ENABLE_SELINUX
+-	{ "context",             1, NULL, 'Z' },
+-	{ "preserve_context",    0, NULL, 0xff },
+-	{ "preserve-context",    0, NULL, 0xff },
++	"context\0"             Required_argument "Z"
++	"preserve_context\0"    No_argument       "\xff"
++	"preserve-context\0"    No_argument       "\xff"
+ #endif
+-	{ 0, 0, 0, 0 }
+-};
++	"\0";
+ #endif
+ 
+ 
+@@ -97,7 +96,7 @@ int install_main(int argc, char **argv)
+ 	};
+ 
+ #if ENABLE_FEATURE_INSTALL_LONG_OPTIONS
+-	applet_long_options = install_long_options;
++	applet_long_options = install_longopts;
+ #endif
+ 	opt_complementary = "s--d:d--s" USE_SELINUX(":Z--\xff:\xff--Z");
+ 	/* -c exists for backwards compatibility, it's needed */
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index a5bd0e3..8545edd 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -117,13 +117,12 @@ SPLIT_SUBDIR    = 2,
+ 
+ /* colored LS support by JaWi, janwillem.janssen@lxtreme.nl */
+ #if ENABLE_FEATURE_LS_COLOR
+-static int show_color;
++static smallint show_color;
+ /* long option entry used only for --color, which has no short option
+  * equivalent */
+-static const struct option ls_color_opt[] = {
+-	{ "color", optional_argument, NULL, 1 },
+-	{ NULL, 0, NULL, 0 }
+-};
++static const char ls_color_opt[] =
++	"color\0" Optional_argument "\xff" /* no short equivalent */
++	"\0";
+ #else
+ enum { show_color = 0 };
+ #endif
+diff --git a/coreutils/mkdir.c b/coreutils/mkdir.c
+index 60c03a1..b0595b4 100644
+--- a/coreutils/mkdir.c
++++ b/coreutils/mkdir.c
+@@ -25,14 +25,13 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ #if ENABLE_FEATURE_MKDIR_LONG_OPTIONS
+-static const struct option mkdir_long_options[] = {
+-	{ "mode"   , 1, NULL, 'm' },
+-	{ "parents", 0, NULL, 'p' },
++static const char mkdir_longopts[] =
++	"mode\0"    Required_argument "m"
++	"parents\0" No_argument       "p"
+ #if ENABLE_SELINUX
+-	{ "context", 1, NULL, 'Z' },
++	"context\0" Required_argument "Z"
+ #endif
+-	{ NULL, 0, NULL, 0 }
+-};
++	"\0";
+ #endif
+ 
+ int mkdir_main(int argc, char **argv);
+@@ -48,7 +47,7 @@ int mkdir_main(int argc, char **argv)
+ #endif
+ 
+ #if ENABLE_FEATURE_MKDIR_LONG_OPTIONS
+-	applet_long_options = mkdir_long_options;
++	applet_long_options = mkdir_longopts;
+ #endif
+ 	opt = getopt32(argc, argv, "m:p" USE_SELINUX("Z:"), &smode USE_SELINUX(,&scontext));
+ 	if (opt & 1) {
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index 8d9c982..bb96af8 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -21,11 +21,10 @@
+ #include "libcoreutils/coreutils.h"
+ 
+ #if ENABLE_FEATURE_MV_LONG_OPTIONS
+-static const struct option mv_long_options[] = {
+-	{ "interactive", 0, NULL, 'i' },
+-	{ "force", 0, NULL, 'f' },
+-	{ 0, 0, 0, 0 }
+-};
++static const char mv_longopts[] =
++	"interactive\0" No_argument "i"
++	"force\0"       No_argument "f"
++	"\0";
+ #endif
+ 
+ #define OPT_FILEUTILS_FORCE       1
+@@ -45,7 +44,7 @@ int mv_main(int argc, char **argv)
+ 	int copy_flag = 0;
+ 
+ #if ENABLE_FEATURE_MV_LONG_OPTIONS
+-	applet_long_options = mv_long_options;
++	applet_long_options = mv_longopts;
+ #endif
+ 	opt_complementary = "f-i:i-f";
+ 	flags = getopt32(argc, argv, "fi");
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index af5eba9..335efe7 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -1242,17 +1242,16 @@ int od_main(int argc, char **argv)
+ 		OPT_traditional = (1 << 18) * ENABLE_GETOPT_LONG,
+ 	};
+ #if ENABLE_GETOPT_LONG
+-	static const struct option long_options[] = {
+-		{ "skip-bytes",    required_argument, NULL, 'j' },
+-		{ "address-radix", required_argument, NULL, 'A' },
+-		{ "read-bytes",    required_argument, NULL, 'N' },
+-		{ "format",        required_argument, NULL, 't' },
+-		{ "output-duplicates", no_argument,   NULL, 'v' },
+-		{ "strings",       optional_argument, NULL, 'S' },
+-		{ "width",         optional_argument, NULL, 'w' },
+-		{ "traditional",   no_argument,       NULL, 0xff },
+-		{ NULL, 0, NULL, 0 }
+-	};
++	static const char od_longopts[] =
++		"skip-bytes\0"        Required_argument "j"
++		"address-radix\0"     Required_argument "A"
++		"read-bytes\0"        Required_argument "N"
++		"format\0"            Required_argument "t"
++		"output-duplicates\0" No_argument       "v"
++		"strings\0"           Optional_argument "S"
++		"width\0"             Optional_argument "w"
++		"traditional\0"       No_argument       "\xff"
++		"\0";
+ #endif
+ 	char *str_A, *str_N, *str_j, *str_S;
+ 	char *str_w = NULL;
+@@ -1267,7 +1266,7 @@ int od_main(int argc, char **argv)
+ 	/* Parse command line */
+ 	opt_complementary = "t::"; // list
+ #if ENABLE_GETOPT_LONG
+-	applet_long_options = long_options;
++	applet_long_options = od_longopts;
+ #endif
+ 	opt = getopt32(argc, argv, "A:N:abcdfhij:lot:vxsS:"
+ 		"w::", // -w with optional param
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index 42170bc..4173987 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -35,17 +35,16 @@
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_RUN_PARTS_LONG_OPTIONS
+-static const struct option runparts_long_options[] = {
+-	{ "arg",        1,      NULL,   'a' },
+-	{ "umask",      1,      NULL,   'u' },
+-	{ "test",       0,      NULL,   't' },
++static const char runparts_longopts[] =
++	"arg\0"     Required_argument "a"
++	"umask\0"   Required_argument "u"
++	"test\0"    No_argument       "t"
+ #if ENABLE_FEATURE_RUN_PARTS_FANCY
+-	{ "list",       0,      NULL,   'l' },
+-//XXX:TODO:	{ "reverse",       0,      NULL,   'r' },
+-//XXX:TODO:	{ "verbose",       0,      NULL,   'v' },
++	"list\0"    No_argument       "l"
++//TODO: "reverse\0" No_argument       "r"
++//TODO: "verbose\0" No_argument       "v"
+ #endif
+-	{ 0,            0,      0,      0   }
+-};
++	"\0";
+ #endif
+ 
+ struct globals {
+@@ -120,7 +119,7 @@ int run_parts_main(int argc, char **argv)
+ 	/* We require exactly one argument: the directory name */
+ 	opt_complementary = "=1:a::";
+ #if ENABLE_FEATURE_RUN_PARTS_LONG_OPTIONS
+-	applet_long_options = runparts_long_options;
++	applet_long_options = runparts_longopts;
+ #endif
+ 	tmp = getopt32(argc, argv, "a:u:t"USE_FEATURE_RUN_PARTS_FANCY("l"), &arg_list, &umask_p);
+ 	G.mode = tmp &~ (RUN_PARTS_OPT_a|RUN_PARTS_OPT_u);
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index fd9f60c..0c8dea7 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -194,29 +194,28 @@ static int do_stop(void)
+ }
+ 
+ #if ENABLE_FEATURE_START_STOP_DAEMON_LONG_OPTIONS
+-static const struct option long_options[] = {
+-	{ "stop",               0,      NULL,   'K' },
+-	{ "start",              0,      NULL,   'S' },
+-	{ "background",         0,      NULL,   'b' },
+-	{ "quiet",              0,      NULL,   'q' },
+-	{ "make-pidfile",       0,      NULL,   'm' },
++static const char start_stop_daemon_longopts[] =
++	"stop\0"         No_argument       "K"
++	"start\0"        No_argument       "S"
++	"background\0"   No_argument       "b"
++	"quiet\0"        No_argument       "q"
++	"make-pidfile\0" No_argument       "m"
+ #if ENABLE_FEATURE_START_STOP_DAEMON_FANCY
+-	{ "oknodo",             0,      NULL,   'o' },
+-	{ "verbose",            0,      NULL,   'v' },
+-	{ "nicelevel",          1,      NULL,   'N' },
++	"oknodo\0"       No_argument       "o"
++	"verbose\0"      No_argument       "v"
++	"nicelevel\0"    Required_argument "N"
+ #endif
+-	{ "startas",            1,      NULL,   'a' },
+-	{ "name",               1,      NULL,   'n' },
+-	{ "signal",             1,      NULL,   's' },
+-	{ "user",               1,      NULL,   'u' },
+-	{ "chuid",              1,      NULL,   'c' },
+-	{ "exec",               1,      NULL,   'x' },
+-	{ "pidfile",            1,      NULL,   'p' },
++	"startas\0"      Required_argument "a"
++	"name\0"         Required_argument "n"
++	"signal\0"       Required_argument "s"
++	"user\0"         Required_argument "u"
++	"chuid\0"        Required_argument "c"
++	"exec\0"         Required_argument "x"
++	"pidfile\0"      Required_argument "p"
+ #if ENABLE_FEATURE_START_STOP_DAEMON_FANCY
+-	{ "retry",              1,      NULL,   'R' },
++	"retry\0"        Required_argument "R"
+ #endif
+-	{ 0,                    0,      0,      0 }
+-};
++	"\0";
+ #endif
+ 
+ enum {
+@@ -250,7 +249,7 @@ int start_stop_daemon_main(int argc, char **argv)
+ 	char *opt_N;
+ #endif
+ #if ENABLE_FEATURE_START_STOP_DAEMON_LONG_OPTIONS
+-	applet_long_options = long_options;
++	applet_long_options = start_stop_daemon_longopts;
+ #endif
+ 
+ 	/* Check required one context option was given */
+diff --git a/include/libbb.h b/include/libbb.h
+index b8ec839..fe99e5e 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -590,7 +590,10 @@ void bb_sanitize_stdio(void);
+ 
+ extern const char *opt_complementary;
+ #if ENABLE_GETOPT_LONG
+-extern const struct option *applet_long_options;
++#define No_argument "\0"
++#define Required_argument "\001"
++#define Optional_argument "\002"
++extern const char *applet_long_options;
+ #endif
+ extern uint32_t option_mask32;
+ extern uint32_t getopt32(int argc, char **argv, const char *applet_opts, ...);
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index f5aaa70..e5d97e9 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -72,24 +72,21 @@ getopt32(int argc, char **argv, const char *applet_opts, ...)
+         env -i ls -d /
+         Here we want env to process just the '-i', not the '-d'.
+ 
+-const struct option *applet_long_options
++const char *applet_long_options
+ 
+-        This struct allows you to define long options.  The syntax for
+-        declaring the array is just like that of getopt's longopts.
+-        (see getopt(3))
++        This struct allows you to define long options:
+ 
+-        static const struct option applet_long_options[] = {
+-		//name,has_arg,flag,val
+-		{ "verbose", 0, 0, 'v' },
+-		{ 0, 0, 0, 0 }
+-        };
+-        applet_long_options = applet_long_options;
++        static const char applet_longopts[] =
++		//"name\0" has_arg val
++		"verbose\0" No_argument "v"
++		"\0";
++        applet_long_options = applet_longopts;
+ 
+         The last member of struct option (val) typically is set to
+         matching short option from applet_opts. If there is no matching
+         char in applet_opts, then:
+         - return bit have next position after short options
+-        - if has_arg is not "no_argument", use ptr for arg also
++        - if has_arg is not "No_argument", use ptr for arg also
+         - opt_complementary affects it too
+ 
+         Note: a good applet will make long options configurable via the
+@@ -290,12 +287,10 @@ typedef struct {
+ 
+ /* You can set applet_long_options for parse called long options */
+ #if ENABLE_GETOPT_LONG
+-static const struct option bb_default_long_options[] = {
+-/*      { "help", 0, NULL, '?' }, */
++static const struct option bb_null_long_options[1] = {
+ 	{ 0, 0, 0, 0 }
+ };
+-
+-const struct option *applet_long_options = bb_default_long_options;
++const char *applet_long_options;
+ #endif
+ 
+ uint32_t option_mask32;
+@@ -312,6 +307,7 @@ getopt32(int argc, char **argv, const char *applet_opts, ...)
+ 	va_list p;
+ #if ENABLE_GETOPT_LONG
+ 	const struct option *l_o;
++	struct option *long_options = NULL;
+ #endif
+ 	unsigned trigger;
+ 	char **pargv = NULL;
+@@ -347,19 +343,42 @@ getopt32(int argc, char **argv, const char *applet_opts, ...)
+ 	}
+ 
+ #if ENABLE_GETOPT_LONG
+-	for (l_o = applet_long_options; l_o->name; l_o++) {
+-		if (l_o->flag)
+-			continue;
+-		for (on_off = complementary; on_off->opt != 0; on_off++)
+-			if (on_off->opt == l_o->val)
+-				goto next_long;
+-		if (c >= 32) break;
+-		on_off->opt = l_o->val;
+-		on_off->switch_on = (1 << c);
+-		if (l_o->has_arg != no_argument)
+-			on_off->optarg = va_arg(p, void **);
+-		c++;
++	if (applet_long_options) {
++		const char *optstr;
++		unsigned i, count;
++
++		count = 1;
++		optstr = applet_long_options;
++		while (optstr[0]) {
++			optstr += strlen(optstr) + 3; /* skip \0, has_arg, val */
++			count++;
++		}
++		/* count == no. of longopts + 1 */
++		long_options = xzalloc(count * sizeof(*long_options));
++		i = 0;
++		optstr = applet_long_options;
++		while (--count) {
++			long_options[i].name = optstr;
++			optstr += strlen(optstr) + 1;
++			long_options[i].has_arg = (unsigned char)(*optstr++);
++			/* long_options[i].flag = NULL; */
++			long_options[i].val = (unsigned char)(*optstr++);
++			i++;
++		}
++		for (l_o = long_options; l_o->name; l_o++) {
++			if (l_o->flag)
++				continue;
++			for (on_off = complementary; on_off->opt != 0; on_off++)
++				if (on_off->opt == l_o->val)
++					goto next_long;
++			if (c >= 32) break;
++			on_off->opt = l_o->val;
++			on_off->switch_on = (1 << c);
++			if (l_o->has_arg != no_argument)
++				on_off->optarg = va_arg(p, void **);
++			c++;
+  next_long: ;
++		}
+ 	}
+ #endif /* ENABLE_GETOPT_LONG */
+ 	for (s = (const unsigned char *)opt_complementary; s && *s; s++) {
+@@ -457,7 +476,7 @@ getopt32(int argc, char **argv, const char *applet_opts, ...)
+ 	 * (supposed to act as --header, but doesn't) */
+ #if ENABLE_GETOPT_LONG
+ 	while ((c = getopt_long(argc, argv, applet_opts,
+-				 applet_long_options, NULL)) != -1) {
++			long_options ? long_options : bb_null_long_options, NULL)) != -1) {
+ #else
+ 	while ((c = getopt(argc, argv, applet_opts)) != -1) {
+ #endif
+@@ -516,6 +535,9 @@ getopt32(int argc, char **argv, const char *applet_opts, ...)
+ 	if (argc < min_arg || (max_arg >= 0 && argc > max_arg))
+ 		bb_show_usage();
+ 
++#if ENABLE_GETOPT_LONG
++	free(long_options);
++#endif
+ 	option_mask32 = flags;
+ 	return flags;
+ }
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index f91ebdc..a4a9a55 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -11,11 +11,10 @@
+ #if ENABLE_GETOPT_LONG
+ #include <getopt.h>
+ 
+-static const struct option chpasswd_opts[] = {
+-	{ "encrypted", no_argument, NULL, 'e' },
+-	{ "md5", no_argument, NULL, 'm' },
+-	{ NULL, 0, NULL, 0 }
+-};
++static const char chpasswd_opts[] =
++	"encrypted\0" No_argument "e"
++	"md5\0"       No_argument "m"
++	"\0";
+ #endif
+ 
+ #define OPT_ENC		1
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index 54b5f5a..011fbac 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -287,14 +287,13 @@ int ftp_send(ftp_host_info_t *server, FILE *control_stream,
+ #define FTPGETPUT_OPT_PORT	16
+ 
+ #if ENABLE_FEATURE_FTPGETPUT_LONG_OPTIONS
+-static const struct option ftpgetput_long_options[] = {
+-	{ "continue", 1, NULL, 'c' },
+-	{ "verbose", 0, NULL, 'v' },
+-	{ "username", 1, NULL, 'u' },
+-	{ "password", 1, NULL, 'p' },
+-	{ "port", 1, NULL, 'P' },
+-	{ 0, 0, 0, 0 }
+-};
++static const char ftpgetput_longopts[] =
++	"continue\0" Required_argument "c"
++	"verbose\0"  No_argument       "v"
++	"username\0" Required_argument "u"
++	"password\0" Required_argument "p"
++	"port\0"     Required_argument "P"
++	"\0";
+ #endif
+ 
+ int ftpgetput_main(int argc, char **argv);
+@@ -329,7 +328,7 @@ int ftpgetput_main(int argc, char **argv)
+ 	 * Decipher the command line
+ 	 */
+ #if ENABLE_FEATURE_FTPGETPUT_LONG_OPTIONS
+-	applet_long_options = ftpgetput_long_options;
++	applet_long_options = ftpgetput_longopts;
+ #endif
+ 	opt_complementary = "=3"; /* must have 3 params */
+ 	opt = getopt32(argc, argv, "cvu:p:P:", &server->user, &server->password, &port);
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index a39ad1a..32b939f 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -63,17 +63,16 @@ int get_prefix(unsigned long netmask);
+ #define SILENT    0x20
+ 
+ #if ENABLE_FEATURE_IPCALC_LONG_OPTIONS
+-	static const struct option long_options[] = {
+-		{ "netmask",     no_argument, NULL, 'm' },
+-		{ "broadcast",   no_argument, NULL, 'b' },
+-		{ "network",     no_argument, NULL, 'n' },
++	static const char ipcalc_longopts[] =
++		"netmask\0"   No_argument "m"
++		"broadcast\0" No_argument "b"
++		"network\0"   No_argument "n"
+ # if ENABLE_FEATURE_IPCALC_FANCY
+-		{ "prefix",      no_argument, NULL, 'p' },
+-		{ "hostname",	 no_argument, NULL, 'h' },
+-		{ "silent",      no_argument, NULL, 's' },
++		"prefix\0"    No_argument "p"
++		"hostname\0"  No_argument "h"
++		"silent\0"    No_argument "s"
+ # endif
+-		{ NULL, 0, NULL, 0 }
+-	};
++		"\0";
+ #endif
+ 
+ int ipcalc_main(int argc, char **argv);
+@@ -86,7 +85,7 @@ int ipcalc_main(int argc, char **argv)
+ 	char *ipstr;
+ 
+ #if ENABLE_FEATURE_IPCALC_LONG_OPTIONS
+-	applet_long_options = long_options;
++	applet_long_options = ipcalc_longopts;
+ #endif
+ 	opt = getopt32(argc, argv, "mbn" USE_FEATURE_IPCALC_FANCY("phs"));
+ 	argc -= optind;
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 3165c2d..2b95c32 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -181,27 +181,26 @@ int udhcpc_main(int argc, char **argv)
+ 		OPT_v = 1 << 17,
+ 	};
+ #if ENABLE_GETOPT_LONG
+-	static const struct option arg_options[] = {
+-		{ "clientid",   required_argument,      0, 'c' },
+-		{ "clientid-none", no_argument,         0, 'C' },
+-		{ "vendorclass", required_argument,     0, 'V' },
+-		{ "foreground", no_argument,            0, 'f' },
+-		{ "background", no_argument,            0, 'b' },
+-		{ "hostname",   required_argument,      0, 'H' },
+-		{ "hostname",   required_argument,      0, 'h' },
+-		{ "fqdn",       required_argument,      0, 'F' },
+-		{ "interface",  required_argument,      0, 'i' },
+-		{ "now",        no_argument,            0, 'n' },
+-		{ "pidfile",    required_argument,      0, 'p' },
+-		{ "quit",       no_argument,            0, 'q' },
+-		{ "release",    no_argument,            0, 'R' },
+-		{ "request",    required_argument,      0, 'r' },
+-		{ "script",     required_argument,      0, 's' },
+-		{ "timeout",    required_argument,      0, 'T' },
+-		{ "version",    no_argument,            0, 'v' },
+-		{ "retries",    required_argument,      0, 't' },
+-		{ 0, 0, 0, 0 }
+-	};
++	static const char udhcpc_longopts[] =
++		"clientid\0"      Required_argument "c"
++		"clientid-none\0" No_argument       "C"
++		"vendorclass\0"   Required_argument "V"
++		"foreground\0"    No_argument       "f"
++		"background\0"    No_argument       "b"
++		"hostname\0"      Required_argument "H"
++		"hostname\0"      Required_argument "h"
++		"fqdn\0"          Required_argument "F"
++		"interface\0"     Required_argument "i"
++		"now\0"           No_argument       "n"
++		"pidfile\0"       Required_argument "p"
++		"quit\0"          No_argument       "q"
++		"release\0"       No_argument       "R"
++		"request\0"       Required_argument "r"
++		"script\0"        Required_argument "s"
++		"timeout\0"       Required_argument "T"
++		"version\0"       No_argument       "v"
++		"retries\0"       Required_argument "t"
++		"\0";
+ #endif
+ 	/* Default options. */
+ 	client_config.interface = "eth0";
+@@ -213,7 +212,7 @@ int udhcpc_main(int argc, char **argv)
+ 	opt_complementary = "c--C:C--c" // mutually exclusive
+ 	                    ":hH:Hh"; // -h and -H are the same
+ #if ENABLE_GETOPT_LONG
+-	applet_long_options = arg_options;
++	applet_long_options = udhcpc_longopts;
+ #endif
+ 	opt = getopt32(argc, argv, "c:CV:fbH:h:F:i:np:qRr:s:T:t:v",
+ 		&str_c, &str_V, &str_h, &str_h, &str_F,
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 95df7ea..fb50d68 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -24,14 +24,13 @@ int dumpleases_main(int argc, char **argv)
+ 		OPT_f	= 0x4,	// -f
+ 	};
+ #if ENABLE_GETOPT_LONG
+-	static const struct option options[] = {
+-		{ "absolute", no_argument, 0, 'a' },
+-		{ "remaining", no_argument, 0, 'r' },
+-		{ "file", required_argument, 0, 'f' },
+-		{ NULL, 0, 0, 0 }
+-	};
++	static const char dumpleases_longopts[] =
++		"absolute\0"  No_argument       "a"
++		"remaining\0" No_argument       "r"
++		"file\0"      Required_argument "f"
++		"\0";
+ 
+-	applet_long_options = options;
++	applet_long_options = dumpleases_longopts;
+ #endif
+ 	opt_complementary = "=0:a--r:r--a";
+ 	opt = getopt32(argc, argv, "arf:", &file);
+diff --git a/networking/wget.c b/networking/wget.c
+index 19ff792..ad09091 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -132,20 +132,19 @@ int wget_main(int argc, char **argv)
+ 		WGET_OPT_HEADER     = 0x100,
+ 	};
+ #if ENABLE_FEATURE_WGET_LONG_OPTIONS
+-	static const struct option wget_long_options[] = {
+-		/* name, has_arg, flag, val */
+-		{ "continue",         no_argument, NULL, 'c' },
+-		{ "spider",           no_argument, NULL, 's' },
+-		{ "quiet",            no_argument, NULL, 'q' },
+-		{ "output-document",  required_argument, NULL, 'O' },
+-		{ "directory-prefix", required_argument, NULL, 'P' },
+-		{ "proxy",            required_argument, NULL, 'Y' },
+-		{ "user-agent",       required_argument, NULL, 'U' },
+-		{ "passive-ftp",      no_argument, NULL, 0xff },
+-		{ "header",           required_argument, NULL, 0xfe },
+-		{ 0, 0, 0, 0 }
+-	};
+-	applet_long_options = wget_long_options;
++	static const char wget_longopts[] =
++		/* name, has_arg, val */
++		"continue\0"         No_argument       "c"
++		"spider\0"           No_argument       "s"
++		"quiet\0"            No_argument       "q"
++		"output-document\0"  Required_argument "O"
++		"directory-prefix\0" Required_argument "P"
++		"proxy\0"            Required_argument "Y"
++		"user-agent\0"       Required_argument "U"
++		"passive-ftp\0"      No_argument       "\xff"
++		"header\0"           Required_argument "\xfe"
++		"\0";
++	applet_long_options = wget_longopts;
+ #endif
+ 	/* server.allocated = target.allocated = NULL; */
+ 	opt_complementary = "-1" USE_FEATURE_WGET_LONG_OPTIONS(":\xfe::");
+diff --git a/selinux/chcon.c b/selinux/chcon.c
+index a8a816b..689ec8c 100644
+--- a/selinux/chcon.c
++++ b/selinux/chcon.c
+@@ -105,20 +105,19 @@ skip:
+ }
+ 
+ #if ENABLE_FEATURE_CHCON_LONG_OPTIONS
+-static struct option chcon_options[] = {
+-	{ "recursive",      0, NULL, 'R' },
+-	{ "changes",        0, NULL, 'c' },
+-	{ "no-dereference", 0, NULL, 'h' },
+-	{ "silent",         0, NULL, 'f' },
+-	{ "quiet",          0, NULL, 'f' },
+-	{ "user",           1, NULL, 'u' },
+-	{ "role",           1, NULL, 'r' },
+-	{ "type",           1, NULL, 't' },
+-	{ "range",          1, NULL, 'l' },
+-	{ "verbose",        0, NULL, 'v' },
+-	{ "reference",      1, NULL, 0xff }, /* no short option */
+-	{ NULL,             0, NULL, 0 },
+-};
++static const char chcon_longopts[] =
++	"recursive\0"      No_argument       "R"
++	"changes\0"        No_argument       "c"
++	"no-dereference\0" No_argument       "h"
++	"silent\0"         No_argument       "f"
++	"quiet\0"          No_argument       "f"
++	"user\0"           Required_argument "u"
++	"role\0"           Required_argument "r"
++	"type\0"           Required_argument "t"
++	"range\0"          Required_argument "l"
++	"verbose\0"        No_argument       "v"
++	"reference\0"      Required_argument "\xff" /* no short option */
++	"\0";
+ #endif
+ 
+ int chcon_main(int argc, char **argv);
+@@ -129,7 +128,7 @@ int chcon_main(int argc, char **argv)
+ 	int i, errors = 0;
+ 
+ #if ENABLE_FEATURE_CHCON_LONG_OPTIONS
+-	applet_long_options = chcon_options;
++	applet_long_options = chcon_longopts;
+ #endif
+ 	opt_complementary = "-1"  /* at least 1 param */
+ 		":?"  /* error if exclusivity constraints are violated */
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index 741c7bb..3502dcd 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -69,15 +69,14 @@ static context_t runcon_compute_new_context(char *user, char *role, char *type,
+ }
+ 
+ #if ENABLE_FEATURE_RUNCON_LONG_OPTIONS
+-static const struct option runcon_options[] = {
+-	{ "user",       1, NULL, 'u' },
+-	{ "role",       1, NULL, 'r' },
+-	{ "type",       1, NULL, 't' },
+-	{ "range",      1, NULL, 'l' },
+-	{ "compute",    0, NULL, 'c' },
+-	{ "help",       0, NULL, 'h' },
+-	{ NULL,         0, NULL, 0 },
+-};
++static const char runcon_options[] =
++	"user\0"    Required_argument "u"
++	"role\0"    Required_argument "r"
++	"type\0"    Required_argument "t"
++	"range\0"   Required_argument "l"
++	"compute\0" No_argument "c"
++	"help\0"    No_argument "h"      
++	"\0";
+ #endif
+ 
+ #define OPTS_ROLE	(1<<0)	/* r */
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index a5e6743..5ee13ec 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -266,18 +266,17 @@ static void set_shell(const char *new_shell)
+  */
+ 
+ #if ENABLE_GETOPT_LONG
+-static const struct option longopts[] = {
+-	{ "options",      required_argument, NULL, 'o' },
+-	{ "longoptions",  required_argument, NULL, 'l' },
+-	{ "quiet",        no_argument,       NULL, 'q' },
+-	{ "quiet-output", no_argument,       NULL, 'Q' },
+-	{ "shell",        required_argument, NULL, 's' },
+-	{ "test",         no_argument,       NULL, 'T' },
+-	{ "unquoted",     no_argument,       NULL, 'u' },
+-	{ "alternative",  no_argument,       NULL, 'a' },
+-	{ "name",         required_argument, NULL, 'n' },
+-	{ NULL, 0, NULL, 0 }
+-};
++static const char getopt_longopts[] =
++	"options\0"      Required_argument "o"
++	"longoptions\0"  Required_argument "l"
++	"quiet\0"        No_argument       "q"
++	"quiet-output\0" No_argument       "Q"
++	"shell\0"        Required_argument "s"
++	"test\0"         No_argument       "T"
++	"unquoted\0"     No_argument       "u"
++	"alternative\0"  No_argument       "a"
++	"name\0"         Required_argument "n"
++	"\0";
+ #endif
+ 
+ int getopt_main(int argc, char *argv[]);
+@@ -317,7 +316,7 @@ int getopt_main(int argc, char *argv[])
+ #if !ENABLE_GETOPT_LONG
+ 	opt = getopt32(argc, argv, "+o:n:qQs:Tu", &optstr, &name, &s_arg);
+ #else
+-	applet_long_options = longopts;
++	applet_long_options = getopt_longopts;
+ 	opt_complementary = "l::";
+ 	opt = getopt32(argc, argv, "+o:n:qQs:Tual:",
+ 					&optstr, &name, &s_arg, &l_arg);
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index 882a0c5..ff696a3 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -178,16 +178,15 @@ int hwclock_main(int argc, char **argv)
+ 	int utc;
+ 
+ #if ENABLE_FEATURE_HWCLOCK_LONG_OPTIONS
+-	static const struct option hwclock_long_options[] = {
+-		{ "localtime", 0, 0, 'l' },
+-		{ "utc",       0, 0, 'u' },
+-		{ "show",      0, 0, 'r' },
+-		{ "hctosys",   0, 0, 's' },
+-		{ "systohc",   0, 0, 'w' },
+-		{ "file",      1, 0, 'f' },
+-		{ 0,           0, 0, 0 }
+-	};
+-	applet_long_options = hwclock_long_options;
++	static const char hwclock_longopts[] =
++		"localtime\0" No_argument "l"
++		"utc\0"       No_argument "u"
++		"show\0"      No_argument "r"
++		"hctosys\0"   No_argument "s"
++		"systohc\0"   No_argument "w"
++		"file\0"      Required_argument "f"
++		"\0";
++	applet_long_options = hwclock_longopts;
+ #endif
+ 	opt_complementary = "r--ws:w--rs:s--wr:l--u:u--l";
+ 	opt = getopt32(argc, argv, "lurswf:", &rtcname);

@@ -1,0 +1,27 @@
+2009-10-24 17:47:56 +0200
+diff --git a/coreutils/sum.c b/coreutils/sum.c
+index 60f3b30..35e89a6 100644
+--- a/coreutils/sum.c
++++ b/coreutils/sum.c
+@@ -41,7 +41,7 @@ static unsigned sum_file(const char *file, unsigned type)
+ 			if (!bytes_read && !r)
+ 				/* no error */
+ 				break;
+-			bb_perror_msg(file);
++			bb_simple_perror_msg(file);
+ 			return 0;
+ 		}
+ 
+diff --git a/networking/tftp.c b/networking/tftp.c
+index e4c31ee..9b08c14 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -572,7 +572,7 @@ static int tftp_protocol(
+ 	strcpy((char*)error_pkt_str, bb_msg_read_error);
+  send_err_pkt:
+ 	if (error_pkt_str[0])
+-		bb_error_msg((char*)error_pkt_str);
++		bb_error_msg("%s", (char*)error_pkt_str);
+ 	error_pkt[1] = TFTP_ERROR;
+ 	xsendto(socket_fd, error_pkt, 4 + 1 + strlen((char*)error_pkt_str),
+ 			&peer_lsa->u.sa, peer_lsa->len);

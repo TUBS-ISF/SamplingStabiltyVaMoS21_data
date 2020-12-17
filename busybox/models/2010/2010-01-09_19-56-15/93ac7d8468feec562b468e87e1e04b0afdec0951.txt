@@ -1,0 +1,92 @@
+2010-01-09 19:56:15 +0100
+diff --git a/archival/cpio.c b/archival/cpio.c
+index b21ba6e..be9fbd0 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -304,8 +304,12 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 	/* -L makes sense only with -o or -p */
+ 
+ #if !ENABLE_FEATURE_CPIO_O
++	/* no parameters */
++	opt_complementary = "=0";
+ 	opt = getopt32(argv, OPTION_STR, &cpio_filename);
+ #else
++	/* _exactly_ one parameter for -p, thus <= 1 param if -p is allowed */
++	opt_complementary = ENABLE_FEATURE_CPIO_P ? "?1" : "=0";
+ 	opt = getopt32(argv, OPTION_STR "oH:" IF_FEATURE_CPIO_P("p"), &cpio_filename, &cpio_fmt);
+ 	argv += optind;
+ 	if (opt & CPIO_OPT_PASSTHROUGH) {
+@@ -346,13 +350,13 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 		xchdir(*argv++);
+ 		close(pp.wr);
+ 		xmove_fd(pp.rd, STDIN_FILENO);
+-		opt &= ~CPIO_OPT_PASSTHROUGH;
++		//opt &= ~CPIO_OPT_PASSTHROUGH;
+ 		opt |= CPIO_OPT_EXTRACT;
+ 		goto skip;
+ 	}
+ 	/* -o */
+ 	if (opt & CPIO_OPT_CREATE) {
+-		if (*cpio_fmt != 'n') /* we _require_ "-H newc" */
++		if (cpio_fmt[0] != 'n') /* we _require_ "-H newc" */
+ 			bb_show_usage();
+ 		if (opt & CPIO_OPT_FILE) {
+ 			xmove_fd(xopen3(cpio_filename, O_WRONLY | O_CREAT | O_TRUNC, 0666), STDOUT_FILENO);
+diff --git a/archival/libunarchive/get_header_cpio.c b/archival/libunarchive/get_header_cpio.c
+index ddc49f7..4507d53 100644
+--- a/archival/libunarchive/get_header_cpio.c
++++ b/archival/libunarchive/get_header_cpio.c
+@@ -115,6 +115,10 @@ char FAST_FUNC get_header_cpio(archive_handle_t *archive_handle)
+ 
+ 	if (archive_handle->filter(archive_handle) == EXIT_SUCCESS) {
+ 		archive_handle->action_data(archive_handle);
++//TODO: run "echo /etc/hosts | cpio -pv /tmp" twice. On 2nd run:
++//cpio: etc/hosts not created: newer or same age file exists
++//etc/hosts  <-- should NOT show it
++//2 blocks <-- should say "0 blocks"
+ 		archive_handle->action_header(file_header);
+ 	} else {
+ 		data_skip(archive_handle);
+diff --git a/archival/libunarchive/header_list.c b/archival/libunarchive/header_list.c
+index 6ec2df3..b1c425a 100644
+--- a/archival/libunarchive/header_list.c
++++ b/archival/libunarchive/header_list.c
+@@ -7,5 +7,6 @@
+ 
+ void FAST_FUNC header_list(const file_header_t *file_header)
+ {
++//TODO: cpio -vp DIR should output "DIR/NAME", not just "NAME" */
+ 	puts(file_header->name);
+ }
+diff --git a/include/usage.h b/include/usage.h
+index 8c11ac4..65836d8 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -560,11 +560,15 @@
+      "\n	-l,-s	Create (sym)links" \
+ 
+ #define cpio_trivial_usage \
+-       "-[ti" IF_FEATURE_CPIO_O("o") IF_FEATURE_CPIO_P("p") "dmvu] [-F FILE]" \
+-       IF_FEATURE_CPIO_O( " [-H newc]" )
++       "[-ti" IF_FEATURE_CPIO_O("o") "]" IF_FEATURE_CPIO_P(" [-p DIR]") \
++       " [-dmvu] [-F FILE]" IF_FEATURE_CPIO_O(" [-H newc]")
+ #define cpio_full_usage "\n\n" \
+        "Extract or list files from a cpio archive" \
+-	IF_FEATURE_CPIO_O( ", or create a cpio archive" ) \
++	IF_FEATURE_CPIO_O(", or" \
++     "\ncreate an archive" IF_FEATURE_CPIO_P(" (-o) or copy files (-p)") \
++		" using file list on standard input" \
++	) \
++     "\n" \
+      "\nMain operation mode:" \
+      "\n	-t	List" \
+      "\n	-i	Extract" \
+@@ -572,7 +576,7 @@
+      "\n	-o	Create" \
+ 	) \
+ 	IF_FEATURE_CPIO_P( \
+-     "\n	-p	Passthrough" \
++     "\n	-p DIR	Copy files to DIR" \
+ 	) \
+      "\nOptions:" \
+      "\n	-d	Make leading directories" \

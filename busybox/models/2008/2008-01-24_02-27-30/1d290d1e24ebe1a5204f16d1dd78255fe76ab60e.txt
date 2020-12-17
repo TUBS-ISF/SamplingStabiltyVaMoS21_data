@@ -1,0 +1,23 @@
+2008-01-24 02:27:30 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 0b5c66c..2fa8780 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1328,10 +1328,13 @@ USE_FEATURE_BRCTL_FANCY("\n" \
+        "[-d delay] [-n] [-f]"
+ #define halt_full_usage \
+        "Halt the system" \
+-       "\n\nOptions:\n" \
+-       "	-d	Delay interval for halting\n" \
+-       "	-n	No call to sync()\n" \
+-       "	-f	Force halt (don't go through init)"
++       "\n\nOptions:" \
++       "\n	-d	Delay interval for halting" \
++       "\n	-n	No call to sync()" \
++       "\n	-f	Force halt (don't go through init)" \
++	USE_FEATURE_WTMP( \
++       "\n	-w	Only write a wtmp record" \
++	)
+ 
+ #define hdparm_trivial_usage \
+        "[options] [device] .."

@@ -1,0 +1,19 @@
+2008-05-07 09:22:44 +0000
+diff --git a/networking/httpd.c b/networking/httpd.c
+index b4a8d27..ed699df 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1457,6 +1457,13 @@ static void send_cgi_and_exit(
+ 				}
+ 			}
+ #endif
++			/* restore default signal dispositions for CGI process */
++			bb_signals(0
++				| (1 << SIGCHLD)
++				| (1 << SIGPIPE)
++				| (1 << SIGHUP)
++				, SIG_DFL);
++
+ 			execv(fullpath, argv);
+ 			if (verbose)
+ 				bb_perror_msg("exec %s", fullpath);

@@ -1,0 +1,14 @@
+2008-08-06 17:39:30 +0000
+diff --git a/shell/Config.in b/shell/Config.in
+index ee2f832..e064450 100644
+--- a/shell/Config.in
++++ b/shell/Config.in
+@@ -51,7 +51,7 @@ config ASH_BASH_COMPAT
+ 	default y
+ 	depends on ASH
+ 	help
+-	  Enable bash-conpatible extensions.
++	  Enable bash-compatible extensions.
+ 
+ config ASH_JOB_CONTROL
+ 	bool "Job control"

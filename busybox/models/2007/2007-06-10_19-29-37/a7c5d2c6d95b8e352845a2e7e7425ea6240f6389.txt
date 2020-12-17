@@ -1,0 +1,31 @@
+2007-06-10 19:29:37 +0000
+diff --git a/coreutils/libcoreutils/coreutils.h b/coreutils/libcoreutils/coreutils.h
+index 102c7b5..687c7cc 100644
+--- a/coreutils/libcoreutils/coreutils.h
++++ b/coreutils/libcoreutils/coreutils.h
+@@ -8,9 +8,9 @@
+ 
+ typedef int (*stat_func)(const char *fn, struct stat *ps);
+ 
+-extern int cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf);
+-extern int cp_mv_stat(const char *fn, struct stat *fn_stat);
++int cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf);
++int cp_mv_stat(const char *fn, struct stat *fn_stat);
+ 
+-extern mode_t getopt_mk_fifo_nod(int argc, char **argv);
++mode_t getopt_mk_fifo_nod(int argc, char **argv);
+ 
+ #endif
+diff --git a/coreutils/libcoreutils/getopt_mk_fifo_nod.c b/coreutils/libcoreutils/getopt_mk_fifo_nod.c
+index 5065c38..6fd2de7 100644
+--- a/coreutils/libcoreutils/getopt_mk_fifo_nod.c
++++ b/coreutils/libcoreutils/getopt_mk_fifo_nod.c
+@@ -21,7 +21,7 @@
+  */
+ 
+ #include "libbb.h"
+-//#include "coreutils.h"
++#include "coreutils.h"
+ 
+ mode_t getopt_mk_fifo_nod(int argc, char **argv)
+ {

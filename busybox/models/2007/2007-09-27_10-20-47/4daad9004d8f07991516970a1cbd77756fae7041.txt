@@ -1,0 +1,1663 @@
+2007-09-27 10:20:47 +0000
+diff --git a/archival/gzip.c b/archival/gzip.c
+index bda4ae1..cabcc5e 100644
+--- a/archival/gzip.c
++++ b/archival/gzip.c
+@@ -686,7 +686,7 @@ static void check_match(IPos start, IPos match, int length)
+ 	if (verbose > 1) {
+ 		bb_error_msg("\\[%d,%d]", start - match, length);
+ 		do {
+-			putc(G1.window[start++], stderr);
++			fputc(G1.window[start++], stderr);
+ 		} while (--length != 0);
+ 	}
+ }
+diff --git a/archival/libunarchive/header_verbose_list.c b/archival/libunarchive/header_verbose_list.c
+index f3b0d8c..b9ac3c4 100644
+--- a/archival/libunarchive/header_verbose_list.c
++++ b/archival/libunarchive/header_verbose_list.c
+@@ -26,6 +26,5 @@ void header_verbose_list(const file_header_t *file_header)
+ 	if (file_header->link_target) {
+ 		printf(" -> %s", file_header->link_target);
+ 	}
+-	/* putchar isnt used anywhere else i dont think */
+-	puts("");
++	bb_putchar('\n');
+ }
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index 35a5631..3116e1e 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -167,7 +167,7 @@ int cal_main(int argc, char **argv)
+ 			if (!julian) {
+ 				printf("%*s%s", HEAD_SEP, "", day_headings);
+ 			}
+-			putchar('\n');
++			bb_putchar('\n');
+ 			for (row = 0; row < (6*7); row += 7) {
+ 				for (which_cal = 0; which_cal < 3-julian; which_cal++) {
+ 					dp = days[month + which_cal] + row;
+diff --git a/coreutils/catv.c b/coreutils/catv.c
+index ce92746..5d5a550 100644
+--- a/coreutils/catv.c
++++ b/coreutils/catv.c
+@@ -62,13 +62,13 @@ int catv_main(int argc, char **argv)
+ 				if (c < 32) {
+ 					if (c == 10) {
+ 						if (flags & CATV_OPT_e)
+-							putchar('$');
++							bb_putchar('$');
+ 					} else if (flags & (c==9 ? CATV_OPT_t : CATV_OPT_v)) {
+ 						printf("^%c", c+'@');
+ 						continue;
+ 					}
+ 				}
+-				putchar(c);
++				bb_putchar(c);
+ 			}
+ 		}
+ 		if (ENABLE_FEATURE_CLEAN_UP && fd)
+diff --git a/coreutils/echo.c b/coreutils/echo.c
+index 085e851..851d2ef 100644
+--- a/coreutils/echo.c
++++ b/coreutils/echo.c
+@@ -100,18 +100,18 @@ int bb_echo(char **argv)
+ 					c = bb_process_escape_sequence(&arg);
+ 				}
+ 			}
+-			putchar(c);
++			bb_putchar(c);
+ 		}
+ 
+ 		arg = *++argv;
+ 		if (!arg)
+ 			break;
+-		putchar(' ');
++		bb_putchar(' ');
+ 	}
+ 
+  newline_ret:
+ 	if (nflag) {
+-		putchar('\n');
++		bb_putchar('\n');
+ 	}
+  ret:
+ 	return fflush(stdout);
+diff --git a/coreutils/fold.c b/coreutils/fold.c
+index 6e422de..a75f466 100644
+--- a/coreutils/fold.c
++++ b/coreutils/fold.c
+@@ -115,7 +115,7 @@ int fold_main(int argc, char **argv)
+ 						/* Found a blank.  Don't output the part after it. */
+ 						logical_end++;
+ 						fwrite(line_out, sizeof(char), (size_t) logical_end, stdout);
+-						putchar('\n');
++						bb_putchar('\n');
+ 						/* Move the remainder to the beginning of the next line.
+ 						   The areas being copied here might overlap. */
+ 						memmove(line_out, line_out + logical_end, offset_out - logical_end);
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 1cc8c4d..536e946 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -102,7 +102,7 @@ int id_main(int argc, char **argv)
+ 	/* Print full info like GNU id */
+ 	/* bb_getpwuid(0) doesn't exit on failure (returns NULL) */
+ 	status = printf_full(uid, bb_getpwuid(NULL, 0, uid), 'u');
+-	putchar(' ');
++	bb_putchar(' ');
+ 	status |= printf_full(gid, bb_getgrgid(NULL, 0, gid), 'g');
+ 
+ #if ENABLE_SELINUX
+@@ -121,6 +121,6 @@ int id_main(int argc, char **argv)
+ 	}
+ #endif
+ 
+-	putchar('\n');
++	bb_putchar('\n');
+ 	fflush_stdout_and_exit(status);
+ }
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 4adf523..a4acc98 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -451,7 +451,7 @@ static void showdirs(struct dnode **dn, int ndirs, int first)
+ 	for (i = 0; i < ndirs; i++) {
+ 		if (all_fmt & (DISP_DIRNAME | DISP_RECURSIVE)) {
+ 			if (!first)
+-				puts("");
++				bb_putchar('\n');
+ 			first = 0;
+ 			printf("%s:\n", dn[i]->fullname);
+ 		}
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 44d0f2d..1bd1b0c 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -1183,7 +1183,7 @@ dump_strings(void)
+ 			case '\r': fputs("\\r", stdout); break;
+ 			case '\t': fputs("\\t", stdout); break;
+ 			case '\v': fputs("\\v", stdout); break;
+-			default: putc(c, stdout);
++			default: bb_putchar(c);
+ 			}
+ 		}
+ 		putchar('\n');
+diff --git a/coreutils/printf.c b/coreutils/printf.c
+index d0cf5a6..d5ef32e 100644
+--- a/coreutils/printf.c
++++ b/coreutils/printf.c
+@@ -99,9 +99,9 @@ static void print_esc_string(char *str)
+ 	for (; *str; str++) {
+ 		if (*str == '\\') {
+ 			str++;
+-			putchar(bb_process_escape_sequence((const char **)&str));
++			bb_putchar(bb_process_escape_sequence((const char **)&str));
+ 		} else {
+-			putchar(*str);
++			bb_putchar(*str);
+ 		}
+ 
+ 	}
+@@ -205,7 +205,7 @@ static int print_formatted(char *format, int argc, char **argv)
+ 			direc_length = 1;
+ 			field_width = precision = -1;
+ 			if (*f == '%') {
+-				putchar('%');
++				bb_putchar('%');
+ 				break;
+ 			}
+ 			if (*f == 'b') {
+@@ -274,11 +274,11 @@ static int print_formatted(char *format, int argc, char **argv)
+ 		case '\\':
+ 			if (*++f == 'c')
+ 				exit(0);
+-			putchar(bb_process_escape_sequence((const char **)&f));
++			bb_putchar(bb_process_escape_sequence((const char **)&f));
+ 			f--;
+ 			break;
+ 		default:
+-			putchar(*f);
++			bb_putchar(*f);
+ 		}
+ 	}
+ 
+diff --git a/coreutils/stat.c b/coreutils/stat.c
+index 18e8e07..a0424d9 100644
+--- a/coreutils/stat.c
++++ b/coreutils/stat.c
+@@ -321,7 +321,7 @@ static void print_it(char const *masterformat, char const *filename,
+ 			b = NULL;
+ 			/* fall through */
+ 		case '%':
+-			putchar('%');
++			bb_putchar('%');
+ 			break;
+ 		default:
+ 			print_func(dest, n_alloc, *p, filename, data USE_SELINUX(,scontext));
+@@ -552,7 +552,7 @@ static bool do_stat(char const *filename, char const *format)
+ 		if (option_mask32 & OPT_SELINUX)
+ 			printf(" %lc\n", *scontext);
+ 		else
+-			putchar('\n');
++			bb_putchar('\n');
+ #endif
+ 	} else {
+ 		char *linkname = NULL;
+@@ -586,7 +586,7 @@ static bool do_stat(char const *filename, char const *format)
+ 			       (unsigned long) major(statbuf.st_rdev),
+ 			       (unsigned long) minor(statbuf.st_rdev));
+ 		else
+-			putchar('\n');
++			bb_putchar('\n');
+ 		printf("Access: (%04lo/%10.10s)  Uid: (%5lu/%8s)   Gid: (%5lu/%8s)\n",
+ 		       (unsigned long) (statbuf.st_mode & (S_ISUID|S_ISGID|S_ISVTX|S_IRWXU|S_IRWXG|S_IRWXO)),
+ 		       bb_mode_string(statbuf.st_mode),
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index 863f28d..1f0d422 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -475,10 +475,10 @@ static void wrapf(const char *message, ...)
+ 		G.current_col++;
+ 		if (buf[0] != '\n') {
+ 			if (G.current_col + buflen >= max_col) {
+-				putchar('\n');
++				bb_putchar('\n');
+ 				G.current_col = 0;
+ 			} else
+-				putchar(' ');
++				bb_putchar(' ');
+ 		}
+ 	}
+ 	fputs(buf, stdout);
+@@ -618,7 +618,7 @@ static void display_recoverable(const struct termios *mode,
+ 		   (unsigned long) mode->c_cflag, (unsigned long) mode->c_lflag);
+ 	for (i = 0; i < NCCS; ++i)
+ 		printf(":%x", (unsigned int) mode->c_cc[i]);
+-	putchar('\n');
++	bb_putchar('\n');
+ }
+ 
+ static void display_speed(const struct termios *mode, int fancy)
+diff --git a/coreutils/tee.c b/coreutils/tee.c
+index d253028..8313258 100644
+--- a/coreutils/tee.c
++++ b/coreutils/tee.c
+@@ -22,6 +22,7 @@ int tee_main(int argc, char **argv)
+ 	char **names;
+ 	char **np;
+ 	char retval;
++//TODO: make unconditional
+ #if ENABLE_FEATURE_TEE_USE_BLOCK_IO
+ 	ssize_t c;
+ # define buf bb_common_bufsiz1
+@@ -62,7 +63,7 @@ int tee_main(int argc, char **argv)
+ 	/* names[0] will be filled later */
+ 
+ #if ENABLE_FEATURE_TEE_USE_BLOCK_IO
+-	while ((c = safe_read(STDIN_FILENO, buf, BUFSIZ)) > 0) {
++	while ((c = safe_read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
+ 		fp = files;
+ 		do
+ 			fwrite(buf, 1, c, *fp++);
+diff --git a/coreutils/uname.c b/coreutils/uname.c
+index e4724c8..e70b1f9 100644
+--- a/coreutils/uname.c
++++ b/coreutils/uname.c
+@@ -91,12 +91,12 @@ int uname_main(int argc, char **argv)
+ 		if (toprint & 1) {
+ 			printf(((char *)(&uname_info)) + *delta);
+ 			if (toprint > 1) {
+-				putchar(' ');
++				bb_putchar(' ');
+ 			}
+ 		}
+ 		++delta;
+ 	} while (toprint >>= 1);
+-	putchar('\n');
++	bb_putchar('\n');
+ 
+ 	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }
+diff --git a/coreutils/uuencode.c b/coreutils/uuencode.c
+index 56d6882..17def8d 100644
+--- a/coreutils/uuencode.c
++++ b/coreutils/uuencode.c
+@@ -48,9 +48,9 @@ int uuencode_main(int argc, char **argv)
+ 			bb_perror_msg_and_die(bb_msg_read_error);
+ 		/* Encode the buffer we just read in */
+ 		bb_uuencode(dst_buf, src_buf, size, tbl);
+-		putchar('\n');
++		bb_putchar('\n');
+ 		if (tbl == bb_uuenc_tbl_std) {
+-			putchar(tbl[size]);
++			bb_putchar(tbl[size]);
+ 		}
+ 		fflush(stdout);
+ 		xwrite(STDOUT_FILENO, dst_buf, 4 * ((size + 2) / 3));
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index dfcbf67..3717781 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -651,7 +651,7 @@ static void execute(const char *type, const char *device, const char *mntpt,
+ 					mntpt ? mntpt : device);
+ 		for (i = 0; i < argc; i++)
+ 			printf(" %s", argv[i]);
+-		puts("");
++		bb_putchar('\n');
+ 	}
+ 
+ 	/* Fork and execute the correct program. */
+diff --git a/e2fsprogs/lsattr.c b/e2fsprogs/lsattr.c
+index dd6efc8..5f4f872 100644
+--- a/e2fsprogs/lsattr.c
++++ b/e2fsprogs/lsattr.c
+@@ -46,7 +46,7 @@ static void list_attributes(const char *name)
+ 	if (option_mask32 & OPT_PF_LONG) {
+ 		printf("%-28s ", name);
+ 		print_flags(stdout, fsflags, PFOPT_LONG);
+-		puts("");
++		bb_putchar('\n');
+ 	} else {
+ 		print_flags(stdout, fsflags, 0);
+ 		printf(" %s\n", name);
+@@ -74,7 +74,7 @@ static int lsattr_dir_proc(const char *dir_name, struct dirent *de,
+ 		) {
+ 			printf("\n%s:\n", path);
+ 			iterate_on_dir(path, lsattr_dir_proc, NULL);
+-			puts("");
++			bb_putchar('\n');
+ 		}
+ 	}
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/dev.c b/e2fsprogs/old_e2fsprogs/blkid/dev.c
+index eddbd02..d86cc48 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/dev.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/dev.c
+@@ -82,7 +82,7 @@ void blkid_debug_dump_dev(blkid_dev dev)
+ 		else
+ 			printf("    tag: NULL\n");
+ 	}
+-	puts("");
++	bb_putchar('\n');
+ }
+ #endif
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/read.c b/e2fsprogs/old_e2fsprogs/blkid/read.c
+index 276e62a..67bc8ee 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/read.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/read.c
+@@ -436,7 +436,7 @@ static void debug_dump_dev(blkid_dev dev)
+ 		else
+ 			printf("    tag: NULL\n");
+ 	}
+-	puts("");
++	bb_putchar('\n');
+ }
+ 
+ int main(int argc, char**argv)
+diff --git a/e2fsprogs/old_e2fsprogs/e2fsck.c b/e2fsprogs/old_e2fsprogs/e2fsck.c
+index 3d5b4f4..61db53e 100644
+--- a/e2fsprogs/old_e2fsprogs/e2fsck.c
++++ b/e2fsprogs/old_e2fsprogs/e2fsck.c
+@@ -2443,10 +2443,10 @@ static void safe_print(const char *cp, int len)
+ 			ch -= 128;
+ 		}
+ 		if ((ch < 32) || (ch == 0x7f)) {
+-			fputc('^', stdout);
++			bb_putchar('^');
+ 			ch ^= 0x40; /* ^@, ^A, ^B; ^? for DEL */
+ 		}
+-		fputc(ch, stdout);
++		bb_putchar(ch);
+ 	}
+ }
+ 
+@@ -2497,7 +2497,7 @@ static void expand_at_expression(e2fsck_t ctx, char ch,
+ 		str = _(*cpp) + 1;
+ 		if (*first && islower(*str)) {
+ 			*first = 0;
+-			fputc(toupper(*str++), stdout);
++			bb_putchar(toupper(*str++));
+ 		}
+ 		print_e2fsck_message(ctx, str, pctx, *first);
+ 	} else
+@@ -2630,7 +2630,7 @@ static void expand_percent_expression(ext2_filsys fs, char ch,
+ 
+ 	switch (ch) {
+ 	case '%':
+-		fputc('%', stdout);
++		bb_putchar('%');
+ 		break;
+ 	case 'b':
+ 		printf("%u", ctx->blk);
+@@ -12767,7 +12767,7 @@ static void check_if_skip(e2fsck_t ctx)
+ 		else
+ 			printf(_(" (check in %ld mounts)"), next_check);
+ 	}
+-	fputc('\n', stdout);
++	bb_putchar('\n');
+ 	ext2fs_close(fs);
+ 	ctx->fs = NULL;
+ 	e2fsck_free_context(ctx);
+@@ -12864,9 +12864,9 @@ int e2fsck_simple_progress(e2fsck_t ctx, const char *label, float percent,
+ 	       bar + (sizeof(bar) - (i+1)),
+ 	       spaces + (sizeof(spaces) - (dpywidth - i + 1)));
+ 	if (fixed_percent == 1000)
+-		fputc('|', stdout);
++		bb_putchar('|');
+ 	else
+-		fputc(spinner[ctx->progress_pos & 3], stdout);
++		bb_putchar(spinner[ctx->progress_pos & 3]);
+ 	printf(" %4.1f%%  ", percent);
+ 	if (dpynum)
+ 		printf("%u\r", dpynum);
+diff --git a/e2fsprogs/old_e2fsprogs/fsck.c b/e2fsprogs/old_e2fsprogs/fsck.c
+index 2617837..aad85cf 100644
+--- a/e2fsprogs/old_e2fsprogs/fsck.c
++++ b/e2fsprogs/old_e2fsprogs/fsck.c
+@@ -613,7 +613,7 @@ static int execute(const char *type, const char *device, const char *mntpt,
+ 		       mntpt ? mntpt : device);
+ 		for (i=0; i < argc; i++)
+ 			printf("%s ", argv[i]);
+-		puts("");
++		bb_putchar('\n');
+ 	}
+ 
+ 	/* Fork and execute the correct program. */
+diff --git a/e2fsprogs/old_e2fsprogs/lsattr.c b/e2fsprogs/old_e2fsprogs/lsattr.c
+index 9201464..bbc03aa 100644
+--- a/e2fsprogs/old_e2fsprogs/lsattr.c
++++ b/e2fsprogs/old_e2fsprogs/lsattr.c
+@@ -57,7 +57,7 @@ static void list_attributes(const char *name)
+ 	if (flags & OPT_PF_LONG) {
+ 		printf("%-28s ", name);
+ 		print_flags(stdout, fsflags, PFOPT_LONG);
+-		puts("");
++		bb_putchar('\n');
+ 	} else {
+ 		print_flags(stdout, fsflags, 0);
+ 		printf(" %s\n", name);
+@@ -102,7 +102,7 @@ static int lsattr_dir_proc(const char *dir_name, struct dirent *de,
+ 			   (de->d_name[1] != '.' && de->d_name[2] != '\0')))) {
+ 				printf("\n%s:\n", path);
+ 				iterate_on_dir(path, lsattr_dir_proc, NULL);
+-				puts("");
++				bb_putchar('\n');
+ 			}
+ 		}
+ 	}
+diff --git a/e2fsprogs/old_e2fsprogs/mke2fs.c b/e2fsprogs/old_e2fsprogs/mke2fs.c
+index c1deefd..89b5223 100644
+--- a/e2fsprogs/old_e2fsprogs/mke2fs.c
++++ b/e2fsprogs/old_e2fsprogs/mke2fs.c
+@@ -641,7 +641,7 @@ static void show_stats(ext2_filsys fs)
+ 			s->s_blocks_per_group, s->s_frags_per_group,
+ 			s->s_inodes_per_group);
+ 	if (fs->group_desc_count == 1) {
+-		puts("");
++		bb_putchar('\n');
+ 		return;
+ 	}
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/uuid/uuid_time.c b/e2fsprogs/old_e2fsprogs/uuid/uuid_time.c
+index b54d673..b6f73e6 100644
+--- a/e2fsprogs/old_e2fsprogs/uuid/uuid_time.c
++++ b/e2fsprogs/old_e2fsprogs/uuid/uuid_time.c
+@@ -147,7 +147,7 @@ main(int argc, char **argv)
+ 		printf(" (random)\n");
+ 		break;
+ 	default:
+-		puts("");
++		bb_putchar('\n');
+ 	}
+ 	if (type != 1) {
+ 		printf("Warning: not a time-based UUID, so UUID time "
+diff --git a/editors/ed.c b/editors/ed.c
+index cd3836a..31185d9 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -853,14 +853,14 @@ static int printLines(int num1, int num2, int expandFlag)
+ 				ch &= 0x7f;
+ 			}
+ 			if (ch < ' ') {
+-				fputc('^', stdout);
++				bb_putchar('^');
+ 				ch += '@';
+ 			}
+ 			if (ch == 0x7f) {
+-				fputc('^', stdout);
++				bb_putchar('^');
+ 				ch = '?';
+ 			}
+-			fputc(ch, stdout);
++			bb_putchar(ch);
+ 		}
+ 
+ 		fputs("$\n", stdout);
+diff --git a/editors/vi.c b/editors/vi.c
+index 1fa7c3a..eafe767 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -868,13 +868,13 @@ static void colon(char * buf)
+ 			if (c == '\n') {
+ 				write1("$\r");
+ 			} else if (c < ' ' || c == 127) {
+-				putchar('^');
++				bb_putchar('^');
+ 				if (c == 127)
+ 					c = '?';
+ 				else
+ 					c += '@';
+ 			}
+-			putchar(c);
++			bb_putchar(c);
+ 			if (c_is_no_print)
+ 				standout_end();
+ 		}
+@@ -2337,7 +2337,7 @@ static char *get_input_line(const char * prompt) // get input line- use "status
+ 		} else {
+ 			buf[i] = c;	// save char in buffer
+ 			buf[i + 1] = '\0';	// make sure buffer is null terminated
+-			putchar(c);   // echo the char back to user
++			bb_putchar(c);   // echo the char back to user
+ 			i++;
+ 		}
+ 	}
+@@ -2860,7 +2860,7 @@ static void refresh(int full_screen)
+ 				char *out = sp + cs;
+ 
+ 				while (nic-- > 0) {
+-					putchar(*out);
++					bb_putchar(*out);
+ 					out++;
+ 				}
+ 			}
+diff --git a/include/libbb.h b/include/libbb.h
+index 26a0f0d..2f5aa60 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -391,11 +391,13 @@ ssize_t recv_from_to(int fd, void *buf, size_t len, int flags,
+ 		struct sockaddr *from, struct sockaddr *to,
+ 		socklen_t sa_size);
+ 
+-
+-extern char *xstrdup(const char *s);
+-extern char *xstrndup(const char *s, int n);
+-extern char *safe_strncpy(char *dst, const char *src, size_t size);
+-extern char *xasprintf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
++char *xstrdup(const char *s);
++char *xstrndup(const char *s, int n);
++char *safe_strncpy(char *dst, const char *src, size_t size);
++/* Guaranteed to NOT be a macro (smallest code). Saves nearly 2k on uclibc.
++/* But potentially slow, don't use in one-billion-times loops */
++int bb_putchar(int ch);
++char *xasprintf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+ // gcc-4.1.1 still isn't good enough at optimizing it
+ // (+200 bytes compared to macro)
+ //static ALWAYS_INLINE
+diff --git a/libbb/bb_askpass.c b/libbb/bb_askpass.c
+index 5ad2349..435314e 100644
+--- a/libbb/bb_askpass.c
++++ b/libbb/bb_askpass.c
+@@ -69,7 +69,7 @@ char *bb_askpass(int timeout, const char * prompt)
+ 	}
+ 
+ 	tcsetattr(STDIN_FILENO, TCSANOW, &old);
+-	putchar('\n');
++	bb_putchar('\n');
+ 	fflush(stdout);
+ 	return ret;
+ }
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index a66398a..2db85d0 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -111,15 +111,15 @@ static void cmdedit_set_out_char(int next_char)
+ #endif
+ 	{
+ 		if (initial_settings.c_lflag & ECHO)
+-			putchar(c);
++			bb_putchar(c);
+ 	}
+ 	if (++cmdedit_x >= cmdedit_termw) {
+ 		/* terminal is scrolled down */
+ 		cmdedit_y++;
+ 		cmdedit_x = 0;
+ 		/* destroy "(auto)margin" */
+-		putchar(next_char);
+-		putchar('\b');
++		bb_putchar(next_char);
++		bb_putchar('\b');
+ 	}
+ // Huh? What if command_ps[cursor] == '\0' (we are at the end already?)
+ 	cursor++;
+@@ -137,7 +137,7 @@ static void goto_new_line(void)
+ {
+ 	input_end();
+ 	if (cmdedit_x)
+-		putchar('\n');
++		bb_putchar('\n');
+ }
+ 
+ 
+@@ -149,7 +149,7 @@ static void out1str(const char *s)
+ 
+ static void beep(void)
+ {
+-	putchar('\007');
++	bb_putchar('\007');
+ }
+ 
+ /* Move back one character */
+@@ -197,7 +197,7 @@ static void redraw(int y, int back_cursor)
+ {
+ 	if (y > 0)                              /* up to start y */
+ 		printf("\033[%dA", y);
+-	putchar('\r');
++	bb_putchar('\r');
+ 	put_prompt();
+ 	input_end();                            /* rewrite */
+ 	printf("\033[J");                       /* erase after cursor */
+@@ -1585,8 +1585,8 @@ int read_line_input(const char* prompt, char* command, int maxsize, line_input_t
+ 				beep();
+ 			else {
+ 				*(command + cursor) = c;
+-				putchar(c);
+-				putchar('\b');
++				bb_putchar(c);
++				bb_putchar('\b');
+ 			}
+ 			break;
+ #endif /* FEATURE_COMMAND_EDITING_VI */
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 2215bb8..eb1633b 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -456,6 +456,14 @@ off_t fdlength(int fd)
+ 	return pos + 1;
+ }
+ 
++int bb_putchar(int ch)
++{
++	/* time.c needs putc(ch, stdout), not putchar(ch).
++	 * it does "stdout = stderr;", but then glibc's putchar()
++	 * doesn't work as expected. bad glibc, bad */
++	return putc(ch, stdout);
++}
++
+ // Die with an error message if we can't malloc() enough space and do an
+ // sprintf() into that space.
+ char *xasprintf(const char *format, ...)
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 7f89075..dfdc58b 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -125,7 +125,7 @@ static void die_if_nologin_and_non_root(int amroot)
+ 	fp = fopen("/etc/nologin", "r");
+ 	if (fp) {
+ 		while ((c = getc(fp)) != EOF)
+-			putchar((c=='\n') ? '\r' : c);
++			bb_putchar((c=='\n') ? '\r' : c);
+ 		fflush(stdout);
+ 		fclose(fp);
+ 	} else
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index b3c2408..396328f 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -482,19 +482,43 @@ static void print_value_on_off(const char *str, unsigned long argp)
+ }
+ 
+ #if ENABLE_FEATURE_HDPARM_GET_IDENTITY
+-static void print_ascii(uint16_t *p, uint8_t length);
++static void print_ascii(const char *p, int length)
++{
++#if BB_BIG_ENDIAN
++#define LE_ONLY(x)
++	enum { ofs = 0 };
++#else
++#define LE_ONLY(x) x
++	/* every 16bit word is big-endian (i.e. inverted) */
++	/* accessing bytes in 1,0, 3,2, 5,4... sequence */
++	int ofs = 1;
++#endif
++
++	length *= 2;
++	/* find first non-space & print it */
++	while (length && p[ofs] != ' ') {
++		p++;
++		LE_ONLY(ofs = -ofs;)
++		length--;
++	}
++	while (length && p[ofs]) {
++		bb_putchar(p[ofs]);
++		p++;
++		LE_ONLY(ofs = -ofs;)
++		length--;
++	}
++	bb_putchar('\n');
++#undef LE_ONLY
++}
+ 
+ static void xprint_ascii(uint16_t *val, int i, const char *string, int n)
+ {
+ 	if (val[i]) {
+ 		printf("\t%-20s", string);
+-		print_ascii(&val[i], n);
++		print_ascii((void*)&val[i], n);
+ 	}
+ }
+-#endif
+-/* end of busybox specific stuff */
+ 
+-#if ENABLE_FEATURE_HDPARM_GET_IDENTITY
+ static uint8_t mode_loop(uint16_t mode_sup, uint16_t mode_sel, int cc, uint8_t *have_mode)
+ {
+ 	uint16_t ii;
+@@ -515,41 +539,11 @@ static uint8_t mode_loop(uint16_t mode_sup, uint16_t mode_sel, int cc, uint8_t *
+ 	return err_dma;
+ }
+ 
+-static void print_ascii(uint16_t *p, uint8_t length)
+-{
+-	uint8_t ii;
+-	char cl;
+-
+-	/* find first non-space & print it */
+-	for (ii = 0; ii < length; ii++) {
+-		if ((char)((*p)>>8) != ' ')
+-			break;
+-		cl = (char)(*p);
+-		if (cl != ' ') {
+-			if (cl != '\0')
+-				printf("%c", cl);
+-			p++;
+-			ii++;
+-			break;
+-		}
+-		p++;
+-	}
+-	/* print the rest */
+-	for (; ii< length; ii++) {
+-		if (!(*p))
+-			break; /* some older devices have NULLs */
+-		printf("%c%c", (char)((*p)>>8), (char)(*p));
+-		p++;
+-	}
+-	puts("");
+-}
+-
+ // Parse 512 byte disk identification block and print much crap.
+ 
+-static void identify(uint16_t *id_supplied)
++static void identify(uint16_t *val)
+ {
+-	uint16_t buf[256];
+-	uint16_t *val, ii, jj, kk;
++	uint16_t ii, jj, kk;
+ 	uint16_t like_std = 1, std = 0, min_std = 0xffff;
+ 	uint16_t dev = NO_DEV, eqpt = NO_DEV;
+ 	uint8_t  have_mode = 0, err_dma = 0;
+@@ -557,19 +551,15 @@ static void identify(uint16_t *id_supplied)
+ 	uint32_t ll, mm, nn, oo;
+ 	uint64_t bbbig; /* (:) */
+ 	const char *strng;
++#if BB_BIG_ENDIAN
++	uint16_t buf[256];
+ 
+-	// Adjust for endianness if necessary.
+-
+-	if (BB_BIG_ENDIAN) {
+-		swab(id_supplied, buf, sizeof(buf));
+-		val = buf;
+-	} else
+-		val = id_supplied;
+-
+-	chksum &= 0xff;
+-
++	// Adjust for endianness
++	swab(val, buf, sizeof(buf));
++	val = buf;
++#endif
+ 	/* check if we recognise the device type */
+-	puts("");
++	bb_putchar('\n');
+ 	if (!(val[GEN_CONFIG] & NOT_ATA)) {
+ 		dev = ATA_DEV;
+ 		printf("ATA device, with ");
+@@ -686,7 +676,7 @@ static void identify(uint16_t *id_supplied)
+ 		else if (like_std > std)
+ 			printf("& some of %u\n", like_std);
+ 		else
+-			puts("");
++			bb_putchar('\n');
+ 	} else {
+ 		/* TBD: do CDROM stuff more thoroughly.  For now... */
+ 		kk = 0;
+@@ -786,7 +776,7 @@ static void identify(uint16_t *id_supplied)
+ 		if (bbbig > 1000)
+ 			printf("(%"PRIu64" GB)\n", bbbig/1000);
+ 		else
+-			puts("");
++			bb_putchar('\n');
+ 	}
+ 
+ 	/* hw support of commands (capabilities) */
+@@ -829,7 +819,7 @@ static void identify(uint16_t *id_supplied)
+ 			if ((like_std > 3) && ((val[CAPAB_1] & VALID) == VALID_VAL))
+ 				printf(", %s device specific minimum\n", (val[CAPAB_1] & MIN_STANDBY_TIMER) ? "with" : "no");
+ 			else
+-				puts("");
++				bb_putchar('\n');
+ 		}
+ 		printf("\tR/W multiple sector transfer: ");
+ 		if ((like_std < 3) && !(val[SECTOR_XFER_MAX] & SECTOR_XFER))
+@@ -866,7 +856,7 @@ static void identify(uint16_t *id_supplied)
+ 			printf("\tOverlap support:");
+ 			if (val[PKT_REL]) printf(" %uus to release bus.", val[PKT_REL]);
+ 			if (val[SVC_NBSY]) printf(" %uus to clear BSY after SERVICE cmd.", val[SVC_NBSY]);
+-			puts("");
++			bb_putchar('\n');
+ 		}
+ 	}
+ 
+@@ -893,7 +883,7 @@ static void identify(uint16_t *id_supplied)
+ 			err_dma += mode_loop(jj, kk, 'u', &have_mode);
+ 		}
+ 		if (err_dma || !have_mode) printf("(?)");
+-		puts("");
++		bb_putchar('\n');
+ 
+ 		if ((dev == ATAPI_DEV) && (eqpt != CDROM) && (val[CAPAB_0] & DMA_IL_SUP))
+ 			printf("\t\tInterleaved DMA support\n");
+@@ -904,7 +894,7 @@ static void identify(uint16_t *id_supplied)
+ 			printf("\t\tCycle time:");
+ 			if (val[DMA_TIME_MIN]) printf(" min=%uns", val[DMA_TIME_MIN]);
+ 			if (val[DMA_TIME_NORM]) printf(" recommended=%uns", val[DMA_TIME_NORM]);
+-			puts("");
++			bb_putchar('\n');
+ 		}
+ 	}
+ 
+@@ -918,11 +908,11 @@ static void identify(uint16_t *id_supplied)
+ 			if (jj & 0x0001) printf("pio%d ", ii);
+ 			jj >>=1;
+ 		}
+-		puts("");
++		bb_putchar('\n');
+ 	} else if (((min_std < 5) || (eqpt == CDROM)) && (val[PIO_MODE] & MODE)) {
+ 		for (ii = 0; ii <= val[PIO_MODE]>>8; ii++)
+ 			printf("pio%d ", ii);
+-		puts("");
++		bb_putchar('\n');
+ 	} else
+ 		printf("unknown\n");
+ 
+@@ -931,7 +921,7 @@ static void identify(uint16_t *id_supplied)
+ 			printf("\t\tCycle time:");
+ 			if (val[PIO_NO_FLOW]) printf(" no flow control=%uns", val[PIO_NO_FLOW]);
+ 			if (val[PIO_FLOW]) printf("  IORDY flow control=%uns", val[PIO_FLOW]);
+-			puts("");
++			bb_putchar('\n');
+ 		}
+ 	}
+ 
+@@ -982,7 +972,7 @@ static void identify(uint16_t *id_supplied)
+ 			printf("\t");
+ 			if (jj) printf("%umin for %sSECURITY ERASE UNIT. ", jj==ERASE_BITS ? 508 : jj<<1, "");
+ 			if (kk) printf("%umin for %sSECURITY ERASE UNIT. ", kk==ERASE_BITS ? 508 : kk<<1, "ENHANCED ");
+-			puts("");
++			bb_putchar('\n');
+ 		}
+ 	}
+ 
+@@ -1134,7 +1124,7 @@ static void dump_identity(const struct hd_driveid *id)
+ 		else
+ 			printf("off");
+ 	}
+-	puts("");
++	bb_putchar('\n');
+ 
+ 	if (!(id->field_valid & 1))
+ 		printf(" (maybe):");
+@@ -1905,7 +1895,7 @@ static void parse_xfermode(int flag, smallint *get, smallint *set, int *value)
+ 
+ /*------- getopt short options --------*/
+ static const char hdparm_options[] ALIGN1 =
+-	"gfu::n::p:r::m::c::k::a::B:tTh"
++	"gfu::n::p:r::m::c::k::a::B:tT"
+ 	USE_FEATURE_HDPARM_GET_IDENTITY("iI")
+ 	USE_FEATURE_HDPARM_HDIO_GETSET_DMA("d::")
+ #ifdef HDIO_DRIVE_CMD
+@@ -1933,7 +1923,6 @@ int hdparm_main(int argc, char **argv)
+ 
+ 	while ((c = getopt(argc, argv, hdparm_options)) >= 0) {
+ 		flagcount++;
+-		if (c == 'h') bb_show_usage(); /* EXIT */
+ 		USE_FEATURE_HDPARM_GET_IDENTITY(get_IDentity |= (c == 'I'));
+ 		USE_FEATURE_HDPARM_GET_IDENTITY(get_identity |= (c == 'i'));
+ 		get_geom |= (c == 'g');
+@@ -1999,7 +1988,7 @@ int hdparm_main(int argc, char **argv)
+ 	if (!*argv) {
+ 		if (ENABLE_FEATURE_HDPARM_GET_IDENTITY && !isatty(STDIN_FILENO))
+ 			identify_from_stdin(); /* EXIT */
+-		else bb_show_usage();
++		bb_show_usage();
+ 	}
+ 
+ 	do {
+diff --git a/miscutils/less.c b/miscutils/less.c
+index a2221cf..ec9c00f 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -173,7 +173,7 @@ static void less_exit(int code)
+ 	 * and restore it when we exit. Less does this with the
+ 	 * "ti" and "te" termcap commands; can this be done with
+ 	 * only termios.h? */
+-	putchar('\n');
++	bb_putchar('\n');
+ 	fflush_stdout_and_exit(code);
+ }
+ 
+@@ -419,7 +419,7 @@ static void status_print(void)
+ 
+ 	clear_line();
+ 	if (cur_fline && cur_fline < max_fline - max_displayed_line) {
+-		putchar(':');
++		bb_putchar(':');
+ 		return;
+ 	}
+ 	p = "(END)";
+@@ -755,7 +755,7 @@ static char* less_gets(int sz)
+ 			continue;
+ 		if (i >= width - sz - 1)
+ 			continue; /* len limit */
+-		putchar(c);
++		bb_putchar(c);
+ 		result[i++] = c;
+ 		result = xrealloc(result, i+1);
+ 		result[i] = '\0';
+@@ -916,7 +916,7 @@ static void regex_process(void)
+ 
+ 	/* Get the uncompiled regular expression from the user */
+ 	clear_line();
+-	putchar((option_mask32 & LESS_STATE_MATCH_BACKWARDS) ? '?' : '/');
++	bb_putchar((option_mask32 & LESS_STATE_MATCH_BACKWARDS) ? '?' : '/');
+ 	uncomp_regex = less_gets(1);
+ 	if (!uncomp_regex[0]) {
+ 		free(uncomp_regex);
+@@ -969,7 +969,7 @@ static void number_process(int first_digit)
+ 		num_input[i] = less_getch();
+ 		if (!num_input[i] || !isdigit(num_input[i]))
+ 			break;
+-		putchar(num_input[i]);
++		bb_putchar(num_input[i]);
+ 		i++;
+ 	}
+ 
+@@ -1024,7 +1024,7 @@ static void flag_change(void)
+ 	int keypress;
+ 
+ 	clear_line();
+-	putchar('-');
++	bb_putchar('-');
+ 	keypress = less_getch();
+ 
+ 	switch (keypress) {
+@@ -1049,7 +1049,7 @@ static void show_flag_status(void)
+ 	int flag_val;
+ 
+ 	clear_line();
+-	putchar('_');
++	bb_putchar('_');
+ 	keypress = less_getch();
+ 
+ 	switch (keypress) {
+diff --git a/miscutils/mountpoint.c b/miscutils/mountpoint.c
+index 1f17ada..0f1e155 100644
+--- a/miscutils/mountpoint.c
++++ b/miscutils/mountpoint.c
+@@ -34,7 +34,7 @@ int mountpoint_main(int argc, char **argv)
+ 				return EXIT_SUCCESS;
+ 			} else {
+ 				if (opt & OPT_q)
+-					putchar('\n');
++					bb_putchar('\n');
+ 				else
+ 					bb_error_msg("%s: not a block device", arg);
+ 			}
+diff --git a/miscutils/strings.c b/miscutils/strings.c
+index 8358802..b7f5a0b 100644
+--- a/miscutils/strings.c
++++ b/miscutils/strings.c
+@@ -56,7 +56,7 @@ int strings_main(int argc, char **argv)
+ 			c = fgetc(file);
+ 			if (isprint(c) || c == '\t') {
+ 				if (count > n) {
+-					putchar(c);
++					bb_putchar(c);
+ 				} else {
+ 					string[count] = c;
+ 					if (count == n) {
+@@ -72,7 +72,7 @@ int strings_main(int argc, char **argv)
+ 				}
+ 			} else {
+ 				if (count > n) {
+-					putchar('\n');
++					bb_putchar('\n');
+ 				}
+ 				count = 0;
+ 			}
+diff --git a/miscutils/time.c b/miscutils/time.c
+index e8473f7..8f79a51 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -188,8 +188,6 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ #endif
+ 	if (!cpu_ticks) cpu_ticks = 1; /* we divide by it, must be nonzero */
+ 
+-	/* putchar() != putc(stdout) in glibc! */
+-
+ 	while (*fmt) {
+ 		/* Handle leading literal part */
+ 		int n = strcspn(fmt, "%\\");
+@@ -205,7 +203,7 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 		/* Usually we optimize for size, but there is a limit
+ 		 * for everything. With this we do a lot of 1-byte writes */
+ 		default:
+-			putc(*fmt, stdout);
++			bb_putchar(*fmt);
+ 			break;
+ #endif
+ 
+@@ -215,11 +213,11 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 		/* Our format strings do not have these */
+ 		/* and we do not take format str from user */
+ 			default:
+-				putc('%', stdout);
++				bb_putchar('%');
+ 				/*FALLTHROUGH*/
+ 			case '%':
+ 				if (!*fmt) goto ret;
+-				putc(*fmt, stdout);
++				bb_putchar(*fmt);
+ 				break;
+ #endif
+ 			case 'C':	/* The command that got timed.  */
+@@ -351,17 +349,17 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 		case '\\':		/* Format escape.  */
+ 			switch (*++fmt) {
+ 			default:
+-				putc('\\', stdout);
++				bb_putchar('\\');
+ 				/*FALLTHROUGH*/
+ 			case '\\':
+ 				if (!*fmt) goto ret;
+-				putc(*fmt, stdout);
++				bb_putchar(*fmt);
+ 				break;
+ 			case 't':
+-				putc('\t', stdout);
++				bb_putchar('\t');
+ 				break;
+ 			case 'n':
+-				putc('\n', stdout);
++				bb_putchar('\n');
+ 				break;
+ 			}
+ 			break;
+@@ -370,7 +368,7 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 		++fmt;
+ 	}
+  /* ret: */
+-	putc('\n', stdout);
++	bb_putchar('\n');
+ }
+ 
+ /* Run command CMD and return statistics on it.
+@@ -437,6 +435,7 @@ int time_main(int argc, char **argv)
+ 	run_command(argv, &res);
+ 
+ 	/* Cheat. printf's are shorter :) */
++	/* (but see bb_putchar() body for additional wrinkle!) */
+ 	stdout = stderr;
+ 	dup2(2, 1); /* just in case libc does something silly :( */
+ 	summarize(output_format, argv, &res);
+diff --git a/miscutils/ttysize.c b/miscutils/ttysize.c
+index 5a3f5dc..292cfb8 100644
+--- a/miscutils/ttysize.c
++++ b/miscutils/ttysize.c
+@@ -39,6 +39,6 @@ int ttysize_main(int argc, char **argv)
+ 			fmt = "%u %u" + 2; /* " %u" */
+ 		}
+ 	}
+-	putchar('\n');
++	bb_putchar('\n');
+ 	return 0;
+ }
+diff --git a/modutils/lsmod.c b/modutils/lsmod.c
+index 01e1c55..09b03d0 100644
+--- a/modutils/lsmod.c
++++ b/modutils/lsmod.c
+@@ -15,7 +15,7 @@
+ 
+ 
+ #if !ENABLE_FEATURE_CHECK_TAINTED_MODULE
+-static void check_tainted(void) { puts(""); }
++static void check_tainted(void) { bb_putchar('\n'); }
+ #else
+ #define TAINT_FILENAME                  "/proc/sys/kernel/tainted"
+ #define TAINT_PROPRIETORY_MODULE        (1<<0)
+@@ -128,7 +128,7 @@ int lsmod_main(int argc, char **argv)
+ 		}
+ 		if (count) printf("]");
+ 
+-		puts("");
++		bb_putchar('\n');
+ 	}
+ 
+ #if ENABLE_FEATURE_CLEAN_UP
+@@ -178,7 +178,7 @@ int lsmod_main(int argc, char **argv)
+ 				}
+ 				printf(" %s", tok);
+ 			}
+-			puts("");
++			bb_putchar('\n');
+ 			free(line);
+ 		}
+ 		fclose(file);
+diff --git a/networking/ether-wake.c b/networking/ether-wake.c
+index 3671383..fc26ad0 100644
+--- a/networking/ether-wake.c
++++ b/networking/ether-wake.c
+@@ -92,7 +92,7 @@ void bb_debug_dump_packet(unsigned char *outpack, int pktsize)
+ 	printf("packet dump:\n");
+ 	for (i = 0; i < pktsize; ++i) {
+ 		printf("%2.2x ", outpack[i]);
+-		if (i % 20 == 19) puts("");
++		if (i % 20 == 19) bb_putchar('\n');
+ 	}
+ 	printf("\n\n");
+ }
+diff --git a/networking/hostname.c b/networking/hostname.c
+index 95dc451..6783dba 100644
+--- a/networking/hostname.c
++++ b/networking/hostname.c
+@@ -83,7 +83,7 @@ int hostname_main(int argc, char **argv)
+ 			while (hp->h_addr_list[0]) {
+ 				printf("%s ", inet_ntoa(*(struct in_addr *) (*hp->h_addr_list++)));
+ 			}
+-			puts("");
++			bb_putchar('\n');
+ 		}
+ 	}
+ 	/* Set the hostname */
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 299d363..02e13ed 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -1259,7 +1259,7 @@ int ifupdown_main(int argc, char **argv)
+ 			iface_list = iface_list->link;
+ 		}
+ 		if (VERBOSE) {
+-			puts("");
++			bb_putchar('\n');
+ 		}
+ 
+ 		if (!okay && !FORCE) {
+diff --git a/networking/interface.c b/networking/interface.c
+index 61ce12e..471ac52 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -937,7 +937,7 @@ static void ife_print(struct interface *ptr)
+ 			printf("(auto)");
+ 	}
+ #endif
+-	puts("");
++	bb_putchar('\n');
+ 
+ 	if (ptr->has_ip) {
+ 		printf("          %s addr:%s ", ap->name,
+@@ -1073,7 +1073,7 @@ static void ife_print(struct interface *ptr)
+ 	if (ptr->outfill || ptr->keepalive)
+ 		printf("  Outfill:%d  Keepalive:%d", ptr->outfill, ptr->keepalive);
+ #endif
+-	puts("");
++	bb_putchar('\n');
+ 
+ 	/* If needed, display the interface statistics. */
+ 
+@@ -1122,9 +1122,9 @@ static void ife_print(struct interface *ptr)
+ 		}
+ 		if (ptr->map.dma)
+ 			printf("DMA chan:%x ", ptr->map.dma);
+-		puts("");
++		bb_putchar('\n');
+ 	}
+-	puts("");
++	bb_putchar('\n');
+ }
+ 
+ 
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index 2b17135..a936a42 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -482,7 +482,7 @@ static void do_tunnels_list(struct ip_tunnel_parm *p)
+ 		    (p->i_key && p1.i_key != p->i_key))
+ 			continue;
+ 		print_tunnel(&p1);
+-		puts("");
++		bb_putchar('\n');
+ 	}
+ }
+ 
+@@ -512,7 +512,7 @@ static int do_show(int argc, char **argv)
+ 		return -1;
+ 
+ 	print_tunnel(&p);
+-	puts("");
++	bb_putchar('\n');
+ 	return 0;
+ }
+ 
+diff --git a/networking/nslookup.c b/networking/nslookup.c
+index 0036d0d..e5bb56f 100644
+--- a/networking/nslookup.c
++++ b/networking/nslookup.c
+@@ -112,7 +112,7 @@ static void server_print(void)
+ 	print_host(server, "Server:");
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		free(server);
+-	puts("");
++	bb_putchar('\n');
+ }
+ 
+ /* alter the global _res nameserver structure to use
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 2d09c71..e8d486f 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -1322,7 +1322,7 @@ int traceroute_main(int argc, char **argv)
+ 				printf(" *");
+ 			(void)fflush(stdout);
+ 		}
+-		putchar('\n');
++		bb_putchar('\n');
+ 		if (got_there ||
+ 		    (unreachable > 0 && unreachable >= nprobes - 1))
+ 			break;
+diff --git a/networking/wget.c b/networking/wget.c
+index 86d6f00..df1a45b 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -142,7 +142,7 @@ static void progressmeter(int flag)
+ 		/* last call to progressmeter */
+ 		alarm(0);
+ 		transferred = 0;
+-		putc('\n', stderr);
++		fputc('\n', stderr);
+ 	} else {
+ 		if (flag == -1) {
+ 			/* first call to progressmeter */
+diff --git a/procps/fuser.c b/procps/fuser.c
+index f65b05d..60c1095 100644
+--- a/procps/fuser.c
++++ b/procps/fuser.c
+@@ -292,7 +292,7 @@ static int fuser_print_pid_list(pid_list *plist)
+ 			printf("%d ", curr->pid);
+ 		curr = curr->next;
+ 	}
+-	puts("");
++	bb_putchar('\n');
+ 	return 1;
+ }
+ 
+diff --git a/procps/pidof.c b/procps/pidof.c
+index c989076..9629452 100644
+--- a/procps/pidof.c
++++ b/procps/pidof.c
+@@ -76,7 +76,7 @@ int pidof_main(int argc, char **argv)
+ 		free(pidList);
+ 		optind++;
+ 	}
+-	putchar('\n');
++	bb_putchar('\n');
+ 
+ #if ENABLE_FEATURE_PIDOF_OMIT
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+diff --git a/procps/top.c b/procps/top.c
+index e55cecc..1b8c185 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -482,7 +482,7 @@ static NOINLINE void display_process_list(int count, int scr_width)
+ 		s++;
+ 	}
+ 	/* printf(" %d", hist_iterations); */
+-	putchar(OPT_BATCH_MODE ? '\n' : '\r');
++	bb_putchar(OPT_BATCH_MODE ? '\n' : '\r');
+ 	fflush(stdout);
+ }
+ #undef UPSCALE
+@@ -752,7 +752,7 @@ static NOINLINE void display_topmem_process_list(int count, int scr_width)
+ 		printf("\n""%.*s", scr_width, line_buf);
+ 		s++;
+ 	}
+-	putchar(OPT_BATCH_MODE ? '\n' : '\r');
++	bb_putchar(OPT_BATCH_MODE ? '\n' : '\r');
+ 	fflush(stdout);
+ #undef HDR_STR
+ #undef MIN_WIDTH
+@@ -972,6 +972,6 @@ int top_main(int argc, char **argv)
+ 		}
+ #endif /* FEATURE_USE_TERMIOS */
+ 	}
+-	putchar('\n');
++	bb_putchar('\n');
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/runit/sv.c b/runit/sv.c
+index 406dc6f..7283bbf 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -179,7 +179,7 @@ static void out(const char *p, const char *m1)
+ 	if (errno) {
+ 		printf(": %s", strerror(errno));
+ 	}
+-	puts(""); /* will also flush the output */
++	bb_putchar('\n'); /* will also flush the output */
+ }
+ 
+ #define WARN    "warning: "
+@@ -300,7 +300,7 @@ static int status(const char *unused)
+ 		printf("; ");
+ 		svstatus_print("log");
+ 	}
+-	puts(""); /* will also flush the output */
++	bb_putchar('\n'); /* will also flush the output */
+ 	return r;
+ }
+ 
+@@ -372,7 +372,7 @@ static int check(const char *a)
+ 	}
+ 	printf(OK);
+ 	svstatus_print(*service);
+-	puts(""); /* will also flush the output */
++	bb_putchar('\n'); /* will also flush the output */
+ 	return 1;
+ }
+ 
+@@ -571,7 +571,7 @@ int sv_main(int argc, char **argv)
+ 					svstatus_print(*service);
+ 					++rc;
+ 				}
+-				puts(""); /* will also flush the output */
++				bb_putchar('\n'); /* will also flush the output */
+ 				if (kll)
+ 					control("k");
+  nullify_service:
+diff --git a/selinux/getsebool.c b/selinux/getsebool.c
+index 06a2980..598a51c 100644
+--- a/selinux/getsebool.c
++++ b/selinux/getsebool.c
+@@ -53,7 +53,7 @@ int getsebool_main(int argc, char **argv)
+ 		printf("%s --> %s", names[i], (active ? "on" : "off"));
+ 		if (pending != active)
+ 			printf(" pending: %s", (pending ? "on" : "off"));
+-		putchar('\n');
++		bb_putchar('\n');
+ 	}
+ 
+ 	if (ENABLE_FEATURE_CLEAN_UP) {
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index 174d4ce..befb68f 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -284,8 +284,8 @@ static int restore(const char *file)
+ 		if (count % 0x400 == 0) { /* every 1024 times */
+ 			count = (count % (80*0x400));
+ 			if (count == 0)
+-				fputc('\n', stdout);
+-			fputc('*', stdout);
++				bb_putchar('\n');
++			bb_putchar('*');
+ 			fflush(stdout);
+ 		}
+ 	}
+diff --git a/shell/hush.c b/shell/hush.c
+index 5796f11..5f9f2c5 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2004,7 +2004,7 @@ static int run_list_real(struct pipe *pi)
+ 				insert_bg_job(pi);
+ 			} else {
+ 				/* ctrl-C. We just stop doing whatever we were doing */
+-				putchar('\n');
++				bb_putchar('\n');
+ 			}
+ 			rcode = 0;
+ 			goto ret;
+diff --git a/shell/lash.c b/shell/lash.c
+index 889fe49..4ce6d42 100644
+--- a/shell/lash.c
++++ b/shell/lash.c
+@@ -319,7 +319,7 @@ static int builtin_help(struct child_prog ATTRIBUTE_UNUSED *dummy)
+ 			continue;
+ 		printf("%s\t%s\n", x->cmd, x->descr);
+ 	}
+-	putchar('\n');
++	bb_putchar('\n');
+ 	return EXIT_SUCCESS;
+ }
+ 
+@@ -677,7 +677,7 @@ static int get_command_bufsiz(FILE * source, char *command)
+ 
+ 	if (!fgets(command, BUFSIZ - 2, source)) {
+ 		if (source == stdin)
+-			puts("");
++			bb_putchar('\n');
+ 		return 1;
+ 	}
+ 
+diff --git a/shell/msh.c b/shell/msh.c
+index f1b3f05..41fe1b6 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -1137,7 +1137,7 @@ static void nameval(struct var *vp, const char *val, const char *name)
+ 	if (vp->status & RONLY) {
+ 		xp = vp->name;
+ 		while (*xp && *xp != '=')
+-			putc(*xp++, stderr);
++			fputc(*xp++, stderr);
+ 		err(" is read-only");
+ 		return;
+ 	}
+@@ -3181,7 +3181,7 @@ static int dohelp(struct op *t)
+ 	while (x->name) {
+ 		col += printf("%c%s", ((col == 0) ? '\t' : ' '), x->name);
+ 		if (col > 60) {
+-			puts("");
++			bb_putchar('\n');
+ 			col = 0;
+ 		}
+ 		x++;
+@@ -3193,7 +3193,7 @@ static int dohelp(struct op *t)
+ 		while (applet->name) {
+ 			col += printf("%c%s", ((col == 0) ? '\t' : ' '), applet->name);
+ 			if (col > 60) {
+-				puts("");
++				bb_putchar('\n');
+ 				col = 0;
+ 			}
+ 			applet++;
+@@ -3274,8 +3274,8 @@ static int doumask(struct op *t)
+ 		i = umask(0);
+ 		umask(i);
+ 		for (n = 3 * 4; (n -= 3) >= 0;)
+-			putc('0' + ((i >> n) & 07), stderr);
+-		putc('\n', stderr);
++			fputc('0' + ((i >> n) & 07), stderr);
++		fputc('\n', stderr);
+ 	} else {
+ /* huh??? '8','9' are not allowed! */
+ 		for (n = 0; *cp >= '0' && *cp <= '9'; cp++)
+diff --git a/util-linux/dmesg.c b/util-linux/dmesg.c
+index 909cbd2..3aa99e5 100644
+--- a/util-linux/dmesg.c
++++ b/util-linux/dmesg.c
+@@ -38,12 +38,12 @@ int dmesg_main(int argc, char **argv)
+ 
+ 			for (in = 0; in<len;) {
+ 				if (last == '\n' && buf[in] == '<') in += 3;
+-				else putchar(last = buf[in++]);
++				else bb_putchar(last = buf[in++]);
+ 			}
+-			if (last != '\n') putchar('\n');
++			if (last != '\n') bb_putchar('\n');
+ 		} else {
+ 			write(1,buf,len);
+-			if (len && buf[len-1]!='\n') putchar('\n');
++			if (len && buf[len-1]!='\n') bb_putchar('\n');
+ 		}
+ 
+ 		if (ENABLE_FEATURE_CLEAN_UP) free(buf);
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 7981abc..9f30571 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -892,7 +892,7 @@ list_types(const char *const *sys)
+ 			next = ++done;
+ 		}
+ 	} while (done < last[0]);
+-	putchar('\n');
++	bb_putchar('\n');
+ }
+ #endif /* FEATURE_FDISK_WRITABLE */
+ 
+@@ -2473,13 +2473,13 @@ print_buffer(char *pbuffer)
+ 			printf("0x%03X:", i);
+ 		printf(" %02X", (unsigned char) pbuffer[i]);
+ 		if (l == MAX_PER_LINE - 1) {
+-			puts("");
++			bb_putchar('\n');
+ 			l = -1;
+ 		}
+ 	}
+ 	if (l > 0)
+-		puts("");
+-	puts("");
++		bb_putchar('\n');
++	bb_putchar('\n');
+ }
+ 
+ static void
+@@ -2527,7 +2527,7 @@ xselect(void)
+ 	char c;
+ 
+ 	while (1) {
+-		putchar('\n');
++		bb_putchar('\n');
+ 		c = tolower(read_nonempty("Expert command (m for help): "));
+ 		switch (c) {
+ 		case 'a':
+@@ -2588,7 +2588,7 @@ xselect(void)
+ 			break;
+ 		case 'q':
+ 			close(fd);
+-			puts("");
++			bb_putchar('\n');
+ 			exit(0);
+ 		case 'r':
+ 			return;
+@@ -2867,7 +2867,7 @@ int fdisk_main(int argc, char **argv)
+ 
+ 	while (1) {
+ 		int c;
+-		putchar('\n');
++		bb_putchar('\n');
+ 		c = tolower(read_nonempty("Command (m for help): "));
+ 		switch (c) {
+ 		case 'a':
+@@ -2947,7 +2947,7 @@ int fdisk_main(int argc, char **argv)
+ 			break;
+ 		case 'q':
+ 			close(fd);
+-			puts("");
++			bb_putchar('\n');
+ 			return 0;
+ 		case 's':
+ #if ENABLE_FEATURE_SUN_LABEL
+diff --git a/util-linux/fdisk_osf.c b/util-linux/fdisk_osf.c
+index f6486d5..7261382 100644
+--- a/util-linux/fdisk_osf.c
++++ b/util-linux/fdisk_osf.c
+@@ -394,7 +394,7 @@ bsd_select(void)
+ #endif
+ 
+ 	while (1) {
+-		putchar('\n');
++		bb_putchar('\n');
+ 		switch (tolower(read_nonempty("BSD disklabel command (m for help): "))) {
+ 		case 'd':
+ 			xbsd_delete_part();
+@@ -521,7 +521,7 @@ xbsd_print_disklabel(int show_all)
+ 			printf(" ecc");
+ 		if (lp->d_flags & BSD_D_BADSECT)
+ 			printf(" badsect");
+-		puts("");
++		bb_putchar('\n');
+ 		/* On various machines the fields of *lp are short/int/long */
+ 		/* In order to avoid problems, we cast them all to long. */
+ 		printf("bytes/sector: %ld\n", (long) lp->d_secsize);
+@@ -588,7 +588,7 @@ xbsd_print_disklabel(int show_all)
+ 				printf("%22.22s", "");
+ 				break;
+ 			}
+-			puts("");
++			bb_putchar('\n');
+ 		}
+ 	}
+ }
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index 531c1ea..5f92f35 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -307,12 +307,12 @@ static int ask(const char *string, int def)
+ 	int c;
+ 
+ 	if (!repair) {
+-		puts("");
++		bb_putchar('\n');
+ 		errors_uncorrected = 1;
+ 		return 0;
+ 	}
+ 	if (automatic) {
+-		puts("");
++		bb_putchar('\n');
+ 		if (!def)
+ 			errors_uncorrected = 1;
+ 		return def;
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 94fb457..4767d58 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -195,7 +195,7 @@ static int generate_output(char **argv, int argc, const char *optstr, const stru
+ 		printf(" --");
+ 		while (optind < argc)
+ 			printf(" %s", normalize(argv[optind++]));
+-		puts("");
++		bb_putchar('\n');
+ 	}
+ 	return exit_code;
+ }
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index 0b4dbf6..d532590 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -555,7 +555,7 @@ static void print_sem(int semid)
+ 		}
+ 		printf("%-10d %-10d %-10d %-10d %-10d\n", i, val, ncnt, zcnt, pid);
+ 	}
+-	puts("");
++	bb_putchar('\n');
+ }
+ 
+ int ipcs_main(int argc, char **argv);
+@@ -603,19 +603,19 @@ int ipcs_main(int argc, char **argv)
+ 
+ 	if (!(flags & (flag_shm | flag_msg | flag_sem)))
+ 		flags |= flag_msg | flag_shm | flag_sem;
+-	puts("");
++	bb_putchar('\n');
+ 
+ 	if (flags & flag_shm) {
+ 		do_shm();
+-		puts("");
++		bb_putchar('\n');
+ 	}
+ 	if (flags & flag_sem) {
+ 		do_sem();
+-		puts("");
++		bb_putchar('\n');
+ 	}
+ 	if (flags & flag_msg) {
+ 		do_msg();
+-		puts("");
++		bb_putchar('\n');
+ 	}
+ 	fflush_stdout_and_exit(0);
+ }
+diff --git a/util-linux/more.c b/util-linux/more.c
+index dc5b4c9..0a21a9a 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -40,7 +40,7 @@ struct globals {
+ 
+ static void gotsig(int sig)
+ {
+-	putchar('\n');
++	bb_putchar('\n');
+ 	setTermSettings(cin_fileno, &initial_settings);
+ 	exit(EXIT_FAILURE);
+ }

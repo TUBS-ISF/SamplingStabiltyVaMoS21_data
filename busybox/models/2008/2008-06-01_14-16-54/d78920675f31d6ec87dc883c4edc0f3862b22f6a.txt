@@ -1,0 +1,17 @@
+2008-06-01 14:16:54 +0000
+diff --git a/shell/msh_test/msh-execution/exitcode_ENOENT.right b/shell/msh_test/msh-execution/exitcode_ENOENT.right
+index e2bad05..dd49d2c 100644
+--- a/shell/msh_test/msh-execution/exitcode_ENOENT.right
++++ b/shell/msh_test/msh-execution/exitcode_ENOENT.right
+@@ -1,2 +1,2 @@
+-./does_exist_for_sure: not found
++./does_not_exist_for_sure: not found
+ 127
+diff --git a/shell/msh_test/msh-execution/exitcode_ENOENT.tests b/shell/msh_test/msh-execution/exitcode_ENOENT.tests
+index c886653..7f1b88a 100755
+--- a/shell/msh_test/msh-execution/exitcode_ENOENT.tests
++++ b/shell/msh_test/msh-execution/exitcode_ENOENT.tests
+@@ -1,2 +1,2 @@
+-./does_exist_for_sure
++./does_not_exist_for_sure
+ echo $?

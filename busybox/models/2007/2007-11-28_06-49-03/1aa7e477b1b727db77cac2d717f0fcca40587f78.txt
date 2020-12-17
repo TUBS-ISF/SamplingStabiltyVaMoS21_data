@@ -1,0 +1,720 @@
+2007-11-28 06:49:03 +0000
+diff --git a/Makefile b/Makefile
+index cfa1aca..5de426a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -928,6 +928,8 @@ MRPROPER_FILES += .config .config.old include/asm .version .old_version \
+ 		  include/autoconf.h \
+ 		  include/bbconfigopts.h \
+ 		  include/usage_compressed.h \
++		  include/applet_tables.h \
++		  applets/usage \
+ 		  .kernelrelease Module.symvers tags TAGS cscope*
+ 
+ # clean - Delete most, but leave enough to build external modules
+diff --git a/applets/Kbuild b/applets/Kbuild
+index 289c5de..b9dba03 100644
+--- a/applets/Kbuild
++++ b/applets/Kbuild
+@@ -8,7 +8,7 @@ obj-y :=
+ obj-y += applets.o
+ 
+ hostprogs-y:=
+-hostprogs-y += usage
++hostprogs-y += usage applet_tables
+ 
+ always:= $(hostprogs-y)
+ 
+@@ -19,7 +19,15 @@ quiet_cmd_gen_usage_compressed = GEN     include/usage_compressed.h
+ 
+ HOSTCFLAGS_usage.o = -I$(srctree)/include
+ 
+-applets/applets.o:          include/usage_compressed.h
++applets/applets.o:          include/usage_compressed.h include/applet_tables.h
++
+ applets/usage:              .config $(srctree)/applets/usage_compressed
++
+ include/usage_compressed.h: applets/usage $(srctree)/applets/usage_compressed
+ 	$(call cmd,gen_usage_compressed)
++
++# Two-stage file creation, to avoid having target file still created
++# in case applet_tables fails
++include/applet_tables.h: applets/applet_tables
++	applets/applet_tables >include/applet_tables.h.tmp
++	mv include/applet_tables.h.tmp include/applet_tables.h
+diff --git a/applets/applets.c b/applets/applets.c
+index 636b5c9..33951fa 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -2,7 +2,7 @@
+ /*
+  * Stub for linking busybox binary against libbusybox.
+  *
+- * Copyright (C) 2007 Denis Vlasenko
++ * Copyright (C) 2007 Denys Vlasenko <vda.linux@googlemail.com>
+  *
+  * Licensed under GPLv2, see file License in this tarball for details.
+  */
+diff --git a/include/applets.h b/include/applets.h
+index 2f31a58..f35a1d8 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -59,12 +59,12 @@ s     - suid type:
+ # define APPLET_NOFORK(name,main,l,s,name2)  LINK l name
+ 
+ #else
+-  const struct bb_applet applets[] = { /*    name, main, location, need_suid */
+-# define APPLET(name,l,s)                    { #name, name##_main USE_FEATURE_INSTALLER(,l) USE_FEATURE_SUID(,s) },
+-# define APPLET_NOUSAGE(name,main,l,s)       { #name, main##_main USE_FEATURE_INSTALLER(,l) USE_FEATURE_SUID(,s) },
+-# define APPLET_ODDNAME(name,main,l,s,name2) { #name, main##_main USE_FEATURE_INSTALLER(,l) USE_FEATURE_SUID(,s) },
+-# define APPLET_NOEXEC(name,main,l,s,name2)  { #name, main##_main USE_FEATURE_INSTALLER(,l) USE_FEATURE_SUID(,s) USE_FEATURE_PREFER_APPLETS(,1) },
+-# define APPLET_NOFORK(name,main,l,s,name2)  { #name, main##_main USE_FEATURE_INSTALLER(,l) USE_FEATURE_SUID(,s) USE_FEATURE_PREFER_APPLETS(,1 ,1) },
++  static struct bb_applet applets[] = { /*    name, main, location, need_suid */
++# define APPLET(name,l,s)                    { #name, #name, l, s },
++# define APPLET_NOUSAGE(name,main,l,s)       { #name, #main, l, s },
++# define APPLET_ODDNAME(name,main,l,s,name2) { #name, #main, l, s },
++# define APPLET_NOEXEC(name,main,l,s,name2)  { #name, #main, l, s, 1 },
++# define APPLET_NOFORK(name,main,l,s,name2)  { #name, #main, l, s, 1, 1 },
+ #endif
+ 
+ #if ENABLE_INSTALL_NO_USR
+@@ -385,7 +385,6 @@ USE_GUNZIP(APPLET_ODDNAME(zcat, gunzip, _BB_DIR_BIN, _BB_SUID_NEVER, zcat))
+ USE_ZCIP(APPLET(zcip, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ 
+ #if !defined(PROTOTYPES) && !defined(NAME_MAIN_CNAME) && !defined(MAKE_USAGE)
+-	{ NULL }
+ };
+ #endif
+ 
+diff --git a/include/busybox.h b/include/busybox.h
+index 7ef3690..f99901a 100644
+--- a/include/busybox.h
++++ b/include/busybox.h
+@@ -9,8 +9,7 @@
+ 
+ #include "libbb.h"
+ 
+-#if ENABLE_FEATURE_INSTALLER
+-/* order matters: used as index into "install_dir[]" in busybox.c */
++/* order matters: used as index into "install_dir[]" in appletlib.c */
+ typedef enum bb_install_loc_t {
+ 	_BB_DIR_ROOT = 0,
+ 	_BB_DIR_BIN,
+@@ -18,40 +17,41 @@ typedef enum bb_install_loc_t {
+ 	_BB_DIR_USR_BIN,
+ 	_BB_DIR_USR_SBIN
+ } bb_install_loc_t;
+-#endif
+ 
+-#if ENABLE_FEATURE_SUID
+ typedef enum bb_suid_t {
+ 	_BB_SUID_NEVER = 0,
+ 	_BB_SUID_MAYBE,
+ 	_BB_SUID_ALWAYS
+ } bb_suid_t;
+-#endif
+ 
+-struct bb_applet {
+-	const char *name;
+-	int (*main) (int argc, char **argv);
+-#if ENABLE_FEATURE_INSTALLER
+-	__extension__ enum bb_install_loc_t install_loc:8;
++
++/* Defined in appletlib.c (by including generated applet_tables.h) */
++/* Keep in sync with applets/applet_tables.c! */
++extern const char applet_names[];
++extern int (*const applet_mains[])(int argc, char **argv);
++
++#if ENABLE_FEATURE_INSTALLER || ENABLE_FEATURE_PREFER_APPLETS
++extern const uint32_t applet_nameofs[];
++#else
++extern const uint16_t applet_nameofs[];
+ #endif
++
+ #if ENABLE_FEATURE_SUID
+-	__extension__ enum bb_suid_t need_suid:8;
++#define APPLET_NAME(i) (applet_names + (applet_nameofs[i] & 0x3fff))
++#define APPLET_SUID(i) ((applet_nameofs[i] >> 14) & 0x3)
++#else
++#define APPLET_NAME(i) (applet_names + (applet_nameofs[i] & 0xffff))
+ #endif
+-#if ENABLE_FEATURE_PREFER_APPLETS
+-	/* true if instead of fork(); exec("applet"); waitpid();
+-	 * one can do fork(); exit(applet_main(argc,argv)); waitpid(); */
+-	unsigned char noexec;
+-	/* Even nicer */
+-	/* true if instead of fork(); exec("applet"); waitpid();
+-	 * one can simply call applet_main(argc,argv); */
+-	unsigned char nofork;
++
++#if ENABLE_FEATURE_INSTALLER
++#define APPLET_INSTALL_LOC(i) ((applet_nameofs[i] >> 16) & 0x7)
+ #endif
+-};
+ 
++#if ENABLE_FEATURE_PREFER_APPLETS
++#define APPLET_IS_NOFORK(i) (applet_nameofs[i] & (1 << 19))
++#define APPLET_IS_NOEXEC(i) (applet_nameofs[i] & (1 << 20))
++#endif
+ 
+-/* Defined in appletlib.c */
+-extern const struct bb_applet applets[];
+-extern const unsigned short NUM_APPLETS;
+ 
+ /* Length of these names has effect on size of libbusybox
+  * and "individual" binaries. Keep them short.
+diff --git a/include/libbb.h b/include/libbb.h
+index 095647d..2b92821 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -550,7 +550,6 @@ void clear_username_cache(void);
+ enum { USERNAME_MAX_SIZE = 16 - sizeof(int) };
+ 
+ 
+-struct bb_applet;
+ int execable_file(const char *name);
+ char *find_execable(const char *filename);
+ int exists_execable(const char *filename);
+@@ -562,7 +561,7 @@ int exists_execable(const char *filename);
+ int bb_execvp(const char *file, char *const argv[]);
+ #define BB_EXECVP(prog,cmd) bb_execvp(prog,cmd)
+ #define BB_EXECLP(prog,cmd,...) \
+-	execlp((find_applet_by_name(prog)) ? CONFIG_BUSYBOX_EXEC_PATH : prog, \
++	execlp((find_applet_by_name(prog) >= 0) ? CONFIG_BUSYBOX_EXEC_PATH : prog, \
+ 		cmd, __VA_ARGS__)
+ #else
+ #define BB_EXECVP(prog,cmd)     execvp(prog,cmd)
+@@ -600,8 +599,8 @@ struct nofork_save_area {
+ void save_nofork_data(struct nofork_save_area *save);
+ void restore_nofork_data(struct nofork_save_area *save);
+ /* Does NOT check that applet is NOFORK, just blindly runs it */
+-int run_nofork_applet(const struct bb_applet *a, char **argv);
+-int run_nofork_applet_prime(struct nofork_save_area *old, const struct bb_applet *a, char **argv);
++int run_nofork_applet(int applet_no, char **argv);
++int run_nofork_applet_prime(struct nofork_save_area *old, int applet_no, char **argv);
+ 
+ /* Helpers for daemonization.
+  *
+@@ -786,10 +785,10 @@ const struct hwtype *get_hwntype(int type);
+ 
+ 
+ #ifndef BUILD_INDIVIDUAL
+-extern const struct bb_applet *find_applet_by_name(const char *name);
++extern int find_applet_by_name(const char *name);
+ /* Returns only if applet is not found. */
+ extern void run_applet_and_exit(const char *name, char **argv);
+-extern void run_appletstruct_and_exit(const struct bb_applet *a, char **argv) ATTRIBUTE_NORETURN;
++extern void run_applet_no_and_exit(int a, char **argv) ATTRIBUTE_NORETURN;
+ #endif
+ 
+ extern int match_fstype(const struct mntent *mt, const char *fstypes);
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 4bd60d0..dcf24f5 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -33,13 +33,9 @@ static const char usage_messages[] ALIGN1 = ""
+ #define usage_messages 0
+ #endif /* SHOW_USAGE */
+ 
+-/* Define struct bb_applet applets[] */
+-#include "applets.h"
+ 
+-#if ENABLE_FEATURE_SH_STANDALONE
+-/* -1 because last entry is NULL */
+-const unsigned short NUM_APPLETS = ARRAY_SIZE(applets) - 1;
+-#endif
++/* Include generated applet names, pointers to <apllet>_main, etc */
++#include "applet_tables.h"
+ 
+ 
+ #if ENABLE_FEATURE_COMPRESS_USAGE
+@@ -84,16 +80,14 @@ void bb_show_usage(void)
+ 		const char *format_string;
+ 		const char *p;
+ 		const char *usage_string = p = unpack_usage_messages();
+-		const struct bb_applet *ap = find_applet_by_name(applet_name);
+-		int i;
++		int ap = find_applet_by_name(applet_name);
+ 
+-		if (!ap) /* never happens, paranoia */
++		if (ap < 0) /* never happens, paranoia */
+ 			xfunc_die();
+ 
+-		i = ap - applets;
+-		while (i) {
++		while (ap) {
+ 			while (*p++) continue;
+-			i--;
++			ap--;
+ 		}
+ 
+ 		fprintf(stderr, "%s multi-call binary\n", bb_banner);
+@@ -107,18 +101,22 @@ void bb_show_usage(void)
+ }
+ 
+ 
+-static int applet_name_compare(const void *name, const void *vapplet)
++static int applet_name_compare(const void *name, const void *v)
+ {
+-	const struct bb_applet *applet = vapplet;
+-
+-	return strcmp(name, applet->name);
++	int i = (const char *)v - applet_names;
++	return strcmp(name, APPLET_NAME(i));
+ }
+ 
+-const struct bb_applet *find_applet_by_name(const char *name)
++int find_applet_by_name(const char *name)
+ {
++	const char *p;
+ 	/* Do a binary search to find the applet entry given the name. */
+-	return bsearch(name, applets, ARRAY_SIZE(applets)-1, sizeof(applets[0]),
+-				applet_name_compare);
++
++	/* NB: any char pointer will work as well, not necessarily applet_names */
++	p = bsearch(name, applet_names, ARRAY_SIZE(applet_mains), 1, applet_name_compare);
++	if (!p)
++		return -1;
++	return p - applet_names;
+ }
+ 
+ 
+@@ -166,7 +164,7 @@ USE_FEATURE_SUID(static uid_t ruid;)  /* real uid */
+ 
+ /* applets[] is const, so we have to define this "override" structure */
+ static struct BB_suid_config {
+-	const struct bb_applet *m_applet;
++	int m_applet;
+ 	uid_t m_uid;
+ 	gid_t m_gid;
+ 	mode_t m_mode;
+@@ -232,7 +230,7 @@ static void parse_config_file(void)
+ {
+ 	struct BB_suid_config *sct_head;
+ 	struct BB_suid_config *sct;
+-	const struct bb_applet *applet;
++	int applet_no;
+ 	FILE *f;
+ 	const char *errmsg;
+ 	char *s;
+@@ -343,14 +341,14 @@ static void parse_config_file(void)
+ 			 * applet is currently built in and ignore it otherwise.
+ 			 * Note: this can hide config file bugs which only pop
+ 			 * up when the busybox configuration is changed. */
+-			applet = find_applet_by_name(s);
+-			if (applet) {
++			applet_no = find_applet_by_name(s);
++			if (applet_no >= 0) {
+ 				/* Note: We currently don't check for duplicates!
+ 				 * The last config line for each applet will be the
+ 				 * one used since we insert at the head of the list.
+ 				 * I suppose this could be considered a feature. */
+ 				sct = xmalloc(sizeof(struct BB_suid_config));
+-				sct->m_applet = applet;
++				sct->m_applet = applet_no;
+ 				sct->m_mode = 0;
+ 				sct->m_next = sct_head;
+ 				sct_head = sct;
+@@ -441,7 +439,7 @@ static inline void parse_config_file(void)
+ 
+ 
+ #if ENABLE_FEATURE_SUID
+-static void check_suid(const struct bb_applet *applet)
++static void check_suid(int applet_no)
+ {
+ 	gid_t rgid;  /* real gid */
+ 
+@@ -456,7 +454,7 @@ static void check_suid(const struct bb_applet *applet)
+ 		mode_t m;
+ 
+ 		for (sct = suid_config; sct; sct = sct->m_next) {
+-			if (sct->m_applet == applet)
++			if (sct->m_applet == applet_no)
+ 				goto found;
+ 		}
+ 		goto check_need_suid;
+@@ -504,12 +502,12 @@ static void check_suid(const struct bb_applet *applet)
+ #endif
+  check_need_suid:
+ #endif
+-	if (applet->need_suid == _BB_SUID_ALWAYS) {
++	if (APPLET_SUID(applet_no) == _BB_SUID_ALWAYS) {
+ 		/* Real uid is not 0. If euid isn't 0 too, suid bit
+ 		 * is most probably not set on our executable */
+ 		if (geteuid())
+ 			bb_error_msg_and_die("must be suid to work properly");
+-	} else if (applet->need_suid == _BB_SUID_NEVER) {
++	} else if (APPLET_SUID(applet_no) == _BB_SUID_NEVER) {
+ 		xsetgid(rgid);  /* drop all privileges */
+ 		xsetuid(ruid);
+ 	}
+@@ -536,18 +534,19 @@ static void install_links(const char *busybox, int use_symbolic_links)
+ 		usr_sbin
+ 	};
+ 
+-	int (*lf)(const char *, const char *) = link;
++	int (*lf)(const char *, const char *);
+ 	char *fpc;
+ 	int i;
+ 	int rc;
+ 
++	lf = link;
+ 	if (use_symbolic_links)
+ 		lf = symlink;
+ 
+-	for (i = 0; applets[i].name != NULL; i++) {
++	for (i = 0; i < ARRAY_SIZE(applet_mains); i++) {
+ 		fpc = concat_path_file(
+-				install_dir[applets[i].install_loc],
+-				applets[i].name);
++				install_dir[APPLET_INSTALL_LOC(i)],
++				APPLET_NAME(i));
+ 		rc = lf(busybox, fpc);
+ 		if (rc != 0 && errno != EEXIST) {
+ 			bb_simple_perror_msg(fpc);
+@@ -564,7 +563,7 @@ static int busybox_main(char **argv)
+ {
+ 	if (!argv[1]) {
+ 		/* Called without arguments */
+-		const struct bb_applet *a;
++		const char *a;
+ 		int col, output_width;
+  help:
+ 		output_width = 80;
+@@ -588,14 +587,14 @@ static int busybox_main(char **argv)
+ 		       "\twill act like whatever it was invoked as!\n"
+ 		       "\nCurrently defined functions:\n");
+ 		col = 0;
+-		a = applets;
+-		while (a->name) {
++		a = applet_names;
++		while (*a) {
+ 			if (col > output_width) {
+ 				puts(",");
+ 				col = 0;
+ 			}
+-			col += printf("%s%s", (col ? ", " : "\t"), a->name);
+-			a++;
++			col += printf("%s%s", (col ? ", " : "\t"), a);
++			a += strlen(a) + 1;
+ 		}
+ 		puts("\n");
+ 		return 0;
+@@ -629,7 +628,7 @@ static int busybox_main(char **argv)
+ 	bb_error_msg_and_die("applet not found");
+ }
+ 
+-void run_appletstruct_and_exit(const struct bb_applet *applet, char **argv)
++void run_applet_no_and_exit(int applet_no, char **argv)
+ {
+ 	int argc = 1;
+ 
+@@ -640,19 +639,19 @@ void run_appletstruct_and_exit(const struct bb_applet *applet, char **argv)
+ 	optind = 1;
+ 	xfunc_error_retval = EXIT_FAILURE;
+ 
+-	applet_name = applet->name;
++	applet_name = APPLET_NAME(applet_no);
+ 	if (argc == 2 && !strcmp(argv[1], "--help"))
+ 		bb_show_usage();
+ 	if (ENABLE_FEATURE_SUID)
+-		check_suid(applet);
+-	exit(applet->main(argc, argv));
++		check_suid(applet_no);
++	exit(applet_mains[applet_no](argc, argv));
+ }
+ 
+ void run_applet_and_exit(const char *name, char **argv)
+ {
+-	const struct bb_applet *applet = find_applet_by_name(name);
+-	if (applet)
+-		run_appletstruct_and_exit(applet, argv);
++	int applet = find_applet_by_name(name);
++	if (applet >= 0)
++		run_applet_no_and_exit(applet, argv);
+ 	if (!strncmp(name, "busybox", 7))
+ 		exit(busybox_main(argv));
+ }
+diff --git a/libbb/execable.c b/libbb/execable.c
+index f679108..2649a6c 100644
+--- a/libbb/execable.c
++++ b/libbb/execable.c
+@@ -65,7 +65,7 @@ int exists_execable(const char *filename)
+  */
+ int bb_execvp(const char *file, char *const argv[])
+ {
+-	return execvp(find_applet_by_name(file) ? bb_busybox_exec_path : file,
++	return execvp(find_applet_by_name(file) >= 0 ? bb_busybox_exec_path : file,
+ 					argv);
+ }
+ #endif
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index a01065d..1d6817e 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -16,7 +16,7 @@
+  */
+ 
+ #include <paths.h>
+-#include "busybox.h" /* for struct bb_applet */
++#include "busybox.h" /* uses applet tables */
+ 
+ /* This does a fork/exec in one call, using vfork().  Returns PID of new child,
+  * -1 for failure.  Runs argv[0], searching path if that has no / in it. */
+@@ -120,11 +120,11 @@ void restore_nofork_data(struct nofork_save_area *save)
+ 	die_sleep = save->die_sleep;
+ }
+ 
+-int run_nofork_applet_prime(struct nofork_save_area *old, const struct bb_applet *a, char **argv)
++int run_nofork_applet_prime(struct nofork_save_area *old, int applet_no, char **argv)
+ {
+ 	int rc, argc;
+ 
+-	applet_name = a->name;
++	applet_name = APPLET_NAME(applet_no);
+ 	xfunc_error_retval = EXIT_FAILURE;
+ 	/*option_mask32 = 0; - not needed */
+ 	/* special flag for xfunc_die(). If xfunc will "die"
+@@ -143,7 +143,7 @@ int run_nofork_applet_prime(struct nofork_save_area *old, const struct bb_applet
+ 		char *tmp_argv[argc+1];
+ 		memcpy(tmp_argv, argv, (argc+1) * sizeof(tmp_argv[0]));
+ 		/* Finally we can call NOFORK applet's main() */
+-		rc = a->main(argc, tmp_argv);
++		rc = applet_mains[applet_no](argc, tmp_argv);
+ 	} else { /* xfunc died in NOFORK applet */
+ 		/* in case they meant to return 0... */
+ 		if (rc == -2222)
+@@ -155,13 +155,13 @@ int run_nofork_applet_prime(struct nofork_save_area *old, const struct bb_applet
+ 	return rc;
+ }
+ 
+-int run_nofork_applet(const struct bb_applet *a, char **argv)
++int run_nofork_applet(int applet_no, char **argv)
+ {
+ 	struct nofork_save_area old;
+ 
+ 	/* Saving globals */
+ 	save_nofork_data(&old);
+-	return run_nofork_applet_prime(&old, a, argv);
++	return run_nofork_applet_prime(&old, applet_no, argv);
+ }
+ #endif /* FEATURE_PREFER_APPLETS */
+ 
+@@ -169,15 +169,15 @@ int spawn_and_wait(char **argv)
+ {
+ 	int rc;
+ #if ENABLE_FEATURE_PREFER_APPLETS
+-	const struct bb_applet *a = find_applet_by_name(argv[0]);
++	int a = find_applet_by_name(argv[0]);
+ 
+-	if (a && (a->nofork
++	if (a >= 0 && (APPLET_IS_NOFORK(a)
+ #if BB_MMU
+-		 || a->noexec /* NOEXEC trick needs fork() */
++			|| APPLET_IS_NOEXEC(a) /* NOEXEC trick needs fork() */
+ #endif
+ 	)) {
+ #if BB_MMU
+-		if (a->nofork)
++		if (APPLET_IS_NOFORK(a))
+ #endif
+ 		{
+ 			return run_nofork_applet(a, argv);
+@@ -190,7 +190,7 @@ int spawn_and_wait(char **argv)
+ 			return wait4pid(rc);
+ 		/* child */
+ 		xfunc_error_retval = EXIT_FAILURE;
+-		run_appletstruct_and_exit(a, argv);
++		run_applet_no_and_exit(a, argv);
+ #endif
+ 	}
+ #endif /* FEATURE_PREFER_APPLETS */
+diff --git a/shell/ash.c b/shell/ash.c
+index 8f388f5..9b9fe5b 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -53,7 +53,7 @@
+ #if DEBUG
+ #define _GNU_SOURCE
+ #endif
+-#include "busybox.h" /* for struct bb_applet */
++#include "busybox.h" /* for applet_names */
+ #include <paths.h>
+ #include <setjmp.h>
+ #include <fnmatch.h>
+@@ -6479,12 +6479,10 @@ tryexec(char *cmd, char **argv, char **envp)
+ 
+ #if ENABLE_FEATURE_SH_STANDALONE
+ 	if (strchr(cmd, '/') == NULL) {
+-		const struct bb_applet *a;
+-
+-		a = find_applet_by_name(cmd);
+-		if (a) {
+-			if (a->noexec)
+-				run_appletstruct_and_exit(a, argv);
++		int a = find_applet_by_name(cmd);
++		if (a >= 0) {
++			if (APPLET_IS_NOEXEC(a))
++				run_applet_no_and_exit(a, argv);
+ 			/* re-exec ourselves with the new arguments */
+ 			execve(bb_busybox_exec_path, argv, envp);
+ 			/* If they called chroot or otherwise made the binary no longer
+@@ -6539,7 +6537,7 @@ shellexec(char **argv, const char *path, int idx)
+ 	envp = environment();
+ 	if (strchr(argv[0], '/')
+ #if ENABLE_FEATURE_SH_STANDALONE
+-	 || find_applet_by_name(argv[0])
++	 || find_applet_by_name(argv[0]) >= 0
+ #endif
+ 	) {
+ 		tryexec(argv[0], argv, envp);
+@@ -11117,7 +11115,7 @@ find_command(char *name, struct cmdentry *entry, int act, const char *path)
+ 	}
+ 
+ #if ENABLE_FEATURE_SH_STANDALONE
+-	if (find_applet_by_name(name)) {
++	if (find_applet_by_name(name) >= 0) {
+ 		entry->cmdtype = CMDNORMAL;
+ 		entry->u.index = -1;
+ 		return;
+@@ -11298,11 +11296,15 @@ helpcmd(int argc, char **argv)
+ 		}
+ 	}
+ #if ENABLE_FEATURE_SH_STANDALONE
+-	for (i = 0; i < NUM_APPLETS; i++) {
+-		col += out1fmt("%c%s", ((col == 0) ? '\t' : ' '), applets[i].name);
+-		if (col > 60) {
+-			out1fmt("\n");
+-			col = 0;
++	{
++		const char *a = applet_names;
++		while (*a) {
++			col += out1fmt("%c%s", ((col == 0) ? '\t' : ' '), a);
++			if (col > 60) {
++				out1fmt("\n");
++				col = 0;
++			}
++			a += strlen(a) + 1;
+ 		}
+ 	}
+ #endif
+diff --git a/shell/hush.c b/shell/hush.c
+index f7e2a4a..8e42a8f 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -83,7 +83,7 @@
+ 
+ extern char **environ; /* This is in <unistd.h>, but protected with __USE_GNU */
+ 
+-#include "busybox.h" /* for struct bb_applet */
++#include "busybox.h" /* for APPLET_IS_NOFORK/NOEXEC */
+ 
+ 
+ #if !BB_MMU
+@@ -1464,12 +1464,12 @@ static void pseudo_exec_argv(char **argv)
+ 	/* Check if the command matches any busybox applets */
+ #if ENABLE_FEATURE_SH_STANDALONE
+ 	if (strchr(argv[0], '/') == NULL) {
+-		const struct bb_applet *a = find_applet_by_name(argv[0]);
+-		if (a) {
+-			if (a->noexec) {
++		int a = find_applet_by_name(argv[0]);
++		if (a >= 0) {
++			if (APPLET_IS_NOEXEC(a)) {
+ 				debug_printf_exec("running applet '%s'\n", argv[0]);
+-// is it ok that run_appletstruct_and_exit() does exit(), not _exit()?
+-				run_appletstruct_and_exit(a, argv);
++// is it ok that run_applet_no_and_exit() does exit(), not _exit()?
++				run_applet_no_and_exit(a, argv);
+ 			}
+ 			/* re-exec ourselves with the new arguments */
+ 			debug_printf_exec("re-execing applet '%s'\n", argv[0]);
+@@ -1855,8 +1855,8 @@ static int run_pipe_real(struct pipe *pi)
+ 		}
+ #if ENABLE_FEATURE_SH_STANDALONE
+ 		{
+-			const struct bb_applet *a = find_applet_by_name(argv[i]);
+-			if (a && a->nofork) {
++			int a = find_applet_by_name(argv[i]);
++			if (a >= 0 && APPLET_IS_NOFORK(a)) {
+ 				setup_redirects(child, squirrel);
+ 				save_nofork_data(&nofork_save);
+ 				argv_expanded = argv + i;
+diff --git a/shell/lash_unused.c b/shell/lash_unused.c
+index 781dfdb..10a9120 100644
+--- a/shell/lash_unused.c
++++ b/shell/lash_unused.c
+@@ -23,7 +23,7 @@
+ #include <getopt.h>
+ #include <glob.h>
+ 
+-#include "busybox.h" /* for struct bb_applet */
++#include "libbb.h"
+ 
+ #define expand_t	glob_t
+ 
+@@ -1253,8 +1253,8 @@ static int run_command(struct job *newjob, int inbg, int outpipe[2])
+ 			}
+ #if ENABLE_FEATURE_SH_STANDALONE
+ 			{
+-				const struct bb_applet *a = find_applet_by_name(child->argv[i]);
+-				if (a && a->nofork) {
++				int a = find_applet_by_name(child->argv[i]);
++				if (a >= 0 && APPLET_IS_NOFORK(a)) {
+ 					setup_redirects(child, squirrel);
+ 					rcode = run_nofork_applet(a, child->argv + i);
+ 					restore_redirects(squirrel);
+diff --git a/shell/msh.c b/shell/msh.c
+index 7efd7f9..32953f4 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -45,9 +45,9 @@
+ # define NOT_LONE_DASH(s) ((s)[0] != '-' || (s)[1])
+ # define LONE_CHAR(s,c) ((s)[0] == (c) && !(s)[1])
+ # define ATTRIBUTE_NORETURN __attribute__ ((__noreturn__))
+-static char *find_applet_by_name(const char *applet)
++static int find_applet_by_name(const char *applet)
+ {
+-	return NULL;
++	return -1;
+ }
+ static char *utoa_to_buf(unsigned n, char *buf, unsigned buflen)
+ {
+@@ -83,7 +83,7 @@ static char *itoa(int n)
+ 	return local_buf;
+ }
+ #else
+-# include "busybox.h"
++# include "busybox.h" /* for applet_names */
+ extern char **environ;
+ #endif
+ 
+@@ -3057,7 +3057,7 @@ static const char *rexecve(char *c, char **v, char **envp)
+ 	char *name = c;
+ 
+ 	if (ENABLE_FEATURE_SH_STANDALONE) {
+-		if (find_applet_by_name(name)) {
++		if (find_applet_by_name(name) >= 0) {
+ 			/* We have to exec here since we vforked.  Running
+ 			 * run_applet_and_exit() won't work and bad things
+ 			 * will happen. */
+@@ -3188,15 +3188,15 @@ static int dohelp(struct op *t)
+ 	}
+ #if ENABLE_FEATURE_SH_STANDALONE
+ 	{
+-		const struct bb_applet *applet = applets;
++		const char *applet = applet_names;
+ 
+-		while (applet->name) {
+-			col += printf("%c%s", ((col == 0) ? '\t' : ' '), applet->name);
++		while (*applet) {
++			col += printf("%c%s", ((col == 0) ? '\t' : ' '), applet);
+ 			if (col > 60) {
+ 				bb_putchar('\n');
+ 				col = 0;
+ 			}
+-			applet++;
++			applet += strlen(applet) + 1;
+ 		}
+ 	}
+ #endif

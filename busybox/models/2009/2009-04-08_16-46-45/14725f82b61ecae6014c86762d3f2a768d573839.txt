@@ -1,0 +1,20 @@
+2009-04-08 16:46:45 +0000
+diff --git a/shell/hush_leaktool.sh b/shell/hush_leaktool.sh
+old mode 100644
+new mode 100755
+index 54161b3..f8e47ae
+--- a/shell/hush_leaktool.sh
++++ b/shell/hush_leaktool.sh
+@@ -5,9 +5,9 @@ output=output
+ 
+ freelist=`grep 'free 0x' "$output" | cut -d' ' -f2 | sort | uniq | xargs`
+ 
+-grep -v free "$output" >temp1
++grep -v free "$output" >"$output.leaked"
+ for freed in $freelist; do
+     echo Dropping $freed
+-    grep -v $freed <temp1 >temp2
+-    mv temp2 temp1
++    grep -v $freed <"$output.leaked" >"$output.temp"
++    mv "$output.temp" "$output.leaked"
+ done

@@ -1,0 +1,3277 @@
+2008-03-17 09:00:54 +0000
+diff --git a/Makefile.flags b/Makefile.flags
+index 2655222..61bff4f 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -20,6 +20,7 @@ CPPFLAGS += \
+ # flag checks are grouped together to speed the checks up a bit..
+ CFLAGS += $(call cc-option,-Wall -Wshadow -Wwrite-strings,)
+ CFLAGS += $(call cc-option,-Wundef -Wstrict-prototypes,)
++CFLAGS += $(call cc-option,-Wunused -Wunused-parameter,)
+ # If you want to add "-Wmissing-prototypes -Wmissing-declarations" above
+ # (or anything else for that matter) make sure that it is still possible
+ # to build bbox without warnings. Current offender: find.c:alloc_action().
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index b467f1b..327b3cf 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -159,7 +159,7 @@ USE_DESKTOP(long long) int unpack_bunzip2(void)
+ }
+ 
+ int bunzip2_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int bunzip2_main(int argc, char **argv)
++int bunzip2_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	getopt32(argv, "cfvdt");
+ 	argv += optind;
+@@ -257,7 +257,7 @@ USE_DESKTOP(long long) int unpack_gunzip(void)
+ }
+ 
+ int gunzip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int gunzip_main(int argc, char **argv)
++int gunzip_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	getopt32(argv, "cfvdt");
+ 	argv += optind;
+@@ -295,7 +295,7 @@ USE_DESKTOP(long long) int unpack_unlzma(void)
+ }
+ 
+ int unlzma_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int unlzma_main(int argc, char **argv)
++int unlzma_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	getopt32(argv, "cf");
+ 	argv += optind;
+@@ -337,7 +337,7 @@ USE_DESKTOP(long long) int unpack_uncompress(void)
+ }
+ 
+ int uncompress_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int uncompress_main(int argc, char **argv)
++int uncompress_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	getopt32(argv, "cf");
+ 	argv += optind;
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index e90e82b..7693342 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -949,7 +949,7 @@ static int package_satisfies_dependency(int package, int depend_type)
+ 	return 0;
+ }
+ 
+-static int check_deps(deb_file_t **deb_file, int deb_start, int dep_max_count)
++static int check_deps(deb_file_t **deb_file, int deb_start /*, int dep_max_count - ?? */)
+ {
+ 	int *conflicts = NULL;
+ 	int conflicts_num = 0;
+@@ -1689,7 +1689,7 @@ int dpkg_main(int argc, char **argv)
+ 
+ 	/* Check that the deb file arguments are installable */
+ 	if (!(opt & OPT_force_ignore_depends)) {
+-		if (!check_deps(deb_file, 0, deb_count)) {
++		if (!check_deps(deb_file, 0 /*, deb_count*/)) {
+ 			bb_error_msg_and_die("dependency check failed");
+ 		}
+ 	}
+diff --git a/console-tools/clear.c b/console-tools/clear.c
+index 769ce31..0d94e35 100644
+--- a/console-tools/clear.c
++++ b/console-tools/clear.c
+@@ -13,7 +13,7 @@
+ #include "libbb.h"
+ 
+ int clear_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int clear_main(int argc, char **argv)
++int clear_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	return printf("\033[H\033[J") != 6;
+ }
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index 882b881..843f4b0 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -167,7 +167,7 @@ static void loadnewfont(int fd)
+ }
+ 
+ int loadfont_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int loadfont_main(int argc, char **argv)
++int loadfont_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	int fd;
+ 
+diff --git a/console-tools/loadkmap.c b/console-tools/loadkmap.c
+index 40885ee..bea5a77 100644
+--- a/console-tools/loadkmap.c
++++ b/console-tools/loadkmap.c
+@@ -26,7 +26,7 @@ struct kbentry {
+ #define MAX_NR_KEYMAPS  256
+ 
+ int loadkmap_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int loadkmap_main(int argc, char **argv)
++int loadkmap_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	struct kbentry ke;
+ 	int i, j, fd;
+diff --git a/console-tools/reset.c b/console-tools/reset.c
+index bc18cd0..f36ef54 100644
+--- a/console-tools/reset.c
++++ b/console-tools/reset.c
+@@ -18,7 +18,7 @@ int stty_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ #endif
+ 
+ int reset_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int reset_main(int argc, char **argv)
++int reset_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	static const char *const args[] = {
+ 		"stty", "sane", NULL
+diff --git a/console-tools/resize.c b/console-tools/resize.c
+index 7f72b9a..01b1442 100644
+--- a/console-tools/resize.c
++++ b/console-tools/resize.c
+@@ -21,10 +21,10 @@ onintr(int sig ATTRIBUTE_UNUSED)
+ }
+ 
+ int resize_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int resize_main(int argc, char **argv)
++int resize_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	struct termios new;
+-	struct winsize w = { 0,0,0,0 };
++	struct winsize w = { 0, 0, 0, 0 };
+ 	int ret;
+ 
+ 	/* We use _stderr_ in order to make resize usable
+diff --git a/coreutils/cat.c b/coreutils/cat.c
+index 18a74b8..181d96a 100644
+--- a/coreutils/cat.c
++++ b/coreutils/cat.c
+@@ -44,7 +44,7 @@ int bb_cat(char **argv)
+ }
+ 
+ int cat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int cat_main(int argc, char **argv)
++int cat_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	getopt32(argv, "u");
+ 	argv += optind;
+diff --git a/coreutils/catv.c b/coreutils/catv.c
+index 5f5f1bf..a5ee534 100644
+--- a/coreutils/catv.c
++++ b/coreutils/catv.c
+@@ -13,7 +13,7 @@
+ #include "libbb.h"
+ 
+ int catv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int catv_main(int argc, char **argv)
++int catv_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+ 	int fd;
+diff --git a/coreutils/chmod.c b/coreutils/chmod.c
+index a58e4f8..1bd0bd5 100644
+--- a/coreutils/chmod.c
++++ b/coreutils/chmod.c
+@@ -68,7 +68,7 @@ static int fileAction(const char *fileName, struct stat *statbuf, void* param, i
+ }
+ 
+ int chmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int chmod_main(int argc, char **argv)
++int chmod_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+ 	char *arg, **argp;
+diff --git a/coreutils/chown.c b/coreutils/chown.c
+index df3b77d..eaaefaf 100644
+--- a/coreutils/chown.c
++++ b/coreutils/chown.c
+@@ -42,7 +42,7 @@ typedef int (*chown_fptr)(const char *, uid_t, gid_t);
+ static struct bb_uidgid_t ugid = { -1, -1 };
+ 
+ static int fileAction(const char *fileName, struct stat *statbuf,
+-		void *cf, int depth)
++		void *cf, int depth ATTRIBUTE_UNUSED)
+ {
+ 	uid_t u = (ugid.uid == (uid_t)-1) ? statbuf->st_uid : ugid.uid;
+ 	gid_t g = (ugid.gid == (gid_t)-1) ? statbuf->st_gid : ugid.gid;
+@@ -62,7 +62,7 @@ static int fileAction(const char *fileName, struct stat *statbuf,
+ }
+ 
+ int chown_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int chown_main(int argc, char **argv)
++int chown_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+ 	int flags;
+diff --git a/coreutils/comm.c b/coreutils/comm.c
+index 67088e0..4dbc0d4 100644
+--- a/coreutils/comm.c
++++ b/coreutils/comm.c
+@@ -36,7 +36,7 @@ static void writeline(char *line, int class, int flags)
+ }
+ 
+ int comm_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int comm_main(int argc, char **argv)
++int comm_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ #define LINE_LEN 100
+ #define BB_EOF_0 0x1
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index 4f0bed3..ed6f8f6 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -162,7 +162,7 @@ static void cut_file(FILE *file, char delim)
+ }
+ 
+ int cut_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int cut_main(int argc, char **argv)
++int cut_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char delim = '\t';	/* delimiter, default is tab */
+ 	char *sopt, *ltok;
+diff --git a/coreutils/du.c b/coreutils/du.c
+index 3941151..7495f7a 100644
+--- a/coreutils/du.c
++++ b/coreutils/du.c
+@@ -141,7 +141,7 @@ static unsigned long du(const char *filename)
+ }
+ 
+ int du_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int du_main(int argc, char **argv)
++int du_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned long total;
+ 	int slink_depth_save;
+diff --git a/coreutils/echo.c b/coreutils/echo.c
+index 771f610..fd6c950 100644
+--- a/coreutils/echo.c
++++ b/coreutils/echo.c
+@@ -31,7 +31,7 @@
+  * using call -> jump optimization */
+ 
+ int echo_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int echo_main(int argc, char **argv)
++int echo_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *arg;
+ #if !ENABLE_FEATURE_FANCY_ECHO
+diff --git a/coreutils/env.c b/coreutils/env.c
+index 7273d39..f678565 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -40,7 +40,7 @@ static const char env_longopts[] ALIGN1 =
+ #endif
+ 
+ int env_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int env_main(int argc, char **argv)
++int env_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	/* cleanenv was static - why? */
+ 	char *cleanenv[1];
+diff --git a/coreutils/expand.c b/coreutils/expand.c
+index 96a74a3..c013395 100644
+--- a/coreutils/expand.c
++++ b/coreutils/expand.c
+@@ -126,7 +126,7 @@ static void unexpand(FILE *file, unsigned int tab_size, unsigned opt)
+ #endif
+ 
+ int expand_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int expand_main(int argc, char **argv)
++int expand_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	/* Default 8 spaces for 1 tab */
+ 	const char *opt_t = "8";
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 7dba802..9afb100 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -37,7 +37,7 @@ static int printf_full(unsigned int id, const char *arg, const char prefix)
+ }
+ 
+ int id_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int id_main(int argc, char **argv)
++int id_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct passwd *p;
+ 	uid_t uid;
+diff --git a/coreutils/libcoreutils/coreutils.h b/coreutils/libcoreutils/coreutils.h
+index 687c7cc..c1796b3 100644
+--- a/coreutils/libcoreutils/coreutils.h
++++ b/coreutils/libcoreutils/coreutils.h
+@@ -11,6 +11,6 @@ typedef int (*stat_func)(const char *fn, struct stat *ps);
+ int cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf);
+ int cp_mv_stat(const char *fn, struct stat *fn_stat);
+ 
+-mode_t getopt_mk_fifo_nod(int argc, char **argv);
++mode_t getopt_mk_fifo_nod(char **argv);
+ 
+ #endif
+diff --git a/coreutils/libcoreutils/getopt_mk_fifo_nod.c b/coreutils/libcoreutils/getopt_mk_fifo_nod.c
+index 3776215..32e55a5 100644
+--- a/coreutils/libcoreutils/getopt_mk_fifo_nod.c
++++ b/coreutils/libcoreutils/getopt_mk_fifo_nod.c
+@@ -23,7 +23,7 @@
+ #include "libbb.h"
+ #include "coreutils.h"
+ 
+-mode_t getopt_mk_fifo_nod(int argc, char **argv)
++mode_t getopt_mk_fifo_nod(char **argv)
+ {
+ 	mode_t mode = 0666;
+ 	char *smode = NULL;
+diff --git a/coreutils/mkfifo.c b/coreutils/mkfifo.c
+index d298ada..d9261b9 100644
+--- a/coreutils/mkfifo.c
++++ b/coreutils/mkfifo.c
+@@ -14,12 +14,12 @@
+ #include "libcoreutils/coreutils.h"
+ 
+ int mkfifo_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int mkfifo_main(int argc, char **argv)
++int mkfifo_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	mode_t mode;
+ 	int retval = EXIT_SUCCESS;
+ 
+-	mode = getopt_mk_fifo_nod(argc, argv);
++	mode = getopt_mk_fifo_nod(argv);
+ 
+ 	argv += optind;
+ 	if (!*argv) {
+diff --git a/coreutils/mknod.c b/coreutils/mknod.c
+index 55f5310..0c69494 100644
+--- a/coreutils/mknod.c
++++ b/coreutils/mknod.c
+@@ -24,7 +24,7 @@ int mknod_main(int argc, char **argv)
+ 	dev_t dev;
+ 	const char *name;
+ 
+-	mode = getopt_mk_fifo_nod(argc, argv);
++	mode = getopt_mk_fifo_nod(argv);
+ 	argv += optind;
+ 	argc -= optind;
+ 
+diff --git a/coreutils/pwd.c b/coreutils/pwd.c
+index ac604db..9279dbe 100644
+--- a/coreutils/pwd.c
++++ b/coreutils/pwd.c
+@@ -12,7 +12,7 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int pwd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int pwd_main(int argc, char **argv)
++int pwd_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	char *buf;
+ 
+diff --git a/coreutils/readlink.c b/coreutils/readlink.c
+index 1ab9459..3f13a36 100644
+--- a/coreutils/readlink.c
++++ b/coreutils/readlink.c
+@@ -11,7 +11,7 @@
+ #include "libbb.h"
+ 
+ int readlink_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int readlink_main(int argc, char **argv)
++int readlink_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *buf;
+ 	char *fname;
+diff --git a/coreutils/rm.c b/coreutils/rm.c
+index a123156..1774ce2 100644
+--- a/coreutils/rm.c
++++ b/coreutils/rm.c
+@@ -20,7 +20,7 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int rm_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int rm_main(int argc, char **argv)
++int rm_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int status = 0;
+ 	int flags = 0;
+diff --git a/coreutils/rmdir.c b/coreutils/rmdir.c
+index 96bee23..cb60466 100644
+--- a/coreutils/rmdir.c
++++ b/coreutils/rmdir.c
+@@ -19,7 +19,7 @@
+ #define IGNORE_NON_EMPTY 0x02
+ 
+ int rmdir_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int rmdir_main(int argc, char **argv)
++int rmdir_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int status = EXIT_SUCCESS;
+ 	int flags;
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index d8df4c5..510f7a2 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -275,7 +275,7 @@ static unsigned str2u(char **str)
+ #endif
+ 
+ int sort_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sort_main(int argc, char **argv)
++int sort_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	FILE *fp, *outfile = stdout;
+ 	char *line, **lines = NULL;
+diff --git a/coreutils/split.c b/coreutils/split.c
+index 895a04b..cf26a93 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -56,7 +56,7 @@ enum { READ_BUFFER_SIZE = COMMON_BUFSIZE - 1 };
+ #define SPLIT_OPT_a (1<<2)
+ 
+ int split_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int split_main(int argc, char **argv)
++int split_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned suffix_len = 2;
+ 	char *pfx;
+diff --git a/coreutils/sync.c b/coreutils/sync.c
+index 9dbdd98..5c9d092 100644
+--- a/coreutils/sync.c
++++ b/coreutils/sync.c
+@@ -14,8 +14,9 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int sync_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sync_main(int argc, char **argv)
++int sync_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ {
++	/* coreutils-6.9 compat */
+ 	bb_warn_ignoring_args(argc - 1);
+ 
+ 	sync();
+diff --git a/coreutils/tac.c b/coreutils/tac.c
+index 7951be2..ddadcc7 100644
+--- a/coreutils/tac.c
++++ b/coreutils/tac.c
+@@ -26,7 +26,7 @@ struct lstring {
+ };
+ 
+ int tac_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int tac_main(int argc, char **argv)
++int tac_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char **name;
+ 	FILE *f;
+diff --git a/coreutils/touch.c b/coreutils/touch.c
+index 3fe8b64..0b58179 100644
+--- a/coreutils/touch.c
++++ b/coreutils/touch.c
+@@ -22,7 +22,7 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int touch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int touch_main(int argc, char **argv)
++int touch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int fd;
+ 	int status = EXIT_SUCCESS;
+diff --git a/coreutils/tr.c b/coreutils/tr.c
+index a28ab46..d0af63a 100644
+--- a/coreutils/tr.c
++++ b/coreutils/tr.c
+@@ -174,7 +174,7 @@ static int complement(char *buffer, int buffer_len)
+ }
+ 
+ int tr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int tr_main(int argc, char **argv)
++int tr_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int output_length = 0, input_length;
+ 	int i;
+diff --git a/coreutils/true.c b/coreutils/true.c
+index 2b59193..565e68b 100644
+--- a/coreutils/true.c
++++ b/coreutils/true.c
+@@ -15,7 +15,7 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int true_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int true_main(int argc, char **argv)
++int true_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/coreutils/tty.c b/coreutils/tty.c
+index b0a50ff..48e1511 100644
+--- a/coreutils/tty.c
++++ b/coreutils/tty.c
+@@ -13,7 +13,7 @@
+ #include "libbb.h"
+ 
+ int tty_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int tty_main(int argc, char **argv)
++int tty_main(int argc, char **argv SKIP_INCLUDE_SUSv2(ATTRIBUTE_UNUSED))
+ {
+ 	const char *s;
+ 	USE_INCLUDE_SUSv2(int silent;)	/* Note: No longer relevant in SUSv3. */
+@@ -22,15 +22,17 @@ int tty_main(int argc, char **argv)
+ 	xfunc_error_retval = 2;	/* SUSv3 requires > 1 for error. */
+ 
+ 	USE_INCLUDE_SUSv2(silent = getopt32(argv, "s");)
++	USE_INCLUDE_SUSv2(argc -= optind;)
++	SKIP_INCLUDE_SUSv2(argc -= 1;)
+ 
+ 	/* gnu tty outputs a warning that it is ignoring all args. */
+-	bb_warn_ignoring_args(argc - optind);
++	bb_warn_ignoring_args(argc);
+ 
+ 	retval = 0;
+ 
+ 	s = ttyname(0);
+ 	if (s == NULL) {
+-	/* According to SUSv3, ttyname can on fail with EBADF or ENOTTY.
++	/* According to SUSv3, ttyname can fail with EBADF or ENOTTY.
+ 	 * We know the file descriptor is good, so failure means not a tty. */
+ 		s = "not a tty";
+ 		retval = 1;
+diff --git a/coreutils/uniq.c b/coreutils/uniq.c
+index cda1e61..d072960 100644
+--- a/coreutils/uniq.c
++++ b/coreutils/uniq.c
+@@ -28,7 +28,7 @@ static FILE *xgetoptfile_uniq_s(char **argv, int read0write2)
+ }
+ 
+ int uniq_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int uniq_main(int argc, char **argv)
++int uniq_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	FILE *in, *out;
+ 	unsigned long dups, skip_fields, skip_chars, i;
+diff --git a/coreutils/uudecode.c b/coreutils/uudecode.c
+index 4683662..34a2239 100644
+--- a/coreutils/uudecode.c
++++ b/coreutils/uudecode.c
+@@ -127,7 +127,7 @@ static void read_base64(FILE *src_stream, FILE *dst_stream)
+ }
+ 
+ int uudecode_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int uudecode_main(int argc, char **argv)
++int uudecode_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	FILE *src_stream = stdin;
+ 	char *outname = NULL;
+diff --git a/coreutils/wc.c b/coreutils/wc.c
+index 58ea1c7..de3c895 100644
+--- a/coreutils/wc.c
++++ b/coreutils/wc.c
+@@ -69,7 +69,7 @@ enum {
+ };
+ 
+ int wc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int wc_main(int argc, char **argv)
++int wc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	FILE *fp;
+ 	const char *s, *arg;
+diff --git a/coreutils/who.c b/coreutils/who.c
+index e6bd0af..a206ec5 100644
+--- a/coreutils/who.c
++++ b/coreutils/who.c
+@@ -41,7 +41,7 @@ static void idle_string(char *str6, time_t t)
+ }
+ 
+ int who_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int who_main(int argc, char **argv)
++int who_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char str6[6];
+ 	struct utmp *ut;
+diff --git a/coreutils/whoami.c b/coreutils/whoami.c
+index e2fdfc9..d35572e 100644
+--- a/coreutils/whoami.c
++++ b/coreutils/whoami.c
+@@ -14,7 +14,7 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int whoami_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int whoami_main(int argc, char **argv)
++int whoami_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	if (argc > 1)
+ 		bb_show_usage();
+diff --git a/debianutils/mktemp.c b/debianutils/mktemp.c
+index 7ed6245..b011fc1 100644
+--- a/debianutils/mktemp.c
++++ b/debianutils/mktemp.c
+@@ -12,7 +12,7 @@
+ #include "libbb.h"
+ 
+ int mktemp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int mktemp_main(int argc, char **argv)
++int mktemp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	// -d      Make a directory instead of a file
+ 	// -q      Fail silently if an error occurs [bbox: ignored]
+diff --git a/debianutils/pipe_progress.c b/debianutils/pipe_progress.c
+index 4bfdf6a..cbdd38f 100644
+--- a/debianutils/pipe_progress.c
++++ b/debianutils/pipe_progress.c
+@@ -15,7 +15,7 @@
+  * Activity is indicated by a '.' to stderr
+  */
+ int pipe_progress_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int pipe_progress_main(int argc, char **argv)
++int pipe_progress_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	RESERVE_CONFIG_BUFFER(buf, PIPE_PROGRESS_SIZE);
+ 	time_t t = time(NULL);
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index 20f8b3a..2adad02 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -79,7 +79,7 @@ static int bb_alphasort(const void *p1, const void *p2)
+ 	return (option_mask32 & OPT_r) ? -r : r;
+ }
+ 
+-static int act(const char *file, struct stat *statbuf, void *args, int depth)
++static int act(const char *file, struct stat *statbuf, void *args ATTRIBUTE_UNUSED, int depth)
+ {
+ 	if (depth == 1)
+ 		return TRUE;
+@@ -113,7 +113,7 @@ static const char runparts_longopts[] ALIGN1 =
+ #endif
+ 
+ int run_parts_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int run_parts_main(int argc, char **argv)
++int run_parts_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *umask_p = "22";
+ 	llist_t *arg_list = NULL;
+diff --git a/e2fsprogs/chattr.c b/e2fsprogs/chattr.c
+index 0f19af8..e783d3e 100644
+--- a/e2fsprogs/chattr.c
++++ b/e2fsprogs/chattr.c
+@@ -125,7 +125,7 @@ static void change_attributes(const char *name, struct globals *gp)
+ }
+ 
+ int chattr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int chattr_main(int argc, char **argv)
++int chattr_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct globals g;
+ 	char *arg;
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 6769a72..178792f 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -1128,7 +1128,7 @@ static void signal_cancel(int sig ATTRIBUTE_UNUSED)
+ }
+ 
+ int fsck_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int fsck_main(int argc, char **argv)
++int fsck_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int i, status;
+ 	/*int interactive;*/
+diff --git a/e2fsprogs/lsattr.c b/e2fsprogs/lsattr.c
+index a11f243..c589486 100644
+--- a/e2fsprogs/lsattr.c
++++ b/e2fsprogs/lsattr.c
+@@ -58,7 +58,7 @@ static void list_attributes(const char *name)
+ }
+ 
+ static int lsattr_dir_proc(const char *dir_name, struct dirent *de,
+-			   void *private)
++			   void *private ATTRIBUTE_UNUSED)
+ {
+ 	struct stat st;
+ 	char *path;
+@@ -96,7 +96,7 @@ static void lsattr_args(const char *name)
+ }
+ 
+ int lsattr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int lsattr_main(int argc, char **argv)
++int lsattr_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	getopt32(argv, "Radlv");
+ 	argv += optind;
+diff --git a/editors/cmp.c b/editors/cmp.c
+index 6dfe040..9189b31 100644
+--- a/editors/cmp.c
++++ b/editors/cmp.c
+@@ -43,7 +43,7 @@ static const char opt_chars[] ALIGN1 = "sl";
+ #define CMP_OPT_l (1<<1)
+ 
+ int cmp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int cmp_main(int argc, char **argv)
++int cmp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	FILE *fp1, *fp2, *outfile = stdout;
+ 	const char *filename1, *filename2 = "-";
+diff --git a/editors/diff.c b/editors/diff.c
+index 1359af8..f9e82ba 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -1205,7 +1205,7 @@ static void diffdir(char *p1, char *p2)
+ 
+ 
+ int diff_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int diff_main(int argc, char **argv)
++int diff_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	bool gotstdin = 0;
+ 	char *U_opt;
+diff --git a/editors/patch.c b/editors/patch.c
+index 1b283a1..ff1a01d 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -78,7 +78,7 @@ static int file_doesnt_exist(const char *filename)
+ }
+ 
+ int patch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int patch_main(int argc, char **argv)
++int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int patch_level = -1;
+ 	char *patch_line;
+diff --git a/editors/sed.c b/editors/sed.c
+index c2b9e94..a0994ae 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -301,7 +301,7 @@ static int get_address(const char *my_str, int *linenum, regex_t ** regex)
+ }
+ 
+ /* Grab a filename.  Whitespace at start is skipped, then goes to EOL. */
+-static int parse_file_cmd(sed_cmd_t *sed_cmd, const char *filecmdstr, char **retval)
++static int parse_file_cmd(/*sed_cmd_t *sed_cmd,*/ const char *filecmdstr, char **retval)
+ {
+ 	int start = 0, idx, hack = 0;
+ 
+@@ -375,7 +375,7 @@ static int parse_subst_cmd(sed_cmd_t *sed_cmd, const char *substr)
+ 		case 'w':
+ 		{
+ 			char *temp;
+-			idx += parse_file_cmd(sed_cmd, substr+idx, &temp);
++			idx += parse_file_cmd(/*sed_cmd,*/ substr+idx, &temp);
+ 			break;
+ 		}
+ 		/* Ignore case (gnu exension) */
+@@ -436,7 +436,7 @@ static const char *parse_cmd_args(sed_cmd_t *sed_cmd, const char *cmdstr)
+ 	} else if (strchr("rw", sed_cmd->cmd)) {
+ 		if (sed_cmd->end_line || sed_cmd->end_match)
+ 			bb_error_msg_and_die("command only uses one address");
+-		cmdstr += parse_file_cmd(sed_cmd, cmdstr, &sed_cmd->string);
++		cmdstr += parse_file_cmd(/*sed_cmd,*/ cmdstr, &sed_cmd->string);
+ 		if (sed_cmd->cmd == 'w') {
+ 			sed_cmd->sw_file = xfopen(sed_cmd->string, "w");
+ 			sed_cmd->sw_last_char = '\n';
+diff --git a/editors/vi.c b/editors/vi.c
+index 572e049..c2d4457 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -301,7 +301,7 @@ static void status_line_bold(const char *, ...);
+ static void not_implemented(const char *); // display "Not implemented" message
+ static int format_edit_status(void);	// format file status on status line
+ static void redraw(int);	// force a full screen refresh
+-static char* format_line(char*, int);
++static char* format_line(char* /*, int*/);
+ static void refresh(int);	// update the terminal from screen[]
+ 
+ static void Indicate_Error(void);       // use flash or beep to indicate error
+@@ -2764,7 +2764,7 @@ static void redraw(int full_screen)
+ }
+ 
+ //----- Format a text[] line into a buffer ---------------------
+-static char* format_line(char *src, int li)
++static char* format_line(char *src /*, int li*/)
+ {
+ 	unsigned char c;
+ 	int co;
+@@ -2848,7 +2848,7 @@ static void refresh(int full_screen)
+ 		int cs, ce;				// column start & end
+ 		char *out_buf;
+ 		// format current text line
+-		out_buf = format_line(tp, li);
++		out_buf = format_line(tp /*, li*/);
+ 
+ 		// skip to the end of the current text[] line
+ 		if (tp < end) {
+diff --git a/findutils/find.c b/findutils/find.c
+index 8c03977..50c7901 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -74,7 +74,9 @@ typedef struct {
+ #endif
+ } action;
+ #define ACTS(name, arg...) typedef struct { action a; arg; } action_##name;
+-#define ACTF(name)         static int func_##name(const char *fileName, struct stat *statbuf, action_##name* ap)
++#define ACTF(name)         static int func_##name(const char *fileName ATTRIBUTE_UNUSED, \
++                                                  struct stat *statbuf ATTRIBUTE_UNUSED, \
++                                                  action_##name* ap ATTRIBUTE_UNUSED)
+                          ACTS(print)
+                          ACTS(name,  const char *pattern; bool iname;)
+ USE_FEATURE_FIND_PATH(   ACTS(path,  const char *pattern;))
+diff --git a/findutils/grep.c b/findutils/grep.c
+index 1094dcc..c4cfcb8 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -371,7 +371,7 @@ static void load_regexes_from_file(llist_t *fopt)
+ 	}
+ }
+ 
+-static int file_action_grep(const char *filename, struct stat *statbuf, void* matched, int depth)
++static int file_action_grep(const char *filename, struct stat *statbuf ATTRIBUTE_UNUSED, void* matched, int depth ATTRIBUTE_UNUSED)
+ {
+ 	FILE *file = fopen(filename, "r");
+ 	if (file == NULL) {
+diff --git a/include/busybox.h b/include/busybox.h
+index ec6953e..5272024 100644
+--- a/include/busybox.h
++++ b/include/busybox.h
+@@ -59,7 +59,9 @@ extern const uint8_t applet_install_loc[];
+ /* Length of these names has effect on size of libbusybox
+  * and "individual" binaries. Keep them short.
+  */
+-void lbb_prepare(const char *applet, char **argv) MAIN_EXTERNALLY_VISIBLE;
++void lbb_prepare(const char *applet
++	USE_FEATURE_INDIVIDUAL(, char **argv)
++	) MAIN_EXTERNALLY_VISIBLE;
+ #if ENABLE_BUILD_LIBBUSYBOX
+ #if ENABLE_FEATURE_SHARED_BUSYBOX
+ int lbb_main(int argc, char **argv) EXTERNALLY_VISIBLE;
+diff --git a/include/libbb.h b/include/libbb.h
+index 09deba6..ee1ef51 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1120,7 +1120,7 @@ enum {
+ 			| PSSCAN_STIME | PSSCAN_UTIME | PSSCAN_START_TIME
+ 			| PSSCAN_TTY,
+ };
+-procps_status_t* alloc_procps_scan(int flags);
++//procps_status_t* alloc_procps_scan(void);
+ void free_procps_scan(procps_status_t* sp);
+ procps_status_t* procps_scan(procps_status_t* sp, int flags);
+ /* Format cmdline (up to col chars) into char buf[col+1] */
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index 2e8dffa..8f23ca6 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -143,7 +143,7 @@ static void connection_status(void)
+ 		bb_error_msg("status %u/%u", cnum, cmax);
+ }
+ 
+-static void sig_child_handler(int sig)
++static void sig_child_handler(int sig ATTRIBUTE_UNUSED)
+ {
+ 	int wstat;
+ 	int pid;
+@@ -161,7 +161,7 @@ static void sig_child_handler(int sig)
+ }
+ 
+ int tcpudpsvd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int tcpudpsvd_main(int argc, char **argv)
++int tcpudpsvd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *str_c, *str_C, *str_b, *str_t;
+ 	char *user;
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index fec99c5..de27dd8 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -123,7 +123,8 @@ int find_applet_by_name(const char *name)
+ int *const bb_errno __attribute__ ((section (".data")));
+ #endif
+ 
+-void lbb_prepare(const char *applet, char **argv)
++void lbb_prepare(const char *applet
++		USE_FEATURE_INDIVIDUAL(, char **argv))
+ {
+ #ifdef __GLIBC__
+ 	(*(int **)&bb_errno) = __errno_location();
+@@ -662,10 +663,10 @@ void run_applet_and_exit(const char *name, char **argv)
+ #if ENABLE_BUILD_LIBBUSYBOX
+ int lbb_main(int argc, char **argv)
+ #else
+-int main(int argc, char **argv)
++int main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #endif
+ {
+-	lbb_prepare("busybox", argv);
++	lbb_prepare("busybox" USE_FEATURE_INDIVIDUAL(, argv));
+ 
+ #if !BB_MMU
+ 	/* NOMMU re-exec trick sets high-order bit in first byte of name */
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 015ad80..f67f7dc 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -93,7 +93,7 @@ static int read_to_buf(const char *filename, void *buf)
+ 	return ret;
+ }
+ 
+-procps_status_t *alloc_procps_scan(int flags)
++static procps_status_t *alloc_procps_scan(void)
+ {
+ 	unsigned n = getpagesize();
+ 	procps_status_t* sp = xzalloc(sizeof(procps_status_t));
+@@ -175,7 +175,7 @@ procps_status_t *procps_scan(procps_status_t* sp, int flags)
+ 	struct stat sb;
+ 
+ 	if (!sp)
+-		sp = alloc_procps_scan(flags);
++		sp = alloc_procps_scan();
+ 
+ 	for (;;) {
+ 		entry = readdir(sp->dir);
+diff --git a/libbb/recursive_action.c b/libbb/recursive_action.c
+index 37363bb..513aff3 100644
+--- a/libbb/recursive_action.c
++++ b/libbb/recursive_action.c
+@@ -22,8 +22,10 @@
+  * is so stinking huge.
+  */
+ 
+-static int true_action(const char *fileName, struct stat *statbuf,
+-						void* userData, int depth)
++static int true_action(const char *fileName ATTRIBUTE_UNUSED,
++		struct stat *statbuf ATTRIBUTE_UNUSED,
++		void* userData ATTRIBUTE_UNUSED,
++		int depth ATTRIBUTE_UNUSED)
+ {
+ 	return TRUE;
+ }
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index 7b5283e..d409eab 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -85,7 +85,7 @@ static const char adduser_longopts[] ALIGN1 =
+  * can be customized via command-line parameters.
+  */
+ int adduser_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int adduser_main(int argc, char **argv)
++int adduser_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct passwd pw;
+ 	const char *usegroup = NULL;
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index 7d47899..83e5e0c 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -21,7 +21,7 @@ static const char chpasswd_longopts[] ALIGN1 =
+ #define OPT_MD5		2
+ 
+ int chpasswd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int chpasswd_main(int argc, char **argv)
++int chpasswd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *name, *pass;
+ 	char salt[sizeof("$N$XXXXXXXX")];
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index 06817a6..c5170c6 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -8,7 +8,7 @@
+ #include "libbb.h"
+ 
+ int cryptpw_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int cryptpw_main(int argc, char **argv)
++int cryptpw_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char salt[sizeof("$N$XXXXXXXX")];
+ 
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 246bb47..c8c54e3 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -367,7 +367,7 @@ static void auto_baud(char *buf, unsigned size_buf, struct termios *tp)
+ }
+ 
+ /* do_prompt - show login prompt, optionally preceded by /etc/issue contents */
+-static void do_prompt(struct options *op, struct termios *tp)
++static void do_prompt(struct options *op)
+ {
+ #ifdef ISSUE
+ 	print_login_issue(op->issue, op->tty);
+@@ -390,7 +390,7 @@ static int all_is_upcase(const char *s)
+ /* get_logname - get user name, establish parity, speed, erase, kill, eol;
+  * return NULL on BREAK, logname on success */
+ static char *get_logname(char *logname, unsigned size_logname,
+-		struct options *op, struct chardata *cp, struct termios *tp)
++		struct options *op, struct chardata *cp)
+ {
+ 	char *bp;
+ 	char c;				/* input character, full eight bits */
+@@ -414,7 +414,7 @@ static char *get_logname(char *logname, unsigned size_logname,
+ 	logname[0] = '\0';
+ 	while (!logname[0]) {
+ 		/* Write issue file and prompt, with "parity" bit == 0. */
+-		do_prompt(op, tp);
++		do_prompt(op);
+ 
+ 		/* Read name, watch for break, parity, erase, kill, end-of-line. */
+ 		bp = logname;
+@@ -621,7 +621,7 @@ static void update_utmp(const char *line, char *fakehost)
+ #endif /* CONFIG_FEATURE_UTMP */
+ 
+ int getty_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int getty_main(int argc, char **argv)
++int getty_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int n;
+ 	char *fakehost = NULL;          /* Fake hostname for ut_host */
+@@ -670,7 +670,7 @@ int getty_main(int argc, char **argv)
+ 
+ #ifdef DEBUGGING
+ 	dbf = xfopen(DEBUGTERM, "w");
+-	for (n = 1; n < argc; n++) {
++	for (n = 1; argv[n]; n++) {
+ 		debug(argv[n]);
+ 		debug("\n");
+ 	}
+@@ -750,7 +750,7 @@ int getty_main(int argc, char **argv)
+ 			/* Read the login name. */
+ 			debug("reading login name\n");
+ 			logname = get_logname(line_buf, sizeof(line_buf),
+-					&options, &chardata, &termios);
++					&options, &chardata);
+ 			if (logname)
+ 				break;
+ 			/* we are here only if options.numspeed > 1 */
+diff --git a/loginutils/login.c b/loginutils/login.c
+index a3caa0f..79e7494 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -114,7 +114,7 @@ static void write_utent(struct utmp *utptr, const char *username)
+ #endif /* !ENABLE_FEATURE_UTMP */
+ 
+ #if ENABLE_FEATURE_NOLOGIN
+-static void die_if_nologin_and_non_root(int amroot)
++static void die_if_nologin(void)
+ {
+ 	FILE *fp;
+ 	int c;
+@@ -135,7 +135,7 @@ static void die_if_nologin_and_non_root(int amroot)
+ 	puts("\r\n[Disconnect bypassed -- root login allowed]\r");
+ }
+ #else
+-static ALWAYS_INLINE void die_if_nologin_and_non_root(int amroot) {}
++static ALWAYS_INLINE void die_if_nologin(void) {}
+ #endif
+ 
+ #if ENABLE_FEATURE_SECURETTY && !ENABLE_PAM
+@@ -406,7 +406,8 @@ int login_main(int argc, char **argv)
+ 	}
+ 
+ 	alarm(0);
+-	die_if_nologin_and_non_root(pw->pw_uid == 0);
++	if (!amroot)
++		die_if_nologin();
+ 
+ 	write_utent(&utent, username);
+ 
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index 2f85e9f..3353db1 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -70,7 +70,7 @@ static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
+ }
+ 
+ int passwd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int passwd_main(int argc, char **argv)
++int passwd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	enum {
+ 		OPT_algo = 0x1, /* -a - password algorithm */
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index 3a1a8e9..caa1a83 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -15,7 +15,7 @@
+ 
+ 
+ int sulogin_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sulogin_main(int argc, char **argv)
++int sulogin_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *cp;
+ 	int timeout = 0;
+diff --git a/loginutils/vlock.c b/loginutils/vlock.c
+index ff60d78..96c1f67 100644
+--- a/loginutils/vlock.c
++++ b/loginutils/vlock.c
+@@ -18,21 +18,21 @@
+ #include <sys/vt.h>
+ #include "libbb.h"
+ 
+-static void release_vt(int signo)
++static void release_vt(int signo ATTRIBUTE_UNUSED)
+ {
+ 	/* If -a, param is 0, which means:
+ 	 * "no, kernel, we don't allow console switch away from us!" */
+ 	ioctl(STDIN_FILENO, VT_RELDISP, (unsigned long) !option_mask32);
+ }
+ 
+-static void acquire_vt(int signo)
++static void acquire_vt(int signo ATTRIBUTE_UNUSED)
+ {
+ 	/* ACK to kernel that switch to console is successful */
+ 	ioctl(STDIN_FILENO, VT_RELDISP, VT_ACKACQ);
+ }
+ 
+ int vlock_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int vlock_main(int argc, char **argv)
++int vlock_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct vt_mode vtm;
+ 	struct termios term;
+diff --git a/miscutils/chat.c b/miscutils/chat.c
+index 4f55738..50c5ad9 100644
+--- a/miscutils/chat.c
++++ b/miscutils/chat.c
+@@ -103,7 +103,7 @@ static size_t unescape(char *s, int *nocr)
+ 
+ 
+ int chat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int chat_main(int argc, char **argv)
++int chat_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ // should we dump device output? to what fd? by default no.
+ // this can be controlled later via ECHO {ON|OFF} chat directive
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 6d4825e..75555c8 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -158,7 +158,7 @@ static void crondlog(const char *ctl, ...)
+ }
+ 
+ int crond_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int crond_main(int ac, char **av)
++int crond_main(int ac ATTRIBUTE_UNUSED, char **av)
+ {
+ 	unsigned opt;
+ 
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index cb261ed..94d69f0 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -88,7 +88,7 @@ static int open_as_user(const struct passwd *pas, const char *file)
+ }
+ 
+ int crontab_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int crontab_main(int argc, char **argv)
++int crontab_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const struct passwd *pas;
+ 	const char *crontab_dir = CRONTABS;
+diff --git a/miscutils/eject.c b/miscutils/eject.c
+index 746a018..3d27ce5 100644
+--- a/miscutils/eject.c
++++ b/miscutils/eject.c
+@@ -79,7 +79,7 @@ static void eject_cdrom(const int fd, const unsigned long flags,
+ }
+ 
+ int eject_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int eject_main(int argc, char **argv)
++int eject_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned long flags;
+ 	const char *device;
+diff --git a/miscutils/last.c b/miscutils/last.c
+index fc5916e..f4d9a81 100644
+--- a/miscutils/last.c
++++ b/miscutils/last.c
+@@ -27,7 +27,7 @@
+ #endif
+ 
+ int last_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int last_main(int argc, char **argv)
++int last_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	struct utmp ut;
+ 	int n, file = STDIN_FILENO;
+diff --git a/miscutils/microcom.c b/miscutils/microcom.c
+index 5219335..5ce430a 100644
+--- a/miscutils/microcom.c
++++ b/miscutils/microcom.c
+@@ -41,7 +41,7 @@ static int xset1(int fd, struct termios *tio, const char *device)
+ }
+ 
+ int microcom_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int microcom_main(int argc, char **argv)
++int microcom_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int sfd;
+ 	int nfd;
+diff --git a/miscutils/strings.c b/miscutils/strings.c
+index d75becc..57a2c0a 100644
+--- a/miscutils/strings.c
++++ b/miscutils/strings.c
+@@ -17,7 +17,7 @@
+ #define SIZE			8
+ 
+ int strings_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int strings_main(int argc, char **argv)
++int strings_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int n, c, status = EXIT_SUCCESS;
+ 	unsigned opt;
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 4620f6f..079de69 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -651,7 +651,7 @@ static struct obj_symbol *arch_new_symbol(void);
+ 
+ static enum obj_reloc arch_apply_relocation(struct obj_file *f,
+ 				      struct obj_section *targsec,
+-				      struct obj_section *symsec,
++				      /*struct obj_section *symsec,*/
+ 				      struct obj_symbol *sym,
+ 				      ElfW(RelM) *rel, ElfW(Addr) value);
+ 
+@@ -792,8 +792,9 @@ static char *m_fullName;
+ /*======================================================================*/
+ 
+ 
+-static int check_module_name_match(const char *filename, struct stat *statbuf,
+-				void *userdata, int depth)
++static int check_module_name_match(const char *filename,
++		struct stat *statbuf ATTRIBUTE_UNUSED,
++		void *userdata, int depth ATTRIBUTE_UNUSED)
+ {
+ 	char *fullname = (char *) userdata;
+ 	char *tmp;
+@@ -835,7 +836,7 @@ static struct obj_symbol *arch_new_symbol(void)
+ static enum obj_reloc
+ arch_apply_relocation(struct obj_file *f,
+ 				struct obj_section *targsec,
+-				struct obj_section *symsec,
++				/*struct obj_section *symsec,*/
+ 				struct obj_symbol *sym,
+ 				ElfW(RelM) *rel, ElfW(Addr) v)
+ {
+@@ -1751,7 +1752,7 @@ static int arch_list_add(ElfW(RelM) *rel, struct arch_list_entry **list,
+ 
+ #if defined(USE_SINGLE)
+ 
+-static int arch_single_init(ElfW(RelM) *rel, struct arch_single_entry *single,
++static int arch_single_init(/*ElfW(RelM) *rel,*/ struct arch_single_entry *single,
+ 			     int offset, int size)
+ {
+ 	if (single->allocated == 0) {
+@@ -1899,7 +1900,7 @@ static void arch_create_got(struct obj_file *f)
+ #if defined(USE_GOT_ENTRIES)
+ 			if (got_allocate) {
+ 				got_offset += arch_single_init(
+-						rel, &intsym->gotent,
++						/*rel,*/ &intsym->gotent,
+ 						got_offset, GOT_ENTRY_SIZE);
+ 
+ 				got_needed = 1;
+@@ -1913,7 +1914,7 @@ static void arch_create_got(struct obj_file *f)
+ 						plt_offset, PLT_ENTRY_SIZE);
+ #else
+ 				plt_offset += arch_single_init(
+-						rel, &intsym->pltent,
++						/*rel,*/ &intsym->pltent,
+ 						plt_offset, PLT_ENTRY_SIZE);
+ #endif
+ 				plt_needed = 1;
+@@ -3220,7 +3221,7 @@ static int obj_relocate(struct obj_file *f, ElfW(Addr) base)
+ 
+ 			/* Do it! */
+ 			switch (arch_apply_relocation
+-					(f, targsec, symsec, intsym, rel, value)
++					(f, targsec, /*symsec,*/ intsym, rel, value)
+ 			) {
+ 			case obj_reloc_ok:
+ 				break;
+@@ -3299,7 +3300,7 @@ static int obj_create_image(struct obj_file *f, char *image)
+ 
+ /*======================================================================*/
+ 
+-static struct obj_file *obj_load(FILE * fp, int loadprogbits)
++static struct obj_file *obj_load(FILE * fp, int loadprogbits ATTRIBUTE_UNUSED)
+ {
+ 	struct obj_file *f;
+ 	ElfW(Shdr) * section_headers;
+@@ -4193,9 +4194,9 @@ static const char *moderror(int err)
+ 
+ #if !ENABLE_FEATURE_2_4_MODULES
+ int insmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int insmod_main(int argc, char **argv)
++int insmod_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #else
+-static int insmod_ng_main(int argc, char **argv)
++static int insmod_ng_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #endif
+ {
+ 	long ret;
+diff --git a/modutils/lsmod.c b/modutils/lsmod.c
+index f1f78ff..baf0e2a 100644
+--- a/modutils/lsmod.c
++++ b/modutils/lsmod.c
+@@ -141,7 +141,7 @@ int lsmod_main(int argc, char **argv)
+ #else /* CONFIG_FEATURE_QUERY_MODULE_INTERFACE */
+ 
+ int lsmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int lsmod_main(int argc, char **argv)
++int lsmod_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	FILE *file = xfopen("/proc/modules", "r");
+ 
+diff --git a/networking/arp.c b/networking/arp.c
+index 36985fc..c9b9d1d 100644
+--- a/networking/arp.c
++++ b/networking/arp.c
+@@ -435,7 +435,7 @@ static int arp_show(char *name)
+ }
+ 
+ int arp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int arp_main(int argc, char **argv)
++int arp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *hw_type;
+ 	char *protocol;
+diff --git a/networking/arping.c b/networking/arping.c
+index 2277ec5..6a17b18 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -245,7 +245,7 @@ static bool recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ }
+ 
+ int arping_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int arping_main(int argc, char **argv)
++int arping_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *device = "eth0";
+ 	char *source = NULL;
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index 0a52783..b269bc5 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -321,15 +321,15 @@ static int process_packet(uint8_t * buf)
+ /*
+  * Exit on signal
+  */
+-static void interrupt(int x)
++static void interrupt(int sig)
+ {
+ 	/* unlink("/var/run/dnsd.lock"); */
+ 	bb_error_msg("interrupt, exiting\n");
+-	exit(2);
++	kill_myself_with_sig(sig);
+ }
+ 
+ int dnsd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int dnsd_main(int argc, char **argv)
++int dnsd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *listen_interface = "0.0.0.0";
+ 	char *sttl, *sport;
+@@ -387,6 +387,9 @@ int dnsd_main(int argc, char **argv)
+ // Or else we can exhibit usual UDP ugliness:
+ // [ip1.multihomed.ip2] <=  query to ip1  <= peer
+ // [ip1.multihomed.ip2] => reply from ip2 => peer (confused)
++
++// TODO: recv_from_to
++
+ 		r = recvfrom(udps, buf, sizeof(buf), 0, &lsa->u.sa, &fromlen);
+ 		if (OPT_verbose)
+ 			bb_info_msg("Got UDP packet");
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index 91f6fcd..6e2d960 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -297,7 +297,7 @@ static const char ftpgetput_longopts[] ALIGN1 =
+ #endif
+ 
+ int ftpgetput_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ftpgetput_main(int argc, char **argv)
++int ftpgetput_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	/* content-length of the file */
+ 	unsigned opt;
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 7b7446e..54f288c 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1754,7 +1754,7 @@ static Htaccess_Proxy *find_proxy_entry(const char *url)
+  * Handle timeouts
+  */
+ static void exit_on_signal(int sig) ATTRIBUTE_NORETURN;
+-static void exit_on_signal(int sig)
++static void exit_on_signal(int sig ATTRIBUTE_UNUSED)
+ {
+ 	send_headers_and_exit(HTTP_REQUEST_TIMEOUT);
+ }
+@@ -2275,7 +2275,7 @@ enum {
+ 
+ 
+ int httpd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int httpd_main(int argc, char **argv)
++int httpd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int server_socket = server_socket; /* for gcc */
+ 	unsigned opt;
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index 76aaa76..1e3d5bb 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -150,7 +150,7 @@ static int release(char *master_ifname, char *slave_ifname);
+ 
+ 
+ int ifenslave_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ifenslave_main(int argc, char **argv)
++int ifenslave_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *master_ifname, *slave_ifname;
+ 	int rv;
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 58e6953..6aa929a 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -530,7 +530,7 @@ static int dhcp_down(struct interface_defn_t *ifd, execfn *exec)
+ #endif
+ }
+ 
+-static int manual_up_down(struct interface_defn_t *ifd, execfn *exec)
++static int manual_up_down(struct interface_defn_t *ifd ATTRIBUTE_UNUSED, execfn *exec ATTRIBUTE_UNUSED)
+ {
+ 	return 1;
+ }
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 41824db..0ddfa6b 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1128,7 +1128,7 @@ static void clean_up_and_exit(int sig ATTRIBUTE_UNUSED)
+ }
+ 
+ int inetd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int inetd_main(int argc, char **argv)
++int inetd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct sigaction sa, saved_pipe_handler;
+ 	servtab_t *sep, *sep2;
+@@ -1492,7 +1492,7 @@ static void init_ring(void)
+ }
+ /* Character generator. MMU arches only. */
+ /* ARGSUSED */
+-static void chargen_stream(int s, servtab_t *sep)
++static void chargen_stream(int s, servtab_t *sep ATTRIBUTE_UNUSED)
+ {
+ 	char *rs;
+ 	int len;
+diff --git a/networking/interface.c b/networking/interface.c
+index 04d12b3..367d2b0 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -237,7 +237,7 @@ static char *UNSPEC_print(unsigned char *ptr)
+ }
+ 
+ /* Display an UNSPEC socket address. */
+-static const char *UNSPEC_sprint(struct sockaddr *sap, int numeric)
++static const char *UNSPEC_sprint(struct sockaddr *sap, int numeric ATTRIBUTE_UNUSED)
+ {
+ 	if (sap->sa_family == 0xFFFF || sap->sa_family == 0)
+ 		return "[NONE SET]";
+diff --git a/networking/ip.c b/networking/ip.c
+index 5d97851..bb409c5 100644
+--- a/networking/ip.c
++++ b/networking/ip.c
+@@ -37,35 +37,35 @@ static int ip_do(int (*ip_func)(char **argv), char **argv)
+ 
+ #if ENABLE_FEATURE_IP_ADDRESS
+ int ipaddr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ipaddr_main(int argc, char **argv)
++int ipaddr_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+     return ip_do(do_ipaddr, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_LINK
+ int iplink_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int iplink_main(int argc, char **argv)
++int iplink_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+     return ip_do(do_iplink, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_ROUTE
+ int iproute_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int iproute_main(int argc, char **argv)
++int iproute_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+     return ip_do(do_iproute, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_RULE
+ int iprule_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int iprule_main(int argc, char **argv)
++int iprule_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+     return ip_do(do_iprule, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_TUNNEL
+ int iptunnel_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int iptunnel_main(int argc, char **argv)
++int iptunnel_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+     return ip_do(do_iptunnel, argv);
+ }
+@@ -73,7 +73,7 @@ int iptunnel_main(int argc, char **argv)
+ 
+ 
+ int ip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ip_main(int argc, char **argv)
++int ip_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	static const char keywords[] ALIGN1 =
+ 		USE_FEATURE_IP_ADDRESS("address\0")
+diff --git a/networking/isrv_identd.c b/networking/isrv_identd.c
+index 3333857..d60c9fb 100644
+--- a/networking/isrv_identd.c
++++ b/networking/isrv_identd.c
+@@ -76,7 +76,7 @@ static int do_rd(int fd, void **paramp)
+ 	return retval;
+ }
+ 
+-static int do_timeout(void **paramp)
++static int do_timeout(void **paramp ATTRIBUTE_UNUSED)
+ {
+ 	return 1; /* terminate session */
+ }
+@@ -93,7 +93,7 @@ static void inetd_mode(void)
+ }
+ 
+ int fakeidentd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int fakeidentd_main(int argc, char **argv)
++int fakeidentd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	enum {
+ 		OPT_foreground = 0x1,
+diff --git a/networking/libiproute/ll_map.c b/networking/libiproute/ll_map.c
+index 7b5de92..3cfc9cc 100644
+--- a/networking/libiproute/ll_map.c
++++ b/networking/libiproute/ll_map.c
+@@ -39,7 +39,9 @@ static struct idxmap *find_by_index(int idx)
+ 	return NULL;
+ }
+ 
+-int ll_remember_index(struct sockaddr_nl *who, struct nlmsghdr *n, void *arg)
++int ll_remember_index(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
++		struct nlmsghdr *n,
++		void *arg ATTRIBUTE_UNUSED)
+ {
+ 	int h;
+ 	struct ifinfomsg *ifi = NLMSG_DATA(n);
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index ce48295..34f715f 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -177,7 +177,7 @@ static void unarm(void)
+ }
+ 
+ /* timeout and other signal handling cruft */
+-static void tmtravel(int sig)
++static void tmtravel(int sig ATTRIBUTE_UNUSED)
+ {
+ 	unarm();
+ 	longjmp(jbuf, 1);
+diff --git a/networking/netstat.c b/networking/netstat.c
+index 399ff9b..fd8d8ec 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -486,7 +486,7 @@ static void do_info(const char *file, const char *name, int (*proc)(int, char *)
+ }
+ 
+ int netstat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int netstat_main(int argc, char **argv)
++int netstat_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *net_conn_line_header = PRINT_NET_CONN_HEADER;
+ 	unsigned opt;
+diff --git a/networking/ping.c b/networking/ping.c
+index 11138c0..93b2e02 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -174,7 +174,7 @@ static void ping6(len_and_sockaddr *lsa)
+ #endif
+ 
+ int ping_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ping_main(int argc, char **argv)
++int ping_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	len_and_sockaddr *lsa;
+ #if ENABLE_PING6
+@@ -495,7 +495,7 @@ static void unpack4(char *buf, int sz, struct sockaddr_in *from)
+ 	}
+ }
+ #if ENABLE_PING6
+-static void unpack6(char *packet, int sz, struct sockaddr_in6 *from, int hoplimit)
++static void unpack6(char *packet, int sz, /*struct sockaddr_in6 *from,*/ int hoplimit)
+ {
+ 	struct icmp6_hdr *icmppkt;
+ 	char buf[INET6_ADDRSTRLEN];
+@@ -658,7 +658,7 @@ static void ping6(len_and_sockaddr *lsa)
+ 				hoplimit = *(int*)CMSG_DATA(mp);
+ 			}
+ 		}
+-		unpack6(packet, c, &from, hoplimit);
++		unpack6(packet, c, /*&from,*/ hoplimit);
+ 		if (pingcount > 0 && nreceived >= pingcount)
+ 			break;
+ 	}
+@@ -683,7 +683,7 @@ static void ping(len_and_sockaddr *lsa)
+ }
+ 
+ int ping_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ping_main(int argc, char **argv)
++int ping_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	len_and_sockaddr *lsa;
+ 	char *opt_c, *opt_s;
+diff --git a/networking/pscan.c b/networking/pscan.c
+index 8304193..022d212 100644
+--- a/networking/pscan.c
++++ b/networking/pscan.c
+@@ -31,7 +31,7 @@ static const char *port_name(unsigned port)
+ #define MONOTONIC_US() ((unsigned)monotonic_us())
+ 
+ int pscan_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int pscan_main(int argc, char **argv)
++int pscan_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *opt_max_port = "1024";      /* -P: default max port */
+ 	const char *opt_min_port = "1";         /* -p: default min port */
+diff --git a/networking/route.c b/networking/route.c
+index 6f945b9..53e3988 100644
+--- a/networking/route.c
++++ b/networking/route.c
+@@ -539,7 +539,7 @@ void bb_displayroutes(int noresolve, int netstatfmt)
+ 
+ #if ENABLE_FEATURE_IPV6
+ 
+-static void INET6_displayroutes(int noresolve)
++static void INET6_displayroutes(void)
+ {
+ 	char addr6[128], *naddr6;
+ 	/* In addr6x, we store both 40-byte ':'-delimited ipv6 addresses.
+@@ -642,7 +642,7 @@ static const char tbl_verb[] ALIGN1 =
+ ;
+ 
+ int route_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int route_main(int argc, char **argv)
++int route_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned opt;
+ 	int what;
+@@ -675,7 +675,7 @@ int route_main(int argc, char **argv)
+ 		int noresolve = (opt & ROUTE_OPT_n) ? 0x0fff : 0;
+ #if ENABLE_FEATURE_IPV6
+ 		if (opt & ROUTE_OPT_INET6)
+-			INET6_displayroutes(noresolve);
++			INET6_displayroutes();
+ 		else
+ #endif
+ 			bb_displayroutes(noresolve, opt & ROUTE_OPT_e);
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index eb356dc..241028b 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -252,7 +252,7 @@ static void pop3_message(const char *filename)
+ #endif
+ 
+ int sendgetmail_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sendgetmail_main(int argc, char **argv)
++int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	llist_t *opt_recipients = NULL;
+ 
+diff --git a/networking/slattach.c b/networking/slattach.c
+index 1987eb3..3ffbb3b 100644
+--- a/networking/slattach.c
++++ b/networking/slattach.c
+@@ -114,13 +114,13 @@ static void set_state(struct termios *state, int encap)
+ 	}
+ }
+ 
+-static void sig_handler(int signo)
++static void sig_handler(int signo ATTRIBUTE_UNUSED)
+ {
+ 	restore_state_and_exit(0);
+ }
+ 
+ int slattach_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int slattach_main(int argc, char **argv)
++int slattach_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	/* Line discipline code table */
+ 	static const char proto_names[] ALIGN1 =
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 05de49e..20c5792 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -338,7 +338,7 @@ free_session(struct tsession *ts)
+ 
+ #endif
+ 
+-static void handle_sigchld(int sig)
++static void handle_sigchld(int sig ATTRIBUTE_UNUSED)
+ {
+ 	pid_t pid;
+ 	struct tsession *ts;
+@@ -360,7 +360,7 @@ static void handle_sigchld(int sig)
+ }
+ 
+ int telnetd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int telnetd_main(int argc, char **argv)
++int telnetd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	fd_set rdfdset, wrfdset;
+ 	unsigned opt;
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 6cad295..14c340b 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -392,7 +392,7 @@ static int tftp( USE_GETPUT(const int cmd,)
+ }
+ 
+ int tftp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int tftp_main(int argc, char **argv)
++int tftp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	len_and_sockaddr *peer_lsa;
+ 	const char *localfile = NULL;
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 7fca184..576b1cb 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -129,7 +129,7 @@ static uint8_t* alloc_dhcp_option(int code, const char *str, int extra)
+ 
+ 
+ int udhcpc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int udhcpc_main(int argc, char **argv)
++int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	uint8_t *temp, *message;
+ 	char *str_c, *str_V, *str_h, *str_F, *str_r, *str_T, *str_A, *str_t;
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index eb7323d..2637196 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -23,7 +23,7 @@ struct dhcpOfferedAddr *leases;
+ 
+ 
+ int udhcpd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int udhcpd_main(int argc, char **argv)
++int udhcpd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	fd_set rfds;
+ 	struct timeval tv;
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 218e6bc..83b3841 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -8,7 +8,7 @@
+ #include "dhcpd.h"
+ 
+ int dumpleases_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int dumpleases_main(int argc, char **argv)
++int dumpleases_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int fd;
+ 	int i;
+diff --git a/networking/wget.c b/networking/wget.c
+index a77a2ad..dc1dc2a 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -387,7 +387,7 @@ static char *gethdr(char *buf, size_t bufsiz, FILE *fp /*, int *istrunc*/)
+ 
+ 
+ int wget_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int wget_main(int argc, char **argv)
++int wget_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char buf[512];
+ 	struct host_info server, target;
+diff --git a/printutils/lpd.c b/printutils/lpd.c
+index 916fd62..49e3fd7 100644
+--- a/printutils/lpd.c
++++ b/printutils/lpd.c
+@@ -11,7 +11,7 @@
+ // TODO: xmalloc_reads is vulnerable to remote OOM attack!
+ 
+ int lpd_main(int argc, char *argv[]) MAIN_EXTERNALLY_VISIBLE;
+-int lpd_main(int argc, char *argv[])
++int lpd_main(int argc ATTRIBUTE_UNUSED, char *argv[])
+ {
+ 	int spooling;
+ 	char *s, *queue;
+diff --git a/printutils/lpr.c b/printutils/lpr.c
+index 153e6ab..5313d5a 100644
+--- a/printutils/lpr.c
++++ b/printutils/lpr.c
+@@ -42,7 +42,7 @@ static void get_response_or_say_and_die(int fd, const char *errmsg)
+ }
+ 
+ int lpqr_main(int argc, char *argv[]) MAIN_EXTERNALLY_VISIBLE;
+-int lpqr_main(int argc, char *argv[])
++int lpqr_main(int argc ATTRIBUTE_UNUSED, char *argv[])
+ {
+ 	enum {
+ 		OPT_P           = 1 << 0, // -P queue[@host[:port]]. If no -P is given use $PRINTER, then "lp@localhost:515"
+diff --git a/procps/fuser.c b/procps/fuser.c
+index d625b16..48c9bdc 100644
+--- a/procps/fuser.c
++++ b/procps/fuser.c
+@@ -267,7 +267,7 @@ static int kill_pid_list(pid_list *plist, int sig)
+ }
+ 
+ int fuser_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int fuser_main(int argc, char **argv)
++int fuser_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	pid_list *plist;
+ 	inode_list *ilist;
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index 7ab2865..b6e754b 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -275,7 +275,7 @@ typedef struct a { \
+ S_STAT(s_stat)
+ S_STAT_END(s_stat)
+ 
+-static void collect_literal(s_stat *s)
++static void collect_literal(s_stat *s ATTRIBUTE_UNUSED)
+ {
+ }
+ 
+@@ -294,7 +294,7 @@ static s_stat* init_delay(const char *param)
+ 	return NULL;
+ }
+ 
+-static s_stat* init_cr(const char *param)
++static s_stat* init_cr(const char *param ATTRIBUTE_UNUSED)
+ {
+ 	final_str = "\r";
+ 	return (s_stat*)0;
+@@ -436,7 +436,7 @@ static void collect_ctx(ctx_stat *s)
+ 	scale(data[0] - old);
+ }
+ 
+-static s_stat* init_ctx(const char *param)
++static s_stat* init_ctx(const char *param ATTRIBUTE_UNUSED)
+ {
+ 	ctx_stat *s = xmalloc(sizeof(ctx_stat));
+ 	s->collect = collect_ctx;
+@@ -478,7 +478,7 @@ static void collect_blk(blk_stat *s)
+ 	scale(data[1]*512);
+ }
+ 
+-static s_stat* init_blk(const char *param)
++static s_stat* init_blk(const char *param ATTRIBUTE_UNUSED)
+ {
+ 	blk_stat *s = xmalloc(sizeof(blk_stat));
+ 	s->collect = collect_blk;
+@@ -491,7 +491,7 @@ S_STAT(fork_stat)
+ 	ullong old;
+ S_STAT_END(fork_stat)
+ 
+-static void collect_thread_nr(fork_stat *s)
++static void collect_thread_nr(fork_stat *s ATTRIBUTE_UNUSED)
+ {
+ 	ullong data[1];
+ 
+@@ -660,7 +660,7 @@ static s_stat* init_mem(const char *param)
+ S_STAT(swp_stat)
+ S_STAT_END(swp_stat)
+ 
+-static void collect_swp(swp_stat *s)
++static void collect_swp(swp_stat *s ATTRIBUTE_UNUSED)
+ {
+ 	ullong s_total[1];
+ 	ullong s_free[1];
+@@ -673,7 +673,7 @@ static void collect_swp(swp_stat *s)
+ 	scale((s_total[0]-s_free[0]) << 10);
+ }
+ 
+-static s_stat* init_swp(const char *param)
++static s_stat* init_swp(const char *param ATTRIBUTE_UNUSED)
+ {
+ 	swp_stat *s = xmalloc(sizeof(swp_stat));
+ 	s->collect = collect_swp;
+@@ -684,7 +684,7 @@ static s_stat* init_swp(const char *param)
+ S_STAT(fd_stat)
+ S_STAT_END(fd_stat)
+ 
+-static void collect_fd(fd_stat *s)
++static void collect_fd(fd_stat *s ATTRIBUTE_UNUSED)
+ {
+ 	ullong data[2];
+ 
+@@ -696,7 +696,7 @@ static void collect_fd(fd_stat *s)
+ 	scale(data[0] - data[1]);
+ }
+ 
+-static s_stat* init_fd(const char *param)
++static s_stat* init_fd(const char *param ATTRIBUTE_UNUSED)
+ {
+ 	fd_stat *s = xmalloc(sizeof(fd_stat));
+ 	s->collect = collect_fd;
+diff --git a/procps/pgrep.c b/procps/pgrep.c
+index e4dfacb..1ffc87d 100644
+--- a/procps/pgrep.c
++++ b/procps/pgrep.c
+@@ -45,7 +45,7 @@ static void act(unsigned pid, char *cmd, int signo, unsigned opt)
+ }
+ 
+ int pgrep_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int pgrep_main(int argc, char **argv)
++int pgrep_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned pid = getpid();
+ 	int signo = SIGTERM;
+diff --git a/procps/pidof.c b/procps/pidof.c
+index 86d1957..46e646d 100644
+--- a/procps/pidof.c
++++ b/procps/pidof.c
+@@ -17,7 +17,7 @@ enum {
+ };
+ 
+ int pidof_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int pidof_main(int argc, char **argv)
++int pidof_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned first = 1;
+ 	unsigned opt;
+diff --git a/procps/ps.c b/procps/ps.c
+index f9d346c..647e03f 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -422,7 +422,7 @@ static void format_process(const procps_status_t *ps)
+ }
+ 
+ int ps_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ps_main(int argc, char **argv)
++int ps_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	procps_status_t *p;
+ 	llist_t* opt_o = NULL;
+diff --git a/procps/renice.c b/procps/renice.c
+index ab0d3a1..d2dcf15 100644
+--- a/procps/renice.c
++++ b/procps/renice.c
+@@ -27,7 +27,7 @@ void BUG_bad_PRIO_PGRP(void);
+ void BUG_bad_PRIO_USER(void);
+ 
+ int renice_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int renice_main(int argc, char **argv)
++int renice_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	static const char Xetpriority_msg[] ALIGN1 = "%cetpriority";
+ 
+diff --git a/procps/sysctl.c b/procps/sysctl.c
+index 3a0af02..1995382 100644
+--- a/procps/sysctl.c
++++ b/procps/sysctl.c
+@@ -57,7 +57,7 @@ enum {
+ };
+ 
+ int sysctl_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sysctl_main(int argc, char **argv)
++int sysctl_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int retval;
+ 	int opt;
+diff --git a/procps/top.c b/procps/top.c
+index f4bb509..fdd7584 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -735,7 +735,7 @@ enum {
+ };
+ 
+ int top_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int top_main(int argc, char **argv)
++int top_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int count, lines, col;
+ 	unsigned interval;
+diff --git a/procps/uptime.c b/procps/uptime.c
+index 07e8d60..b729055 100644
+--- a/procps/uptime.c
++++ b/procps/uptime.c
+@@ -26,7 +26,7 @@
+ 
+ 
+ int uptime_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int uptime_main(int argc, char **argv)
++int uptime_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	int updays, uphours, upminutes;
+ 	struct sysinfo info;
+diff --git a/procps/watch.c b/procps/watch.c
+index b495525..5b774e8 100644
+--- a/procps/watch.c
++++ b/procps/watch.c
+@@ -24,7 +24,7 @@
+ // (procps 3.x and procps 2.x are forks, not newer/older versions of the same)
+ 
+ int watch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int watch_main(int argc, char **argv)
++int watch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned opt;
+ 	unsigned period = 2;
+diff --git a/runit/chpst.c b/runit/chpst.c
+index b306974..fcac8ee 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -290,7 +290,7 @@ static void envdir(int, char **) ATTRIBUTE_NORETURN;
+ static void softlimit(int, char **) ATTRIBUTE_NORETURN;
+ 
+ int chpst_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int chpst_main(int argc, char **argv)
++int chpst_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	INIT_G();
+ 
+@@ -349,7 +349,7 @@ int chpst_main(int argc, char **argv)
+ 	bb_perror_msg_and_die("exec %s", argv[0]);
+ }
+ 
+-static void setuidgid(int argc, char **argv)
++static void setuidgid(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *account;
+ 
+@@ -361,7 +361,7 @@ static void setuidgid(int argc, char **argv)
+ 	bb_perror_msg_and_die("exec %s", argv[0]);
+ }
+ 
+-static void envuidgid(int argc, char **argv)
++static void envuidgid(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *account;
+ 
+@@ -373,7 +373,7 @@ static void envuidgid(int argc, char **argv)
+ 	bb_perror_msg_and_die("exec %s", argv[0]);
+ }
+ 
+-static void envdir(int argc, char **argv)
++static void envdir(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *dir;
+ 
+@@ -385,7 +385,7 @@ static void envdir(int argc, char **argv)
+ 	bb_perror_msg_and_die("exec %s", argv[0]);
+ }
+ 
+-static void softlimit(int argc, char **argv)
++static void softlimit(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *a,*c,*d,*f,*l,*m,*o,*p,*r,*s,*t;
+ 	getopt32(argv, "+a:c:d:f:l:m:o:p:r:s:t:",
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 5d4e158..0da03e6 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -128,12 +128,12 @@ static void warn_cannot(const char *m)
+ 	bb_perror_msg("%s: warning: cannot %s", dir, m);
+ }
+ 
+-static void s_child(int sig_no)
++static void s_child(int sig_no ATTRIBUTE_UNUSED)
+ {
+ 	write(selfpipe.wr, "", 1);
+ }
+ 
+-static void s_term(int sig_no)
++static void s_term(int sig_no ATTRIBUTE_UNUSED)
+ {
+ 	sigterm = 1;
+ 	write(selfpipe.wr, "", 1); /* XXX */
+@@ -432,7 +432,7 @@ static int ctrl(struct svdir *s, char c)
+ }
+ 
+ int runsv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int runsv_main(int argc, char **argv)
++int runsv_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct stat s;
+ 	int fd;
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 0ab672e..bca5c90 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -72,11 +72,11 @@ static void warnx(const char *m1)
+ 	warn3x(m1, "", "");
+ }
+ 
+-static void s_term(int sig_no)
++static void s_term(int sig_no ATTRIBUTE_UNUSED)
+ {
+ 	exitsoon = 1;
+ }
+-static void s_hangup(int sig_no)
++static void s_hangup(int sig_no ATTRIBUTE_UNUSED)
+ {
+ 	exitsoon = 2;
+ }
+@@ -207,7 +207,7 @@ static int setup_log(void)
+ }
+ 
+ int runsvdir_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int runsvdir_main(int argc, char **argv)
++int runsvdir_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct stat s;
+ 	dev_t last_dev = last_dev; /* for gcc */
+diff --git a/runit/sv.c b/runit/sv.c
+index 141f7a8..45d5572 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -293,7 +293,7 @@ static unsigned svstatus_print(const char *m)
+ 	return pid ? 1 : 2;
+ }
+ 
+-static int status(const char *unused)
++static int status(const char *unused ATTRIBUTE_UNUSED)
+ {
+ 	int r;
+ 
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index c69cb54..4458bd7 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -783,14 +783,14 @@ static int buffer_pread(/*int fd, */char *s, unsigned len)
+ 	return i;
+ }
+ 
+-static void sig_term_handler(int sig_no)
++static void sig_term_handler(int sig_no ATTRIBUTE_UNUSED)
+ {
+ 	if (verbose)
+ 		bb_error_msg(INFO"sig%s received", "term");
+ 	exitasap = 1;
+ }
+ 
+-static void sig_child_handler(int sig_no)
++static void sig_child_handler(int sig_no ATTRIBUTE_UNUSED)
+ {
+ 	int pid, l;
+ 
+@@ -807,14 +807,14 @@ static void sig_child_handler(int sig_no)
+ 	}
+ }
+ 
+-static void sig_alarm_handler(int sig_no)
++static void sig_alarm_handler(int sig_no ATTRIBUTE_UNUSED)
+ {
+ 	if (verbose)
+ 		bb_error_msg(INFO"sig%s received", "alarm");
+ 	rotateasap = 1;
+ }
+ 
+-static void sig_hangup_handler(int sig_no)
++static void sig_hangup_handler(int sig_no ATTRIBUTE_UNUSED)
+ {
+ 	if (verbose)
+ 		bb_error_msg(INFO"sig%s received", "hangup");
+diff --git a/shell/ash.c b/shell/ash.c
+index 0699091..580918c 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -2472,7 +2472,7 @@ docd(const char *dest, int flags)
+ }
+ 
+ static int
+-cdcmd(int argc, char **argv)
++cdcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	const char *dest;
+ 	const char *path;
+@@ -2536,7 +2536,7 @@ cdcmd(int argc, char **argv)
+ }
+ 
+ static int
+-pwdcmd(int argc, char **argv)
++pwdcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	int flags;
+ 	const char *dir = curdir;
+@@ -3138,19 +3138,20 @@ printalias(const struct alias *ap)
+  * TODO - sort output
+  */
+ static int
+-aliascmd(int argc, char **argv)
++aliascmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *n, *v;
+ 	int ret = 0;
+ 	struct alias *ap;
+ 
+-	if (argc == 1) {
++	if (!argv[1]) {
+ 		int i;
+ 
+-		for (i = 0; i < ATABSIZE; i++)
++		for (i = 0; i < ATABSIZE; i++) {
+ 			for (ap = atab[i]; ap; ap = ap->next) {
+ 				printalias(ap);
+ 			}
++		}
+ 		return 0;
+ 	}
+ 	while ((n = *++argv) != NULL) {
+@@ -3172,7 +3173,7 @@ aliascmd(int argc, char **argv)
+ }
+ 
+ static int
+-unaliascmd(int argc, char **argv)
++unaliascmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	int i;
+ 
+@@ -3245,7 +3246,7 @@ struct job {
+ static pid_t backgndpid;        /* pid of last background process */
+ static smallint job_warning;    /* user was warned about stopped jobs (can be 2, 1 or 0). */
+ 
+-static struct job *makejob(union node *, int);
++static struct job *makejob(/*union node *,*/ int);
+ static int forkshell(struct job *, union node *, int);
+ static int waitforjob(struct job *);
+ 
+@@ -3612,8 +3613,8 @@ setjobctl(int on)
+ static int
+ killcmd(int argc, char **argv)
+ {
++	int i = 1;
+ 	if (argv[1] && strcmp(argv[1], "-l") != 0) {
+-		int i = 1;
+ 		do {
+ 			if (argv[i][0] == '%') {
+ 				struct job *jp = getjob(argv[i], 0);
+@@ -3675,7 +3676,7 @@ restartjob(struct job *jp, int mode)
+ }
+ 
+ static int
+-fg_bgcmd(int argc, char **argv)
++fg_bgcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct job *jp;
+ 	FILE *out;
+@@ -3962,7 +3963,7 @@ showjobs(FILE *out, int mode)
+ }
+ 
+ static int
+-jobscmd(int argc, char **argv)
++jobscmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int mode, m;
+ 
+@@ -4015,7 +4016,7 @@ getstatus(struct job *job)
+ }
+ 
+ static int
+-waitcmd(int argc, char **argv)
++waitcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct job *job;
+ 	int retval;
+@@ -4121,7 +4122,7 @@ growjobtab(void)
+  * Called with interrupts off.
+  */
+ static struct job *
+-makejob(union node *node, int nprocs)
++makejob(/*union node *node,*/ int nprocs)
+ {
+ 	int i;
+ 	struct job *jp;
+@@ -4156,7 +4157,7 @@ makejob(union node *node, int nprocs)
+ 	if (nprocs > 1) {
+ 		jp->ps = ckmalloc(nprocs * sizeof(struct procstat));
+ 	}
+-	TRACE(("makejob(0x%lx, %d) returns %%%d\n", (long)node, nprocs,
++	TRACE(("makejob(%d) returns %%%d\n", nprocs,
+ 				jobno(jp)));
+ 	return jp;
+ }
+@@ -4484,7 +4485,7 @@ static void closescript(void);
+ 
+ /* Called after fork(), in child */
+ static void
+-forkchild(struct job *jp, union node *n, int mode)
++forkchild(struct job *jp, /*union node *n,*/ int mode)
+ {
+ 	int oldlvl;
+ 
+@@ -4584,7 +4585,7 @@ forkshell(struct job *jp, union node *n, int mode)
+ 		ash_msg_and_raise_error("cannot fork");
+ 	}
+ 	if (pid == 0)
+-		forkchild(jp, n, mode);
++		forkchild(jp, /*n,*/ mode);
+ 	else
+ 		forkparent(jp, n, mode, pid);
+ 	return pid;
+@@ -5371,7 +5372,7 @@ evalbackcmd(union node *n, struct backcmd *result)
+ 
+ 		if (pipe(pip) < 0)
+ 			ash_msg_and_raise_error("pipe call failed");
+-		jp = makejob(n, 1);
++		jp = makejob(/*n,*/ 1);
+ 		if (forkshell(jp, n, FORK_NOJOB) == 0) {
+ 			FORCE_INT_ON;
+ 			close(pip[0]);
+@@ -5668,7 +5669,7 @@ argstr(char *p, int flag, struct strlist *var_str_list)
+ }
+ 
+ static char *
+-scanleft(char *startp, char *rmesc, char *rmescend, char *str, int quotes,
++scanleft(char *startp, char *rmesc, char *rmescend ATTRIBUTE_UNUSED, char *str, int quotes,
+ 	int zero)
+ {
+ 	char *loc;
+@@ -6407,7 +6408,7 @@ expsort(struct strlist *str)
+ }
+ 
+ static void
+-expandmeta(struct strlist *str, int flag)
++expandmeta(struct strlist *str /*, int flag*/)
+ {
+ 	static const char metachars[] ALIGN1 = {
+ 		'*', '?', '[', 0
+@@ -6488,7 +6489,7 @@ expandarg(union node *arg, struct arglist *arglist, int flag)
+ 		ifsbreakup(p, &exparg);
+ 		*exparg.lastp = NULL;
+ 		exparg.lastp = &exparg.list;
+-		expandmeta(exparg.list, flag);
++		expandmeta(exparg.list /*, flag*/);
+ 	} else {
+ 		if (flag & EXP_REDIR) /*XXX - for now, just remove escapes */
+ 			rmescapes(p);
+@@ -6838,7 +6839,7 @@ addcmdentry(char *name, struct cmdentry *entry)
+ }
+ 
+ static int
+-hashcmd(int argc, char **argv)
++hashcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	struct tblentry **pp;
+ 	struct tblentry *cmdp;
+@@ -7139,7 +7140,7 @@ describe_command(char *command, int describe_command_verbose)
+ }
+ 
+ static int
+-typecmd(int argc, char **argv)
++typecmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int i = 1;
+ 	int err = 0;
+@@ -7150,7 +7151,7 @@ typecmd(int argc, char **argv)
+ 		i++;
+ 		verbose = 0;
+ 	}
+-	while (i < argc) {
++	while (argv[i]) {
+ 		err |= describe_command(argv[i++], verbose);
+ 	}
+ 	return err;
+@@ -7158,7 +7159,7 @@ typecmd(int argc, char **argv)
+ 
+ #if ENABLE_ASH_CMDCMD
+ static int
+-commandcmd(int argc, char **argv)
++commandcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	int c;
+ 	enum {
+@@ -7768,7 +7769,7 @@ evalsubshell(union node *n, int flags)
+ 	if (!backgnd && flags & EV_EXIT && !trap[0])
+ 		goto nofork;
+ 	INT_OFF;
+-	jp = makejob(n, 1);
++	jp = makejob(/*n,*/ 1);
+ 	if (forkshell(jp, n, backgnd) == 0) {
+ 		INT_ON;
+ 		flags |= EV_EXIT;
+@@ -7843,7 +7844,7 @@ evalpipe(union node *n, int flags)
+ 		pipelen++;
+ 	flags |= EV_EXIT;
+ 	INT_OFF;
+-	jp = makejob(n, pipelen);
++	jp = makejob(/*n,*/ pipelen);
+ 	prevfd = -1;
+ 	for (lp = n->npipe.cmdlist; lp; lp = lp->next) {
+ 		prehash(lp->n);
+@@ -8098,7 +8099,7 @@ mklocal(char *name)
+  * The "local" command.
+  */
+ static int
+-localcmd(int argc, char **argv)
++localcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *name;
+ 
+@@ -8110,21 +8111,21 @@ localcmd(int argc, char **argv)
+ }
+ 
+ static int
+-falsecmd(int argc, char **argv)
++falsecmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	return 1;
+ }
+ 
+ static int
+-truecmd(int argc, char **argv)
++truecmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	return 0;
+ }
+ 
+ static int
+-execcmd(int argc, char **argv)
++execcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	if (argc > 1) {
++	if (argv[1]) {
+ 		iflag = 0;              /* exit on error */
+ 		mflag = 0;
+ 		optschanged();
+@@ -8137,7 +8138,7 @@ execcmd(int argc, char **argv)
+  * The return command.
+  */
+ static int
+-returncmd(int argc, char **argv)
++returncmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	/*
+ 	 * If called outside a function, do what ksh does;
+@@ -8296,7 +8297,7 @@ isassignment(const char *p)
+ 	return *q == '=';
+ }
+ static int
+-bltincmd(int argc, char **argv)
++bltincmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	/* Preserve exitstatus of a previous possible redirection
+ 	 * as POSIX mandates */
+@@ -8466,7 +8467,7 @@ evalcommand(union node *cmd, int flags)
+ 		/* Fork off a child process if necessary. */
+ 		if (!(flags & EV_EXIT) || trap[0]) {
+ 			INT_OFF;
+-			jp = makejob(cmd, 1);
++			jp = makejob(/*cmd,*/ 1);
+ 			if (forkshell(jp, cmd, FORK_FG) != 0) {
+ 				exitstatus = waitforjob(jp);
+ 				INT_ON;
+@@ -8596,9 +8597,9 @@ prehash(union node *n)
+  * in the standard shell so we don't make it one here.
+  */
+ static int
+-breakcmd(int argc, char **argv)
++breakcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	int n = argc > 1 ? number(argv[1]) : 1;
++	int n = argv[1] ? number(argv[1]) : 1;
+ 
+ 	if (n <= 0)
+ 		ash_msg_and_raise_error(illnum, argv[1]);
+@@ -9095,7 +9096,7 @@ chkmail(void)
+ }
+ 
+ static void
+-changemail(const char *val)
++changemail(const char *val ATTRIBUTE_UNUSED)
+ {
+ 	mail_var_path_changed = 1;
+ }
+@@ -9247,13 +9248,13 @@ options(int cmdline)
+  * The shift builtin command.
+  */
+ static int
+-shiftcmd(int argc, char **argv)
++shiftcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int n;
+ 	char **ap1, **ap2;
+ 
+ 	n = 1;
+-	if (argc > 1)
++	if (argv[1])
+ 		n = number(argv[1]);
+ 	if (n > shellparam.nparam)
+ 		ash_msg_and_raise_error("can't shift that many");
+@@ -9308,11 +9309,11 @@ showvars(const char *sep_prefix, int on, int off)
+  * The set command builtin.
+  */
+ static int
+-setcmd(int argc, char **argv)
++setcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	int retval;
+ 
+-	if (argc == 1)
++	if (!argv[1])
+ 		return showvars(nullstr, 0, VUNSET);
+ 	INT_OFF;
+ 	retval = 1;
+@@ -11015,20 +11016,19 @@ evalstring(char *s, int mask)
+  * The eval command.
+  */
+ static int
+-evalcmd(int argc, char **argv)
++evalcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *p;
+ 	char *concat;
+-	char **ap;
+ 
+-	if (argc > 1) {
++	if (argv[1]) {
+ 		p = argv[1];
+-		if (argc > 2) {
++		argv += 2;
++		if (argv[0]) {
+ 			STARTSTACKSTR(concat);
+-			ap = argv + 2;
+ 			for (;;) {
+ 				concat = stack_putstr(p, concat);
+-				p = *ap++;
++				p = *argv++;
+ 				if (p == NULL)
+ 					break;
+ 				STPUTC(' ', concat);
+@@ -11139,16 +11139,15 @@ dotcmd(int argc, char **argv)
+ 	for (sp = cmdenviron; sp; sp = sp->next)
+ 		setvareq(ckstrdup(sp->text), VSTRFIXED | VTEXTFIXED);
+ 
+-	if (argc >= 2) {        /* That's what SVR2 does */
+-		char *fullname;
+-
+-		fullname = find_dot_file(argv[1]);
+-
+-		if (argc > 2) {
++	if (argv[1]) {        /* That's what SVR2 does */
++		char *fullname = find_dot_file(argv[1]);
++		argv += 2;
++		argc -= 2;
++		if (argc) { /* argc > 0, argv[0] != NULL */
+ 			saveparam = shellparam;
+ 			shellparam.malloced = 0;
+-			shellparam.nparam = argc - 2;
+-			shellparam.p = argv + 2;
++			shellparam.nparam = argc;
++			shellparam.p = argv;
+ 		};
+ 
+ 		setinputfile(fullname, INPUT_PUSH_FILE);
+@@ -11156,7 +11155,7 @@ dotcmd(int argc, char **argv)
+ 		cmdloop(0);
+ 		popfile();
+ 
+-		if (argc > 2) {
++		if (argc) {
+ 			freeparam(&shellparam);
+ 			shellparam = saveparam;
+ 		};
+@@ -11166,11 +11165,11 @@ dotcmd(int argc, char **argv)
+ }
+ 
+ static int
+-exitcmd(int argc, char **argv)
++exitcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	if (stoppedjobs())
+ 		return 0;
+-	if (argc > 1)
++	if (argv[1])
+ 		exitstatus = number(argv[1]);
+ 	raise_exception(EXEXIT);
+ 	/* NOTREACHED */
+@@ -11404,7 +11403,7 @@ find_command(char *name, struct cmdentry *entry, int act, const char *path)
+  * The trap builtin.
+  */
+ static int
+-trapcmd(int argc, char **argv)
++trapcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	char *action;
+ 	char **ap;
+@@ -11457,7 +11456,7 @@ trapcmd(int argc, char **argv)
+  * Lists available builtins
+  */
+ static int
+-helpcmd(int argc, char **argv)
++helpcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	int col, i;
+ 
+@@ -11492,7 +11491,7 @@ helpcmd(int argc, char **argv)
+  * The export and readonly commands.
+  */
+ static int
+-exportcmd(int argc, char **argv)
++exportcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct var *vp;
+ 	char *name;
+@@ -11543,7 +11542,7 @@ unsetfunc(const char *name)
+  * with the same name.
+  */
+ static int
+-unsetcmd(int argc, char **argv)
++unsetcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	char **ap;
+ 	int i;
+@@ -11581,7 +11580,7 @@ static const unsigned char timescmd_str[] ALIGN1 = {
+ };
+ 
+ static int
+-timescmd(int ac, char **av)
++timescmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	long clk_tck, s, t;
+ 	const unsigned char *p;
+@@ -11633,17 +11632,16 @@ dash_arith(const char *s)
+  *  Copyright (C) 2003 Vladimir Oleynik <dzo@simtreas.ru>
+  */
+ static int
+-letcmd(int argc, char **argv)
++letcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	char **ap;
+-	arith_t i = 0;
++	arith_t i;
+ 
+-	ap = argv + 1;
+-	if (!*ap)
++	argv++;
++	if (!*argv)
+ 		ash_msg_and_raise_error("expression expected");
+-	for (ap = argv + 1; *ap; ap++) {
+-		i = dash_arith(*ap);
+-	}
++	do {
++		i = dash_arith(*argv);
++	} while (*++argv);
+ 
+ 	return !i;
+ }
+@@ -11668,7 +11666,7 @@ typedef enum __rlimit_resource rlim_t;
+  * This uses unbuffered input, which may be avoidable in some cases.
+  */
+ static int
+-readcmd(int argc, char **argv)
++readcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	char **ap;
+ 	int backslash;
+@@ -11859,7 +11857,7 @@ readcmd(int argc, char **argv)
+ }
+ 
+ static int
+-umaskcmd(int argc, char **argv)
++umaskcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	static const char permuser[3] ALIGN1 = "ugo";
+ 	static const char permmode[3] ALIGN1 = "rwx";
+@@ -12034,7 +12032,7 @@ printlim(enum limtype how, const struct rlimit *limit,
+ }
+ 
+ static int
+-ulimitcmd(int argc, char **argv)
++ulimitcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	int c;
+ 	rlim_t val = 0;
+@@ -12868,7 +12866,7 @@ init(void)
+  * Process the shell command line arguments.
+  */
+ static void
+-procargs(int argc, char **argv)
++procargs(char **argv)
+ {
+ 	int i;
+ 	const char *xminusc;
+@@ -12876,7 +12874,7 @@ procargs(int argc, char **argv)
+ 
+ 	xargv = argv;
+ 	arg0 = xargv[0];
+-	if (argc > 0)
++	/* if (xargv[0]) - mmm, this is always true! */
+ 		xargv++;
+ 	for (i = 0; i < NOPTS; i++)
+ 		optlist[i] = 2;
+@@ -12976,7 +12974,7 @@ extern int etext();
+  * is used to figure out how far we had gotten.
+  */
+ int ash_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ash_main(int argc, char **argv)
++int ash_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *shinit;
+ 	volatile int state;
+@@ -13039,7 +13037,8 @@ int ash_main(int argc, char **argv)
+ #endif
+ 	init();
+ 	setstackmark(&smark);
+-	procargs(argc, argv);
++	procargs(argv);
++
+ #if ENABLE_FEATURE_EDITING_SAVEHISTORY
+ 	if (iflag) {
+ 		const char *hp = lookupvar("HISTFILE");
+diff --git a/shell/hush.c b/shell/hush.c
+index c61607d..2d56972 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -536,11 +536,13 @@ static int done_pipe(struct p_context *ctx, pipe_style type);
+ static int redirect_dup_num(struct in_str *input);
+ static int redirect_opt_num(o_string *o);
+ #if ENABLE_HUSH_TICK
+-static int process_command_subs(o_string *dest, struct p_context *ctx, struct in_str *input, const char *subst_end);
++static int process_command_subs(o_string *dest, /*struct p_context *ctx,*/
++		struct in_str *input, const char *subst_end);
+ #endif
+ static int parse_group(o_string *dest, struct p_context *ctx, struct in_str *input, int ch);
+ static const char *lookup_param(const char *src);
+-static int handle_dollar(o_string *dest, struct p_context *ctx, struct in_str *input);
++static int handle_dollar(o_string *dest, /*struct p_context *ctx,*/
++		struct in_str *input);
+ static int parse_stream(o_string *dest, struct p_context *ctx, struct in_str *input0, const char *end_trigger);
+ /*   setup: */
+ static int parse_and_run_stream(struct in_str *inp, int parse_flag);
+@@ -741,14 +743,14 @@ static void set_every_sighandler(void (*handler)(int))
+ 	signal(SIGCHLD, handler);
+ }
+ 
+-static void handler_ctrl_c(int sig)
++static void handler_ctrl_c(int sig ATTRIBUTE_UNUSED)
+ {
+ 	debug_printf_jobs("got sig %d\n", sig);
+ // as usual we can have all kinds of nasty problems with leaked malloc data here
+ 	siglongjmp(toplevel_jb, 1);
+ }
+ 
+-static void handler_ctrl_z(int sig)
++static void handler_ctrl_z(int sig ATTRIBUTE_UNUSED)
+ {
+ 	pid_t pid;
+ 
+@@ -3257,8 +3259,10 @@ static FILE *generate_stream_from_list(struct pipe *head)
+ }
+ 
+ /* Return code is exit status of the process that is run. */
+-static int process_command_subs(o_string *dest, struct p_context *ctx,
+-	struct in_str *input, const char *subst_end)
++static int process_command_subs(o_string *dest,
++		/*struct p_context *ctx,*/
++		struct in_str *input,
++		const char *subst_end)
+ {
+ 	int retcode, ch, eol_cnt;
+ 	o_string result = NULL_O_STRING;
+@@ -3351,7 +3355,7 @@ static const char *lookup_param(const char *src)
+ }
+ 
+ /* return code: 0 for OK, 1 for syntax error */
+-static int handle_dollar(o_string *dest, struct p_context *ctx, struct in_str *input)
++static int handle_dollar(o_string *dest, /*struct p_context *ctx,*/ struct in_str *input)
+ {
+ 	int ch = b_peek(input);  /* first character after the $ */
+ 	unsigned char quote_mask = dest->o_quote ? 0x80 : 0;
+@@ -3409,7 +3413,7 @@ static int handle_dollar(o_string *dest, struct p_context *ctx, struct in_str *i
+ #if ENABLE_HUSH_TICK
+ 		case '(':
+ 			b_getch(input);
+-			process_command_subs(dest, ctx, input, ")");
++			process_command_subs(dest, /*ctx,*/ input, ")");
+ 			break;
+ #endif
+ 		case '-':
+@@ -3507,7 +3511,7 @@ static int parse_stream(o_string *dest, struct p_context *ctx,
+ 			b_addqchr(dest, b_getch(input), dest->o_quote);
+ 			break;
+ 		case '$':
+-			if (handle_dollar(dest, ctx, input) != 0) {
++			if (handle_dollar(dest, /*ctx,*/ input) != 0) {
+ 				debug_printf_parse("parse_stream return 1: handle_dollar returned non-0\n");
+ 				return 1;
+ 			}
+@@ -3532,7 +3536,7 @@ static int parse_stream(o_string *dest, struct p_context *ctx,
+ 			break;
+ #if ENABLE_HUSH_TICK
+ 		case '`':
+-			process_command_subs(dest, ctx, input, "`");
++			process_command_subs(dest, /*ctx,*/ input, "`");
+ 			break;
+ #endif
+ 		case '>':
+diff --git a/shell/msh.c b/shell/msh.c
+index 5ed6dfd..63f3659 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -589,7 +589,7 @@ static const struct builtincmd builtincmds[] = {
+ };
+ 
+ static struct op *scantree(struct op *);
+-static struct op *dowholefile(int, int);
++static struct op *dowholefile(int /*, int*/);
+ 
+ 
+ /* Globals */
+@@ -1448,7 +1448,7 @@ static void next(int f)
+ 	PUSHIO(afile, f, filechar);
+ }
+ 
+-static void onintr(int s)					/* ANSI C requires a parameter */
++static void onintr(int s ATTRIBUTE_UNUSED) /* ANSI C requires a parameter */
+ {
+ 	signal(SIGINT, onintr);
+ 	intr = 1;
+@@ -1864,11 +1864,11 @@ static struct op *command(int cf)
+ 	return t;
+ }
+ 
+-static struct op *dowholefile(int type, int mark)
++static struct op *dowholefile(int type /*, int mark*/)
+ {
+ 	struct op *t;
+ 
+-	DBGPRINTF(("DOWHOLEFILE: enter, type=%d, mark=%d\n", type, mark));
++	DBGPRINTF(("DOWHOLEFILE: enter, type=%d\n", type /*, mark*/));
+ 
+ 	multiline++;
+ 	t = c_list();
+@@ -2477,7 +2477,7 @@ static int execute(struct op *t, int *pin, int *pout, int no_fork)
+ 
+ 		newfile(evalstr(t->op_words[0], DOALL));
+ 
+-		t->left = dowholefile(TLIST, 0);
++		t->left = dowholefile(TLIST /*, 0*/);
+ 		t->right = NULL;
+ 
+ 		outtree = outtree_save;
+@@ -3155,7 +3155,7 @@ static int run(struct ioarg *argp, int (*f) (struct ioarg *))
+  * built-in commands: doX
+  */
+ 
+-static int dohelp(struct op *t, char **args)
++static int dohelp(struct op *t ATTRIBUTE_UNUSED, char **args ATTRIBUTE_UNUSED)
+ {
+ 	int col;
+ 	const struct builtincmd *x;
+@@ -3191,12 +3191,12 @@ static int dohelp(struct op *t, char **args)
+ 	return EXIT_SUCCESS;
+ }
+ 
+-static int dolabel(struct op *t, char **args)
++static int dolabel(struct op *t ATTRIBUTE_UNUSED, char **args ATTRIBUTE_UNUSED)
+ {
+ 	return 0;
+ }
+ 
+-static int dochdir(struct op *t, char **args)
++static int dochdir(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	const char *cp, *er;
+ 
+@@ -3217,7 +3217,7 @@ static int dochdir(struct op *t, char **args)
+ 	return 1;
+ }
+ 
+-static int doshift(struct op *t, char **args)
++static int doshift(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	int n;
+ 
+@@ -3236,7 +3236,7 @@ static int doshift(struct op *t, char **args)
+ /*
+  * execute login and newgrp directly
+  */
+-static int dologin(struct op *t, char **args)
++static int dologin(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	const char *cp;
+ 
+@@ -3251,7 +3251,7 @@ static int dologin(struct op *t, char **args)
+ 	return 1;
+ }
+ 
+-static int doumask(struct op *t, char **args)
++static int doumask(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	int i;
+ 	char *cp;
+@@ -3301,7 +3301,7 @@ static int doexec(struct op *t, char **args)
+ 	return 1;
+ }
+ 
+-static int dodot(struct op *t, char **args)
++static int dodot(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	int i;
+ 	const char *sp;
+@@ -3355,7 +3355,7 @@ static int dodot(struct op *t, char **args)
+ 	return -1;
+ }
+ 
+-static int dowait(struct op *t, char **args)
++static int dowait(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	int i;
+ 	char *cp;
+@@ -3371,7 +3371,7 @@ static int dowait(struct op *t, char **args)
+ 	return 0;
+ }
+ 
+-static int doread(struct op *t, char **args)
++static int doread(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	char *cp, **wp;
+ 	int nb = 0;
+@@ -3398,12 +3398,12 @@ static int doread(struct op *t, char **args)
+ 	return nb <= 0;
+ }
+ 
+-static int doeval(struct op *t, char **args)
++static int doeval(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	return RUN(awordlist, args + 1, wdchar);
+ }
+ 
+-static int dotrap(struct op *t, char **args)
++static int dotrap(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	int n, i;
+ 	int resetsig;
+@@ -3484,12 +3484,12 @@ static int getn(char *as)
+ 	return n * m;
+ }
+ 
+-static int dobreak(struct op *t, char **args)
++static int dobreak(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	return brkcontin(args[1], 1);
+ }
+ 
+-static int docontinue(struct op *t, char **args)
++static int docontinue(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	return brkcontin(args[1], 0);
+ }
+@@ -3517,7 +3517,7 @@ static int brkcontin(char *cp, int val)
+ 	/* NOTREACHED */
+ }
+ 
+-static int doexit(struct op *t, char **args)
++static int doexit(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	char *cp;
+ 
+@@ -3533,13 +3533,13 @@ static int doexit(struct op *t, char **args)
+ 	return 0;
+ }
+ 
+-static int doexport(struct op *t, char **args)
++static int doexport(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	rdexp(args + 1, export, EXPORT);
+ 	return 0;
+ }
+ 
+-static int doreadonly(struct op *t, char **args)
++static int doreadonly(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	rdexp(args + 1, ronly, RONLY);
+ 	return 0;
+@@ -3575,7 +3575,7 @@ static void badid(char *s)
+ 	err(": bad identifier");
+ }
+ 
+-static int doset(struct op *t, char **args)
++static int doset(struct op *t ATTRIBUTE_UNUSED, char **args)
+ {
+ 	struct var *vp;
+ 	char *cp;
+@@ -3650,7 +3650,7 @@ static void times_fmt(char *buf, clock_t val, unsigned clk_tck)
+ #endif
+ }
+ 
+-static int dotimes(struct op *t, char **args)
++static int dotimes(struct op *t ATTRIBUTE_UNUSED, char **args ATTRIBUTE_UNUSED)
+ {
+ 	struct tms buf;
+ 	unsigned clk_tck = sysconf(_SC_CLK_TCK);
+diff --git a/sysklogd/klogd.c b/sysklogd/klogd.c
+index 01d5971..983a597 100644
+--- a/sysklogd/klogd.c
++++ b/sysklogd/klogd.c
+@@ -37,7 +37,7 @@ enum {
+ };
+ 
+ int klogd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int klogd_main(int argc, char **argv)
++int klogd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int i = i; /* silence gcc */
+ 	char *start;
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index 6284646..6f4429f 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -68,7 +68,7 @@ static void interrupted(int sig ATTRIBUTE_UNUSED)
+ }
+ 
+ int logread_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int logread_main(int argc, char **argv)
++int logread_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int cur;
+ 	int log_semid; /* ipc semaphore id */
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 596984e..371b558 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -633,7 +633,7 @@ static void do_syslogd(void)
+ }
+ 
+ int syslogd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int syslogd_main(int argc, char **argv)
++int syslogd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char OPTION_DECL;
+ 
+diff --git a/util-linux/dmesg.c b/util-linux/dmesg.c
+index cdd385e..9e834ff 100644
+--- a/util-linux/dmesg.c
++++ b/util-linux/dmesg.c
+@@ -13,7 +13,7 @@
+ #include "libbb.h"
+ 
+ int dmesg_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int dmesg_main(int argc, char **argv)
++int dmesg_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int len;
+ 	char *buf;
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index 63f915a..058e8be 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -1204,7 +1204,7 @@ void check2(void);
+ #endif
+ 
+ int fsck_minix_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int fsck_minix_main(int argc, char **argv)
++int fsck_minix_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct termios tmp;
+ 	int retcode = 0;
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index f226535..44522df 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -91,7 +91,7 @@ static void from_sys_clock(int utc)
+ #define HWCLOCK_OPT_RTCFILE     0x20
+ 
+ int hwclock_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int hwclock_main(int argc, char **argv)
++int hwclock_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned opt;
+ 	int utc;
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index 97b98f3..4b5c597 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -559,7 +559,7 @@ static void print_sem(int semid)
+ }
+ 
+ int ipcs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ipcs_main(int argc, char **argv)
++int ipcs_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int id = 0;
+ 	unsigned flags = 0;
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 9c33feb..0edaf10 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -244,8 +244,10 @@ static void make_device(char *path, int delete)
+ }
+ 
+ /* File callback for /sys/ traversal */
+-static int fileAction(const char *fileName, struct stat *statbuf,
+-                      void *userData, int depth)
++static int fileAction(const char *fileName,
++                      struct stat *statbuf ATTRIBUTE_UNUSED,
++                      void *userData,
++                      int depth ATTRIBUTE_UNUSED)
+ {
+ 	size_t len = strlen(fileName) - 4;
+ 	char *scratch = userData;
+@@ -261,8 +263,10 @@ static int fileAction(const char *fileName, struct stat *statbuf,
+ }
+ 
+ /* Directory callback for /sys/ traversal */
+-static int dirAction(const char *fileName, struct stat *statbuf,
+-                      void *userData, int depth)
++static int dirAction(const char *fileName ATTRIBUTE_UNUSED,
++                      struct stat *statbuf ATTRIBUTE_UNUSED,
++                      void *userData ATTRIBUTE_UNUSED,
++                      int depth)
+ {
+ 	return (depth >= MAX_SYSFS_DEPTH ? SKIP : TRUE);
+ }
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index a784b72..3fbdc20 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -495,7 +495,7 @@ static size_t do_check(char *buffer, size_t try, unsigned current_block)
+ 	return try;
+ }
+ 
+-static void alarm_intr(int alnum)
++static void alarm_intr(int alnum ATTRIBUTE_UNUSED)
+ {
+ 	if (G.currently_testing >= SB_ZONES)
+ 		return;
+@@ -621,7 +621,7 @@ static void setup_tables(void)
+ }
+ 
+ int mkfs_minix_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int mkfs_minix_main(int argc, char **argv)
++int mkfs_minix_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct mntent *mp;
+ 	unsigned opt;
+diff --git a/util-linux/more.c b/util-linux/more.c
+index 2d55359..257f401 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -36,7 +36,7 @@ struct globals {
+ #define setTermSettings(fd, argp) tcsetattr(fd, TCSANOW, argp)
+ #define getTermSettings(fd, argp) tcgetattr(fd, argp)
+ 
+-static void gotsig(int sig)
++static void gotsig(int sig ATTRIBUTE_UNUSED)
+ {
+ 	bb_putchar('\n');
+ 	setTermSettings(cin_fileno, &initial_settings);
+@@ -51,7 +51,7 @@ static void gotsig(int sig)
+ #define CONVERTED_TAB_SIZE 8
+ 
+ int more_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int more_main(int argc, char **argv)
++int more_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int c = c; /* for gcc */
+ 	int lines;
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 796e1e1..6e63a01 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -909,7 +909,7 @@ static inline int daemonize(void) { return -ENOSYS; }
+ #endif
+ 
+ // TODO
+-static inline int we_saw_this_host_before(const char *hostname)
++static inline int we_saw_this_host_before(const char *hostname ATTRIBUTE_UNUSED)
+ {
+ 	return 0;
+ }
+diff --git a/util-linux/rdate.c b/util-linux/rdate.c
+index 150efbe..9e7bdba 100644
+--- a/util-linux/rdate.c
++++ b/util-linux/rdate.c
+@@ -12,7 +12,7 @@
+ 
+ enum { RFC_868_BIAS = 2208988800UL };
+ 
+-static void socket_timeout(int sig)
++static void socket_timeout(int sig ATTRIBUTE_UNUSED)
+ {
+ 	bb_error_msg_and_die("timeout connecting to time server");
+ }
+@@ -43,7 +43,7 @@ static time_t askremotedate(const char *host)
+ }
+ 
+ int rdate_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int rdate_main(int argc, char **argv)
++int rdate_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	time_t remote_time;
+ 	unsigned long flags;
+diff --git a/util-linux/readprofile.c b/util-linux/readprofile.c
+index c615255..ef78659 100644
+--- a/util-linux/readprofile.c
++++ b/util-linux/readprofile.c
+@@ -42,7 +42,7 @@ static const char defaultmap[] ALIGN1 = "/boot/System.map";
+ static const char defaultpro[] ALIGN1 = "/proc/profile";
+ 
+ int readprofile_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int readprofile_main(int argc, char **argv)
++int readprofile_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	FILE *map;
+ 	const char *mapFile, *proFile, *mult = 0;
+diff --git a/util-linux/rtcwake.c b/util-linux/rtcwake.c
+index 2b1ab1f..6df7334 100644
+--- a/util-linux/rtcwake.c
++++ b/util-linux/rtcwake.c
+@@ -107,7 +107,7 @@ static void suspend_system(const char *suspend)
+ #define RTCWAKE_OPT_TIME         0x40
+ 
+ int rtcwake_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int rtcwake_main(int argc, char **argv)
++int rtcwake_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned opt;
+ 	const char *rtcname = NULL;
+diff --git a/util-linux/script.c b/util-linux/script.c
+index a4aaa42..c37fd9d 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -15,13 +15,13 @@
+ 
+ static smallint fd_count = 2;
+ 
+-static void handle_sigchld(int sig)
++static void handle_sigchld(int sig ATTRIBUTE_UNUSED)
+ {
+ 	fd_count = 0;
+ }
+ 
+-int script_main(int argc, char *argv[]) MAIN_EXTERNALLY_VISIBLE;
+-int script_main(int argc, char *argv[])
++int script_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int script_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int opt;
+ 	int mode;
+diff --git a/util-linux/switch_root.c b/util-linux/switch_root.c
+index 3a17411..c030b99 100644
+--- a/util-linux/switch_root.c
++++ b/util-linux/switch_root.c
+@@ -65,7 +65,7 @@ static void delete_contents(const char *directory)
+ }
+ 
+ int switch_root_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int switch_root_main(int argc, char **argv)
++int switch_root_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *newroot, *console = NULL;
+ 	struct stat st1, st2;
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index 3f7c0ab..6136fa9 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -27,7 +27,7 @@
+ //#define MNT_DETACH 0x00000002 /* Just detach from the tree */
+ 
+ int umount_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int umount_main(int argc, char **argv)
++int umount_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int doForce;
+ 	char *const path = xmalloc(PATH_MAX + 2); /* to save stack */

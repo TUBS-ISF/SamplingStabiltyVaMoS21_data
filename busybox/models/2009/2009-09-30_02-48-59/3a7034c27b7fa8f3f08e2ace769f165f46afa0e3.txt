@@ -1,0 +1,14 @@
+2009-09-30 02:48:59 +0200
+diff --git a/shell/hush_test/hush-trap/subshell.tests b/shell/hush_test/hush-trap/subshell.tests
+index b5d6094..4564c2e 100755
+--- a/shell/hush_test/hush-trap/subshell.tests
++++ b/shell/hush_test/hush-trap/subshell.tests
+@@ -11,7 +11,7 @@ trap 'bad: caught WINCH' WINCH
+ # With TERM we'll check whether it is reset
+ trap 'bad: caught TERM'  TERM
+ 
+-# using bash, becuase we don't have $PPID (yet)
++# using bash, because we don't have $PPID (yet)
+ (bash -c 'kill -HUP   $PPID'; echo Ok)
+ (bash -c 'kill -QUIT  $PPID'; echo Ok)
+ (bash -c 'kill -SYS   $PPID'; echo Ok)

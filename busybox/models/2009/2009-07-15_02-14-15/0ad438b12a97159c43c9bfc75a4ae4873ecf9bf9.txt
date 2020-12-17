@@ -1,0 +1,17 @@
+2009-07-15 02:14:15 +0200
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index b196808..835d42c 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -689,8 +689,9 @@ static int busybox_main(char **argv)
+ 		busybox = xmalloc_readlink(bb_busybox_exec_path);
+ 		if (!busybox)
+ 			busybox = bb_busybox_exec_path;
+-		/* -s makes symlinks, argv[3] is a custom defined */
+-		/* install directory or NULL to use the hardcoded defaults */
++		/* busybox --install [-s] [DIR]: */
++		/* -s: make symlinks */
++		/* DIR: directory to install links to */
+ 		use_symbolic_links = (argv[2] && strcmp(argv[2], "-s") == 0 && argv++);
+ 		install_links(busybox, use_symbolic_links, argv[2]);
+ 		return 0;

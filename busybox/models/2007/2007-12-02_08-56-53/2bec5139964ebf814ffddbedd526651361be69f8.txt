@@ -1,0 +1,11 @@
+2007-12-02 08:56:53 +0000
+diff --git a/networking/udhcp/Config.in b/networking/udhcp/Config.in
+index 242a9f3..26cc8f5 100644
+--- a/networking/udhcp/Config.in
++++ b/networking/udhcp/Config.in
+@@ -104,4 +104,4 @@ config UDHCPC_SLACK_FOR_BUGGY_SERVERS
+ 	    seems to confuse maximum allowed UDP packet size with
+ 	    maximum size of entire IP packet, and sends packets which are
+ 	    28 bytes too large.
+-          Seednet (ISP) VDSL: sends packets 2 bytes too big.
++	  Seednet (ISP) VDSL: sends packets 2 bytes too big.

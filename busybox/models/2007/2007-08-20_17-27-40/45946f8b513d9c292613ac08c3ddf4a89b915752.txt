@@ -1,0 +1,1749 @@
+2007-08-20 17:27:40 +0000
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 8174ab6..44d0f2d 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -155,9 +155,8 @@ static const signed char width_bytes[] ALIGN1 = {
+ };
+ /* Ensure that for each member of 'enum size_spec' there is an
+    initializer in the width_bytes array.  */
+-struct dummy {
+-	int assert_width_bytes_matches_size_spec_decl
+-		[ARRAY_SIZE(width_bytes) == N_SIZE_SPECS ? 1 : -1];
++struct ERR_width_bytes_has_bad_size {
++	char ERR_width_bytes_has_bad_size[ARRAY_SIZE(width_bytes) == N_SIZE_SPECS ? 1 : -1];
+ };
+ 
+ static smallint flag_dump_strings;
+diff --git a/runit/runit_lib.c b/runit/runit_lib.c
+index 295b45f..4b7950c 100644
+--- a/runit/runit_lib.c
++++ b/runit/runit_lib.c
+@@ -34,8 +34,6 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include "libbb.h"
+ #include "runit_lib.h"
+ 
+-/*** byte_chr.c ***/
+-
+ unsigned byte_chr(char *s,unsigned n,int c)
+ {
+ 	char ch;
+@@ -52,62 +50,14 @@ unsigned byte_chr(char *s,unsigned n,int c)
+ 	return t - s;
+ }
+ 
+-
+-/*** coe.c ***/
+-
+ int coe(int fd)
+ {
+-	return fcntl(fd,F_SETFD,FD_CLOEXEC);
+-}
+-
+-
+-/*** fmt_ptime.c ***/
+-
+-void fmt_ptime30nul(char *s, struct taia *ta) {
+-	struct tm *t;
+-	unsigned long u;
+-
+-	if (ta->sec.x < 4611686018427387914ULL)
+-		return; /* impossible? */
+-	u = ta->sec.x -4611686018427387914ULL;
+-	t = gmtime((time_t*)&u);
+-	if (!t)
+-		return; /* huh? */
+-	//fmt_ulong(s, 1900 + t->tm_year);
+-	//s[4] = '-'; fmt_uint0(&s[5], t->tm_mon+1, 2);
+-	//s[7] = '-'; fmt_uint0(&s[8], t->tm_mday, 2);
+-	//s[10] = '_'; fmt_uint0(&s[11], t->tm_hour, 2);
+-	//s[13] = ':'; fmt_uint0(&s[14], t->tm_min, 2);
+-	//s[16] = ':'; fmt_uint0(&s[17], t->tm_sec, 2);
+-	//s[19] = '.'; fmt_uint0(&s[20], ta->nano, 9);
+-	sprintf(s, "%04u-%02u-%02u_%02u:%02u:%02u.%09u",
+-		(unsigned)(1900 + t->tm_year),
+-		(unsigned)(t->tm_mon+1),
+-		(unsigned)(t->tm_mday),
+-		(unsigned)(t->tm_hour),
+-		(unsigned)(t->tm_min),
+-		(unsigned)(t->tm_sec),
+-		(unsigned)(ta->nano)
+-	);
+-	/* 4+1 + 2+1 + 2+1 + 2+1 + 2+1 + 2+1 + 9 = */
+-	/* 5   + 3   + 3   + 3   + 3   + 3   + 9 = */
+-	/* 20 (up to '.' inclusive) + 9 (not including '\0') */
++	return fcntl(fd, F_SETFD, FD_CLOEXEC);
+ }
+ 
+-unsigned fmt_taia25(char *s, struct taia *t) {
+-	static char pack[TAIA_PACK];
+-
+-	taia_pack(pack, t);
+-	*s++ = '@';
+-	bin2hex(s, pack, 12);
+-	return 25;
+-}
+-
+-
+-/*** tai_pack.c ***/
+-
++#ifdef UNUSED
+ static /* as it isn't used anywhere else */
+-void tai_pack(char *s,const struct tai *t)
++void tai_pack(char *s, const struct tai *t)
+ {
+ 	uint64_t x;
+ 
+@@ -122,19 +72,6 @@ void tai_pack(char *s,const struct tai *t)
+ 	s[0] = x;
+ }
+ 
+-
+-#ifdef UNUSED
+-/*** tai_sub.c ***/
+-
+-void tai_sub(struct tai *t, const struct tai *u, const struct tai *v)
+-{
+-	t->x = u->x - v->x;
+-}
+-#endif
+-
+-
+-/*** tai_unpack.c ***/
+-
+ void tai_unpack(const char *s,struct tai *t)
+ {
+ 	uint64_t x;
+@@ -151,8 +88,6 @@ void tai_unpack(const char *s,struct tai *t)
+ }
+ 
+ 
+-/*** taia_add.c ***/
+-
+ void taia_add(struct taia *t,const struct taia *u,const struct taia *v)
+ {
+ 	t->sec.x = u->sec.x + v->sec.x;
+@@ -168,9 +103,6 @@ void taia_add(struct taia *t,const struct taia *u,const struct taia *v)
+ 	}
+ }
+ 
+-
+-/*** taia_less.c ***/
+-
+ int taia_less(const struct taia *t, const struct taia *u)
+ {
+ 	if (t->sec.x < u->sec.x) return 1;
+@@ -180,9 +112,6 @@ int taia_less(const struct taia *t, const struct taia *u)
+ 	return t->atto < u->atto;
+ }
+ 
+-
+-/*** taia_now.c ***/
+-
+ void taia_now(struct taia *t)
+ {
+ 	struct timeval now;
+@@ -192,9 +121,7 @@ void taia_now(struct taia *t)
+ 	t->atto = 0;
+ }
+ 
+-
+-/*** taia_pack.c ***/
+-
++/* UNUSED
+ void taia_pack(char *s, const struct taia *t)
+ {
+ 	unsigned long x;
+@@ -213,9 +140,7 @@ void taia_pack(char *s, const struct taia *t)
+ 	s[1] = x & 255; x >>= 8;
+ 	s[0] = x;
+ }
+-
+-
+-/*** taia_sub.c ***/
++*/
+ 
+ void taia_sub(struct taia *t, const struct taia *u, const struct taia *v)
+ {
+@@ -235,11 +160,7 @@ void taia_sub(struct taia *t, const struct taia *u, const struct taia *v)
+ 	}
+ }
+ 
+-
+-/*** taia_uint.c ***/
+-
+ /* XXX: breaks tai encapsulation */
+-
+ void taia_uint(struct taia *t, unsigned s)
+ {
+ 	t->sec.x = s;
+@@ -247,16 +168,12 @@ void taia_uint(struct taia *t, unsigned s)
+ 	t->atto = 0;
+ }
+ 
+-
+-/*** iopause.c ***/
+-
+ static
+ uint64_t taia2millisec(const struct taia *t)
+ {
+ 	return (t->sec.x * 1000) + (t->nano / 1000000);
+ }
+ 
+-
+ void iopause(iopause_fd *x, unsigned len, struct taia *deadline, struct taia *stamp)
+ {
+ 	int millisecs;
+@@ -282,59 +199,40 @@ void iopause(iopause_fd *x, unsigned len, struct taia *deadline, struct taia *st
+ 	/* XXX: how to handle EAGAIN? are kernels really this dumb? */
+ 	/* XXX: how to handle EINVAL? when exactly can this happen? */
+ }
+-
+-
+-/*** lock_ex.c ***/
++#endif
+ 
+ int lock_ex(int fd)
+ {
+ 	return flock(fd,LOCK_EX);
+ }
+ 
+-
+-/*** lock_exnb.c ***/
+-
+ int lock_exnb(int fd)
+ {
+ 	return flock(fd,LOCK_EX | LOCK_NB);
+ }
+ 
+-
+-/*** open_append.c ***/
+-
+ int open_append(const char *fn)
+ {
+ 	return open(fn, O_WRONLY|O_NDELAY|O_APPEND|O_CREAT, 0600);
+ }
+ 
+-
+-/*** open_read.c ***/
+-
+ int open_read(const char *fn)
+ {
+ 	return open(fn, O_RDONLY|O_NDELAY);
+ }
+ 
+-
+-/*** open_trunc.c ***/
+-
+ int open_trunc(const char *fn)
+ {
+ 	return open(fn,O_WRONLY | O_NDELAY | O_TRUNC | O_CREAT,0644);
+ }
+ 
+-
+-/*** open_write.c ***/
+-
+ int open_write(const char *fn)
+ {
+ 	return open(fn, O_WRONLY|O_NDELAY);
+ }
+ 
+-
+-/*** pmatch.c ***/
+-
+-unsigned pmatch(const char *p, const char *s, unsigned len) {
++unsigned pmatch(const char *p, const char *s, unsigned len)
++{
+ 	for (;;) {
+ 		char c = *p++;
+ 		if (!c) return !len;
+@@ -373,32 +271,3 @@ unsigned pmatch(const char *p, const char *s, unsigned len) {
+ 	}
+ 	return 0;
+ }
+-
+-
+-#ifdef UNUSED
+-/*** seek_set.c ***/
+-
+-int seek_set(int fd,seek_pos pos)
+-{
+-	if (lseek(fd,(off_t) pos,SEEK_SET) == -1) return -1; return 0;
+-}
+-
+-
+-/*** str_chr.c ***/
+-
+-// strchrnul?
+-unsigned str_chr(const char *s,int c)
+-{
+-	char ch;
+-	const char *t;
+-
+-	ch = c;
+-	t = s;
+-	for (;;) {
+-		if (!*t) break;
+-		if (*t == ch) break;
+-		++t;
+-	}
+-	return t - s;
+-}
+-#endif
+diff --git a/runit/runit_lib.h b/runit/runit_lib.h
+index 1dadb6e..c73befc 100644
+--- a/runit/runit_lib.h
++++ b/runit/runit_lib.h
+@@ -25,107 +25,75 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ 
+-/*** byte.h ***/
+-
+ extern unsigned byte_chr(char *s,unsigned n,int c);
+ 
+-
+-/*** coe.h ***/
+-
+ extern int coe(int);
+ 
+-
+-/*** direntry.h ***/
+-
+ #define direntry struct dirent
+ 
+-
+-/*** tai.h ***/
+-
+-struct tai {
+-	uint64_t x;
+-};
+-
+-#define tai_unix(t,u) ((void) ((t)->x = 4611686018427387914ULL + (uint64_t) (u)))
+-
+-#define TAI_PACK 8
+-//extern void tai_pack(char *,const struct tai *);
+-extern void tai_unpack(const char *,struct tai *);
+-
+-extern void tai_uint(struct tai *,unsigned);
+-
+-
+-/*** taia.h ***/
+-
+-struct taia {
+-	struct tai sec;
+-	unsigned long nano; /* 0...999999999 */
+-	unsigned long atto; /* 0...999999999 */
+-};
+-
+-//extern void taia_tai(const struct taia *,struct tai *);
+-
+-extern void taia_now(struct taia *);
+-
+-extern void taia_add(struct taia *,const struct taia *,const struct taia *);
+-extern void taia_addsec(struct taia *,const struct taia *,int);
+-extern void taia_sub(struct taia *,const struct taia *,const struct taia *);
+-extern void taia_half(struct taia *,const struct taia *);
+-extern int taia_less(const struct taia *,const struct taia *);
+-
+-#define TAIA_PACK 16
+-extern void taia_pack(char *,const struct taia *);
+-//extern void taia_unpack(const char *,struct taia *);
+-
+-//#define TAIA_FMTFRAC 19
+-//extern unsigned taia_fmtfrac(char *,const struct taia *);
+-
+-extern void taia_uint(struct taia *,unsigned);
+-
+-
+-/*** fmt_ptime.h ***/
+-
+-#define FMT_PTIME 30
+-
+-/* NUL terminated */
+-extern void fmt_ptime30nul(char *, struct taia *);
+-/* NOT terminated! */
+-extern unsigned fmt_taia25(char *, struct taia *);
+-
+-
+-/*** iopause.h ***/
+-
+-typedef struct pollfd iopause_fd;
+-#define IOPAUSE_READ POLLIN
+-#define IOPAUSE_WRITE POLLOUT
+-
+-extern void iopause(iopause_fd *,unsigned,struct taia *,struct taia *);
+-
+-
+-/*** lock.h ***/
++//struct tai {
++//	uint64_t x;
++//};
++//
++//#define tai_unix(t,u) ((void) ((t)->x = 0x400000000000000aULL + (uint64_t) (u)))
++//
++//#define TAI_PACK 8
++//extern void tai_unpack(const char *,struct tai *);
++//
++//extern void tai_uint(struct tai *,unsigned);
++//
++//struct taia {
++//	struct tai sec;
++//	unsigned long nano; /* 0...999999999 */
++//	unsigned long atto; /* 0...999999999 */
++//};
++//
++//extern void taia_now(struct taia *);
++//
++//extern void taia_add(struct taia *,const struct taia *,const struct taia *);
++//extern void taia_addsec(struct taia *,const struct taia *,int);
++//extern void taia_sub(struct taia *,const struct taia *,const struct taia *);
++//extern void taia_half(struct taia *,const struct taia *);
++//extern int taia_less(const struct taia *,const struct taia *);
++//
++//#define TAIA_PACK 16
++//extern void taia_pack(char *,const struct taia *);
++//
++//extern void taia_uint(struct taia *,unsigned);
++//
++//typedef struct pollfd iopause_fd;
++//#define IOPAUSE_READ POLLIN
++//#define IOPAUSE_WRITE POLLOUT
++//
++//extern void iopause(iopause_fd *,unsigned,struct taia *,struct taia *);
+ 
+ extern int lock_ex(int);
+ extern int lock_un(int);
+ extern int lock_exnb(int);
+ 
+-
+-/*** open.h ***/
+-
+ extern int open_read(const char *);
+ extern int open_excl(const char *);
+ extern int open_append(const char *);
+ extern int open_trunc(const char *);
+ extern int open_write(const char *);
+ 
+-
+-/*** pmatch.h ***/
+-
+ extern unsigned pmatch(const char *, const char *, unsigned);
+ 
+-
+-/*** str.h ***/
+-
+-//extern unsigned str_chr(const char *,int);  /* never returns NULL */
+-
+ #define str_diff(s,t) strcmp((s), (t))
+ #define str_equal(s,t) (!strcmp((s), (t)))
++
++/*
++ * runsv / supervise / sv stuff
++ */
++typedef struct svstatus_t {
++	uint64_t time_be64;
++	uint32_t time_nsec_be32;
++	uint32_t pid_le32;
++	uint8_t  paused;
++	uint8_t  want;
++	uint8_t  got_term;
++	uint8_t  run_or_finish;
++} svstatus_t;
++struct ERR_svstatus_must_be_20_bytes {
++	char ERR_svstatus_must_be_20_bytes[sizeof(svstatus_t) == 20 ? 1 : -1];
++};
+diff --git a/runit/runsv.c b/runit/runsv.c
+index f70b513..baef6e1 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -54,21 +54,19 @@ struct svdir {
+ 	smallint ctrl;
+ 	smallint want;
+ 	smallint islog;
+-	struct taia start;
++	struct timespec start;
+ 	int fdlock;
+ 	int fdcontrol;
+ 	int fdcontrolwrite;
+ };
+-static struct svdir svd[2];
+ 
++static struct svdir svd[2];
+ static smallint sigterm;
+ static smallint haslog;
+ static smallint pidchanged = 1;
+ static int logpipe[2];
+ static char *dir;
+ 
+-#define usage() bb_show_usage()
+-
+ static void fatal2_cannot(const char *m1, const char *m2)
+ {
+ 	bb_perror_msg_and_die("%s: fatal: cannot %s%s", dir, m1, m2);
+@@ -88,10 +86,6 @@ static void warn_cannot(const char *m)
+ {
+ 	bb_perror_msg("%s: warning: cannot %s", dir, m);
+ }
+-static void warnx_cannot(const char *m)
+-{
+-	bb_error_msg("%s: warning: cannot %s", dir, m);
+-}
+ 
+ static void s_child(int sig_no)
+ {
+@@ -132,11 +126,19 @@ static int rename_or_warn(const char *old, const char *new)
+ 	return 0;
+ }
+ 
++#define LESS(a,b) ((int)((unsigned)(b) - (unsigned)(a)) > 0)
++
++#include <sys/syscall.h>
++static void gettimeofday_ns(struct timespec *ts)
++{
++	syscall(__NR_clock_gettime, CLOCK_REALTIME, ts);
++}
++
+ static void update_status(struct svdir *s)
+ {
+-	unsigned long l;
++	ssize_t sz;
+ 	int fd;
+-	char status[20];
++	svstatus_t status;
+ 
+ 	/* pid */
+ 	if (pidchanged) {
+@@ -194,40 +196,29 @@ static void update_status(struct svdir *s)
+ 		s->islog ? "log/supervise/stat" : "log/supervise/stat"+4);
+ 
+ 	/* supervise compatibility */
+-	taia_pack(status, &s->start);
+-	l = (unsigned long)s->pid;
+-	status[12] = l; l >>=8;
+-	status[13] = l; l >>=8;
+-	status[14] = l; l >>=8;
+-	status[15] = l;
++	memset(&status, 0, sizeof(status));
++	status.time_be64 = SWAP_BE64(s->start.tv_sec + 0x400000000000000aULL);
++	status.time_nsec_be32 = SWAP_BE32(s->start.tv_nsec);
++	status.pid_le32 = SWAP_LE32(s->pid);
+ 	if (s->ctrl & C_PAUSE)
+-		status[16] = 1;
+-	else
+-		status[16] = 0;
++		status.paused = 1;
+ 	if (s->want == W_UP)
+-		status[17] = 'u';
++		status.want = 'u';
+ 	else
+-		status[17] = 'd';
++		status.want = 'd';
+ 	if (s->ctrl & C_TERM)
+-		status[18] = 1;
+-	else
+-		status[18] = 0;
+-	status[19] = s->state;
++		status.got_term = 1;
++	status.run_or_finish = s->state;
+ 	fd = open_trunc_or_warn("supervise/status.new");
+ 	if (fd < 0)
+ 		return;
+-	l = write(fd, status, sizeof(status));
+-	if (l < 0) {
++	sz = write(fd, &status, sizeof(status));
++	close(fd);
++	if (sz != sizeof(status)) {
+ 		warn_cannot("write supervise/status.new");
+-		close(fd);
+ 		unlink("supervise/status.new");
+ 		return;
+ 	}
+-	close(fd);
+-	if (l < sizeof(status)) {
+-		warnx_cannot("write supervise/status.new: partial write");
+-		return;
+-	}
+ 	rename_or_warn("supervise/status.new",
+ 		s->islog ? "log/supervise/status" : "log/supervise/status"+4);
+ }
+@@ -329,7 +320,7 @@ static void startservice(struct svdir *s)
+ 		fatal2_cannot(s->islog ? "start log/" : "start ", *run);
+ 	}
+ 	if (s->state != S_FINISH) {
+-		taia_now(&s->start);
++		gettimeofday_ns(&s->start);
+ 		s->state = S_RUN;
+ 	}
+ 	s->pid = p;
+@@ -346,39 +337,48 @@ static int ctrl(struct svdir *s, char c)
+ 	case 'd': /* down */
+ 		s->want = W_DOWN;
+ 		update_status(s);
+-		if (s->pid && s->state != S_FINISH) stopservice(s);
++		if (s->pid && s->state != S_FINISH)
++			stopservice(s);
+ 		break;
+ 	case 'u': /* up */
+ 		s->want = W_UP;
+ 		update_status(s);
+-		if (s->pid == 0) startservice(s);
++		if (s->pid == 0)
++			startservice(s);
+ 		break;
+ 	case 'x': /* exit */
+-		if (s->islog) break;
++		if (s->islog)
++			break;
+ 		s->want = W_EXIT;
+ 		update_status(s);
+ 		/* FALLTHROUGH */
+ 	case 't': /* sig term */
+-		if (s->pid && s->state != S_FINISH) stopservice(s);
++		if (s->pid && s->state != S_FINISH)
++			stopservice(s);
+ 		break;
+ 	case 'k': /* sig kill */
+-		if (s->pid && !custom(s, c)) kill(s->pid, SIGKILL);
++		if (s->pid && !custom(s, c))
++			kill(s->pid, SIGKILL);
+ 		s->state = S_DOWN;
+ 		break;
+ 	case 'p': /* sig pause */
+-		if (s->pid && !custom(s, c)) kill(s->pid, SIGSTOP);
++		if (s->pid && !custom(s, c))
++			kill(s->pid, SIGSTOP);
+ 		s->ctrl |= C_PAUSE;
+ 		update_status(s);
+ 		break;
+ 	case 'c': /* sig cont */
+-		if (s->pid && !custom(s, c)) kill(s->pid, SIGCONT);
+-		if (s->ctrl & C_PAUSE) s->ctrl &= ~C_PAUSE;
++		if (s->pid && !custom(s, c))
++			kill(s->pid, SIGCONT);
++		if (s->ctrl & C_PAUSE)
++			s->ctrl &= ~C_PAUSE;
+ 		update_status(s);
+ 		break;
+ 	case 'o': /* once */
+ 		s->want = W_DOWN;
+ 		update_status(s);
+-		if (!s->pid) startservice(s);
++		if (!s->pid)
++			startservice(s);
+ 		break;
+ 	case 'a': /* sig alarm */
+ 		sig = SIGALRM;
+@@ -414,7 +414,8 @@ int runsv_main(int argc, char **argv)
+ 	int r;
+ 	char buf[256];
+ 
+-	if (!argv[1] || argv[2]) usage();
++	if (!argv[1] || argv[2])
++		bb_show_usage();
+ 	dir = argv[1];
+ 
+ 	xpipe(selfpipe);
+@@ -435,22 +436,23 @@ int runsv_main(int argc, char **argv)
+ 	if (W_UP) svd[0].want = W_UP;
+ 	/* bss: svd[0].islog = 0; */
+ 	/* bss: svd[1].pid = 0; */
+-	taia_now(&svd[0].start);
++	gettimeofday_ns(&svd[0].start);
+ 	if (stat("down", &s) != -1) svd[0].want = W_DOWN;
+ 
+ 	if (stat("log", &s) == -1) {
+ 		if (errno != ENOENT)
+ 			warn_cannot("stat ./log");
+ 	} else {
+-		if (!S_ISDIR(s.st_mode))
+-			warnx_cannot("stat log/down: log is not a directory");
+-		else {
++		if (!S_ISDIR(s.st_mode)) {
++			errno = 0;
++			warn_cannot("stat log/down: log is not a directory");
++		} else {
+ 			haslog = 1;
+ 			svd[1].state = S_DOWN;
+ 			svd[1].ctrl = C_NOOP;
+ 			svd[1].want = W_UP;
+ 			svd[1].islog = 1;
+-			taia_now(&svd[1].start);
++			gettimeofday_ns(&svd[1].start);
+ 			if (stat("log/down", &s) != -1)
+ 				svd[1].want = W_DOWN;
+ 			xpipe(logpipe);
+@@ -525,9 +527,8 @@ int runsv_main(int argc, char **argv)
+ 		coe(fd);
+ 	}
+ 	for (;;) {
+-		iopause_fd x[3];
+-		struct taia deadline;
+-		struct taia now;
++		struct pollfd x[3];
++		unsigned deadline;
+ 		char ch;
+ 
+ 		if (haslog)
+@@ -538,32 +539,30 @@ int runsv_main(int argc, char **argv)
+ 				startservice(&svd[0]);
+ 
+ 		x[0].fd = selfpipe[0];
+-		x[0].events = IOPAUSE_READ;
++		x[0].events = POLLIN;
+ 		x[1].fd = svd[0].fdcontrol;
+-		x[1].events = IOPAUSE_READ;
+-		if (haslog) {
+-			x[2].fd = svd[1].fdcontrol;
+-			x[2].events = IOPAUSE_READ;
+-		}
+-		taia_now(&now);
+-		taia_uint(&deadline, 3600);
+-		taia_add(&deadline, &now, &deadline);
+-
++		x[1].events = POLLIN;
++		/* x[2] is used only if haslog == 1 */
++		x[2].fd = svd[1].fdcontrol;
++		x[2].events = POLLIN;
+ 		sig_unblock(SIGTERM);
+ 		sig_unblock(SIGCHLD);
+-		iopause(x, 2+haslog, &deadline, &now);
++		poll(x, 2 + haslog, 3600*1000);
+ 		sig_block(SIGTERM);
+ 		sig_block(SIGCHLD);
+ 
+ 		while (read(selfpipe[0], &ch, 1) == 1)
+-			;
++			continue;
++
+ 		for (;;) {
+ 			int child;
+ 			int wstat;
+ 
+ 			child = wait_nohang(&wstat);
+-			if (!child) break;
+-			if ((child == -1) && (errno != EINTR)) break;
++			if (!child)
++				break;
++			if ((child == -1) && (errno != EINTR))
++				break;
+ 			if (child == svd[0].pid) {
+ 				svd[0].pid = 0;
+ 				pidchanged = 1;
+@@ -578,11 +577,11 @@ int runsv_main(int argc, char **argv)
+ 					}
+ 				}
+ 				svd[0].state = S_DOWN;
+-				taia_uint(&deadline, 1);
+-				taia_add(&deadline, &svd[0].start, &deadline);
+-				taia_now(&svd[0].start);
++				deadline = svd[0].start.tv_sec + 1;
++				gettimeofday_ns(&svd[0].start);
+ 				update_status(&svd[0]);
+-				if (taia_less(&svd[0].start, &deadline)) sleep(1);
++				if (LESS(svd[0].start.tv_sec, deadline))
++					sleep(1);
+ 			}
+ 			if (haslog) {
+ 				if (child == svd[1].pid) {
+@@ -590,11 +589,11 @@ int runsv_main(int argc, char **argv)
+ 					pidchanged = 1;
+ 					svd[1].state = S_DOWN;
+ 					svd[1].ctrl &= ~C_TERM;
+-					taia_uint(&deadline, 1);
+-					taia_add(&deadline, &svd[1].start, &deadline);
+-					taia_now(&svd[1].start);
++					deadline = svd[1].start.tv_sec + 1;
++					gettimeofday_ns(&svd[1].start);
+ 					update_status(&svd[1]);
+-					if (taia_less(&svd[1].start, &deadline)) sleep(1);
++					if (LESS(svd[1].start.tv_sec, deadline))
++						sleep(1);
+ 				}
+ 			}
+ 		}
+@@ -618,10 +617,6 @@ int runsv_main(int argc, char **argv)
+ 				update_status(&svd[1]);
+ 				close(logpipe[1]);
+ 				close(logpipe[0]);
+-				//if (close(logpipe[1]) == -1)
+-				//	warn_cannot("close logpipe[1]");
+-				//if (close(logpipe[0]) == -1)
+-				//	warn_cannot("close logpipe[0]");
+ 			}
+ 		}
+ 	}
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 8db0fc1..38da7f8 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -35,26 +35,25 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ #define MAXSERVICES 1000
+ 
++struct service {
++	dev_t dev;
++	ino_t ino;
++	pid_t pid;
++	smallint isgone;
++};
++
++struct service *sv;
+ static char *svdir;
+-static unsigned long dev;
+-static unsigned long ino;
+-static struct service {
+-	unsigned long dev;
+-	unsigned long ino;
+-	int pid;
+-	int isgone;
+-} *sv;
+ static int svnum;
+-static int check = 1;
+ static char *rplog;
+ static int rploglen;
+ static int logpipe[2];
+-static iopause_fd io[1];
+-static struct taia stamplog;
+-static int exitsoon;
+-static int pgrp;
++static struct pollfd pfd[1];
++static unsigned stamplog;
++static smallint check = 1;
++static smallint exitsoon;
++static smallint set_pgrp;
+ 
+-#define usage() bb_show_usage()
+ static void fatal2_cannot(const char *m1, const char *m2)
+ {
+ 	bb_perror_msg_and_die("%s: fatal: cannot %s%s", svdir, m1, m2);
+@@ -84,25 +83,26 @@ static void s_hangup(int sig_no)
+ 
+ static void runsv(int no, const char *name)
+ {
+-	int pid = fork();
++	pid_t pid;
++	char *prog[3];
++
++	prog[0] = (char*)"runsv";
++	prog[1] = (char*)name;
++	prog[2] = NULL;
++
++	pid = vfork();
+ 
+ 	if (pid == -1) {
+-		warn2_cannot("fork for ", name);
++		warn2_cannot("vfork", "");
+ 		return;
+ 	}
+ 	if (pid == 0) {
+ 		/* child */
+-		char *prog[3];
+-
+-		prog[0] = (char*)"runsv";
+-		prog[1] = (char*)name;
+-		prog[2] = NULL;
+-		if (pgrp)
++		if (set_pgrp)
+ 			setsid();
+ 		signal(SIGHUP, SIG_DFL);
+ 		signal(SIGTERM, SIG_DFL);
+-		BB_EXECVP(prog[0], prog);
+-		//pathexec_run(*prog, prog, (char* const*)environ);
++		execvp(prog[0], prog);
+ 		fatal2_cannot("start runsv ", name);
+ 	}
+ 	sv[no].pid = pid;
+@@ -124,13 +124,15 @@ static void runsvdir(void)
+ 		sv[i].isgone = 1;
+ 	errno = 0;
+ 	while ((d = readdir(dir))) {
+-		if (d->d_name[0] == '.') continue;
++		if (d->d_name[0] == '.')
++			continue;
+ 		if (stat(d->d_name, &s) == -1) {
+ 			warn2_cannot("stat ", d->d_name);
+ 			errno = 0;
+ 			continue;
+ 		}
+-		if (!S_ISDIR(s.st_mode)) continue;
++		if (!S_ISDIR(s.st_mode))
++			continue;
+ 		for (i = 0; i < svnum; i++) {
+ 			if ((sv[i].ino == s.st_ino) && (sv[i].dev == s.st_dev)) {
+ 				sv[i].isgone = 0;
+@@ -152,8 +154,8 @@ static void runsvdir(void)
+ 			memset(&sv[i], 0, sizeof(sv[i]));
+ 			sv[i].ino = s.st_ino;
+ 			sv[i].dev = s.st_dev;
+-			//sv[i].pid = 0;
+-			//sv[i].isgone = 0;
++			/*sv[i].pid = 0;*/
++			/*sv[i].isgone = 0;*/
+ 			runsv(i, d->d_name);
+ 			check = 1;
+ 		}
+@@ -196,9 +198,9 @@ static int setup_log(void)
+ 		warnx("cannot set filedescriptor for log");
+ 		return -1;
+ 	}
+-	io[0].fd = logpipe[0];
+-	io[0].events = IOPAUSE_READ;
+-	taia_now(&stamplog);
++	pfd[0].fd = logpipe[0];
++	pfd[0].events = POLLIN;
++	stamplog = monotonic_sec();
+ 	return 1;
+ }
+ 
+@@ -206,24 +208,28 @@ int runsvdir_main(int argc, char **argv);
+ int runsvdir_main(int argc, char **argv)
+ {
+ 	struct stat s;
+-	time_t mtime = 0;
++	dev_t last_dev = last_dev; /* for gcc */
++	ino_t last_ino = last_ino; /* for gcc */
++	time_t last_mtime = 0;
+ 	int wstat;
+ 	int curdir;
+ 	int pid;
+-	struct taia deadline;
+-	struct taia now;
+-	struct taia stampcheck;
++	unsigned deadline;
++	unsigned now;
++	unsigned stampcheck;
+ 	char ch;
+ 	int i;
+ 
+ 	argv++;
+-	if (!argv || !*argv) usage();
+-	if (**argv == '-') {
+-		switch (*(*argv + 1)) {
+-		case 'P': pgrp = 1;
++	if (!*argv)
++		bb_show_usage();
++	if (argv[0][0] == '-') {
++		switch (argv[0][1]) {
++		case 'P': set_pgrp = 1;
+ 		case '-': ++argv;
+ 		}
+-		if (!argv || !*argv) usage();
++		if (!*argv)
++			bb_show_usage();
+ 	}
+ 
+ 	sig_catch(SIGTERM, s_term);
+@@ -241,13 +247,14 @@ int runsvdir_main(int argc, char **argv)
+ 		fatal2_cannot("open current directory", "");
+ 	coe(curdir);
+ 
+-	taia_now(&stampcheck);
++	stampcheck = monotonic_sec();
+ 
+ 	for (;;) {
+ 		/* collect children */
+ 		for (;;) {
+ 			pid = wait_nohang(&wstat);
+-			if (pid <= 0) break;
++			if (pid <= 0)
++				break;
+ 			for (i = 0; i < svnum; i++) {
+ 				if (pid == sv[i].pid) {
+ 					/* runsv has gone */
+@@ -258,31 +265,23 @@ int runsvdir_main(int argc, char **argv)
+ 			}
+ 		}
+ 
+-		taia_now(&now);
+-		if (now.sec.x < (stampcheck.sec.x - 3)) {
+-			/* time warp */
+-			warnx("time warp: resetting time stamp");
+-			taia_now(&stampcheck);
+-			taia_now(&now);
+-			if (rplog) taia_now(&stamplog);
+-		}
+-		if (taia_less(&now, &stampcheck) == 0) {
++		now = monotonic_sec();
++		if ((int)(now - stampcheck) >= 0) {
+ 			/* wait at least a second */
+-			taia_uint(&deadline, 1);
+-			taia_add(&stampcheck, &now, &deadline);
++			stampcheck = now + 1;
+ 
+ 			if (stat(svdir, &s) != -1) {
+-				if (check || s.st_mtime != mtime
+-				 || s.st_ino != ino || s.st_dev != dev
++				if (check || s.st_mtime != last_mtime
++				 || s.st_ino != last_ino || s.st_dev != last_dev
+ 				) {
+ 					/* svdir modified */
+ 					if (chdir(svdir) != -1) {
+-						mtime = s.st_mtime;
+-						dev = s.st_dev;
+-						ino = s.st_ino;
++						last_mtime = s.st_mtime;
++						last_dev = s.st_dev;
++						last_ino = s.st_ino;
+ 						check = 0;
+-						if (now.sec.x <= (4611686018427387914ULL + (uint64_t)mtime))
+-							sleep(1);
++						//if (now <= mtime)
++						//	sleep(1);
+ 						runsvdir();
+ 						while (fchdir(curdir) == -1) {
+ 							warn2_cannot("change directory, pausing", "");
+@@ -296,29 +295,30 @@ int runsvdir_main(int argc, char **argv)
+ 		}
+ 
+ 		if (rplog) {
+-			if (taia_less(&now, &stamplog) == 0) {
++			if ((int)(now - stamplog) >= 0) {
+ 				write(logpipe[1], ".", 1);
+-				taia_uint(&deadline, 900);
+-				taia_add(&stamplog, &now, &deadline);
++				stamplog = now + 900;
+ 			}
+ 		}
+-		taia_uint(&deadline, check ? 1 : 5);
+-		taia_add(&deadline, &now, &deadline);
++		deadline = now + (check ? 1 : 5);
+ 
++		pfd[0].revents = 0;
+ 		sig_block(SIGCHLD);
+ 		if (rplog)
+-			iopause(io, 1, &deadline, &now);
++			poll(pfd, 1, deadline*1000);
+ 		else
+-			iopause(0, 0, &deadline, &now);
++			sleep(deadline);
+ 		sig_unblock(SIGCHLD);
+ 
+-		if (rplog && (io[0].revents | IOPAUSE_READ))
+-			while (read(logpipe[0], &ch, 1) > 0)
++		if (pfd[0].revents & POLLIN) {
++			while (read(logpipe[0], &ch, 1) > 0) {
+ 				if (ch) {
+ 					for (i = 6; i < rploglen; i++)
+ 						rplog[i-1] = rplog[i];
+ 					rplog[rploglen-1] = ch;
+ 				}
++			}
++		}
+ 
+ 		switch (exitsoon) {
+ 		case 1:
+diff --git a/runit/sv.c b/runit/sv.c
+index e9bfc75..c87f565 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -161,10 +161,10 @@ Exit Codes
+ static const char *acts;
+ static char **service;
+ static unsigned rc;
+-static struct taia tstart, tnow;
+-static char svstatus[20];
++/* "Bernstein" time format: unix + 0x400000000000000aULL */
++static uint64_t tstart, tnow;
++svstatus_t svstatus;
+ 
+-#define usage() bb_show_usage()
+ 
+ static void fatal_cannot(const char *m1) ATTRIBUTE_NORETURN;
+ static void fatal_cannot(const char *m1)
+@@ -195,15 +195,11 @@ static void failx(const char *m1)
+ 	errno = 0;
+ 	fail(m1);
+ }
+-static void warn_cannot(const char *m1)
++static void warn(const char *m1)
+ {
+ 	++rc;
+-	out("warning: cannot ", m1);
+-}
+-static void warnx_cannot(const char *m1)
+-{
+-	errno = 0;
+-	warn_cannot(m1);
++	/* "warning: <service>: <m1>\n" */
++	out("warning: ", m1);
+ }
+ static void ok(const char *m1)
+ {
+@@ -222,32 +218,38 @@ static int svstatus_get(void)
+ 			             : failx("runsv not running");
+ 			return 0;
+ 		}
+-		warn_cannot("open supervise/ok");
++		warn("cannot open supervise/ok");
+ 		return -1;
+ 	}
+ 	close(fd);
+ 	fd = open_read("supervise/status");
+ 	if (fd == -1) {
+-		warn_cannot("open supervise/status");
++		warn("cannot open supervise/status");
+ 		return -1;
+ 	}
+-	r = read(fd, svstatus, 20);
++	r = read(fd, &svstatus, 20);
+ 	close(fd);
+ 	switch (r) {
+-	case 20: break;
+-	case -1: warn_cannot("read supervise/status"); return -1;
+-	default: warnx_cannot("read supervise/status: bad format"); return -1;
++	case 20:
++		break;
++	case -1:
++		warn("cannot read supervise/status");
++		return -1;
++	default:
++		errno = 0;
++		warn("cannot read supervise/status: bad format");
++		return -1;
+ 	}
+ 	return 1;
+ }
+ 
+ static unsigned svstatus_print(const char *m)
+ {
+-	long diff;
++	int diff;
+ 	int pid;
+ 	int normallyup = 0;
+ 	struct stat s;
+-	struct tai tstatus;
++	uint64_t timestamp;
+ 
+ 	if (stat("down", &s) == -1) {
+ 		if (errno != ENOENT) {
+@@ -256,13 +258,10 @@ static unsigned svstatus_print(const char *m)
+ 		}
+ 		normallyup = 1;
+ 	}
+-	pid = (unsigned char) svstatus[15];
+-	pid <<= 8; pid += (unsigned char)svstatus[14];
+-	pid <<= 8; pid += (unsigned char)svstatus[13];
+-	pid <<= 8; pid += (unsigned char)svstatus[12];
+-	tai_unpack(svstatus, &tstatus);
++	pid = SWAP_LE32(svstatus.pid_le32);
++	timestamp = SWAP_BE64(svstatus.time_be64);
+ 	if (pid) {
+-		switch (svstatus[19]) {
++		switch (svstatus.run_or_finish) {
+ 		case 1: printf("run: "); break;
+ 		case 2: printf("finish: "); break;
+ 		}
+@@ -270,16 +269,16 @@ static unsigned svstatus_print(const char *m)
+ 	} else {
+ 		printf("down: %s: ", m);
+ 	}
+-	diff = tnow.sec.x - tstatus.x;
+-	printf("%lds", (diff < 0 ? 0L : diff));
++	diff = tnow - timestamp;
++	printf("%us", (diff < 0 ? 0 : diff));
+ 	if (pid) {
+ 		if (!normallyup) printf(", normally down");
+-		if (svstatus[16]) printf(", paused");
+-		if (svstatus[17] == 'd') printf(", want down");
+-		if (svstatus[18]) printf(", got TERM");
++		if (svstatus.paused) printf(", paused");
++		if (svstatus.want == 'd') printf(", want down");
++		if (svstatus.got_term) printf(", got TERM");
+ 	} else {
+ 		if (normallyup) printf(", normally up");
+-		if (svstatus[17] == 'u') printf(", want up");
++		if (svstatus.want == 'u') printf(", want up");
+ 	}
+ 	return pid ? 1 : 2;
+ }
+@@ -336,7 +335,7 @@ static int check(const char *a)
+ {
+ 	int r;
+ 	unsigned pid;
+-	struct tai tstatus;
++	uint64_t timestamp;
+ 
+ 	r = svstatus_get();
+ 	if (r == -1)
+@@ -346,15 +345,12 @@ static int check(const char *a)
+ 			return 1;
+ 		return -1;
+ 	}
+-	pid = (unsigned char)svstatus[15];
+-	pid <<= 8; pid += (unsigned char)svstatus[14];
+-	pid <<= 8; pid += (unsigned char)svstatus[13];
+-	pid <<= 8; pid += (unsigned char)svstatus[12];
++	pid = SWAP_LE32(svstatus.pid_le32);
+ 	switch (*a) {
+ 	case 'x':
+ 		return 0;
+ 	case 'u':
+-		if (!pid || svstatus[19] != 1) return 0;
++		if (!pid || svstatus.run_or_finish != 1) return 0;
+ 		if (!checkscript()) return 0;
+ 		break;
+ 	case 'd':
+@@ -364,14 +360,14 @@ static int check(const char *a)
+ 		if (pid && !checkscript()) return 0;
+ 		break;
+ 	case 't':
+-		if (!pid && svstatus[17] == 'd') break;
+-		tai_unpack(svstatus, &tstatus);
+-		if ((tstart.sec.x > tstatus.x) || !pid || svstatus[18] || !checkscript())
++		if (!pid && svstatus.want == 'd') break;
++		timestamp = SWAP_BE64(svstatus.time_be64);
++		if ((tstart > timestamp) || !pid || svstatus.got_term || !checkscript())
+ 			return 0;
+ 		break;
+ 	case 'o':
+-		tai_unpack(svstatus, &tstatus);
+-		if ((!pid && tstart.sec.x > tstatus.x) || (pid && svstatus[17] != 'd'))
++		timestamp = SWAP_BE64(svstatus.time_be64);
++		if ((!pid && tstart > timestamp) || (pid && svstatus.want != 'd'))
+ 			return 0;
+ 	}
+ 	printf(OK);
+@@ -384,12 +380,14 @@ static int control(const char *a)
+ {
+ 	int fd, r;
+ 
+-	if (svstatus_get() <= 0) return -1;
+-	if (svstatus[17] == *a) return 0;
++	if (svstatus_get() <= 0)
++		return -1;
++	if (svstatus.want == *a)
++		return 0;
+ 	fd = open_write("supervise/control");
+ 	if (fd == -1) {
+ 		if (errno != ENODEV)
+-			warn_cannot("open supervise/control");
++			warn("cannot open supervise/control");
+ 		else
+ 			*a == 'x' ? ok("runsv not running") : failx("runsv not running");
+ 		return -1;
+@@ -397,7 +395,7 @@ static int control(const char *a)
+ 	r = write(fd, a, strlen(a));
+ 	close(fd);
+ 	if (r != strlen(a)) {
+-		warn_cannot("write to supervise/control");
++		warn("cannot write to supervise/control");
+ 		return -1;
+ 	}
+ 	return 1;
+@@ -413,7 +411,7 @@ int sv_main(int argc, char **argv)
+ 	const char *varservice = "/var/service/";
+ 	unsigned services;
+ 	char **servicex;
+-	unsigned long waitsec = 7;
++	unsigned waitsec = 7;
+ 	smallint kll = 0;
+ 	smallint verbose = 0;
+ 	int (*act)(const char*);
+@@ -425,19 +423,19 @@ int sv_main(int argc, char **argv)
+ 	x = getenv("SVDIR");
+ 	if (x) varservice = x;
+ 	x = getenv("SVWAIT");
+-	if (x) waitsec = xatoul(x);
++	if (x) waitsec = xatou(x);
+ 
+ 	opt = getopt32(argv, "w:v", &x);
+-	if (opt & 1) waitsec = xatoul(x); // -w
++	if (opt & 1) waitsec = xatou(x); // -w
+ 	if (opt & 2) verbose = 1; // -v
+ 	argc -= optind;
+ 	argv += optind;
+ 	action = *argv++;
+-	if (!action || !*argv) usage();
++	if (!action || !*argv) bb_show_usage();
+ 	service = argv;
+ 	services = argc - 1;
+ 
+-	taia_now(&tnow);
++	tnow = time(0) + 0x400000000000000aULL;
+ 	tstart = tnow;
+ 	curdir = open_read(".");
+ 	if (curdir == -1)
+@@ -467,7 +465,7 @@ int sv_main(int argc, char **argv)
+ 		kll = 1;
+ 		break;
+ 	case 'c':
+-		if (!str_diff(action, "check")) {
++		if (str_equal(action, "check")) {
+ 			act = NULL;
+ 			acts = "c";
+ 			break;
+@@ -479,15 +477,15 @@ int sv_main(int argc, char **argv)
+ 		if (!verbose) cbk = NULL;
+ 		break;
+ 	case 's':
+-		if (!str_diff(action, "shutdown")) {
++		if (str_equal(action, "shutdown")) {
+ 			acts = "x";
+ 			break;
+ 		}
+-		if (!str_diff(action, "start")) {
++		if (str_equal(action, "start")) {
+ 			acts = "u";
+ 			break;
+ 		}
+-		if (!str_diff(action, "stop")) {
++		if (str_equal(action, "stop")) {
+ 			acts = "d";
+ 			break;
+ 		}
+@@ -496,34 +494,34 @@ int sv_main(int argc, char **argv)
+ 		cbk = NULL;
+ 		break;
+ 	case 'r':
+-		if (!str_diff(action, "restart")) {
++		if (str_equal(action, "restart")) {
+ 			acts = "tcu";
+ 			break;
+ 		}
+-		usage();
++		bb_show_usage();
+ 	case 'f':
+-		if (!str_diff(action, "force-reload")) {
++		if (str_equal(action, "force-reload")) {
+ 			acts = "tc";
+ 			kll = 1;
+ 			break;
+ 		}
+-		if (!str_diff(action, "force-restart")) {
++		if (str_equal(action, "force-restart")) {
+ 			acts = "tcu";
+ 			kll = 1;
+ 			break;
+ 		}
+-		if (!str_diff(action, "force-shutdown")) {
++		if (str_equal(action, "force-shutdown")) {
+ 			acts = "x";
+ 			kll = 1;
+ 			break;
+ 		}
+-		if (!str_diff(action, "force-stop")) {
++		if (str_equal(action, "force-stop")) {
+ 			acts = "d";
+ 			kll = 1;
+ 			break;
+ 		}
+ 	default:
+-		usage();
++		bb_show_usage();
+ 	}
+ 
+ 	servicex = service;
+@@ -547,11 +545,9 @@ int sv_main(int argc, char **argv)
+ 	}
+ 
+ 	if (cbk) while (1) {
+-		//struct taia tdiff;
+-		long diff;
++		int diff;
+ 
+-		//taia_sub(&tdiff, &tnow, &tstart);
+-		diff = tnow.sec.x - tstart.sec.x;
++		diff = tnow - tstart;
+ 		service = servicex;
+ 		want_exit = 1;
+ 		for (i = 0; i < services; ++i, ++service) {
+@@ -586,7 +582,7 @@ int sv_main(int argc, char **argv)
+ 		}
+ 		if (want_exit) break;
+ 		usleep(420000);
+-		taia_now(&tnow);
++		tnow = time(0) + 0x400000000000000aULL;
+ 	}
+ 	return rc > 99 ? 99 : rc;
+ }
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 8632ba6..b8fa564 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -33,6 +33,10 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include "libbb.h"
+ #include "runit_lib.h"
+ 
++#define LESS(a,b) ((int)((unsigned)(b) - (unsigned)(a)) > 0)
++
++#define FMT_PTIME 30
++
+ static unsigned verbose;
+ static int linemax = 1000;
+ ////static int buflen = 1024;
+@@ -41,7 +45,7 @@ static int linelen;
+ static char **fndir;
+ static int fdwdir;
+ static int wstat;
+-static struct taia trotate;
++static unsigned nearest_rotate;
+ 
+ static char *line;
+ static smallint exitasap;
+@@ -55,7 +59,6 @@ static char repl;
+ static const char *replace = "";
+ 
+ static sigset_t *blocked_sigset;
+-static iopause_fd input;
+ static int fl_flag_0;
+ 
+ static struct logdir {
+@@ -68,14 +71,13 @@ static struct logdir {
+ 	unsigned sizemax;
+ 	unsigned nmax;
+ 	unsigned nmin;
+-	/* int (not long) because of taia_uint() usage: */
+-	unsigned tmax;
++	unsigned rotate_period;
+ 	int ppid;
+ 	int fddir;
+ 	int fdcur;
+ 	FILE* filecur; ////
+ 	int fdlock;
+-	struct taia trotate;
++	unsigned next_rotate;
+ 	char fnsave[FMT_PTIME];
+ 	char match;
+ 	char matcherr;
+@@ -128,6 +130,50 @@ static char* wstrdup(const char *str)
+ 	return s;
+ }
+ 
++/*** ex fmt_ptime.[ch] ***/
++
++/* NUL terminated */
++static void fmt_time_human_30nul(char *s)
++{
++	struct tm *t;
++	struct timeval tv;
++
++	gettimeofday(&tv, NULL);
++	t = gmtime(&(tv.tv_sec));
++	sprintf(s, "%04u-%02u-%02u_%02u:%02u:%02u.%06u000",
++		(unsigned)(1900 + t->tm_year),
++		(unsigned)(t->tm_mon + 1),
++		(unsigned)(t->tm_mday),
++		(unsigned)(t->tm_hour),
++		(unsigned)(t->tm_min),
++		(unsigned)(t->tm_sec),
++		(unsigned)(tv.tv_usec)
++	);
++	/* 4+1 + 2+1 + 2+1 + 2+1 + 2+1 + 2+1 + 9 = */
++	/* 5   + 3   + 3   + 3   + 3   + 3   + 9 = */
++	/* 20 (up to '.' inclusive) + 9 (not including '\0') */
++}
++
++/* NOT terminated! */
++static void fmt_time_bernstein_25(char *s)
++{
++	uint32_t pack[3];
++	struct timeval tv;
++	unsigned sec_hi;
++
++	gettimeofday(&tv, NULL);
++	sec_hi = (0x400000000000000aULL + tv.tv_sec) >> 32;
++	tv.tv_sec = (time_t)(0x400000000000000aULL) + tv.tv_sec;
++	tv.tv_usec *= 1000;
++	/* Network order is big-endian: most significant byte first.
++	 * This is exactly what we want here */
++	pack[0] = htonl(sec_hi);
++	pack[1] = htonl(tv.tv_sec);
++	pack[2] = htonl(tv.tv_usec);
++	*s++ = '@';
++	bin2hex(s, (char*)pack, 12);
++}
++
+ static unsigned processorstart(struct logdir *ld)
+ {
+ 	int pid;
+@@ -264,15 +310,15 @@ static void rmoldest(struct logdir *ld)
+ static unsigned rotate(struct logdir *ld)
+ {
+ 	struct stat st;
+-	struct taia now;
++	unsigned now;
+ 
+ 	if (ld->fddir == -1) {
+-		ld->tmax = 0;
++		ld->rotate_period = 0;
+ 		return 0;
+ 	}
+ 	if (ld->ppid)
+ 		while (!processorstop(ld))
+-			/* wait */;
++			continue;
+ 
+ 	while (fchdir(ld->fddir) == -1)
+ 		pause2cannot("change directory, want rotate", ld->name);
+@@ -284,17 +330,16 @@ static unsigned rotate(struct logdir *ld)
+ 		ld->fnsave[26] = 'u';
+ 	ld->fnsave[27] = '\0';
+ 	do {
+-		taia_now(&now);
+-		fmt_taia25(ld->fnsave, &now);
++		fmt_time_bernstein_25(ld->fnsave);
+ 		errno = 0;
+ 		stat(ld->fnsave, &st);
+ 	} while (errno != ENOENT);
+ 
+-	if (ld->tmax && taia_less(&ld->trotate, &now)) {
+-		taia_uint(&ld->trotate, ld->tmax);
+-		taia_add(&ld->trotate, &now, &ld->trotate);
+-		if (taia_less(&ld->trotate, &trotate))
+-			trotate = ld->trotate;
++	now = monotonic_sec();
++	if (ld->rotate_period && LESS(ld->next_rotate, now)) {
++		ld->next_rotate = now + ld->rotate_period;
++		if (LESS(ld->next_rotate, nearest_rotate))
++			nearest_rotate = ld->next_rotate;
+ 	}
+ 
+ 	if (ld->size > 0) {
+@@ -425,11 +470,13 @@ static void logdir_close(struct logdir *ld)
+ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ {
+ 	char buf[128];
+-	struct taia now;
++	unsigned now;
+ 	char *new, *s, *np;
+ 	int i;
+ 	struct stat st;
+ 
++	now = monotonic_sec();
++
+ 	ld->fddir = open(fn, O_RDONLY|O_NDELAY);
+ 	if (ld->fddir == -1) {
+ 		warn2("cannot open log directory", (char*)fn);
+@@ -456,7 +503,7 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 	ld->size = 0;
+ 	ld->sizemax = 1000000;
+ 	ld->nmax = ld->nmin = 10;
+-	ld->tmax = 0;
++	ld->rotate_period = 0;
+ 	ld->name = (char*)fn;
+ 	ld->ppid = 0;
+ 	ld->match = '+';
+@@ -468,7 +515,8 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 	if (i < 0 && errno != ENOENT)
+ 		bb_perror_msg(WARNING": %s/config", ld->name);
+ 	if (i > 0) {
+-		if (verbose) bb_error_msg(INFO"read: %s/config", ld->name);
++		if (verbose)
++			bb_error_msg(INFO"read: %s/config", ld->name);
+ 		s = buf;
+ 		while (s) {
+ 			np = strchr(s, '\n');
+@@ -508,12 +556,11 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 					/*{ "d", 24*60*60 },*/
+ 					{ }
+ 				};
+-				ld->tmax = xatou_sfx(&s[1], mh_suffixes);
+-				if (ld->tmax) {
+-					taia_uint(&ld->trotate, ld->tmax);
+-					taia_add(&ld->trotate, &now, &ld->trotate);
+-					if (!tmaxflag || taia_less(&ld->trotate, &trotate))
+-						trotate = ld->trotate;
++				ld->rotate_period = xatou_sfx(&s[1], mh_suffixes);
++				if (ld->rotate_period) {
++					ld->next_rotate = now + ld->rotate_period;
++					if (!tmaxflag || LESS(ld->next_rotate, nearest_rotate))
++						nearest_rotate = ld->next_rotate;
+ 					tmaxflag = 1;
+ 				}
+ 				break;
+@@ -544,8 +591,7 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 			ld->fnsave[26] = 'u';
+ 			ld->fnsave[27] = '\0';
+ 			do {
+-				taia_now(&now);
+-				fmt_taia25(ld->fnsave, &now);
++				fmt_time_bernstein_25(ld->fnsave);
+ 				errno = 0;
+ 				stat(ld->fnsave, &st);
+ 			} while (errno != ENOENT);
+@@ -589,17 +635,17 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 
+ static void logdirs_reopen(void)
+ {
+-	struct taia now;
+ 	int l;
+ 	int ok = 0;
+ 
+ 	tmaxflag = 0;
+-	taia_now(&now);
+ 	for (l = 0; l < dirn; ++l) {
+ 		logdir_close(&dir[l]);
+-		if (logdir_open(&dir[l], fndir[l])) ok = 1;
++		if (logdir_open(&dir[l], fndir[l]))
++			ok = 1;
+ 	}
+-	if (!ok) fatalx("no functional log directories");
++	if (!ok)
++		fatalx("no functional log directories");
+ }
+ 
+ /* Will look good in libbb one day */
+@@ -614,42 +660,55 @@ static ssize_t ndelay_read(int fd, void *buf, size_t count)
+ }
+ 
+ /* Used for reading stdin */
+-static int buffer_pread(int fd, char *s, unsigned len, struct taia *now)
++static int buffer_pread(int fd, char *s, unsigned len)
+ {
++	unsigned now;
++	struct pollfd input;
+ 	int i;
+ 
+-	if (rotateasap) {
+-		for (i = 0; i < dirn; ++i)
+-			rotate(dir+i);
+-		rotateasap = 0;
+-	}
+-	if (exitasap) {
+-		if (linecomplete)
+-			return 0;
+-		len = 1;
+-	}
+-	if (reopenasap) {
+-		logdirs_reopen();
+-		reopenasap = 0;
+-	}
+-	taia_uint(&trotate, 2744);
+-	taia_add(&trotate, now, &trotate);
+-	for (i = 0; i < dirn; ++i)
+-		if (dir[i].tmax) {
+-			if (taia_less(&dir[i].trotate, now))
+-				rotate(dir+i);
+-			if (taia_less(&dir[i].trotate, &trotate))
+-				trotate = dir[i].trotate;
+-		}
++	input.fd = 0;
++        input.events = POLLIN|POLLHUP|POLLERR;
+ 
+ 	do {
++		if (rotateasap) {
++			for (i = 0; i < dirn; ++i)
++				rotate(dir + i);
++			rotateasap = 0;
++		}
++		if (exitasap) {
++			if (linecomplete)
++				return 0;
++			len = 1;
++		}
++		if (reopenasap) {
++			logdirs_reopen();
++			reopenasap = 0;
++		}
++		now = monotonic_sec();
++		nearest_rotate = now + (45 * 60 + 45);
++		for (i = 0; i < dirn; ++i) {
++			if (dir[i].rotate_period) {
++				if (LESS(dir[i].next_rotate, now))
++					rotate(dir + i);
++				if (LESS(dir[i].next_rotate, nearest_rotate))
++					nearest_rotate = dir[i].next_rotate;
++			}
++		}
++
+ 		sigprocmask(SIG_UNBLOCK, blocked_sigset, NULL);
+-		iopause(&input, 1, &trotate, now);
+-// TODO: do not unblock/block, but use sigpending after iopause
+-// to see whether there was any sig? (one syscall less...)
++		i = nearest_rotate - now;
++		if (i > 1000000)
++			i = 1000000;
++		if (i <= 0)
++			i = 1;
++		poll(&input, 1, i * 1000);
+ 		sigprocmask(SIG_BLOCK, blocked_sigset, NULL);
++
+ 		i = ndelay_read(fd, s, len);
+-		if (i >= 0) break;
++		if (i >= 0)
++			break;
++		if (errno == EINTR)
++			continue;
+ 		if (errno != EAGAIN) {
+ 			warn("cannot read standard input");
+ 			break;
+@@ -660,7 +719,8 @@ static int buffer_pread(int fd, char *s, unsigned len, struct taia *now)
+ 	if (i > 0) {
+ 		int cnt;
+ 		linecomplete = (s[i-1] == '\n');
+-		if (!repl) return i;
++		if (!repl)
++			return i;
+ 
+ 		cnt = i;
+ 		while (--cnt >= 0) {
+@@ -698,13 +758,15 @@ static void sig_child_handler(int sig_no)
+ 
+ 	if (verbose)
+ 		bb_error_msg(INFO"sig%s received", "child");
+-	while ((pid = wait_nohang(&wstat)) > 0)
+-		for (l = 0; l < dirn; ++l)
++	while ((pid = wait_nohang(&wstat)) > 0) {
++		for (l = 0; l < dirn; ++l) {
+ 			if (dir[l].ppid == pid) {
+ 				dir[l].ppid = 0;
+ 				processorstop(&dir[l]);
+ 				break;
+ 			}
++		}
++	}
+ }
+ 
+ static void sig_alarm_handler(int sig_no)
+@@ -795,8 +857,6 @@ int svlogd_main(int argc, char **argv)
+ 	}
+ 	/* line = xmalloc(linemax + (timestamp ? 26 : 0)); */
+ 	fndir = argv;
+-	input.fd = 0;
+-	input.events = IOPAUSE_READ;
+ 	/* We cannot set NONBLOCK on fd #0 permanently - this setting
+ 	 * _isn't_ per-process! It is shared among all other processes
+ 	 * with the same stdin */
+@@ -826,7 +886,6 @@ int svlogd_main(int argc, char **argv)
+ 
+ 	/* Each iteration processes one or more lines */
+ 	while (1) {
+-		struct taia now;
+ 		char stamp[FMT_PTIME];
+ 		char *lineptr;
+ 		char *printptr;
+@@ -846,8 +905,7 @@ int svlogd_main(int argc, char **argv)
+ 		if (!np && !exitasap) {
+ 			i = linemax - stdin_cnt; /* avail. bytes at tail */
+ 			if (i >= 128) {
+-				taia_now(&now);
+-				i = buffer_pread(0, lineptr + stdin_cnt, i, &now);
++				i = buffer_pread(0, lineptr + stdin_cnt, i);
+ 				if (i <= 0) /* EOF or error on stdin */
+ 					exitasap = 1;
+ 				else {
+@@ -879,11 +937,10 @@ int svlogd_main(int argc, char **argv)
+ 		printlen = linelen;
+ 		printptr = lineptr;
+ 		if (timestamp) {
+-			taia_now(&now);
+ 			if (timestamp == 1)
+-				fmt_taia25(stamp, &now);
++				fmt_time_bernstein_25(stamp);
+ 			else /* 2: */
+-				fmt_ptime30nul(stamp, &now);
++				fmt_time_human_30nul(stamp);
+ 			printlen += 26;
+ 			printptr -= 26;
+ 			memcpy(printptr, stamp, 25);
+@@ -905,8 +962,7 @@ int svlogd_main(int argc, char **argv)
+ 		/* read/write repeatedly until we see it */
+ 		while (ch != '\n') {
+ 			/* lineptr is emptied now, safe to use as buffer */
+-			taia_now(&now);
+-			stdin_cnt = exitasap ? -1 : buffer_pread(0, lineptr, linemax, &now);
++			stdin_cnt = exitasap ? -1 : buffer_pread(0, lineptr, linemax);
+ 			if (stdin_cnt <= 0) { /* EOF or error on stdin */
+ 				exitasap = 1;
+ 				lineptr[0] = ch = '\n';

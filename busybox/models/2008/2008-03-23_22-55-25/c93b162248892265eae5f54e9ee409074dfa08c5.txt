@@ -1,0 +1,690 @@
+2008-03-23 22:55:25 +0000
+diff --git a/archival/tar.c b/archival/tar.c
+index e790f28..7bd7955 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -24,7 +24,6 @@
+  */
+ 
+ #include <fnmatch.h>
+-#include <getopt.h>
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
+diff --git a/console-tools/kbd_mode.c b/console-tools/kbd_mode.c
+index 0000ea1..46ec3fd 100644
+--- a/console-tools/kbd_mode.c
++++ b/console-tools/kbd_mode.c
+@@ -10,7 +10,6 @@
+  *
+  */
+ 
+-#include <getopt.h>
+ #include "libbb.h"
+ #include <linux/kd.h>
+ 
+diff --git a/console-tools/setconsole.c b/console-tools/setconsole.c
+index 0aa1d3a..8765a7c 100644
+--- a/console-tools/setconsole.c
++++ b/console-tools/setconsole.c
+@@ -7,7 +7,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <getopt.h>
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_SETCONSOLE_LONG_OPTIONS
+diff --git a/coreutils/env.c b/coreutils/env.c
+index f678565..20cf348 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -29,7 +29,6 @@
+  * - use xfunc_error_retval
+  */
+ 
+-#include <getopt.h> /* struct option */
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_ENV_LONG_OPTIONS
+diff --git a/coreutils/install.c b/coreutils/install.c
+index 4adcadb..0b5eda0 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -9,9 +9,6 @@
+  *           owner/group, will probably modify bb_make_directory(...)
+  */
+ 
+-#include <libgen.h>
+-#include <getopt.h> /* struct option */
+-
+ #include "libbb.h"
+ #include "libcoreutils/coreutils.h"
+ 
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 9e5c6de..9850866 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -29,7 +29,6 @@
+  * 1. requires lstat (BSD) - how do you do it without?
+  */
+ 
+-#include <getopt.h>
+ #include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+diff --git a/coreutils/mkdir.c b/coreutils/mkdir.c
+index 6bdf76d..72bd105 100644
+--- a/coreutils/mkdir.c
++++ b/coreutils/mkdir.c
+@@ -19,7 +19,6 @@
+ /* Nov 28, 2006      Yoshinori Sato <ysato@users.sourceforge.jp>: Add SELinux Support.
+  */
+ 
+-#include <getopt.h> /* struct option */
+ #include "libbb.h"
+ 
+ /* This is a NOFORK applet. Be very careful! */
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index d8dc6c0..5d02196 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -13,10 +13,6 @@
+  * Size reduction and improved error checking.
+  */
+ 
+-#include <sys/types.h>
+-#include <sys/stat.h>
+-#include <dirent.h>
+-#include <getopt.h> /* struct option */
+ #include "libbb.h"
+ #include "libcoreutils/coreutils.h"
+ 
+diff --git a/coreutils/od.c b/coreutils/od.c
+index 85e979f..94a6b95 100644
+--- a/coreutils/od.c
++++ b/coreutils/od.c
+@@ -17,7 +17,6 @@
+ /* This one provides -t (busybox's own build script needs it) */
+ #include "od_bloaty.c"
+ #else
+-#include <getopt.h>
+ 
+ #include "dump.h"
+ 
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index dce2349..942cf03 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -50,7 +50,6 @@ diff -u -a std bbox >bbox.diff || { echo Different!; sleep 1; }
+ */
+ 
+ #include "libbb.h"
+-#include <getopt.h>
+ 
+ #define assert(a) ((void)0)
+ 
+diff --git a/coreutils/readlink.c b/coreutils/readlink.c
+index 3f13a36..0c45e12 100644
+--- a/coreutils/readlink.c
++++ b/coreutils/readlink.c
+@@ -7,7 +7,6 @@
+  * Licensed under GPL v2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <getopt.h>
+ #include "libbb.h"
+ 
+ int readlink_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index 2adad02..47eda8c 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -30,8 +30,6 @@
+  * -u MASK      umask. Set the umask of the program executed to MASK.
+  */
+ 
+-#include <getopt.h>
+-
+ #include "libbb.h"
+ 
+ struct globals {
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 6f4b6b2..a2679f3 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -11,7 +11,6 @@
+ /* NB: we have a problem here with /proc/NN/exe usage, similar to
+  * one fixed in killall/pidof */
+ 
+-#include <getopt.h>
+ #include <sys/resource.h>
+ 
+ /* Override ENABLE_FEATURE_PIDFILE */
+diff --git a/editors/patch.c b/editors/patch.c
+index 9a678e1..a37f4e6 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -19,15 +19,11 @@
+  *   - Reject file isnt saved
+  */
+ 
+-#include <getopt.h>
+-
+ #include "libbb.h"
+ 
+-static unsigned int copy_lines(FILE *src_stream, FILE *dest_stream, const unsigned int lines_count)
++static unsigned copy_lines(FILE *src_stream, FILE *dest_stream, unsigned lines_count)
+ {
+-	unsigned int i = 0;
+-
+-	while (src_stream && (i < lines_count)) {
++	while (src_stream && lines_count) {
+ 		char *line;
+ 		line = xmalloc_fgets(src_stream);
+ 		if (line == NULL) {
+@@ -37,60 +33,54 @@ static unsigned int copy_lines(FILE *src_stream, FILE *dest_stream, const unsign
+ 			bb_perror_msg_and_die("error writing to new file");
+ 		}
+ 		free(line);
+-
+-		i++;
++		lines_count--;
+ 	}
+-	return i;
++	return lines_count;
+ }
+ 
+ /* If patch_level is -1 it will remove all directory names
+  * char *line must be greater than 4 chars
+  * returns NULL if the file doesnt exist or error
+  * returns malloc'ed filename
++ * NB: frees 1st argument!
+  */
+-
+-static char *extract_filename(char *line, int patch_level)
++static char *extract_filename_and_free_line(char *line, int patch_level)
+ {
+ 	char *temp, *filename_start_ptr = line + 4;
+-	int i;
+ 
+ 	/* Terminate string at end of source filename */
+ 	temp = strchrnul(filename_start_ptr, '\t');
+ 	*temp = '\0';
+ 
+ 	/* Skip over (patch_level) number of leading directories */
+-	if (patch_level == -1)
+-		patch_level = INT_MAX;
+-	for (i = 0; i < patch_level; i++) {
++	while (patch_level--) {
+ 		temp = strchr(filename_start_ptr, '/');
+ 		if (!temp)
+ 			break;
+ 		filename_start_ptr = temp + 1;
+ 	}
+ 
+-	return xstrdup(filename_start_ptr);
++	temp = xstrdup(filename_start_ptr);
++	free(line);
++	return temp;
+ }
+ 
+ int patch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	int patch_level = -1;
+-	char *patch_line;
+-	int ret;
+-	FILE *patch_file = NULL;
+ 	struct stat saved_stat;
+-	
++	char *patch_line;
++	FILE *patch_file;
++	int patch_level;
++	int ret = 0;
++
++	xfunc_error_retval = 2;	
+ 	{
+-		char *p, *i;
+-		ret = getopt32(argv, "p:i:", &p, &i);
+-		if (ret & 1)
+-			patch_level = xatol_range(p, -1, USHRT_MAX);
+-		if (ret & 2) {
+-			patch_file = xfopen(i, "r");
+-		} else {
+-			patch_file = stdin;
+-		}
+-		ret = 0;
++		const char *p = "-1";
++		const char *i = "-"; /* compat */
++		getopt32(argv, "p:i:", &p, &i);
++		patch_level = xatoi(p); /* can be negative! */
++		patch_file = xfopen_stdin(i);
+ 	}
+ 
+ 	patch_line = xmalloc_getline(patch_file);
+@@ -100,38 +90,33 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		char *original_filename;
+ 		char *new_filename;
+ 		char *backup_filename;
+-		unsigned int src_cur_line = 1;
+-		unsigned int dest_cur_line = 0;
+-		unsigned int dest_beg_line;
+-		unsigned int bad_hunk_count = 0;
+-		unsigned int hunk_count = 0;
+-		char copy_trailing_lines_flag = 0;
++		unsigned src_cur_line = 1;
++		unsigned dest_cur_line = 0;
++		unsigned dest_beg_line;
++		unsigned bad_hunk_count = 0;
++		unsigned hunk_count = 0;
++		smallint copy_trailing_lines_flag = 0;
+ 
+ 		/* Skip everything upto the "---" marker
+ 		 * No need to parse the lines "Only in <dir>", and "diff <args>"
+ 		 */
+-		while (patch_line && strncmp(patch_line, "--- ", 4) != 0) {
++		while (strncmp(patch_line, "--- ", 4) != 0) {
+ 			free(patch_line);
+ 			patch_line = xmalloc_getline(patch_file);
++			if (!patch_line)
++				bb_error_msg_and_die("invalid patch");
+ 		}
+-		/* FIXME: patch_line NULL check?? */
+ 
+ 		/* Extract the filename used before the patch was generated */
+-		original_filename = extract_filename(patch_line, patch_level);
+-		free(patch_line);
++		original_filename = extract_filename_and_free_line(patch_line, patch_level);
+ 
+ 		patch_line = xmalloc_getline(patch_file);
+-		/* FIXME: NULL check?? */
+-		if (strncmp(patch_line, "+++ ", 4) != 0) {
+-			ret = 2;
+-			bb_error_msg("invalid patch");
+-			continue;
+-		}
+-		new_filename = extract_filename(patch_line, patch_level);
+-		free(patch_line);
++		if (!patch_line || strncmp(patch_line, "+++ ", 4) != 0)
++			bb_error_msg_and_die("invalid patch");
++		new_filename = extract_filename_and_free_line(patch_line, patch_level);
+ 		
+ 		/* Get access rights from the file to be patched, -1 file does not exist */
+-		if (stat(new_filename, &saved_stat)) {
++		if (stat(new_filename, &saved_stat) != 0) {
+ 			char *line_ptr;
+ 			/* Create leading directories */
+ 			line_ptr = strrchr(new_filename, '/');
+@@ -140,53 +125,47 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				bb_make_directory(new_filename, -1, FILEUTILS_RECUR);
+ 				*line_ptr = '/';
+ 			}
+-			dst_stream = xfopen(new_filename, "w+");
+ 			backup_filename = NULL;
++			saved_stat.st_mode = 0644;
+ 		} else {
+-			backup_filename = xmalloc(strlen(new_filename) + 6);
+-			strcpy(backup_filename, new_filename);
+-			strcat(backup_filename, ".orig");
++			backup_filename = xasprintf("%s.orig", new_filename);
+ 			xrename(new_filename, backup_filename);
+-			dst_stream = xfopen(new_filename, "w");
+-			fchmod(fileno(dst_stream), saved_stat.st_mode);
+ 		}
++		dst_stream = xfopen(new_filename, "w");
++		fchmod(fileno(dst_stream), saved_stat.st_mode);
++		src_stream = NULL;
+ 
+-		if ((backup_filename == NULL) || stat(original_filename, &saved_stat)) {
+-			src_stream = NULL;
+-		} else {
+-			if (strcmp(original_filename, new_filename) == 0) {
+-				src_stream = xfopen(backup_filename, "r");
+-			} else {
+-				src_stream = xfopen(original_filename, "r");
+-			}
++		if (backup_filename && !stat(original_filename, &saved_stat)) {
++			src_stream = xfopen((strcmp(original_filename, new_filename)) ? 
++							    original_filename : backup_filename, "r");
+ 		}
+ 
+ 		printf("patching file %s\n", new_filename);
+ 
+-		/* Handle each hunk */
++		/* Handle all hunks for this file */
+ 		patch_line = xmalloc_fgets(patch_file);
+ 		while (patch_line) {
+-			unsigned int count;
+-			unsigned int src_beg_line;
+-			unsigned int unused;
+-			unsigned int hunk_offset_start = 0;
+-			int hunk_error = 0;
++			unsigned count;
++			unsigned src_beg_line;
++			unsigned unused;
++			unsigned hunk_offset_start = 0;
++			smallint hunk_error = 0;
+ 
+ 			/* This bit should be improved */
+-			if ((sscanf(patch_line, "@@ -%d,%d +%d,%d @@", &src_beg_line, &unused, &dest_beg_line, &unused) != 4) &&
+-				(sscanf(patch_line, "@@ -%d,%d +%d @@", &src_beg_line, &unused, &dest_beg_line) != 3) &&
+-				(sscanf(patch_line, "@@ -%d +%d,%d @@", &src_beg_line, &dest_beg_line, &unused) != 3)) {
++			if ((sscanf(patch_line, "@@ -%d,%d +%d,%d @@", &src_beg_line, &unused, &dest_beg_line, &unused) != 4)
++			 && (sscanf(patch_line, "@@ -%d,%d +%d @@", &src_beg_line, &unused, &dest_beg_line) != 3)
++			 && (sscanf(patch_line, "@@ -%d +%d,%d @@", &src_beg_line, &dest_beg_line, &unused) != 3)
++			) {
+ 				/* No more hunks for this file */
+ 				break;
+ 			}
+-			free(patch_line);
+ 			hunk_count++;
+ 
+ 			if (src_beg_line && dest_beg_line) {
+ 				/* Copy unmodified lines upto start of hunk */
+-				/* src_beg_line will be 0 if its a new file */
++				/* src_beg_line will be 0 if it's a new file */
+ 				count = src_beg_line - src_cur_line;
+-				if (copy_lines(src_stream, dst_stream, count) != count) {
++				if (copy_lines(src_stream, dst_stream, count)) {
+ 					bb_error_msg_and_die("bad src file");
+ 				}
+ 				src_cur_line += count;
+@@ -195,27 +174,25 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			}
+ 			hunk_offset_start = src_cur_line;
+ 
+-			while ((patch_line = xmalloc_fgets(patch_file)) != NULL) {
++			while (1) {
++				free(patch_line);
++			        patch_line = xmalloc_fgets(patch_file);
++				if (patch_line == NULL) break;
+ 				if ((*patch_line == '-') || (*patch_line == ' ')) {
+ 					char *src_line = NULL;
+ 					if (src_stream) {
+ 						src_line = xmalloc_fgets(src_stream);
+-						if (!src_line) {
+-							hunk_error++;
+-							break;
+-						} else {
++						if (src_line) {
++							int diff = strcmp(src_line, patch_line + 1);
+ 							src_cur_line++;
++							free(src_line);
++							if (diff) src_line = NULL;
+ 						}
+-						if (strcmp(src_line, patch_line + 1) != 0) {
++						if (!src_line) {
+ 							bb_error_msg("hunk #%d FAILED at %d", hunk_count, hunk_offset_start);
+-							hunk_error++;
+-							free(patch_line);
+-							/* Probably need to find next hunk, etc... */
+-							/* but for now we just bail out */
+-							patch_line = NULL;
++							hunk_error = 1;
+ 							break;
+ 						}
+-						free(src_line);
+ 					}
+ 					if (*patch_line == ' ') {
+ 						fputs(patch_line + 1, dst_stream);
+@@ -227,16 +204,15 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				} else {
+ 					break;
+ 				}
+-				free(patch_line);
+-			}
++			} /* end of while loop handling one hunk */
+ 			if (hunk_error) {
+ 				bad_hunk_count++;
+ 			}
+-		}
++		} /* end of while loop handling one file */
+ 
+ 		/* Cleanup last patched file */
+ 		if (copy_trailing_lines_flag) {
+-			copy_lines(src_stream, dst_stream, -1);
++			copy_lines(src_stream, dst_stream, (unsigned)(-1));
+ 		}
+ 		if (src_stream) {
+ 			fclose(src_stream);
+@@ -245,14 +221,13 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			fclose(dst_stream);
+ 		}
+ 		if (bad_hunk_count) {
+-			if (!ret) {
+-				ret = 1;
+-			}
+-			bb_error_msg("%d out of %d hunk FAILED", bad_hunk_count, hunk_count);
++			ret = 1;
++			bb_error_msg("%u out of %u hunk FAILED", bad_hunk_count, hunk_count);
+ 		} else {
+ 			/* It worked, we can remove the backup */
+ 			if (backup_filename) {
+ 				unlink(backup_filename);
++				free(backup_filename);
+ 			}
+ 			if ((dest_cur_line == 0) || (dest_beg_line == 0)) {
+ 				/* The new patched file is empty, remove it */
+@@ -261,11 +236,11 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					xunlink(original_filename);
+ 			}
+ 		}
+-	}
++	} /* end of "while there are patch lines" */
+ 
+ 	/* 0 = SUCCESS
+ 	 * 1 = Some hunks failed
+-	 * 2 = More serious problems
++	 * 2 = More serious problems (exited earlier)
+ 	 */
+ 	return ret;
+ }
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index 83e5e0c..cb13ebb 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -9,8 +9,6 @@
+ #include "libbb.h"
+ 
+ #if ENABLE_GETOPT_LONG
+-#include <getopt.h>
+-
+ static const char chpasswd_longopts[] ALIGN1 =
+ 	"encrypted\0" No_argument "e"
+ 	"md5\0"       No_argument "m"
+diff --git a/miscutils/chrt.c b/miscutils/chrt.c
+index 0d55e32..13557fe 100644
+--- a/miscutils/chrt.c
++++ b/miscutils/chrt.c
+@@ -7,7 +7,6 @@
+  */
+ 
+ #include <sched.h>
+-#include <getopt.h> /* optind */
+ #include "libbb.h"
+ #ifndef _POSIX_PRIORITY_SCHEDULING
+ #warning your system may be foobared
+diff --git a/miscutils/strings.c b/miscutils/strings.c
+index 5efbabf..1474137 100644
+--- a/miscutils/strings.c
++++ b/miscutils/strings.c
+@@ -7,8 +7,6 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include <getopt.h>
+-
+ #include "libbb.h"
+ 
+ #define WHOLE_FILE		1
+diff --git a/miscutils/taskset.c b/miscutils/taskset.c
+index bf98ea1..4815b6a 100644
+--- a/miscutils/taskset.c
++++ b/miscutils/taskset.c
+@@ -7,7 +7,6 @@
+  */
+ 
+ #include <sched.h>
+-#include <getopt.h> /* optind */
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_TASKSET_FANCY
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index 6e2d960..a1ee054 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -13,7 +13,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <getopt.h>
+ #include "libbb.h"
+ 
+ typedef struct ftp_host_info_s {
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 1746819..29738c6 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -19,7 +19,6 @@
+ 
+ #include <sys/utsname.h>
+ #include <fnmatch.h>
+-#include <getopt.h>
+ 
+ #include "libbb.h"
+ 
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index d7c968c..9e92b64 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -12,7 +12,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <getopt.h>
+ #include <sys/socket.h>
+ #include <arpa/inet.h>
+ 
+diff --git a/networking/route.c b/networking/route.c
+index 53e3988..857424c 100644
+--- a/networking/route.c
++++ b/networking/route.c
+@@ -25,7 +25,6 @@
+  * remove ridiculous amounts of bloat.
+  */
+ 
+-#include <getopt.h>
+ #include <net/route.h>
+ #include <net/if.h>
+ 
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index fe8f4c8..bc06761 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -8,7 +8,6 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include <getopt.h>
+ #include <syslog.h>
+ 
+ /* Override ENABLE_FEATURE_PIDFILE - ifupdown needs our pidfile to always exist */
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 83b3841..c98005f 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -2,7 +2,6 @@
+ /*
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+-#include <getopt.h>
+ 
+ #include "common.h"
+ #include "dhcpd.h"
+diff --git a/networking/wget.c b/networking/wget.c
+index f8adcd7..7dd1d36 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -6,7 +6,6 @@
+  *
+  */
+ 
+-#include <getopt.h>	/* for struct option */
+ #include "libbb.h"
+ 
+ struct host_info {
+diff --git a/procps/pgrep.c b/procps/pgrep.c
+index 1ffc87d..f20789c 100644
+--- a/procps/pgrep.c
++++ b/procps/pgrep.c
+@@ -7,8 +7,6 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-#include <getopt.h>
+-
+ #include "libbb.h"
+ #include "xregex.h"
+ 
+diff --git a/shell/hush.c b/shell/hush.c
+index 4e6d500..eb0633b 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -78,7 +78,6 @@
+ 
+ 
+ #include <glob.h>      /* glob, of course */
+-#include <getopt.h>    /* should be pretty obvious */
+ /* #include <dmalloc.h> */
+ 
+ #include "busybox.h" /* for APPLET_IS_NOFORK/NOEXEC */
+diff --git a/util-linux/hexdump.c b/util-linux/hexdump.c
+index cdb17ca..10c57fd 100644
+--- a/util-linux/hexdump.c
++++ b/util-linux/hexdump.c
+@@ -9,7 +9,6 @@
+  * Licensed under GPLv2 or later, see file License in this tarball for details.
+  */
+ 
+-#include <getopt.h>
+ #include "libbb.h"
+ #include "dump.h"
+ 
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index 44522df..a03d61b 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -8,7 +8,6 @@
+ */
+ 
+ #include <sys/utsname.h>
+-#include <getopt.h>
+ #include "libbb.h"
+ #include "rtc_.h"
+ 
+diff --git a/util-linux/losetup.c b/util-linux/losetup.c
+index d521b7b..62a1a73 100644
+--- a/util-linux/losetup.c
++++ b/util-linux/losetup.c
+@@ -7,8 +7,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <getopt.h>
+-
+ #include "libbb.h"
+ 
+ int losetup_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index 6136fa9..34c979e 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -9,7 +9,6 @@
+  */
+ 
+ #include <mntent.h>
+-#include <getopt.h>
+ #include "libbb.h"
+ 
+ /* ignored: -v -d -t -i */

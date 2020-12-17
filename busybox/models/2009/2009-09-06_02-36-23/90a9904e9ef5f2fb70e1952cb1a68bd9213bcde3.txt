@@ -1,0 +1,226 @@
+2009-09-06 02:36:23 +0200
+diff --git a/archival/gzip.c b/archival/gzip.c
+index 3358469..1e56c9d 100644
+--- a/archival/gzip.c
++++ b/archival/gzip.c
+@@ -2078,7 +2078,7 @@ int gzip_main(int argc UNUSED_PARAM, char **argv)
+ 	//if (opt & 0x4) // -v
+ 	argv += optind;
+ 
+-	SET_PTR_TO_GLOBALS(xzalloc(sizeof(struct globals) + sizeof(struct globals2))
++	SET_PTR_TO_GLOBALS((char *)xzalloc(sizeof(struct globals)+sizeof(struct globals2))
+ 			+ sizeof(struct globals));
+ 	barrier();
+ 
+diff --git a/editors/awk.c b/editors/awk.c
+index cef7334..30f09cb 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -486,7 +486,7 @@ struct globals2 {
+ #define fsplitter    (G.fsplitter   )
+ #define rsplitter    (G.rsplitter   )
+ #define INIT_G() do { \
+-	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G1) + sizeof(G)) + sizeof(G1)); \
++	SET_PTR_TO_GLOBALS((char*)xzalloc(sizeof(G1)+sizeof(G)) + sizeof(G1)); \
+ 	G.next_token__ltclass = TC_OPTERM; \
+ 	G.evaluate__seed = 1; \
+ } while (0)
+diff --git a/editors/sed.c b/editors/sed.c
+index 8b4f60a..b749419 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1186,7 +1186,7 @@ static void process_files(void)
+ 		case 'x': /* Exchange hold and pattern space */
+ 		{
+ 			char *tmp = pattern_space;
+-			pattern_space = G.hold_space ? : xzalloc(1);
++			pattern_space = G.hold_space ? G.hold_space : xzalloc(1);
+ 			last_gets_char = '\n';
+ 			G.hold_space = tmp;
+ 			break;
+diff --git a/include/libbb.h b/include/libbb.h
+index c795e6a..9f7c260 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1479,7 +1479,7 @@ extern struct globals *const ptr_to_globals;
+ /* At least gcc 3.4.6 on mipsel system needs optimization barrier */
+ #define barrier() __asm__ __volatile__("":::"memory")
+ #define SET_PTR_TO_GLOBALS(x) do { \
+-	(*(struct globals**)&ptr_to_globals) = (x); \
++	(*(struct globals**)&ptr_to_globals) = (void*)(x); \
+ 	barrier(); \
+ } while (0)
+ 
+diff --git a/init/init.c b/init/init.c
+index 35f64cf..6bee8f3 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -862,7 +862,7 @@ int init_main(int argc UNUSED_PARAM, char **argv)
+ 		struct sysinfo info;
+ 
+ 		if (sysinfo(&info) == 0
+-		 && (info.mem_unit ? : 1) * (long long)info.totalram < 1024*1024
++		 && (info.mem_unit ? info.mem_unit : 1) * (long long)info.totalram < 1024*1024
+ 		) {
+ 			message(L_CONSOLE, "Low memory, forcing swapon");
+ 			/* swapon -a requires /proc typically */
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 9a773b4..38c69c6 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -2037,7 +2037,8 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+  rewrite_line:
+ 			/* Rewrite the line with the selected history item */
+ 			/* change command */
+-			command_len = load_string(state->history[state->cur_history] ? : "", maxsize);
++			command_len = load_string(state->history[state->cur_history] ?
++					state->history[state->cur_history] : "", maxsize);
+ 			/* redraw and go to eol (bol, in vi) */
+ 			redraw(cmdedit_y, (state->flags & VI_MODE) ? 9999 : 0);
+ 			break;
+diff --git a/libbb/loop.c b/libbb/loop.c
+index 24dab1a..3fec7ad 100644
+--- a/libbb/loop.c
++++ b/libbb/loop.c
+@@ -105,7 +105,7 @@ int FAST_FUNC set_loop(char **device, const char *file, unsigned long long offse
+ 	}
+ 
+ 	/* Find a loop device.  */
+-	try = *device ? : dev;
++	try = *device ? *device : dev;
+ 	for (i = 0; rc; i++) {
+ 		sprintf(dev, LOOP_FORMAT, i);
+ 
+diff --git a/mailutils/mime.c b/mailutils/mime.c
+index b856c81..dd81139 100644
+--- a/mailutils/mime.c
++++ b/mailutils/mime.c
+@@ -177,7 +177,8 @@ int makemime_main(int argc UNUSED_PARAM, char **argv)
+ static const char *find_token(const char *const string_array[], const char *key, const char *defvalue)
+ {
+ 	const char *r = NULL;
+-	for (int i = 0; string_array[i] != 0; i++) {
++	int i;
++	for (i = 0; string_array[i] != NULL; i++) {
+ 		if (strcasecmp(string_array[i], key) == 0) {
+ 			r = (char *)string_array[i+1];
+ 			break;
+diff --git a/miscutils/less.c b/miscutils/less.c
+index bd85506..ce77ddd 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -624,7 +624,7 @@ static void print_found(const char *line)
+ 
+ 	while (match_status == 0) {
+ 		char *new = xasprintf("%s%.*s"HIGHLIGHT"%.*s"NORMAL,
+-				growline ? : "",
++				growline ? growline : "",
+ 				match_structs.rm_so, str,
+ 				match_structs.rm_eo - match_structs.rm_so,
+ 						str + match_structs.rm_so);
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index 0d78033..bbd700e 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -314,6 +314,7 @@ static int load_dep_bb(void)
+ 
+ 	while ((line = xmalloc_fgetline(fp)) != NULL) {
+ 		char* space;
++		char* linebuf;
+ 		int cur;
+ 
+ 		if (!line[0]) {
+@@ -328,7 +329,8 @@ static int load_dep_bb(void)
+ 		if (*space)
+ 			*space++ = '\0';
+ 		modinfo[cur].aliases = space;
+-		modinfo[cur].deps = xmalloc_fgetline(fp) ? : xzalloc(1);
++		linebuf = xmalloc_fgetline(fp);
++		modinfo[cur].deps = linebuf ? linebuf : xzalloc(1);
+ 		if (modinfo[cur].deps[0]) {
+ 			/* deps are not "", so next line must be empty */
+ 			line = xmalloc_fgetline(fp);
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 25c169a..66a13fb 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -670,7 +670,7 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 				memRchr = memchr;
+ 				/* Add '\n'-terminated line to ld->inst */
+ 				while (1) {
+-					int l = asprintf(&new, "%s%s\n", ld->inst ? : "", s);
++					int l = asprintf(&new, "%s%s\n", ld->inst ? ld->inst : "", s);
+ 					if (l >= 0 && new)
+ 						break;
+ 					pause_nomem();
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index b410d7e..aabc371 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -347,7 +347,7 @@ static int restore(const char *file)
+ 		 * same.  For "-vv", emit everything. */
+ 		if (verbose > 1 || !user_only_changed) {
+ 			bb_info_msg("%s: reset %s context %s->%s",
+-				applet_name, my_file, context ?: "", newcon);
++				applet_name, my_file, context ? context : "", newcon);
+ 		}
+ 	}
+ 
+diff --git a/shell/bbsh.c b/shell/bbsh.c
+index 897c022..ad875ab 100644
+--- a/shell/bbsh.c
++++ b/shell/bbsh.c
+@@ -212,7 +212,7 @@ int bbsh_main(int argc, char **argv)
+ 		unsigned cmdlen=0;
+ 		for (;;) {
+ 			if (!f) putchar('$');
+-			if (1 > getline(&command, &cmdlen,f ? : stdin)) break;
++			if (1 > getline(&command, &cmdlen, f ? f : stdin)) break;
+ 
+ 			handle(command);
+ 		}
+diff --git a/shell/hush.c b/shell/hush.c
+index 5794b1d..30eddad 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -5794,7 +5794,7 @@ static struct pipe *parse_stream(char **pstring,
+ 	 * found.  When recursing, quote state is passed in via dest->o_escape.
+ 	 */
+ 	debug_printf_parse("parse_stream entered, end_trigger='%c'\n",
+-			end_trigger ? : 'X');
++			end_trigger ? end_trigger : 'X');
+ 	debug_enter();
+ 
+ 	G.ifs = get_local_var_value("IFS");
+@@ -6860,7 +6860,8 @@ static int FAST_FUNC builtin_cd(char **argv)
+ 		 * bash says "bash: cd: HOME not set" and does nothing
+ 		 * (exitcode 1)
+ 		 */
+-		newdir = get_local_var_value("HOME") ? : "/";
++		const char *home = get_local_var_value("HOME");
++		newdir = home ? home : "/";
+ 	}
+ 	if (chdir(newdir)) {
+ 		/* Mimic bash message exactly */
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index affeab0..358d0a8 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -254,7 +254,7 @@ static int read_mode_db(struct fb_var_screeninfo *base, const char *fn,
+ }
+ #endif
+ 
+-static void setmode(struct fb_var_screeninfo *base,
++static void setfbmode(struct fb_var_screeninfo *base,
+ 					struct fb_var_screeninfo *set)
+ {
+ 	if ((int32_t) set->xres > 0)
+@@ -402,7 +402,7 @@ int fbset_main(int argc, char **argv)
+ 	}
+ 
+ 	if (options & OPT_CHANGE) {
+-		setmode(&var, &varset);
++		setfbmode(&var, &varset);
+ 		if (options & OPT_ALL)
+ 			var.activate = FB_ACTIVATE_ALL;
+ 		xioctl(fh, FBIOPUT_VSCREENINFO, &var);

@@ -1,0 +1,19 @@
+2008-11-17 00:12:17 +0000
+diff --git a/coreutils/id.c b/coreutils/id.c
+index f33f9ab..6ddb236 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -17,11 +17,13 @@
+ 
+ #include "libbb.h"
+ 
++#if !ENABLE_USE_BB_PWD_GRP
+ #if defined(__UCLIBC_MAJOR__) && (__UCLIBC_MAJOR__ == 0)
+ #if (__UCLIBC_MINOR__ < 9) || (__UCLIBC_MINOR__ == 9 &&  __UCLIBC_SUBLEVEL__ < 30)
+ #error "Sorry, you need at least uClibc version 0.9.30 for id applet to build"
+ #endif
+ #endif
++#endif
+ 
+ enum {
+ 	PRINT_REAL      = (1 << 0),

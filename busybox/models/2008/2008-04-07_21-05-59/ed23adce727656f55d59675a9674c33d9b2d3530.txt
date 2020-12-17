@@ -1,0 +1,13 @@
+2008-04-07 21:05:59 +0000
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 351a31a..4b8aea8 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -23,7 +23,6 @@
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_MOUNT_LABEL
+-/* For FEATURE_MOUNT_LABEL only */
+ #include "volume_id.h"
+ #endif
+ 

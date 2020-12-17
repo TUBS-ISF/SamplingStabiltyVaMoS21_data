@@ -1,0 +1,705 @@
+2010-02-04 15:00:15 +0100
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index 982404d..d5b86ff 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -14,6 +14,10 @@
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
++typedef uint32_t aliased_uint32_t FIX_ALIASING;
++typedef off_t    aliased_off_t    FIX_ALIASING;
++
++
+ /*
+  * GNU tar uses "base-256 encoding" for very large numbers (>8 billion).
+  * Encoding is binary, with highest bit always set as a marker
+@@ -68,10 +72,10 @@ static off_t getBase256_len12(const char *str)
+  * and fetch it in one go:
+  */
+ 	if (sizeof(off_t) == 8) {
+-		value = *(off_t*)str;
++		value = *(aliased_off_t*)str;
+ 		value = SWAP_BE64(value);
+ 	} else if (sizeof(off_t) == 4) {
+-		value = *(off_t*)str;
++		value = *(aliased_off_t*)str;
+ 		value = SWAP_BE32(value);
+ 	} else {
+ 		value = 0;
+@@ -156,7 +160,7 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+ 
+ #if ENABLE_DESKTOP || ENABLE_FEATURE_TAR_AUTODETECT
+ 	/* to prevent misdetection of bz2 sig */
+-	*(uint32_t*)(&tar) = 0;
++	*(aliased_uint32_t*)&tar = 0;
+ 	i = full_read(archive_handle->src_fd, &tar, 512);
+ 	/* If GNU tar sees EOF in above read, it says:
+ 	 * "tar: A lone zero block at N", where N = kilobyte
+diff --git a/archival/lzop.c b/archival/lzop.c
+index a752a9d..0a15c51 100644
+--- a/archival/lzop.c
++++ b/archival/lzop.c
+@@ -396,7 +396,7 @@ struct globals {
+ 	const uint32_t *lzo_crc32_table;
+ 	chksum_t chksum_in;
+ 	chksum_t chksum_out;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { } while (0)
+ //#define G (*ptr_to_globals)
+diff --git a/console-tools/resize.c b/console-tools/resize.c
+index 4504cc8..828b5bb 100644
+--- a/console-tools/resize.c
++++ b/console-tools/resize.c
+@@ -11,12 +11,12 @@
+ 
+ #define ESC "\033"
+ 
+-#define old_termios (*(struct termios*)&bb_common_bufsiz1)
++#define old_termios_p ((struct termios*)&bb_common_bufsiz1)
+ 
+ static void
+ onintr(int sig UNUSED_PARAM)
+ {
+-	tcsetattr(STDERR_FILENO, TCSANOW, &old_termios);
++	tcsetattr(STDERR_FILENO, TCSANOW, old_termios_p);
+ 	exit(EXIT_FAILURE);
+ }
+ 
+@@ -33,8 +33,8 @@ int resize_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	 * and operate on it - should we do the same?
+ 	 */
+ 
+-	tcgetattr(STDERR_FILENO, &old_termios); /* fiddle echo */
+-	new = old_termios;
++	tcgetattr(STDERR_FILENO, old_termios_p); /* fiddle echo */
++	memcpy(&new, old_termios_p, sizeof(new));
+ 	new.c_cflag |= (CLOCAL | CREAD);
+ 	new.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+ 	bb_signals(0
+@@ -61,7 +61,7 @@ int resize_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	 * (gotten via TIOCGWINSZ) and recomputing *pixel values */
+ 	ret = ioctl(STDERR_FILENO, TIOCSWINSZ, &w);
+ 
+-	tcsetattr(STDERR_FILENO, TCSANOW, &old_termios);
++	tcsetattr(STDERR_FILENO, TCSANOW, old_termios_p);
+ 
+ 	if (ENABLE_FEATURE_RESIZE_PRINT)
+ 		printf("COLUMNS=%d;LINES=%d;export COLUMNS LINES;\n",
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index 8173d40..7c1a0c0 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -38,7 +38,7 @@ struct globals {
+ 	unsigned long long total_bytes;
+ 	unsigned long long begin_time_us;
+ #endif
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { \
+ 	/* we have to zero it out because of NOEXEC */ \
+diff --git a/coreutils/du.c b/coreutils/du.c
+index 730d6d1..5894ed4 100644
+--- a/coreutils/du.c
++++ b/coreutils/du.c
+@@ -50,7 +50,7 @@ struct globals {
+ 	int slink_depth;
+ 	int du_depth;
+ 	dev_t dir_dev;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ 
+ 
+diff --git a/coreutils/expr.c b/coreutils/expr.c
+index f5701a4..f40edad 100644
+--- a/coreutils/expr.c
++++ b/coreutils/expr.c
+@@ -63,7 +63,7 @@ typedef struct valinfo VALUE;
+ /* The arguments given to the program, minus the program name.  */
+ struct globals {
+ 	char **args;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ 
+ /* forward declarations */
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index d004ce8..1197f7d 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -255,7 +255,7 @@ struct globals {
+ 	/* Do time() just once. Saves one syscall per file for "ls -l" */
+ 	time_t current_time_t;
+ #endif
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #if ENABLE_FEATURE_LS_COLOR
+ # define show_color     (G.show_color    )
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index 4952d53..c40d718 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -625,7 +625,7 @@ struct globals {
+ 	/* Current position, to know when to wrap */
+ 	unsigned current_col;
+ 	char buf[10];
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { \
+ 	G.device_name = bb_msg_standard_input; \
+diff --git a/coreutils/tail.c b/coreutils/tail.c
+index 0be1663..83768d4 100644
+--- a/coreutils/tail.c
++++ b/coreutils/tail.c
+@@ -35,7 +35,7 @@ static const struct suffix_mult tail_suffixes[] = {
+ 
+ struct globals {
+ 	bool status;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ 
+ static void tail_xprint_header(const char *fmt, const char *filename)
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index ea019c2..2854a53 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -36,7 +36,7 @@ struct globals {
+ 	char **names;
+ 	int    cur;
+ 	char  *cmd[1];
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define names (G.names)
+ #define cur   (G.cur  )
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 10da8dc..dfc72f0 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -96,7 +96,7 @@ struct globals {
+ 	char *pidfile;
+ 	int user_id;
+ 	smallint signal_nr;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define found             (G.found               )
+ #define userspec          (G.userspec            )
+diff --git a/editors/awk.c b/editors/awk.c
+index bc8b0da..a6f3f55 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -444,7 +444,7 @@ struct globals2 {
+ 
+ 	/* biggest and least used members go last */
+ 	tsplitter fsplitter, rsplitter;
+-};
++}; //FIX_ALIASING; - large code growth
+ #define G1 (ptr_to_globals[-1])
+ #define G (*(struct globals2 *)ptr_to_globals)
+ /* For debug. nm --size-sort awk.o | grep -vi ' [tr] ' */
+diff --git a/editors/sed.c b/editors/sed.c
+index fd9dd1b..e5e1877 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -117,7 +117,7 @@ struct globals {
+ 		int idx;	/* Space used */
+ 		int len;	/* Space allocated */
+ 	} pipeline;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ void BUG_sed_globals_too_big(void);
+ #define INIT_G() do { \
+diff --git a/findutils/find.c b/findutils/find.c
+index b417123..4bc3b38 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -104,7 +104,7 @@ struct globals {
+ 	action ***actions;
+ 	bool need_print;
+ 	recurse_flags_t recurse_flags;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { \
+ 	struct G_sizecheck { \
+diff --git a/findutils/grep.c b/findutils/grep.c
+index 193b48c..a321cc3 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -111,7 +111,7 @@ struct globals {
+ 	/* globals used internally */
+ 	llist_t *pattern_head;   /* growable list of patterns to match */
+ 	const char *cur_file;    /* the current file we are reading */
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { \
+ 	struct G_sizecheck { \
+diff --git a/include/platform.h b/include/platform.h
+index b58b149..ab4402e 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -100,6 +100,13 @@
+ # define EXTERNALLY_VISIBLE
+ #endif
+ 
++/* At 4.4 gcc become much more anal about this, need to use "aliased" types */
++#if __GNUC_PREREQ(4,4)
++# define FIX_ALIASING __attribute__((__may_alias__))
++#else
++# define FIX_ALIASING
++#endif
++
+ /* We use __extension__ in some places to suppress -pedantic warnings
+    about GCC extensions.  This feature didn't work properly before
+    gcc 2.8.  */
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 7135e44..ebd4812 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -94,7 +94,7 @@ struct globals {
+ 	char *env_var_user;
+ 	char *env_var_home;
+ #endif
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define LogLevel           (G.LogLevel               )
+ #define LogFile            (G.LogFile                )
+diff --git a/miscutils/dc.c b/miscutils/dc.c
+index 7348ed3..cb4b1e9 100644
+--- a/miscutils/dc.c
++++ b/miscutils/dc.c
+@@ -13,7 +13,7 @@ struct globals {
+ 	unsigned pointer;
+ 	unsigned base;
+ 	double stack[1];
+-};
++} FIX_ALIASING;
+ enum { STACK_SIZE = (COMMON_BUFSIZE - offsetof(struct globals, stack)) / sizeof(double) };
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define pointer   (G.pointer   )
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 399b77a..9738620 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -315,7 +315,7 @@ struct globals {
+ #ifdef DO_FLUSHCACHE
+ 	unsigned char flushcache[4] = { WIN_FLUSHCACHE, 0, 0, 0 };
+ #endif
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ struct BUG_G_too_big {
+ 	char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index f339fbd..292f2df 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -70,7 +70,7 @@ struct globals {
+ 	int num_unresolved_deps;
+ 	/* bool. "Did we have 'symbol:FOO' requested on cmdline?" */
+ 	smallint need_symbols;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { } while (0)
+ 
+diff --git a/modutils/modutils-24.c b/modutils/modutils-24.c
+index 442e80f..05c1bf2 100644
+--- a/modutils/modutils-24.c
++++ b/modutils/modutils-24.c
+@@ -3203,6 +3203,7 @@ static int obj_create_image(struct obj_file *f, char *image)
+ 
+ static struct obj_file *obj_load(char *image, size_t image_size, int loadprogbits)
+ {
++	typedef uint32_t aliased_uint32_t FIX_ALIASING;
+ #if BB_LITTLE_ENDIAN
+ # define ELFMAG_U32 ((uint32_t)(ELFMAG0 + 0x100 * (ELFMAG1 + (0x100 * (ELFMAG2 + 0x100 * ELFMAG3)))))
+ #else
+@@ -3224,7 +3225,7 @@ static struct obj_file *obj_load(char *image, size_t image_size, int loadprogbit
+ 		bb_error_msg_and_die("error while loading ELF header");
+ 	memcpy(&f->header, image, sizeof(f->header));
+ 
+-	if (*(uint32_t*)(&f->header.e_ident) != ELFMAG_U32) {
++	if (*(aliased_uint32_t*)(&f->header.e_ident) != ELFMAG_U32) {
+ 		bb_error_msg_and_die("not an ELF file");
+ 	}
+ 	if (f->header.e_ident[EI_CLASS] != ELFCLASSM
+diff --git a/networking/arp.c b/networking/arp.c
+index 278f2dc..0ef267a 100644
+--- a/networking/arp.c
++++ b/networking/arp.c
+@@ -51,7 +51,7 @@ struct globals {
+ 	const char *device;      /* current device */
+ 	smallint hw_set;         /* flag if hw-type was set (-H) */
+ 
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define ap         (G.ap        )
+ #define hw         (G.hw        )
+diff --git a/networking/arping.c b/networking/arping.c
+index e3418a9..effe418 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -45,7 +45,7 @@ struct globals {
+ 	unsigned received;
+ 	unsigned brd_recv;
+ 	unsigned req_recv;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define src        (G.src       )
+ #define dst        (G.dst       )
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index b7d5b20..186ff50 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -106,7 +106,7 @@ struct globals {
+ 	/* We need these aligned to uint32_t */
+ 	char msg_ok [(sizeof("NNN " MSG_OK ) + 3) & 0xfffc];
+ 	char msg_err[(sizeof("NNN " MSG_ERR) + 3) & 0xfffc];
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { \
+ 	/* Moved to main */ \
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index 2dd7e92..120ccff 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -23,7 +23,7 @@ struct globals {
+ 	int verbose_flag;
+ 	int do_continue;
+ 	char buf[1]; /* actually [BUFSZ] */
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ enum { BUFSZ = COMMON_BUFSIZE - offsetof(struct globals, buf) };
+ struct BUG_G_too_big {
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 51b3626..bf88b1c 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -106,7 +106,7 @@ enum {
+ struct globals {
+ 	char **my_environ;
+ 	const char *startup_PATH;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { } while (0)
+ 
+diff --git a/networking/inetd.c b/networking/inetd.c
+index a455733..7aa6b7b 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -313,7 +313,7 @@ struct globals {
+ 	fd_set allsock;
+ 	/* Used in next_line(), and as scratch read buffer */
+ 	char line[256];          /* _at least_ 256, see LINE_SIZE */
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ enum { LINE_SIZE = COMMON_BUFSIZE - offsetof(struct globals, line) };
+ struct BUG_G_too_big {
+diff --git a/networking/ping.c b/networking/ping.c
+index 23b39f2..467b7f6 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -263,7 +263,7 @@ struct globals {
+ #endif
+ 	} pingaddr;
+ 	char rcvd_tbl[MAX_DUP_CHK / 8];
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define pingsock     (G.pingsock    )
+ #define if_index     (G.if_index    )
+diff --git a/networking/slattach.c b/networking/slattach.c
+index d3212bb..12a3067 100644
+--- a/networking/slattach.c
++++ b/networking/slattach.c
+@@ -20,7 +20,7 @@ struct globals {
+ 	int handle;
+ 	int saved_disc;
+ 	struct termios saved_state;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define handle       (G.handle      )
+ #define saved_disc   (G.saved_disc  )
+diff --git a/networking/tc.c b/networking/tc.c
+index 541a0f8..6a5a850 100644
+--- a/networking/tc.c
++++ b/networking/tc.c
+@@ -43,8 +43,7 @@ struct globals {
+ 	__u32 filter_parent;
+ 	__u32 filter_prio;
+ 	__u32 filter_proto;
+-};
+-
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define filter_ifindex (G.filter_ifindex)
+ #define filter_qdisc (G.filter_qdisc)
+diff --git a/networking/tcpudp.c b/networking/tcpudp.c
+index d0db33b..42845df 100644
+--- a/networking/tcpudp.c
++++ b/networking/tcpudp.c
+@@ -50,7 +50,7 @@ struct globals {
+ 	unsigned cmax;
+ 	char **env_cur;
+ 	char *env_var[1]; /* actually bigger */
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define verbose      (G.verbose     )
+ #define max_per_host (G.max_per_host)
+diff --git a/networking/telnet.c b/networking/telnet.c
+index 013d959..344bb0d 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -75,7 +75,7 @@ struct globals {
+ 	char    iacbuf[IACBUFSIZE];
+ 	struct termios termios_def;
+ 	struct termios termios_raw;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { \
+ 	struct G_sizecheck { \
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index b0a1cc4..dd59de9 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -60,7 +60,7 @@ struct globals {
+ 	const char *loginpath;
+ 	const char *issuefile;
+ 	int maxfd;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { \
+ 	G.loginpath = "/bin/login"; \
+diff --git a/networking/tftp.c b/networking/tftp.c
+index b2c3c03..0e5b48d 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -90,7 +90,7 @@ struct globals {
+ 	const char *file;
+ 	bb_progress_t pmt;
+ #endif
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ struct BUG_G_too_big {
+ 	char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
+diff --git a/networking/wget.c b/networking/wget.c
+index ad1770b..9d813dc 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -30,7 +30,7 @@ struct globals {
+ #endif
+ 	smallint chunked;         /* chunked transfer encoding */
+ 	smallint got_clen;        /* got content-length: from server  */
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ struct BUG_G_too_big {
+ 	char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
+diff --git a/networking/zcip.c b/networking/zcip.c
+index a4da5cb..db10d0a 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -77,7 +77,7 @@ enum {
+ struct globals {
+ 	struct sockaddr saddr;
+ 	struct ether_addr eth_addr;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define saddr    (G.saddr   )
+ #define eth_addr (G.eth_addr)
+diff --git a/procps/ps.c b/procps/ps.c
+index 0b674ff..91ebd68 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -49,7 +49,7 @@ struct globals {
+ 	unsigned long long seconds_since_boot;
+ #endif
+ 	char default_o[sizeof(DEFAULT_O_STR)];
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define out                (G.out               )
+ #define out_cnt            (G.out_cnt           )
+diff --git a/procps/top.c b/procps/top.c
+index f514df7..d76d9af 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -100,10 +100,8 @@ struct globals {
+ 	int num_cpus;
+ #endif
+ 	char line_buf[80];
+-};
+-
++}; //FIX_ALIASING; - large code growth
+ enum { LINE_BUF_SIZE = COMMON_BUFSIZE - offsetof(struct globals, line_buf) };
+-
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { \
+ 	struct G_sizecheck { \
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 48b8396..5b221e9 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -95,7 +95,7 @@ struct globals {
+ 	struct fd_pair logpipe;
+ 	char *dir;
+ 	struct svdir svd[2];
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define haslog       (G.haslog      )
+ #define sigterm      (G.sigterm     )
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index f6aaeb7..71fde75 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -58,7 +58,7 @@ struct globals {
+ 	struct pollfd pfd[1];
+ 	unsigned stamplog;
+ #endif
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define sv          (G.sv          )
+ #define svdir       (G.svdir       )
+diff --git a/runit/sv.c b/runit/sv.c
+index 96ebb74..3f76a2d 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -165,7 +165,7 @@ struct globals {
+ /* "Bernstein" time format: unix + 0x400000000000000aULL */
+ 	uint64_t tstart, tnow;
+ 	svstatus_t svstatus;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define acts         (G.acts        )
+ #define service      (G.service     )
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index f556c7d..fc8b4ab 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -184,7 +184,7 @@ struct globals {
+ 
+ 	sigset_t blocked_sigset;
+ };
+-#define G (*(struct globals*)ptr_to_globals)
++#define G (*ptr_to_globals)
+ #define dir            (G.dir           )
+ #define verbose        (G.verbose       )
+ #define linemax        (G.linemax       )
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index 4686d80..f45e41b 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -35,8 +35,7 @@ struct globals {
+ 	dev_t dev_id; /* Device id where target file exists */
+ 	int nerr;
+ 	struct edir excludeArray[MAX_EXCLUDES];
+-};
+-
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ void BUG_setfiles_globals_too_big(void);
+ #define INIT_G() do { \
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index 932bbec..1e8d6bc 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -34,7 +34,7 @@ struct globals {
+ 	struct sembuf SMrup[1]; // {0, -1, IPC_NOWAIT | SEM_UNDO},
+ 	struct sembuf SMrdn[2]; // {1, 0}, {0, +1, SEM_UNDO}
+ 	struct shbuf_ds *shbuf;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define SMrup (G.SMrup)
+ #define SMrdn (G.SMrdn)
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index feece99..970f5f7 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -157,7 +157,6 @@ struct globals {
+ 	/* File-name data */
+ 	char current_name[MAX_DEPTH * MINIX_NAME_MAX];
+ };
+-
+ #define G (*ptr_to_globals)
+ #if ENABLE_FEATURE_MINIX2
+ #define version2           (G.version2           )
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 80549d1..69e1e69 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -64,7 +64,7 @@
+ struct globals {
+ 	int root_major, root_minor;
+ 	char *subsystem;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define root_major (G.root_major)
+ #define root_minor (G.root_minor)
+diff --git a/util-linux/more.c b/util-linux/more.c
+index 076b400..55694e4 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -22,7 +22,7 @@ struct globals {
+ 	int cin_fileno;
+ 	struct termios initial_settings;
+ 	struct termios new_settings;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)bb_common_bufsiz1)
+ #define INIT_G() ((void)0)
+ #define initial_settings (G.initial_settings)
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 23a3459..0bad597 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -268,7 +268,7 @@ struct globals {
+ 	llist_t *fslist;
+ 	char getmntent_buf[1];
+ 
+-};
++} FIX_ALIASING;
+ enum { GETMNTENT_BUFSIZE = COMMON_BUFSIZE - offsetof(struct globals, getmntent_buf) };
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define nfs_mount_version (G.nfs_mount_version)
+diff --git a/util-linux/swaponoff.c b/util-linux/swaponoff.c
+index 33ad00a..f647a32 100644
+--- a/util-linux/swaponoff.c
++++ b/util-linux/swaponoff.c
+@@ -20,7 +20,7 @@
+ #if ENABLE_FEATURE_SWAPON_PRI
+ struct globals {
+ 	int flags;
+-};
++} FIX_ALIASING;
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define g_flags (G.flags)
+ #else

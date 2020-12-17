@@ -1,0 +1,287 @@
+2008-03-02 12:53:15 +0000
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 501a92b..a083114 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -17,7 +17,7 @@
+ 
+ /* Written by Jim Meyering.  */
+ 
+-/* Busyboxed by Denis Vlasenko
++/* Busyboxed by Denys Vlasenko
+ 
+ Based on od.c from coreutils-5.2.1
+ Top bloat sources:
+diff --git a/ipsvd/ipsvd_perhost.c b/ipsvd/ipsvd_perhost.c
+index d4c0d79..6075c0a 100644
+--- a/ipsvd/ipsvd_perhost.c
++++ b/ipsvd/ipsvd_perhost.c
+@@ -2,7 +2,7 @@
+  * which are released into public domain by the author.
+  * Homepage: http://smarden.sunsite.dk/ipsvd/
+  *
+- * Copyright (C) 2007 Denis Vlasenko.
++ * Copyright (C) 2007 Denys Vlasenko.
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+diff --git a/ipsvd/ipsvd_perhost.h b/ipsvd/ipsvd_perhost.h
+index afe2c29..9fc8cee 100644
+--- a/ipsvd/ipsvd_perhost.h
++++ b/ipsvd/ipsvd_perhost.h
+@@ -2,7 +2,7 @@
+  * which are released into public domain by the author.
+  * Homepage: http://smarden.sunsite.dk/ipsvd/
+  *
+- * Copyright (C) 2007 Denis Vlasenko.
++ * Copyright (C) 2007 Denys Vlasenko.
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index b3a2c7a..cb57e59 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -2,7 +2,7 @@
+  * which are released into public domain by the author.
+  * Homepage: http://smarden.sunsite.dk/ipsvd/
+  *
+- * Copyright (C) 2007 Denis Vlasenko.
++ * Copyright (C) 2007 Denys Vlasenko.
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+diff --git a/libbb/bb_basename.c b/libbb/bb_basename.c
+index e19156d..e6832f8 100644
+--- a/libbb/bb_basename.c
++++ b/libbb/bb_basename.c
+@@ -2,7 +2,7 @@
+ /*
+  * Utility routines.
+  *
+- * Copyright (C) 2007 Denis Vlasenko
++ * Copyright (C) 2007 Denys Vlasenko
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+diff --git a/libbb/bb_qsort.c b/libbb/bb_qsort.c
+new file mode 100644
+index 0000000..e8673ab
+--- /dev/null
++++ b/libbb/bb_qsort.c
+@@ -0,0 +1,20 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Wrapper for common string vector sorting operation
++ *
++ * Copyright (c) 2008 Denys Vlasenko
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
++
++#include "libbb.h"
++
++int bb_pstrcmp(const void *a, const void *b)
++{
++	return strcmp(*(char**)a, *(char**)b);
++}
++
++void qsort_string_vector(char **sv, unsigned count)
++{
++	qsort(sv, count, sizeof(char*), bb_pstrcmp);
++}
+diff --git a/libbb/makedev.c b/libbb/makedev.c
+index 81cd82b..efd5122 100644
+--- a/libbb/makedev.c
++++ b/libbb/makedev.c
+@@ -1,7 +1,7 @@
+ /*
+  * Utility routines.
+  *
+- * Copyright (C) 2006 Denis Vlasenko
++ * Copyright (C) 2006 Denys Vlasenko
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+diff --git a/libbb/printable.c b/libbb/printable.c
+index 2420a91..676758a 100644
+--- a/libbb/printable.c
++++ b/libbb/printable.c
+@@ -2,7 +2,7 @@
+ /*
+  * Utility routines.
+  *
+- * Copyright (C) 2007 Denis Vlasenko
++ * Copyright (C) 2007 Denys Vlasenko
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+diff --git a/libbb/signals.c b/libbb/signals.c
+index b46b595..1929cb8 100644
+--- a/libbb/signals.c
++++ b/libbb/signals.c
+@@ -4,7 +4,7 @@
+  *
+  * Copyright (C) 1999-2004 by Erik Andersen <andersen@codepoet.org>
+  * Copyright (C) 2006 Rob Landley
+- * Copyright (C) 2006 Denis Vlasenko
++ * Copyright (C) 2006 Denys Vlasenko
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+diff --git a/libbb/time.c b/libbb/time.c
+index 525032d..3aa0ee3 100644
+--- a/libbb/time.c
++++ b/libbb/time.c
+@@ -2,7 +2,7 @@
+ /*
+  * Utility routines.
+  *
+- * Copyright (C) 2007 Denis Vlasenko
++ * Copyright (C) 2007 Denys Vlasenko
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+diff --git a/libbb/udp_io.c b/libbb/udp_io.c
+index 7e48d32..2f02a13 100644
+--- a/libbb/udp_io.c
++++ b/libbb/udp_io.c
+@@ -2,7 +2,7 @@
+ /*
+  * Utility routines.
+  *
+- * Copyright (C) 2007 Denis Vlasenko
++ * Copyright (C) 2007 Denys Vlasenko
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 18e696a..ca7f941 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -4,7 +4,7 @@
+  *
+  * Copyright (C) 1999-2004 by Erik Andersen <andersen@codepoet.org>
+  * Copyright (C) 2006 Rob Landley
+- * Copyright (C) 2006 Denis Vlasenko
++ * Copyright (C) 2006 Denys Vlasenko
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+diff --git a/networking/isrv.c b/networking/isrv.c
+index 080c60f..66bb371 100644
+--- a/networking/isrv.c
++++ b/networking/isrv.c
+@@ -3,7 +3,7 @@
+  * Generic non-forking server infrastructure.
+  * Intended to make writing telnetd-type servers easier.
+  *
+- * Copyright (C) 2007 Denis Vlasenko
++ * Copyright (C) 2007 Denys Vlasenko
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+diff --git a/networking/isrv.h b/networking/isrv.h
+index c786770..370ed90 100644
+--- a/networking/isrv.h
++++ b/networking/isrv.h
+@@ -3,7 +3,7 @@
+  * Generic non-forking server infrastructure.
+  * Intended to make writing telnetd-type servers easier.
+  *
+- * Copyright (C) 2007 Denis Vlasenko
++ * Copyright (C) 2007 Denys Vlasenko
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+diff --git a/networking/isrv_identd.c b/networking/isrv_identd.c
+index dbdecba..3333857 100644
+--- a/networking/isrv_identd.c
++++ b/networking/isrv_identd.c
+@@ -2,7 +2,7 @@
+ /*
+  * Fake identd server.
+  *
+- * Copyright (C) 2007 Denis Vlasenko
++ * Copyright (C) 2007 Denys Vlasenko
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 7b70a4d..89d8ce4 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -25,7 +25,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ 
+-/* Busyboxed by Denis Vlasenko <vda.linux@googlemail.com> */
++/* Busyboxed by Denys Vlasenko <vda.linux@googlemail.com> */
+ /* Dependencies on runit_lib.c removed */
+ 
+ #include "libbb.h"
+diff --git a/runit/runit_lib.c b/runit/runit_lib.c
+index bedd540..f33619d 100644
+--- a/runit/runit_lib.c
++++ b/runit/runit_lib.c
+@@ -25,7 +25,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ 
+-/* Busyboxed by Denis Vlasenko <vda.linux@googlemail.com> */
++/* Busyboxed by Denys Vlasenko <vda.linux@googlemail.com> */
+ /* Collected into one file from runit's many tiny files */
+ /* TODO: review, eliminate unneeded stuff, move good stuff to libbb */
+ 
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 02dcf50..5d4e158 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -25,7 +25,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ 
+-/* Busyboxed by Denis Vlasenko <vda.linux@googlemail.com> */
++/* Busyboxed by Denys Vlasenko <vda.linux@googlemail.com> */
+ /* TODO: depends on runit_lib.c - review and reduce/eliminate */
+ 
+ #include <sys/poll.h>
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 3ff1d4c..0ab672e 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -25,7 +25,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ 
+-/* Busyboxed by Denis Vlasenko <vda.linux@googlemail.com> */
++/* Busyboxed by Denys Vlasenko <vda.linux@googlemail.com> */
+ /* TODO: depends on runit_lib.c - review and reduce/eliminate */
+ 
+ #include <sys/poll.h>
+diff --git a/runit/sv.c b/runit/sv.c
+index a89e244..141f7a8 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -150,7 +150,7 @@ Exit Codes
+     is 99. sv exits 100 on error.
+ */
+ 
+-/* Busyboxed by Denis Vlasenko <vda.linux@googlemail.com> */
++/* Busyboxed by Denys Vlasenko <vda.linux@googlemail.com> */
+ /* TODO: depends on runit_lib.c - review and reduce/eliminate */
+ 
+ #include <sys/poll.h>
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index d7da180..c69cb54 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -25,7 +25,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ 
+-/* Busyboxed by Denis Vlasenko <vda.linux@googlemail.com> */
++/* Busyboxed by Denys Vlasenko <vda.linux@googlemail.com> */
+ /* TODO: depends on runit_lib.c - review and reduce/eliminate */
+ 
+ #include <sys/poll.h>

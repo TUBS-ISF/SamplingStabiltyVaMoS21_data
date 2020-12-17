@@ -1,0 +1,127 @@
+2007-06-08 15:02:55 +0000
+diff --git a/applets/applets.c b/applets/applets.c
+index bd37043..f341242 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -577,21 +577,13 @@ static int busybox_main(char **argv)
+ 	}
+ 
+ 	if (ENABLE_FEATURE_INSTALLER && strcmp(argv[1], "--install") == 0) {
+-		int use_symbolic_links = 0;
+-		char *busybox;
+-
+-		/* to use symlinks, or not to use symlinks... */
+-		if (argv[2])
+-			if (strcmp(argv[2], "-s") == 0)
+-				use_symbolic_links = 1;
+-
+-		/* link */
+-		busybox = xmalloc_readlink_or_warn("/proc/self/exe");
++		const char *busybox;
++		busybox = xmalloc_readlink_or_warn(bb_busybox_exec_path);
+ 		if (!busybox)
+-			return 1;
+-		install_links(busybox, use_symbolic_links);
+-		if (ENABLE_FEATURE_CLEAN_UP)
+-			free(busybox);
++			busybox = bb_busybox_exec_path;
++		/* -s makes symlinks */
++		install_links(busybox,
++				 argv[2] && strcmp(argv[2], "-s") == 0);
+ 		return 0;
+ 	}
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index 1ba122a..a32a742 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -952,6 +952,7 @@ extern const char bb_path_securetty_file[];
+ extern const char bb_path_motd_file[];
+ extern const char bb_path_wtmp_file[];
+ extern const char bb_dev_null[];
++extern const char bb_busybox_exec_path[];
+ 
+ extern const int const_int_0;
+ extern const int const_int_1;
+diff --git a/libbb/execable.c b/libbb/execable.c
+index d843647..f679108 100644
+--- a/libbb/execable.c
++++ b/libbb/execable.c
+@@ -65,7 +65,7 @@ int exists_execable(const char *filename)
+  */
+ int bb_execvp(const char *file, char *const argv[])
+ {
+-	return execvp(find_applet_by_name(file) ? CONFIG_BUSYBOX_EXEC_PATH : file,
++	return execvp(find_applet_by_name(file) ? bb_busybox_exec_path : file,
+ 					argv);
+ }
+ #endif
+diff --git a/libbb/messages.c b/libbb/messages.c
+index fbd882c..16aaea5 100644
+--- a/libbb/messages.c
++++ b/libbb/messages.c
+@@ -37,8 +37,9 @@ const char bb_path_gshadow_file[] = "/etc/gshadow";
+ const char bb_path_nologin_file[] = "/etc/nologin";
+ const char bb_path_securetty_file[] = "/etc/securetty";
+ const char bb_path_motd_file[] = "/etc/motd";
+-const char bb_default_login_shell[] = LIBBB_DEFAULT_LOGIN_SHELL;
+ const char bb_dev_null[] = "/dev/null";
++const char bb_busybox_exec_path[] = CONFIG_BUSYBOX_EXEC_PATH;
++const char bb_default_login_shell[] = LIBBB_DEFAULT_LOGIN_SHELL;
+ 
+ const int const_int_0;
+ const int const_int_1 = 1;
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 3496287..cb4dee7 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -220,8 +220,8 @@ void forkexit_or_rexec(char **argv)
+ 	/* high-order bit of first char in argv[0] is a hidden
+ 	 * "we have (alrealy) re-execed, don't do it again" flag */
+ 	argv[0][0] |= 0x80;
+-	execv(CONFIG_BUSYBOX_EXEC_PATH, argv);
+-	bb_perror_msg_and_die("exec %s", CONFIG_BUSYBOX_EXEC_PATH);
++	execv(bb_busybox_exec_path, argv);
++	bb_perror_msg_and_die("exec %s", bb_busybox_exec_path);
+ }
+ #else
+ /* Dance around (void)...*/
+diff --git a/shell/ash.c b/shell/ash.c
+index ea10a65..29d8713 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -6471,7 +6471,7 @@ tryexec(char *cmd, char **argv, char **envp)
+ 				run_current_applet_and_exit(argv);
+ 			}
+ 			/* re-exec ourselves with the new arguments */
+-			execve(CONFIG_BUSYBOX_EXEC_PATH, argv, envp);
++			execve(bb_busybox_exec_path, argv, envp);
+ 			/* If they called chroot or otherwise made the binary no longer
+ 			 * executable, fall through */
+ 		}
+diff --git a/shell/hush.c b/shell/hush.c
+index 2a4076e..40bcafd 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1392,7 +1392,7 @@ static void pseudo_exec_argv(char **argv)
+ 			}
+ 			/* re-exec ourselves with the new arguments */
+ 			debug_printf_exec("re-execing applet '%s'\n", argv[0]);
+-			execvp(CONFIG_BUSYBOX_EXEC_PATH, argv);
++			execvp(bb_busybox_exec_path, argv);
+ 			/* If they called chroot or otherwise made the binary no longer
+ 			 * executable, fall through */
+ 		}
+diff --git a/shell/msh.c b/shell/msh.c
+index d81a001..aab805f 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -3062,7 +3062,7 @@ static const char *rexecve(char *c, char **v, char **envp)
+ 			/* We have to exec here since we vforked.  Running
+ 			 * run_applet_and_exit() won't work and bad things
+ 			 * will happen. */
+-			execve(CONFIG_BUSYBOX_EXEC_PATH, v, envp);
++			execve(bb_busybox_exec_path, v, envp);
+ 		}
+ 	}
+ 

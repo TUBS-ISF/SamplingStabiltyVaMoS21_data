@@ -1,0 +1,26 @@
+2007-10-16 10:47:27 +0000
+diff --git a/archival/bzip2.c b/archival/bzip2.c
+index e9a69c4..c750a05 100644
+--- a/archival/bzip2.c
++++ b/archival/bzip2.c
+@@ -182,6 +182,7 @@ int bzip2_main(int argc, char **argv)
+ 	 * --best        alias for -9
+ 	 */
+ 
++	opt_complementary = "s2"; /* -s means -2 (compatibility) */
+ 	/* Must match bbunzip's constants OPT_STDOUT, OPT_FORCE! */
+ 	opt = getopt32(argv, "cfv" USE_BUNZIP2("d") "123456789qzs" );
+ #if ENABLE_BUNZIP2 /* bunzip2_main may not be visible... */
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 96620d9..eb37011 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -415,7 +415,7 @@ int telnetd_main(int argc, char **argv)
+ 		/*bb_error_msg("listening for connections");*/
+ 		if (!(opt & OPT_FOREGROUND)) {
+ 			/* DAEMON_CHDIR_ROOT was giving inconsistent
+-			 * behavior with/wthout -F, -i */
++			 * behavior with/without -F, -i */
+ 			bb_daemonize_or_rexec(0 /*DAEMON_CHDIR_ROOT*/, argv);
+ 		}
+ 	}

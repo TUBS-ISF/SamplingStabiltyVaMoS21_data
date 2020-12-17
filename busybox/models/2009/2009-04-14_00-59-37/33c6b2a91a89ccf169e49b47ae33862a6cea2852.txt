@@ -1,0 +1,17 @@
+2009-04-14 00:59:37 +0000
+diff --git a/docs/busybox.net/subversion.html b/docs/busybox.net/subversion.html
+index f051422..2c4517a 100644
+--- a/docs/busybox.net/subversion.html
++++ b/docs/busybox.net/subversion.html
+@@ -18,9 +18,9 @@ grab a copy of the latest version of BusyBox using anonymous svn access:
+ svn co svn://busybox.net/trunk/busybox</pre>
+ 
+ <p>
+-The current <em>stable branch</em> can be obtained with
++The <em>stable branches</em> can be obtained with
+ <pre>
+-svn co svn://busybox.net/branches/busybox_1_12_stable
++svn co svn://busybox.net/branches/busybox_1_NN_stable
+ </pre>
+ 
+ <p>

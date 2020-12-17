@@ -1,0 +1,35 @@
+2008-02-19 23:42:22 +0000
+diff --git a/archival/Config.in b/archival/Config.in
+index 6f803f4..619cd1b 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -250,6 +250,7 @@ config FEATURE_TAR_LONG_OPTIONS
+ config FEATURE_TAR_UNAME_GNAME
+ 	bool "Enable use of user and group names"
+ 	default n
++	depends on TAR
+ 	help
+ 	  Enables use of user and group names in tar. This affects contents
+ 	  listings (-t) and preserving permissions when unpacking (-p).
+diff --git a/debianutils/Config.in b/debianutils/Config.in
+index 50ccac8..f1b73b6 100644
+--- a/debianutils/Config.in
++++ b/debianutils/Config.in
+@@ -50,7 +50,7 @@ config FEATURE_RUN_PARTS_FANCY
+ 
+ config START_STOP_DAEMON
+ 	bool "start-stop-daemon"
+-	default y
++	default n
+ 	help
+ 	  start-stop-daemon is used to control the creation and
+ 	  termination of system-level processes, usually the ones
+@@ -58,7 +58,7 @@ config START_STOP_DAEMON
+ 
+ config FEATURE_START_STOP_DAEMON_FANCY
+ 	bool "Support additional arguments"
+-	default y
++	default n
+ 	depends on START_STOP_DAEMON
+ 	help
+ 	  Support additional arguments.

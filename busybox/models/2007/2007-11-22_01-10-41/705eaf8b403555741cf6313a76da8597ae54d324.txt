@@ -1,0 +1,281 @@
+2007-11-22 01:10:41 +0000
+diff --git a/include/applets.h b/include/applets.h
+index f188232..757fa4a 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -300,6 +300,7 @@ USE_RX(APPLET(rx, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_SED(APPLET(sed, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_SELINUXENABLED(APPLET(selinuxenabled, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_SEQ(APPLET_NOFORK(seq, seq, _BB_DIR_USR_BIN, _BB_SUID_NEVER, seq))
++USE_SESTATUS(APPLET(sestatus, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_SETARCH(APPLET(setarch, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_SETCONSOLE(APPLET(setconsole, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_SETENFORCE(APPLET(setenforce, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index 3c8762e..5c03719 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3121,6 +3121,12 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "	FIRST LAST\n" \
+        "	FIRST INCREMENT LAST"
+ 
++#define sestatus_trivial_usage \
++       "[-vb]"
++#define sestatus_full_usage \
++       "-v	Verbose\n" \
++       "-b	Display current state of booleans"
++
+ #define setconsole_trivial_usage \
+        "[-r" USE_FEATURE_SETCONSOLE_LONG_OPTIONS("|--reset") "] [DEVICE]"
+ #define setconsole_full_usage \
+diff --git a/selinux/Config.in b/selinux/Config.in
+index c9b48fb..f764056 100644
+--- a/selinux/Config.in
++++ b/selinux/Config.in
+@@ -112,5 +112,12 @@ config SETSEBOOL
+ 	  Enable support for change boolean.
+ 	  semanage and -P option is not supported yet.
+ 
++config SESTATUS
++	bool "sestatus"
++	default n
++	depends on SELINUX
++	help
++	  Displays the status of SELinux.
++
+ endmenu
+ 
+diff --git a/selinux/Kbuild b/selinux/Kbuild
+index ce353e0..d0c190c 100644
+--- a/selinux/Kbuild
++++ b/selinux/Kbuild
+@@ -17,3 +17,4 @@ lib-$(CONFIG_SETENFORCE)	+= setenforce.o
+ lib-$(CONFIG_SETFILES)		+= setfiles.o
+ lib-$(CONFIG_RESTORECON)	+= setfiles.o
+ lib-$(CONFIG_SETSEBOOL)		+= setsebool.o
++lib-$(CONFIG_SESTATUS)		+= sestatus.o
+diff --git a/selinux/sestatus.c b/selinux/sestatus.c
+new file mode 100644
+index 0000000..cc17b17
+--- /dev/null
++++ b/selinux/sestatus.c
+@@ -0,0 +1,219 @@
++/*
++ * sestatus -- displays the status of SELinux
++ *
++ * Ported to busybox: KaiGai Kohei <kaigai@ak.jp.nec.com>
++ *
++ * Copyright (C) KaiGai Kohei <kaigai@ak.jp.nec.com>
++ */
++
++#include "libbb.h"
++
++extern char *selinux_mnt;
++
++#define OPT_VERBOSE	(1 << 0)
++#define OPT_BOOLEAN	(1 << 1)
++
++#define COL_FMT		"%-31s "
++
++static void display_boolean(void)
++{
++	char **bools;
++	int i, active, pending, nbool;
++
++	if (security_get_boolean_names(&bools, &nbool) < 0)
++		return;
++
++	puts("\nPolicy booleans:");
++
++	for (i = 0; i < nbool; i++) {
++		active = security_get_boolean_active(bools[i]);
++		if (active < 0)
++			goto skip;
++		pending = security_get_boolean_pending(bools[i]);
++		if (pending < 0)
++			goto skip;
++		printf(COL_FMT "%s",
++		       bools[i], active == 0 ? "off" : "on");
++		if (active != pending)
++			printf(" (%sactivate pending)", pending == 0 ? "in" : "");
++		bb_putchar('\n');
++ skip:
++		if (ENABLE_FEATURE_CLEAN_UP)
++			free(bools[i]);
++	}
++	if (ENABLE_FEATURE_CLEAN_UP)
++		free(bools);
++}
++
++static void read_config(char **pc, int npc, char **fc, int nfc)
++{
++	char buf[256];
++	FILE *fp;
++	int pc_ofs = 0, fc_ofs = 0, section = -1;
++
++	pc[0] = fc[0] = NULL;
++
++	fp = fopen("/etc/sestatus.conf", "rb");
++	if (fp == NULL)
++		return;
++
++	while (fgets(buf, sizeof(buf), fp) != NULL) {
++		int i, c;
++
++		/* kills comments */
++		for (i = 0; (c = buf[i]) != '\0'; i++) {
++			if (c == '#') {
++				buf[i] = '\0';
++				break;
++			}
++		}
++		trim(buf);
++
++		if (buf[0] == '\0')
++			continue;
++
++		if (strcmp(buf, "[process]") == 0) {
++			section = 1;
++		} else if (strcmp(buf, "[files]") == 0) {
++			section = 2;
++		} else {
++			if (section == 1 && pc_ofs < npc -1) {
++				pc[pc_ofs++] = strdup(buf);
++				pc[pc_ofs] = NULL;
++			} else if (section == 2 && fc_ofs < nfc - 1) {
++				fc[fc_ofs++] = strdup(buf);
++				fc[fc_ofs] = NULL;
++			}
++		}
++	}
++	fclose(fp);
++}
++
++static void display_verbose(void)
++{
++	security_context_t con, _con;
++	char *fc[50], *pc[50], *cterm;
++	pid_t *pidList;
++	int i;
++
++	read_config(pc, ARRAY_SIZE(pc), fc, ARRAY_SIZE(fc));
++
++	/* process contexts */
++	puts("\nProcess contexts:");
++
++	/* current context */
++	if (getcon(&con) == 0) {
++		printf(COL_FMT "%s\n", "Current context:", con);
++		if (ENABLE_FEATURE_CLEAN_UP)
++			freecon(con);
++	}
++	/* /sbin/init context */
++	if (getpidcon(1, &con) == 0) {
++		printf(COL_FMT "%s\n", "Init context:", con);
++		if (ENABLE_FEATURE_CLEAN_UP)
++			freecon(con);
++	}
++
++	/* [process] context */
++	for (i = 0; pc[i] != NULL; i++) {
++		pidList = find_pid_by_name(bb_basename(pc[i]));
++		if (pidList[0] > 0 && getpidcon(pidList[0], &con) == 0) {
++			printf(COL_FMT "%s\n", pc[i], con);
++			if (ENABLE_FEATURE_CLEAN_UP)
++				freecon(con);
++		}
++		if (ENABLE_FEATURE_CLEAN_UP)
++			free(pidList);
++	}
++
++	/* files contexts */
++	puts("\nFile contexts:");
++
++	cterm = ttyname(0);
++	puts(cterm);
++	if (cterm && lgetfilecon(cterm, &con) >= 0) {
++		printf(COL_FMT "%s\n", "Controlling term:", con);
++		if (ENABLE_FEATURE_CLEAN_UP)
++			freecon(con);
++	}
++
++	for (i=0; fc[i] != NULL; i++) {
++		struct stat stbuf;
++
++		if (lgetfilecon(fc[i], &con) < 0)
++			continue;
++		if (lstat(fc[i], &stbuf) == 0) {
++			if (S_ISLNK(stbuf.st_mode)) {
++				if (getfilecon(fc[i], &_con) >= 0) {
++					printf(COL_FMT "%s -> %s\n", fc[i], _con, con);
++					if (ENABLE_FEATURE_CLEAN_UP)
++						freecon(_con);
++				}
++			} else {
++				printf(COL_FMT "%s\n", fc[i], con);
++			}
++		}
++		if (ENABLE_FEATURE_CLEAN_UP)
++			freecon(con);
++	}
++}
++
++int sestatus_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int sestatus_main(int argc, char **argv)
++{
++	unsigned opts;
++	const char *pol_path;
++	int rc;
++
++	opt_complementary = "?0";	/* no arguments are required. */
++	opts = getopt32(argv, "vb");
++
++	/* SELinux status: line */
++	rc = is_selinux_enabled();
++	if (rc < 0)
++		goto error;
++	printf(COL_FMT "%s\n", "SELinux status:",
++	       rc == 1 ? "enabled" : "disabled");
++
++	/* SELinuxfs mount: line */
++	if (!selinux_mnt)
++		goto error;
++	printf(COL_FMT "%s\n", "SELinuxfs mount:",
++	       selinux_mnt);
++
++	/* Current mode: line */
++	rc = security_getenforce();
++	if (rc < 0)
++		goto error;
++	printf(COL_FMT "%s\n", "Current mode:",
++	       rc == 0 ? "permissive" : "enforcing");
++
++	/* Mode from config file: line */
++	if (selinux_getenforcemode(&rc) != 0)
++		goto error;
++	printf(COL_FMT "%s\n", "Mode from config file:",
++	       rc < 0 ? "disabled" : (rc == 0 ? "permissive" : "enforcing"));
++
++	/* Policy version: line */
++	rc = security_policyvers();
++	if (rc < 0)
++		goto error;
++	printf(COL_FMT "%u\n", "Policy version:", rc);
++
++	/* Policy from config file: line */
++	pol_path = selinux_policy_root();
++	if (!pol_path)
++		goto error;
++	printf(COL_FMT "%s\n", "Policy from config file:",
++	       bb_basename(pol_path));
++
++	if (opts & OPT_BOOLEAN)
++		display_boolean();
++	if (opts & OPT_VERBOSE)
++		display_verbose();
++
++	return 0;
++
++  error:
++	bb_perror_msg_and_die("libselinux returns unknown state");
++}

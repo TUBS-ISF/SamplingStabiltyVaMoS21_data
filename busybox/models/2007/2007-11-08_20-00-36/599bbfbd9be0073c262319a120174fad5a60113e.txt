@@ -1,0 +1,103 @@
+2007-11-08 20:00:36 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 0170085..1adac84 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -260,10 +260,10 @@ DIR *warn_opendir(const char *path);
+ 
+ /* UNUSED: char *xmalloc_realpath(const char *path); */
+ char *xmalloc_readlink(const char *path);
+-char *xmalloc_readlink_follow(const char *path);
+ char *xmalloc_readlink_or_warn(const char *path);
+ char *xrealloc_getcwd_or_warn(char *cwd);
+ 
++char *xmalloc_follow_symlinks(const char *path);
+ 
+ //TODO: signal(sid, f) is the same? then why?
+ extern void sig_catch(int,void (*)(int));
+diff --git a/libbb/update_passwd.c b/libbb/update_passwd.c
+index e99db40..d10e863 100644
+--- a/libbb/update_passwd.c
++++ b/libbb/update_passwd.c
+@@ -52,7 +52,7 @@ int update_passwd(const char *filename, const char *username,
+ 	int cnt = 0;
+ 	int ret = -1; /* failure */
+ 
+-	filename = xmalloc_readlink_follow(filename);
++	filename = xmalloc_follow_symlinks(filename);
+ 	if (filename == NULL)
+ 		return -1;
+ 
+diff --git a/libbb/xreadlink.c b/libbb/xreadlink.c
+index f7948cb..a5f7eb8 100644
+--- a/libbb/xreadlink.c
++++ b/libbb/xreadlink.c
+@@ -33,13 +33,16 @@ char *xmalloc_readlink(const char *path)
+ }
+ 
+ /*
+- * this routine is not the same as realpath(), which canonicalizes
+- * the given path completely.  this routine only follows trailing
+- * symlinks until a real file is reached, and returns its name. 
+- * intermediate symlinks are not expanded.  as above, a malloced
+- * char* is returned, which must be freed.
++ * this routine is not the same as realpath(), which
++ * canonicalizes the given path completely.  this routine only
++ * follows trailing symlinks until a real file is reached, and
++ * returns its name.  if the path ends in a dangling link, or if
++ * the target doesn't exist, the path is returned in any case. 
++ * intermediate symlinks in the path are not expanded -- only
++ * those at the tail.
++ * a malloced char* is returned, which must be freed by the caller.
+  */
+-char *xmalloc_readlink_follow(const char *path)
++char *xmalloc_follow_symlinks(const char *path)
+ {
+ 	char *buf;
+ 	char *lpc;
+@@ -47,23 +50,27 @@ char *xmalloc_readlink_follow(const char *path)
+ 	int bufsize;
+ 	int looping = MAXSYMLINKS + 1;
+ 
+-	linkpath = xstrdup(path);
++	buf = xstrdup(path);
+ 	goto jump_in;
+ 
+ 	while (1) {
+-		if (!--looping) {
+-			free(linkpath);
+-			free(buf);
+-			return NULL;
+-		}
++
+ 		linkpath = xmalloc_readlink(buf);
+ 		if (!linkpath) {
+-			if (errno == EINVAL) /* not a symlink */
++			/* not a symlink, or doesn't exist */
++			if (errno == EINVAL || errno == ENOENT)
+ 				return buf;
+ 			free(buf);
+ 			return NULL;
+ 		} 
+-		if (linkpath[0] != '/') {
++
++		if (!--looping) {
++			free(linkpath);
++			free(buf);
++			return NULL;
++		}
++
++		if (*linkpath != '/') {
+ 			bufsize += strlen(linkpath);
+ 			buf = xrealloc(buf, bufsize);
+ 			lpc = bb_get_last_path_component_strip(buf);
+@@ -71,8 +78,8 @@ char *xmalloc_readlink_follow(const char *path)
+ 			free(linkpath);
+ 		} else {
+ 			free(buf);
+- jump_in:
+ 			buf = linkpath;
++ jump_in:
+ 			bufsize = strlen(buf) + 1;
+ 		}
+ 	}

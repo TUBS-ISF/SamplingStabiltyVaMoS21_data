@@ -1,0 +1,1699 @@
+2007-10-14 00:43:01 +0000
+diff --git a/archival/bz/blocksort.c b/archival/bz/blocksort.c
+index 7d2856b..ec8a2a5 100644
+--- a/archival/bz/blocksort.c
++++ b/archival/bz/blocksort.c
+@@ -25,6 +25,34 @@ in the file LICENSE.
+ 
+ /* #include "bzlib_private.h" */
+ 
++#define mswap(zz1, zz2) \
++{ \
++	int32_t zztmp = zz1; \
++	zz1 = zz2; \
++	zz2 = zztmp; \
++}
++
++static
++/* No measurable speed gain with inlining */
++/* ALWAYS_INLINE */
++void mvswap(uint32_t* ptr, int32_t zzp1, int32_t zzp2, int32_t zzn)
++{
++	while (zzn > 0) {
++		mswap(ptr[zzp1], ptr[zzp2]);
++		zzp1++;
++		zzp2++;
++		zzn--;
++	}
++}
++
++static
++ALWAYS_INLINE
++int32_t mmin(int32_t a, int32_t b)
++{
++	return (a < b) ? a : b;
++}
++
++
+ /*---------------------------------------------*/
+ /*--- Fallback O(N log(N)^2) sorting        ---*/
+ /*--- algorithm, for repetitive blocks      ---*/
+@@ -64,29 +92,6 @@ void fallbackSimpleSort(uint32_t* fmap,
+ 
+ 
+ /*---------------------------------------------*/
+-#define fswap(zz1, zz2) \
+-{ \
+-	int32_t zztmp = zz1; \
+-	zz1 = zz2; \
+-	zz2 = zztmp; \
+-}
+-
+-#define fvswap(zzp1, zzp2, zzn) \
+-{ \
+-	int32_t yyp1 = (zzp1); \
+-	int32_t yyp2 = (zzp2); \
+-	int32_t yyn  = (zzn); \
+-	while (yyn > 0) { \
+-		fswap(fmap[yyp1], fmap[yyp2]); \
+-		yyp1++; \
+-		yyp2++; \
+-		yyn--; \
+-	} \
+-}
+-
+-
+-#define fmin(a,b) ((a) < (b)) ? (a) : (b)
+-
+ #define fpush(lz,hz) { \
+ 	stackLo[sp] = lz; \
+ 	stackHi[sp] = hz; \
+@@ -102,7 +107,6 @@ void fallbackSimpleSort(uint32_t* fmap,
+ #define FALLBACK_QSORT_SMALL_THRESH 10
+ #define FALLBACK_QSORT_STACK_SIZE   100
+ 
+-
+ static
+ void fallbackQSort3(uint32_t* fmap,
+ 		uint32_t* eclass,
+@@ -153,7 +157,7 @@ void fallbackQSort3(uint32_t* fmap,
+ 				if (unLo > unHi) break;
+ 				n = (int32_t)eclass[fmap[unLo]] - (int32_t)med;
+ 				if (n == 0) {
+-					fswap(fmap[unLo], fmap[ltLo]);
++					mswap(fmap[unLo], fmap[ltLo]);
+ 					ltLo++;
+ 					unLo++;
+ 					continue;
+@@ -165,7 +169,7 @@ void fallbackQSort3(uint32_t* fmap,
+ 				if (unLo > unHi) break;
+ 				n = (int32_t)eclass[fmap[unHi]] - (int32_t)med;
+ 				if (n == 0) {
+-					fswap(fmap[unHi], fmap[gtHi]);
++					mswap(fmap[unHi], fmap[gtHi]);
+ 					gtHi--; unHi--;
+ 					continue;
+ 				};
+@@ -173,15 +177,15 @@ void fallbackQSort3(uint32_t* fmap,
+ 				unHi--;
+ 			}
+ 			if (unLo > unHi) break;
+-			fswap(fmap[unLo], fmap[unHi]); unLo++; unHi--;
++			mswap(fmap[unLo], fmap[unHi]); unLo++; unHi--;
+ 		}
+ 
+ 		AssertD(unHi == unLo-1, "fallbackQSort3(2)");
+ 
+ 		if (gtHi < ltLo) continue;
+ 
+-		n = fmin(ltLo-lo, unLo-ltLo); fvswap(lo, unLo-n, n);
+-		m = fmin(hi-gtHi, gtHi-unHi); fvswap(unLo, hi-m+1, m);
++		n = mmin(ltLo-lo, unLo-ltLo); mvswap(fmap, lo, unLo-n, n);
++		m = mmin(hi-gtHi, gtHi-unHi); mvswap(fmap, unLo, hi-m+1, m);
+ 
+ 		n = lo + unLo - ltLo - 1;
+ 		m = hi - (gtHi - unHi) + 1;
+@@ -196,11 +200,8 @@ void fallbackQSort3(uint32_t* fmap,
+ 	}
+ }
+ 
+-#undef fmin
+ #undef fpush
+ #undef fpop
+-#undef fswap
+-#undef fvswap
+ #undef FALLBACK_QSORT_SMALL_THRESH
+ #undef FALLBACK_QSORT_STACK_SIZE
+ 
+@@ -209,11 +210,11 @@ void fallbackQSort3(uint32_t* fmap,
+ /* Pre:
+  *	nblock > 0
+  *	eclass exists for [0 .. nblock-1]
+- *	((UChar*)eclass) [0 .. nblock-1] holds block
++ *	((uint8_t*)eclass) [0 .. nblock-1] holds block
+  *	ptr exists for [0 .. nblock-1]
+  *
+  * Post:
+- *	((UChar*)eclass) [0 .. nblock-1] holds block
++ *	((uint8_t*)eclass) [0 .. nblock-1] holds block
+  *	All other areas of eclass destroyed
+  *	fmap [0 .. nblock-1] holds sorted order
+  *	bhtab[0 .. 2+(nblock/32)] destroyed
+@@ -236,7 +237,7 @@ void fallbackSort(uint32_t* fmap,
+ 	int32_t H, i, j, k, l, r, cc, cc1;
+ 	int32_t nNotDone;
+ 	int32_t nBhtab;
+-	UChar* eclass8 = (UChar*)eclass;
++	uint8_t* eclass8 = (uint8_t*)eclass;
+ 
+ 	/*
+ 	 * Initial 1-char radix sort to generate
+@@ -287,7 +288,7 @@ void fallbackSort(uint32_t* fmap,
+ 		r = -1;
+ 		while (1) {
+ 
+-	 /*-- find the next non-singleton bucket --*/
++		/*-- find the next non-singleton bucket --*/
+ 			k = r + 1;
+ 			while (ISSET_BH(k) && UNALIGNED_BH(k))
+ 				k++;
+@@ -340,7 +341,7 @@ void fallbackSort(uint32_t* fmap,
+ 		while (ftabCopy[j] == 0)
+ 			j++;
+ 		ftabCopy[j]--;
+-		eclass8[fmap[i]] = (UChar)j;
++		eclass8[fmap[i]] = (uint8_t)j;
+ 	}
+ 	AssertH(j < 256, 1005);
+ }
+@@ -360,133 +361,83 @@ void fallbackSort(uint32_t* fmap,
+ 
+ /*---------------------------------------------*/
+ static
+-inline
+-Bool mainGtU(
++NOINLINE
++int mainGtU(
+ 		uint32_t  i1,
+ 		uint32_t  i2,
+-		UChar*    block,
++		uint8_t*  block,
+ 		uint16_t* quadrant,
+ 		uint32_t  nblock,
+ 		int32_t*  budget)
+ {
+ 	int32_t  k;
+-	UChar  c1, c2;
++	uint8_t  c1, c2;
+ 	uint16_t s1, s2;
+ 
+-///unrolling
+-	AssertD(i1 != i2, "mainGtU");
+-	/* 1 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 2 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 3 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 4 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 5 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 6 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 7 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 8 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 9 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 10 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 11 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
+-	/* 12 */
+-	c1 = block[i1]; c2 = block[i2];
+-	if (c1 != c2) return (c1 > c2);
+-	i1++; i2++;
++/* Loop unrolling here is actually very useful
++ * (generated code is much simpler),
++ * code size increase is only 270 bytes (i386)
++ * but speeds up compression 10% overall
++ */
+ 
+-	k = nblock + 8;
++#if CONFIG_BZIP2_FEATURE_SPEED >= 1
+ 
+-///unrolling
+-	do {
+-		/* 1 */
+-		c1 = block[i1]; c2 = block[i2];
+-		if (c1 != c2) return (c1 > c2);
+-		s1 = quadrant[i1]; s2 = quadrant[i2];
+-		if (s1 != s2) return (s1 > s2);
+-		i1++; i2++;
+-		/* 2 */
+-		c1 = block[i1]; c2 = block[i2];
+-		if (c1 != c2) return (c1 > c2);
+-		s1 = quadrant[i1]; s2 = quadrant[i2];
+-		if (s1 != s2) return (s1 > s2);
+-		i1++; i2++;
+-		/* 3 */
+-		c1 = block[i1]; c2 = block[i2];
+-		if (c1 != c2) return (c1 > c2);
+-		s1 = quadrant[i1]; s2 = quadrant[i2];
+-		if (s1 != s2) return (s1 > s2);
+-		i1++; i2++;
+-		/* 4 */
+-		c1 = block[i1]; c2 = block[i2];
+-		if (c1 != c2) return (c1 > c2);
+-		s1 = quadrant[i1]; s2 = quadrant[i2];
+-		if (s1 != s2) return (s1 > s2);
+-		i1++; i2++;
+-		/* 5 */
+-		c1 = block[i1]; c2 = block[i2];
+-		if (c1 != c2) return (c1 > c2);
+-		s1 = quadrant[i1]; s2 = quadrant[i2];
+-		if (s1 != s2) return (s1 > s2);
+-		i1++; i2++;
+-		/* 6 */
+-		c1 = block[i1]; c2 = block[i2];
+-		if (c1 != c2) return (c1 > c2);
+-		s1 = quadrant[i1]; s2 = quadrant[i2];
+-		if (s1 != s2) return (s1 > s2);
+-		i1++; i2++;
+-		/* 7 */
+-		c1 = block[i1]; c2 = block[i2];
+-		if (c1 != c2) return (c1 > c2);
+-		s1 = quadrant[i1]; s2 = quadrant[i2];
+-		if (s1 != s2) return (s1 > s2);
+-		i1++; i2++;
+-		/* 8 */
++#define TIMES_8(code) \
++	code; code; code; code; \
++	code; code; code; code;
++#define TIMES_12(code) \
++	code; code; code; code; \
++	code; code; code; code; \
++	code; code; code; code;
++
++#else
++
++#define TIMES_8(code) \
++{ \
++	int nn = 8; \
++	do { \
++		code; \
++	} while (--nn); \
++}
++#define TIMES_12(code) \
++{ \
++	int nn = 12; \
++	do { \
++		code; \
++	} while (--nn); \
++}
++
++#endif
++
++	AssertD(i1 != i2, "mainGtU");
++	TIMES_12(
+ 		c1 = block[i1]; c2 = block[i2];
+ 		if (c1 != c2) return (c1 > c2);
+-		s1 = quadrant[i1]; s2 = quadrant[i2];
+-		if (s1 != s2) return (s1 > s2);
+ 		i1++; i2++;
++	)
++
++	k = nblock + 8;
++
++	do {
++		TIMES_8(
++			c1 = block[i1]; c2 = block[i2];
++			if (c1 != c2) return (c1 > c2);
++			s1 = quadrant[i1]; s2 = quadrant[i2];
++			if (s1 != s2) return (s1 > s2);
++			i1++; i2++;
++		)
+ 
+ 		if (i1 >= nblock) i1 -= nblock;
+ 		if (i2 >= nblock) i2 -= nblock;
+ 
+-		k -= 8;
+ 		(*budget)--;
++		k -= 8;
+ 	} while (k >= 0);
+ 
+ 	return False;
+ }
+-
++#undef TIMES_8
++#undef TIMES_12
+ 
+ /*---------------------------------------------*/
+ /*
+@@ -504,7 +455,7 @@ const int32_t incs[14] = {
+ 
+ static
+ void mainSimpleSort(uint32_t* ptr,
+-		UChar*  block,
++		uint8_t*  block,
+ 		uint16_t* quadrant,
+ 		int32_t   nblock,
+ 		int32_t   lo,
+@@ -527,8 +478,6 @@ void mainSimpleSort(uint32_t* ptr,
+ 
+ 		i = lo + h;
+ 		while (1) {
+-
+-///unrolling
+ 			/*-- copy 1 --*/
+ 			if (i > hi) break;
+ 			v = ptr[i];
+@@ -541,6 +490,8 @@ void mainSimpleSort(uint32_t* ptr,
+ 			ptr[j] = v;
+ 			i++;
+ 
++/* 1.5% overall speedup, +290 bytes */
++#if CONFIG_BZIP2_FEATURE_SPEED >= 3
+ 			/*-- copy 2 --*/
+ 			if (i > hi) break;
+ 			v = ptr[i];
+@@ -557,14 +508,14 @@ void mainSimpleSort(uint32_t* ptr,
+ 			if (i > hi) break;
+ 			v = ptr[i];
+ 			j = i;
+-			while (mainGtU (ptr[j-h]+d, v+d, block, quadrant, nblock, budget)) {
++			while (mainGtU(ptr[j-h]+d, v+d, block, quadrant, nblock, budget)) {
+ 				ptr[j] = ptr[j-h];
+ 				j = j - h;
+ 				if (j <= (lo + h - 1)) break;
+ 			}
+ 			ptr[j] = v;
+ 			i++;
+-
++#endif
+ 			if (*budget < 0) return;
+ 		}
+ 	}
+@@ -580,36 +531,17 @@ void mainSimpleSort(uint32_t* ptr,
+  * Sedgewick and Jon L. Bentley.
+  */
+ 
+-#define mswap(zz1, zz2) \
+-{ \
+-	int32_t zztmp = zz1; \
+-	zz1 = zz2; \
+-	zz2 = zztmp; \
+-}
+-
+-#define mvswap(zzp1, zzp2, zzn) \
+-{ \
+-	int32_t yyp1 = (zzp1); \
+-	int32_t yyp2 = (zzp2); \
+-	int32_t yyn  = (zzn); \
+-	while (yyn > 0) { \
+-		mswap(ptr[yyp1], ptr[yyp2]); \
+-		yyp1++; \
+-		yyp2++; \
+-		yyn--; \
+-	} \
+-}
+-
+ static
+-inline
+-UChar mmed3(UChar a, UChar b, UChar c)
++ALWAYS_INLINE
++uint8_t mmed3(uint8_t a, uint8_t b, uint8_t c)
+ {
+-	UChar t;
++	uint8_t t;
+ 	if (a > b) {
+ 		t = a;
+ 		a = b;
+ 		b = t;
+ 	};
++	/* here b >= a */
+ 	if (b > c) {
+ 		b = c;
+ 		if (a > b)
+@@ -618,8 +550,6 @@ UChar mmed3(UChar a, UChar b, UChar c)
+ 	return b;
+ }
+ 
+-#define mmin(a,b) ((a) < (b)) ? (a) : (b)
+-
+ #define mpush(lz,hz,dz) \
+ { \
+ 	stackLo[sp] = lz; \
+@@ -636,8 +566,7 @@ UChar mmed3(UChar a, UChar b, UChar c)
+ 	dz = stackD [sp]; \
+ }
+ 
+-
+-#define mnextsize(az) (nextHi[az]-nextLo[az])
++#define mnextsize(az) (nextHi[az] - nextLo[az])
+ 
+ #define mnextswap(az,bz) \
+ { \
+@@ -653,7 +582,7 @@ UChar mmed3(UChar a, UChar b, UChar c)
+ 
+ static
+ void mainQSort3(uint32_t* ptr,
+-		UChar*    block,
++		uint8_t*  block,
+ 		uint16_t* quadrant,
+ 		int32_t   nblock,
+ 		int32_t   loSt,
+@@ -687,7 +616,6 @@ void mainQSort3(uint32_t* ptr,
+ 				return;
+ 			continue;
+ 		}
+-
+ 		med = (int32_t)	mmed3(block[ptr[lo          ] + d],
+ 		                      block[ptr[hi          ] + d],
+ 		                      block[ptr[(lo+hi) >> 1] + d]);
+@@ -736,8 +664,8 @@ void mainQSort3(uint32_t* ptr,
+ 			continue;
+ 		}
+ 
+-		n = mmin(ltLo-lo, unLo-ltLo); mvswap(lo, unLo-n, n);
+-		m = mmin(hi-gtHi, gtHi-unHi); mvswap(unLo, hi-m+1, m);
++		n = mmin(ltLo-lo, unLo-ltLo); mvswap(ptr, lo, unLo-n, n);
++		m = mmin(hi-gtHi, gtHi-unHi); mvswap(ptr, unLo, hi-m+1, m);
+ 
+ 		n = lo + unLo - ltLo - 1;
+ 		m = hi - (gtHi - unHi) + 1;
+@@ -746,24 +674,21 @@ void mainQSort3(uint32_t* ptr,
+ 		nextLo[1] = m;   nextHi[1] = hi;  nextD[1] = d;
+ 		nextLo[2] = n+1; nextHi[2] = m-1; nextD[2] = d+1;
+ 
+-		if (mnextsize(0) < mnextsize(1)) mnextswap(0,1);
+-		if (mnextsize(1) < mnextsize(2)) mnextswap(1,2);
+-		if (mnextsize(0) < mnextsize(1)) mnextswap(0,1);
++		if (mnextsize(0) < mnextsize(1)) mnextswap(0, 1);
++		if (mnextsize(1) < mnextsize(2)) mnextswap(1, 2);
++		if (mnextsize(0) < mnextsize(1)) mnextswap(0, 1);
+ 
+ 		AssertD (mnextsize(0) >= mnextsize(1), "mainQSort3(8)");
+ 		AssertD (mnextsize(1) >= mnextsize(2), "mainQSort3(9)");
+ 
+-		mpush (nextLo[0], nextHi[0], nextD[0]);
+-		mpush (nextLo[1], nextHi[1], nextD[1]);
+-		mpush (nextLo[2], nextHi[2], nextD[2]);
++		mpush(nextLo[0], nextHi[0], nextD[0]);
++		mpush(nextLo[1], nextHi[1], nextD[1]);
++		mpush(nextLo[2], nextHi[2], nextD[2]);
+ 	}
+ }
+ 
+-#undef mswap
+-#undef mvswap
+ #undef mpush
+ #undef mpop
+-#undef mmin
+ #undef mnextsize
+ #undef mnextswap
+ #undef MAIN_QSORT_SMALL_THRESH
+@@ -775,11 +700,11 @@ void mainQSort3(uint32_t* ptr,
+ /* Pre:
+  * 	nblock > N_OVERSHOOT
+  * 	block32 exists for [0 .. nblock-1 +N_OVERSHOOT]
+- * 	((UChar*)block32) [0 .. nblock-1] holds block
++ * 	((uint8_t*)block32) [0 .. nblock-1] holds block
+  * 	ptr exists for [0 .. nblock-1]
+  *
+  * Post:
+- * 	((UChar*)block32) [0 .. nblock-1] holds block
++ * 	((uint8_t*)block32) [0 .. nblock-1] holds block
+  * 	All other areas of block32 destroyed
+  * 	ftab[0 .. 65536] destroyed
+  * 	ptr [0 .. nblock-1] holds sorted order
+@@ -792,7 +717,7 @@ void mainQSort3(uint32_t* ptr,
+ 
+ static NOINLINE
+ void mainSort(uint32_t*   ptr,
+-		UChar*    block,
++		uint8_t*  block,
+ 		uint16_t* quadrant,
+ 		uint32_t* ftab,
+ 		int32_t   nblock,
+@@ -800,10 +725,10 @@ void mainSort(uint32_t*   ptr,
+ {
+ 	int32_t  i, j, k, ss, sb;
+ 	int32_t  runningOrder[256];
+-	Bool   bigDone[256];
++	Bool     bigDone[256];
+ 	int32_t  copyStart[256];
+ 	int32_t  copyEnd  [256];
+-	UChar  c1;
++	uint8_t  c1;
+ 	int32_t  numQSorted;
+ 	uint16_t s;
+ 
+@@ -813,7 +738,8 @@ void mainSort(uint32_t*   ptr,
+ 
+ 	j = block[0] << 8;
+ 	i = nblock-1;
+-#if 0
++/* 3%, +300 bytes */
++#if CONFIG_BZIP2_FEATURE_SPEED >= 2
+ 	for (; i >= 3; i -= 4) {
+ 		quadrant[i] = 0;
+ 		j = (j >> 8) |(((uint16_t)block[i]) << 8);
+@@ -842,11 +768,12 @@ void mainSort(uint32_t*   ptr,
+ 	}
+ 
+ 	/*-- Complete the initial radix sort --*/
+-	for (i = 1; i <= 65536; i++) ftab[i] += ftab[i-1];
++	for (i = 1; i <= 65536; i++)
++		ftab[i] += ftab[i-1];
+ 
+ 	s = block[0] << 8;
+ 	i = nblock-1;
+-#if 0
++#if CONFIG_BZIP2_FEATURE_SPEED >= 2
+ 	for (; i >= 3; i -= 4) {
+ 		s = (s >> 8) | (block[i] << 8);
+ 		j = ftab[s] -1;
+@@ -940,8 +867,8 @@ void mainSort(uint32_t*   ptr,
+ 							ptr, block, quadrant, nblock,
+ 							lo, hi, BZ_N_RADIX, budget
+ 						);
+-						numQSorted += (hi - lo + 1);
+ 						if (*budget < 0) return;
++						numQSorted += (hi - lo + 1);
+ 					}
+ 				}
+ 				ftab[sb] |= SETMASK;
+@@ -980,14 +907,12 @@ void mainSort(uint32_t*   ptr,
+ 			}
+ 		}
+ 
+-		AssertH((copyStart[ss]-1 == copyEnd[ss])
+-					 ||
+-					/* Extremely rare case missing in bzip2-1.0.0 and 1.0.1.
+-					 * Necessity for this case is demonstrated by compressing
+-					 * a sequence of approximately 48.5 million of character
+-					 * 251; 1.0.0/1.0.1 will then die here. */
+-					(copyStart[ss] == 0 && copyEnd[ss] == nblock-1),
+-					1007)
++		/* Extremely rare case missing in bzip2-1.0.0 and 1.0.1.
++		 * Necessity for this case is demonstrated by compressing
++		 * a sequence of approximately 48.5 million of character
++		 * 251; 1.0.0/1.0.1 will then die here. */
++		AssertH((copyStart[ss]-1 == copyEnd[ss]) \
++		     || (copyStart[ss] == 0 && copyEnd[ss] == nblock-1), 1007);
+ 
+ 		for (j = 0; j <= 255; j++)
+ 			ftab[(j << 8) + ss] |= SETMASK;
+@@ -1062,11 +987,11 @@ void mainSort(uint32_t*   ptr,
+ /* Pre:
+  *	nblock > 0
+  *	arr2 exists for [0 .. nblock-1 +N_OVERSHOOT]
+- *	  ((UChar*)arr2)[0 .. nblock-1] holds block
++ *	  ((uint8_t*)arr2)[0 .. nblock-1] holds block
+  *	arr1 exists for [0 .. nblock-1]
+  *
+  * Post:
+- *	((UChar*)arr2) [0 .. nblock-1] holds block
++ *	((uint8_t*)arr2) [0 .. nblock-1] holds block
+  *	All other areas of block destroyed
+  *	ftab[0 .. 65536] destroyed
+  *	arr1[0 .. nblock-1] holds sorted order
+@@ -1075,11 +1000,11 @@ static NOINLINE
+ void BZ2_blockSort(EState* s)
+ {
+ 	/* In original bzip2 1.0.4, it's a parameter, but 30
+-	 * should work ok. */
++	 * (which was the default) should work ok. */
+ 	enum { wfact = 30 };
+ 
+ 	uint32_t* ptr    = s->ptr;
+-	UChar*    block  = s->block;
++	uint8_t*  block  = s->block;
+ 	uint32_t* ftab   = s->ftab;
+ 	int32_t   nblock = s->nblock;
+ 	uint16_t* quadrant;
+diff --git a/archival/bz/bzlib.c b/archival/bz/bzlib.c
+index 3125bb0..57a6974 100644
+--- a/archival/bz/bzlib.c
++++ b/archival/bz/bzlib.c
+@@ -40,25 +40,27 @@ in the file LICENSE.
+ /*---------------------------------------------------*/
+ 
+ /*---------------------------------------------------*/
+-#ifndef BZ_NO_STDIO
+-static void bz_assert_fail(int errcode)
++#if BZ_LIGHT_DEBUG
++static
++void bz_assert_fail(int errcode)
+ {
+ 	/* if (errcode == 1007) bb_error_msg_and_die("probably bad RAM"); */
+-	bb_error_msg_and_die("bzip2 internal error %d", errcode);
++	bb_error_msg_and_die("internal error %d", errcode);
+ }
+ #endif
+ 
+-
+ /*---------------------------------------------------*/
+ static
+ void prepare_new_block(EState* s)
+ {
+-	int32_t i;
++	int i;
+ 	s->nblock = 0;
+ 	s->numZ = 0;
+ 	s->state_out_pos = 0;
+ 	BZ_INITIALISE_CRC(s->blockCRC);
+-	for (i = 0; i < 256; i++) s->inUse[i] = False;
++	/* inlined memset would be nice to have here */
++	for (i = 0; i < 256; i++)
++		s->inUse[i] = 0;
+ 	s->blockNo++;
+ }
+ 
+@@ -97,9 +99,11 @@ void BZ2_bzCompressInit(bz_stream *strm, int blockSize100k)
+ 	s->mtfv  = (uint16_t*)s->arr1;
+ 	s->ptr   = (uint32_t*)s->arr1;
+ 	s->arr2  = xmalloc((n + BZ_N_OVERSHOOT) * sizeof(uint32_t));
+-	s->block = (UChar*)s->arr2;
++	s->block = (uint8_t*)s->arr2;
+ 	s->ftab  = xmalloc(65537                * sizeof(uint32_t));
+ 
++	s->crc32table = crc32_filltable(NULL, 1);
++
+ 	s->state             = BZ_S_INPUT;
+ 	s->mode              = BZ_M_RUNNING;
+ 	s->blockSize100k     = blockSize100k;
+@@ -107,7 +111,7 @@ void BZ2_bzCompressInit(bz_stream *strm, int blockSize100k)
+ 
+ 	strm->state          = s;
+ 	/*strm->total_in     = 0;*/
+-	strm->total_out = 0;
++	strm->total_out      = 0;
+ 	init_RL(s);
+ 	prepare_new_block(s);
+ }
+@@ -118,31 +122,28 @@ static
+ void add_pair_to_block(EState* s)
+ {
+ 	int32_t i;
+-	UChar ch = (UChar)(s->state_in_ch);
++	uint8_t ch = (uint8_t)(s->state_in_ch);
+ 	for (i = 0; i < s->state_in_len; i++) {
+-		BZ_UPDATE_CRC(s->blockCRC, ch);
++		BZ_UPDATE_CRC(s, s->blockCRC, ch);
+ 	}
+-	s->inUse[s->state_in_ch] = True;
++	s->inUse[s->state_in_ch] = 1;
+ 	switch (s->state_in_len) {
+-		case 1:
+-			s->block[s->nblock] = (UChar)ch; s->nblock++;
+-			break;
+-		case 2:
+-			s->block[s->nblock] = (UChar)ch; s->nblock++;
+-			s->block[s->nblock] = (UChar)ch; s->nblock++;
+-			break;
+ 		case 3:
+-			s->block[s->nblock] = (UChar)ch; s->nblock++;
+-			s->block[s->nblock] = (UChar)ch; s->nblock++;
+-			s->block[s->nblock] = (UChar)ch; s->nblock++;
++			s->block[s->nblock] = (uint8_t)ch; s->nblock++;
++			/* fall through */
++		case 2:
++			s->block[s->nblock] = (uint8_t)ch; s->nblock++;
++			/* fall through */
++		case 1:
++			s->block[s->nblock] = (uint8_t)ch; s->nblock++;
+ 			break;
+ 		default:
+-			s->inUse[s->state_in_len-4] = True;
+-			s->block[s->nblock] = (UChar)ch; s->nblock++;
+-			s->block[s->nblock] = (UChar)ch; s->nblock++;
+-			s->block[s->nblock] = (UChar)ch; s->nblock++;
+-			s->block[s->nblock] = (UChar)ch; s->nblock++;
+-			s->block[s->nblock] = ((UChar)(s->state_in_len-4));
++			s->inUse[s->state_in_len - 4] = 1;
++			s->block[s->nblock] = (uint8_t)ch; s->nblock++;
++			s->block[s->nblock] = (uint8_t)ch; s->nblock++;
++			s->block[s->nblock] = (uint8_t)ch; s->nblock++;
++			s->block[s->nblock] = (uint8_t)ch; s->nblock++;
++			s->block[s->nblock] = (uint8_t)(s->state_in_len - 4);
+ 			s->nblock++;
+ 			break;
+ 	}
+@@ -164,17 +165,16 @@ void flush_RL(EState* s)
+ 	uint32_t zchh = (uint32_t)(zchh0); \
+ 	/*-- fast track the common case --*/ \
+ 	if (zchh != zs->state_in_ch && zs->state_in_len == 1) { \
+-		UChar ch = (UChar)(zs->state_in_ch); \
+-		BZ_UPDATE_CRC(zs->blockCRC, ch); \
+-		zs->inUse[zs->state_in_ch] = True; \
+-		zs->block[zs->nblock] = (UChar)ch; \
++		uint8_t ch = (uint8_t)(zs->state_in_ch); \
++		BZ_UPDATE_CRC(zs, zs->blockCRC, ch); \
++		zs->inUse[zs->state_in_ch] = 1; \
++		zs->block[zs->nblock] = (uint8_t)ch; \
+ 		zs->nblock++; \
+ 		zs->state_in_ch = zchh; \
+ 	} \
+ 	else \
+ 	/*-- general, uncommon cases --*/ \
+-	if (zchh != zs->state_in_ch || \
+-		zs->state_in_len == 255) { \
++	if (zchh != zs->state_in_ch || zs->state_in_len == 255) { \
+ 		if (zs->state_in_ch < 256) \
+ 			add_pair_to_block(zs); \
+ 		zs->state_in_ch = zchh; \
+@@ -187,114 +187,117 @@ void flush_RL(EState* s)
+ 
+ /*---------------------------------------------------*/
+ static
+-Bool copy_input_until_stop(EState* s)
++void /*Bool*/ copy_input_until_stop(EState* s)
+ {
+-	Bool progress_in = False;
++	/*Bool progress_in = False;*/
+ 
+-//vda: cannot simplify this until avail_in_expect is removed
++#ifdef SAME_CODE_AS_BELOW
+ 	if (s->mode == BZ_M_RUNNING) {
+ 		/*-- fast track the common case --*/
+ 		while (1) {
+-			/*-- block full? --*/
+-			if (s->nblock >= s->nblockMAX) break;
+ 			/*-- no input? --*/
+ 			if (s->strm->avail_in == 0) break;
+-			progress_in = True;
+-			ADD_CHAR_TO_BLOCK(s, (uint32_t)(*((UChar*)(s->strm->next_in))));
++			/*-- block full? --*/
++			if (s->nblock >= s->nblockMAX) break;
++			/*progress_in = True;*/
++			ADD_CHAR_TO_BLOCK(s, (uint32_t)(*(uint8_t*)(s->strm->next_in)));
+ 			s->strm->next_in++;
+ 			s->strm->avail_in--;
+ 			/*s->strm->total_in++;*/
+ 		}
+-	} else {
++	} else
++#endif
++	{
+ 		/*-- general, uncommon case --*/
+ 		while (1) {
+-			/*-- block full? --*/
+-			if (s->nblock >= s->nblockMAX) break;
+ 			/*-- no input? --*/
+ 			if (s->strm->avail_in == 0) break;
+-			/*-- flush/finish end? --*/
+-			if (s->avail_in_expect == 0) break;
+-			progress_in = True;
+-			ADD_CHAR_TO_BLOCK(s, (uint32_t)(*((UChar*)(s->strm->next_in))));
++			/*-- block full? --*/
++			if (s->nblock >= s->nblockMAX) break;
++		//#	/*-- flush/finish end? --*/
++		//#	if (s->avail_in_expect == 0) break;
++			/*progress_in = True;*/
++			ADD_CHAR_TO_BLOCK(s, *(uint8_t*)(s->strm->next_in));
+ 			s->strm->next_in++;
+ 			s->strm->avail_in--;
+ 			/*s->strm->total_in++;*/
+-			s->avail_in_expect--;
++		//#	s->avail_in_expect--;
+ 		}
+ 	}
+-	return progress_in;
++	/*return progress_in;*/
+ }
+ 
+ 
+ /*---------------------------------------------------*/
+ static
+-Bool copy_output_until_stop(EState* s)
++void /*Bool*/ copy_output_until_stop(EState* s)
+ {
+-	Bool progress_out = False;
++	/*Bool progress_out = False;*/
+ 
+ 	while (1) {
+-
+ 		/*-- no output space? --*/
+ 		if (s->strm->avail_out == 0) break;
+ 
+ 		/*-- block done? --*/
+ 		if (s->state_out_pos >= s->numZ) break;
+ 
+-		progress_out = True;
++		/*progress_out = True;*/
+ 		*(s->strm->next_out) = s->zbits[s->state_out_pos];
+ 		s->state_out_pos++;
+ 		s->strm->avail_out--;
+ 		s->strm->next_out++;
+ 		s->strm->total_out++;
+ 	}
+-
+-	return progress_out;
++	/*return progress_out;*/
+ }
+ 
+ 
+ /*---------------------------------------------------*/
+ static
+-Bool handle_compress(bz_stream *strm)
++void /*Bool*/ handle_compress(bz_stream *strm)
+ {
+-	Bool progress_in  = False;
+-	Bool progress_out = False;
++	/*Bool progress_in  = False;*/
++	/*Bool progress_out = False;*/
+ 	EState* s = strm->state;
+ 	
+ 	while (1) {
+ 		if (s->state == BZ_S_OUTPUT) {
+-			progress_out |= copy_output_until_stop(s);
++			/*progress_out |=*/ copy_output_until_stop(s);
+ 			if (s->state_out_pos < s->numZ) break;
+ 			if (s->mode == BZ_M_FINISHING
+-			 && s->avail_in_expect == 0
++			//# && s->avail_in_expect == 0
++			 && s->strm->avail_in == 0
+ 			 && isempty_RL(s))
+ 				break;
+ 			prepare_new_block(s);
+ 			s->state = BZ_S_INPUT;
++#ifdef FLUSH_IS_UNUSED
+ 			if (s->mode == BZ_M_FLUSHING
+ 			 && s->avail_in_expect == 0
+ 			 && isempty_RL(s))
+ 				break;
++#endif
+ 		}
+ 
+ 		if (s->state == BZ_S_INPUT) {
+-			progress_in |= copy_input_until_stop(s);
+-			if (s->mode != BZ_M_RUNNING && s->avail_in_expect == 0) {
++			/*progress_in |=*/ copy_input_until_stop(s);
++			//#if (s->mode != BZ_M_RUNNING && s->avail_in_expect == 0) {
++			if (s->mode != BZ_M_RUNNING && s->strm->avail_in == 0) {
+ 				flush_RL(s);
+-				BZ2_compressBlock(s, (Bool)(s->mode == BZ_M_FINISHING));
++				BZ2_compressBlock(s, (s->mode == BZ_M_FINISHING));
+ 				s->state = BZ_S_OUTPUT;
+ 			} else
+ 			if (s->nblock >= s->nblockMAX) {
+-				BZ2_compressBlock(s, False);
++				BZ2_compressBlock(s, 0);
+ 				s->state = BZ_S_OUTPUT;
+ 			} else
+ 			if (s->strm->avail_in == 0) {
+ 				break;
+ 			}
+ 		}
+-
+ 	}
+ 
+-	return progress_in || progress_out;
++	/*return progress_in || progress_out;*/
+ }
+ 
+ 
+@@ -302,82 +305,75 @@ Bool handle_compress(bz_stream *strm)
+ static
+ int BZ2_bzCompress(bz_stream *strm, int action)
+ {
+-	Bool progress;
++	/*Bool progress;*/
+ 	EState* s;
+-	if (strm == NULL) return BZ_PARAM_ERROR;
++
+ 	s = strm->state;
+-	if (s == NULL) return BZ_PARAM_ERROR;
+-	if (s->strm != strm) return BZ_PARAM_ERROR;
+ 
+-	preswitch:
+ 	switch (s->mode) {
+-
+-		case BZ_M_IDLE:
+-			return BZ_SEQUENCE_ERROR;
+-
+ 		case BZ_M_RUNNING:
+ 			if (action == BZ_RUN) {
+-				progress = handle_compress(strm);
+-				return progress ? BZ_RUN_OK : BZ_PARAM_ERROR;
++				/*progress =*/ handle_compress(strm);
++				/*return progress ? BZ_RUN_OK : BZ_PARAM_ERROR;*/
++				return BZ_RUN_OK;
+ 			}
++#ifdef FLUSH_IS_UNUSED
+ 			else
+ 			if (action == BZ_FLUSH) {
+-				s->avail_in_expect = strm->avail_in;
++				//#s->avail_in_expect = strm->avail_in;
+ 				s->mode = BZ_M_FLUSHING;
+-				goto preswitch;
++				goto case_BZ_M_FLUSHING;
+ 			}
++#endif
+ 			else
+-			if (action == BZ_FINISH) {
+-				s->avail_in_expect = strm->avail_in;
++			/*if (action == BZ_FINISH)*/ {
++				//#s->avail_in_expect = strm->avail_in;
+ 				s->mode = BZ_M_FINISHING;
+-				goto preswitch;
++				goto case_BZ_M_FINISHING;
+ 			}
+-			else
+-				return BZ_PARAM_ERROR;
+ 
++#ifdef FLUSH_IS_UNUSED
++case_BZ_M_FLUSHING:
+ 		case BZ_M_FLUSHING:
+-			if (action != BZ_FLUSH) return BZ_SEQUENCE_ERROR;
+-			if (s->avail_in_expect != s->strm->avail_in)
+-				return BZ_SEQUENCE_ERROR;
+-			progress = handle_compress(strm);
++			/*if (s->avail_in_expect != s->strm->avail_in)
++				return BZ_SEQUENCE_ERROR;*/
++			/*progress =*/ handle_compress(strm);
+ 			if (s->avail_in_expect > 0 || !isempty_RL(s) || s->state_out_pos < s->numZ)
+ 				return BZ_FLUSH_OK;
+ 			s->mode = BZ_M_RUNNING;
+ 			return BZ_RUN_OK;
++#endif
+ 
+-		case BZ_M_FINISHING:
+-			if (action != BZ_FINISH) return BZ_SEQUENCE_ERROR;
+-			if (s->avail_in_expect != s->strm->avail_in)
+-				return BZ_SEQUENCE_ERROR;
+-			progress = handle_compress(strm);
+-			if (!progress) return BZ_SEQUENCE_ERROR;
+-			if (s->avail_in_expect > 0 || !isempty_RL(s) || s->state_out_pos < s->numZ)
++ case_BZ_M_FINISHING:
++		/*case BZ_M_FINISHING:*/
++		default:
++			/*if (s->avail_in_expect != s->strm->avail_in)
++				return BZ_SEQUENCE_ERROR;*/
++			/*progress =*/ handle_compress(strm);
++			/*if (!progress) return BZ_SEQUENCE_ERROR;*/
++			//#if (s->avail_in_expect > 0 || !isempty_RL(s) || s->state_out_pos < s->numZ)
++			//#	return BZ_FINISH_OK;
++			if (s->strm->avail_in > 0 || !isempty_RL(s) || s->state_out_pos < s->numZ)
+ 				return BZ_FINISH_OK;
+-			s->mode = BZ_M_IDLE;
++			/*s->mode = BZ_M_IDLE;*/
+ 			return BZ_STREAM_END;
+ 	}
+-	return BZ_OK; /*--not reached--*/
++	/* return BZ_OK; --not reached--*/
+ }
+ 
+ 
+ /*---------------------------------------------------*/
+ static
+-int BZ2_bzCompressEnd(bz_stream *strm)
++void BZ2_bzCompressEnd(bz_stream *strm)
+ {
+ 	EState* s;
+-	if (strm == NULL) return BZ_PARAM_ERROR;
+-	s = strm->state;
+-	if (s == NULL) return BZ_PARAM_ERROR;
+-	if (s->strm != strm) return BZ_PARAM_ERROR;
+ 
+-	if (s->arr1 != NULL) free(s->arr1);
+-	if (s->arr2 != NULL) free(s->arr2);
+-	if (s->ftab != NULL) free(s->ftab);
++	s = strm->state;
++	free(s->arr1);
++	free(s->arr2);
++	free(s->ftab);
++	free(s->crc32table);
+ 	free(strm->state);
+-
+-	strm->state = NULL;
+-
+-	return BZ_OK;
+ }
+ 
+ 
+@@ -418,11 +414,11 @@ int BZ2_bzBuffToBuffCompress(char* dest,
+ 	BZ2_bzCompressEnd(&strm);
+ 	return BZ_OK;
+ 
+-	output_overflow:
++ output_overflow:
+ 	BZ2_bzCompressEnd(&strm);
+ 	return BZ_OUTBUFF_FULL;
+ 
+-	errhandler:
++ errhandler:
+ 	BZ2_bzCompressEnd(&strm);
+ 	return ret;
+ }
+diff --git a/archival/bz/bzlib.h b/archival/bz/bzlib.h
+index 805e9b3..602aab9 100644
+--- a/archival/bz/bzlib.h
++++ b/archival/bz/bzlib.h
+@@ -56,7 +56,7 @@ typedef struct bz_stream {
+ 
+ static void BZ2_bzCompressInit(bz_stream *strm, int blockSize100k);
+ static int BZ2_bzCompress(bz_stream *strm, int action);
+-static int BZ2_bzCompressEnd(bz_stream *strm);
++static void BZ2_bzCompressEnd(bz_stream *strm);
+ 
+ /*-------------------------------------------------------------*/
+ /*--- end                                           bzlib.h ---*/
+diff --git a/archival/bz/bzlib_private.h b/archival/bz/bzlib_private.h
+index 24ffbee..02f177e 100644
+--- a/archival/bz/bzlib_private.h
++++ b/archival/bz/bzlib_private.h
+@@ -25,31 +25,30 @@ in the file LICENSE.
+ 
+ /* #include "bzlib.h" */
+ 
+-#define BZ_DEBUG 0
+-//#define BZ_NO_STDIO 1 - does not work
+-
+-
+ /*-- General stuff. --*/
+ 
+ typedef unsigned char Bool;
+-typedef unsigned char UChar;
+ 
+ #define True  ((Bool)1)
+ #define False ((Bool)0)
+ 
++#if BZ_LIGHT_DEBUG
+ static void bz_assert_fail(int errcode) ATTRIBUTE_NORETURN;
+ #define AssertH(cond, errcode) \
+-{ \
++do { \
+ 	if (!(cond)) \
+ 		bz_assert_fail(errcode); \
+-}
++} while (0)
++#else
++#define AssertH(cond, msg) do { } while (0)
++#endif
+ 
+ #if BZ_DEBUG
+ #define AssertD(cond, msg) \
+-{ \
++do { \
+ 	if (!(cond)) \
+ 		bb_error_msg_and_die("(debug build): internal error %s", msg); \
+-}
++} while (0)
+ #else
+ #define AssertD(cond, msg) do { } while (0)
+ #endif
+@@ -79,35 +78,8 @@ static void bz_assert_fail(int errcode) ATTRIBUTE_NORETURN;
+ #define BZ_MAX_SELECTORS (2 + (900000 / BZ_G_SIZE))
+ 
+ 
+-/*-- Stuff for randomising repetitive blocks. --*/
+-
+-static const int32_t BZ2_rNums[512];
+-
+-#define BZ_RAND_DECLS \
+-	int32_t rNToGo; \
+-	int32_t rTPos \
+-
+-#define BZ_RAND_INIT_MASK \
+-	s->rNToGo = 0; \
+-	s->rTPos  = 0 \
+-
+-#define BZ_RAND_MASK ((s->rNToGo == 1) ? 1 : 0)
+-
+-#define BZ_RAND_UPD_MASK \
+-{ \
+-	if (s->rNToGo == 0) { \
+-		s->rNToGo = BZ2_rNums[s->rTPos]; \
+-		s->rTPos++; \
+-		if (s->rTPos == 512) s->rTPos = 0; \
+-	} \
+-	s->rNToGo--; \
+-}
+-
+-
+ /*-- Stuff for doing CRCs. --*/
+ 
+-static const uint32_t BZ2_crc32Table[256];
+-
+ #define BZ_INITIALISE_CRC(crcVar) \
+ { \
+ 	crcVar = 0xffffffffL; \
+@@ -118,9 +90,9 @@ static const uint32_t BZ2_crc32Table[256];
+ 	crcVar = ~(crcVar); \
+ }
+ 
+-#define BZ_UPDATE_CRC(crcVar,cha) \
++#define BZ_UPDATE_CRC(s, crcVar, cha) \
+ { \
+-	crcVar = (crcVar << 8) ^ BZ2_crc32Table[(crcVar >> 24) ^ ((UChar)cha)]; \
++	crcVar = (crcVar << 8) ^ s->crc32table[(crcVar >> 24) ^ ((uint8_t)cha)]; \
+ }
+ 
+ 
+@@ -152,24 +124,28 @@ typedef struct EState {
+ 	int32_t  state;
+ 
+ 	/* remembers avail_in when flush/finish requested */
+-	uint32_t avail_in_expect; //vda: do we need this?
++/* bbox: not needed, strm->avail_in always has the same value */
++/* commented out with '//#' throughout the code */
++	/* uint32_t avail_in_expect; */
+ 
+ 	/* for doing the block sorting */
++	int32_t  origPtr;
+ 	uint32_t *arr1;
+ 	uint32_t *arr2;
+ 	uint32_t *ftab;
+-	int32_t  origPtr;
+ 
+ 	/* aliases for arr1 and arr2 */
+ 	uint32_t *ptr;
+-	UChar    *block;
++	uint8_t  *block;
+ 	uint16_t *mtfv;
+-	UChar    *zbits;
++	uint8_t  *zbits;
++
++	/* guess what */
++	uint32_t *crc32table;
+ 
+ 	/* run-length-encoding of the input */
+ 	uint32_t state_in_ch;
+ 	int32_t  state_in_len;
+-	BZ_RAND_DECLS;
+ 
+ 	/* input and output limits and current posns */
+ 	int32_t  nblock;
+@@ -194,18 +170,18 @@ typedef struct EState {
+ 
+ 	/* map of bytes used in block */
+ 	int32_t  nInUse;
+-	Bool     inUse[256];
+-	UChar    unseqToSeq[256];
++	Bool     inUse[256] __attribute__(( aligned(sizeof(long)) ));
++	uint8_t  unseqToSeq[256];
+ 
+ 	/* stuff for coding the MTF values */
+ 	int32_t  mtfFreq    [BZ_MAX_ALPHA_SIZE];
+-	UChar    selector   [BZ_MAX_SELECTORS];
+-	UChar    selectorMtf[BZ_MAX_SELECTORS];
++	uint8_t  selector   [BZ_MAX_SELECTORS];
++	uint8_t  selectorMtf[BZ_MAX_SELECTORS];
+ 
+-	UChar    len     [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
+-	int32_t  code    [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
+-	int32_t  rfreq   [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
+-#ifdef FAST_GROUP6
++	uint8_t  len  [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
++	int32_t  code [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
++	int32_t  rfreq[BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
++#if CONFIG_BZIP2_FEATURE_SPEED >= 5
+ 	/* second dimension: only 3 needed; 4 makes index calculations faster */
+ 	uint32_t len_pack[BZ_MAX_ALPHA_SIZE][4];
+ #endif
+@@ -218,16 +194,16 @@ static void
+ BZ2_blockSort(EState*);
+ 
+ static void
+-BZ2_compressBlock(EState*, Bool);
++BZ2_compressBlock(EState*, int);
+ 
+ static void
+ BZ2_bsInitWrite(EState*);
+ 
+ static void
+-BZ2_hbAssignCodes(int32_t*, UChar*, int32_t, int32_t, int32_t);
++BZ2_hbAssignCodes(int32_t*, uint8_t*, int32_t, int32_t, int32_t);
+ 
+ static void
+-BZ2_hbMakeCodeLengths(UChar*, int32_t*, int32_t, int32_t);
++BZ2_hbMakeCodeLengths(uint8_t*, int32_t*, int32_t, int32_t);
+ 
+ /*-------------------------------------------------------------*/
+ /*--- end                                   bzlib_private.h ---*/
+diff --git a/archival/bz/compress.c b/archival/bz/compress.c
+index 54426dc..4bd364e 100644
+--- a/archival/bz/compress.c
++++ b/archival/bz/compress.c
+@@ -50,7 +50,7 @@ static NOINLINE
+ void bsFinishWrite(EState* s)
+ {
+ 	while (s->bsLive > 0) {
+-		s->zbits[s->numZ] = (UChar)(s->bsBuff >> 24);
++		s->zbits[s->numZ] = (uint8_t)(s->bsBuff >> 24);
+ 		s->numZ++;
+ 		s->bsBuff <<= 8;
+ 		s->bsLive -= 8;
+@@ -60,13 +60,14 @@ void bsFinishWrite(EState* s)
+ 
+ /*---------------------------------------------------*/
+ static
+-/* Forced inlining results in +600 bytes code,
+- * 2% faster compression. Not worth it. */
+-/*ALWAYS_INLINE*/
++/* Helps only on level 5, on other levels hurts. ? */
++#if CONFIG_BZIP2_FEATURE_SPEED >= 5
++ALWAYS_INLINE
++#endif
+ void bsW(EState* s, int32_t n, uint32_t v)
+ {
+ 	while (s->bsLive >= 8) {
+-		s->zbits[s->numZ] = (UChar)(s->bsBuff >> 24);
++		s->zbits[s->numZ] = (uint8_t)(s->bsBuff >> 24);
+ 		s->numZ++;
+ 		s->bsBuff <<= 8;
+ 		s->bsLive -= 8;
+@@ -78,7 +79,7 @@ void bsW(EState* s, int32_t n, uint32_t v)
+ 
+ /*---------------------------------------------------*/
+ static
+-void bsPutU32(EState* s, uint32_t u)
++void bsPutU32(EState* s, unsigned u)
+ {
+ 	bsW(s, 8, (u >> 24) & 0xff);
+ 	bsW(s, 8, (u >> 16) & 0xff);
+@@ -89,9 +90,10 @@ void bsPutU32(EState* s, uint32_t u)
+ 
+ /*---------------------------------------------------*/
+ static
+-void bsPutUChar(EState* s, UChar c)
++void bsPutU16(EState* s, unsigned u)
+ {
+-	bsW(s, 8, (uint32_t)c);
++	bsW(s, 8, (u >>  8) & 0xff);
++	bsW(s, 8,  u        & 0xff);
+ }
+ 
+ 
+@@ -103,7 +105,7 @@ void bsPutUChar(EState* s, UChar c)
+ static
+ void makeMaps_e(EState* s)
+ {
+-	int32_t i;
++	int i;
+ 	s->nInUse = 0;
+ 	for (i = 0; i < 256; i++) {
+ 		if (s->inUse[i]) {
+@@ -118,7 +120,7 @@ void makeMaps_e(EState* s)
+ static NOINLINE
+ void generateMTFValues(EState* s)
+ {
+-	UChar   yy[256];
++	uint8_t yy[256];
+ 	int32_t i, j;
+ 	int32_t zPend;
+ 	int32_t wr;
+@@ -128,7 +130,7 @@ void generateMTFValues(EState* s)
+ 	 * After sorting (eg, here),
+ 	 * s->arr1[0 .. s->nblock-1] holds sorted order,
+ 	 * and
+-	 * ((UChar*)s->arr2)[0 .. s->nblock-1]
++	 * ((uint8_t*)s->arr2)[0 .. s->nblock-1]
+ 	 * holds the original block data.
+ 	 *
+ 	 * The first thing to do is generate the MTF values,
+@@ -140,14 +142,14 @@ void generateMTFValues(EState* s)
+ 	 *
+ 	 * The final compressed bitstream is generated into the
+ 	 * area starting at
+-	 *	(UChar*) (&((UChar*)s->arr2)[s->nblock])
++	 *	&((uint8_t*)s->arr2)[s->nblock]
+ 	 *
+ 	 * These storage aliases are set up in bzCompressInit(),
+ 	 * except for the last one, which is arranged in
+ 	 * compressBlock().
+ 	 */
+ 	uint32_t* ptr   = s->ptr;
+-	UChar*    block = s->block;
++	uint8_t*  block = s->block;
+ 	uint16_t* mtfv  = s->mtfv;
+ 
+ 	makeMaps_e(s);
+@@ -159,12 +161,12 @@ void generateMTFValues(EState* s)
+ 	wr = 0;
+ 	zPend = 0;
+ 	for (i = 0; i < s->nInUse; i++)
+-		yy[i] = (UChar) i;
++		yy[i] = (uint8_t) i;
+ 
+ 	for (i = 0; i < s->nblock; i++) {
+-		UChar ll_i;
++		uint8_t ll_i;
+ 		AssertD(wr <= i, "generateMTFValues(1)");
+-		j = ptr[i]-1;
++		j = ptr[i] - 1;
+ 		if (j < 0)
+ 			j += s->nblock;
+ 		ll_i = s->unseqToSeq[block[j]];
+@@ -189,15 +191,15 @@ void generateMTFValues(EState* s)
+ 				zPend = 0;
+ 			}
+ 			{
+-				register UChar  rtmp;
+-				register UChar* ryy_j;
+-				register UChar  rll_i;
++				register uint8_t  rtmp;
++				register uint8_t* ryy_j;
++				register uint8_t  rll_i;
+ 				rtmp  = yy[1];
+ 				yy[1] = yy[0];
+ 				ryy_j = &(yy[1]);
+ 				rll_i = ll_i;
+ 				while (rll_i != rtmp) {
+-					register UChar rtmp2;
++					register uint8_t rtmp2;
+ 					ryy_j++;
+ 					rtmp2  = rtmp;
+ 					rtmp   = *ryy_j;
+@@ -250,7 +252,7 @@ void sendMTFValues(EState* s)
+ 	int32_t nGroups, nBytes;
+ 
+ 	/*
+-	 * UChar  len [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
++	 * uint8_t len[BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
+ 	 * is a global since the decoder also needs it.
+ 	 *
+ 	 * int32_t  code[BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
+@@ -295,7 +297,7 @@ void sendMTFValues(EState* s)
+ 
+ 			if (ge > gs
+ 			 && nPart != nGroups && nPart != 1
+-			 && ((nGroups-nPart) % 2 == 1)
++			 && ((nGroups - nPart) % 2 == 1)
+ 			) {
+ 				aFreq -= s->mtfFreq[ge];
+ 				ge--;
+@@ -324,7 +326,7 @@ void sendMTFValues(EState* s)
+ 			for (v = 0; v < alphaSize; v++)
+ 				s->rfreq[t][v] = 0;
+ 
+-#ifdef FAST_GROUP6
++#if CONFIG_BZIP2_FEATURE_SPEED >= 5
+ 		/*
+ 		 * Set up an auxiliary length table which is used to fast-track
+ 		 * the common case (nGroups == 6).
+@@ -337,7 +339,6 @@ void sendMTFValues(EState* s)
+ 			}
+ 		}
+ #endif
+-
+ 		nSelectors = 0;
+ 		totc = 0;
+ 		gs = 0;
+@@ -355,7 +356,7 @@ void sendMTFValues(EState* s)
+ 			 */
+ 			for (t = 0; t < nGroups; t++)
+ 				cost[t] = 0;
+-#ifdef FAST_GROUP6
++#if CONFIG_BZIP2_FEATURE_SPEED >= 5
+ 			if (nGroups == 6 && 50 == ge-gs+1) {
+ 				/*--- fast track the common case ---*/
+ 				register uint32_t cost01, cost23, cost45;
+@@ -395,11 +396,11 @@ void sendMTFValues(EState* s)
+ 			 * Find the coding table which is best for this group,
+ 			 * and record its identity in the selector table.
+ 			 */
+-			bc = 999999999;
+-			bt = -1;
+-			//bc = cost[0];
+-			//bt = 0;
+-			for (t = 0; t < nGroups; t++) {
++			/*bc = 999999999;*/
++			/*bt = -1;*/
++			bc = cost[0];
++			bt = 0;
++			for (t = 1 /*0*/; t < nGroups; t++) {
+ 				if (cost[t] < bc) {
+ 					bc = cost[t];
+ 					bt = t;
+@@ -413,8 +414,8 @@ void sendMTFValues(EState* s)
+ 			/*
+ 			 * Increment the symbol frequencies for the selected table.
+ 			 */
+-/* ~0.5% faster compress. +800 bytes */ 
+-#if 0
++/* 1% faster compress. +800 bytes */ 
++#if CONFIG_BZIP2_FEATURE_SPEED >= 4
+ 			if (nGroups == 6 && 50 == ge-gs+1) {
+ 				/*--- fast track the common case ---*/
+ #define BZ_ITUR(nn) s->rfreq[bt][mtfv[gs + (nn)]]++
+@@ -429,7 +430,7 @@ void sendMTFValues(EState* s)
+ 				BZ_ITUR(40); BZ_ITUR(41); BZ_ITUR(42); BZ_ITUR(43); BZ_ITUR(44);
+ 				BZ_ITUR(45); BZ_ITUR(46); BZ_ITUR(47); BZ_ITUR(48); BZ_ITUR(49);
+ #undef BZ_ITUR
+-				gs = ge+1;
++				gs = ge + 1;
+ 			} else
+ #endif
+ 			{
+@@ -438,7 +439,7 @@ void sendMTFValues(EState* s)
+ 					s->rfreq[bt][mtfv[gs]]++;
+ 					gs++;
+ 				}
+-				/* already is: gs = ge+1; */
++				/* already is: gs = ge + 1; */
+ 			}
+ 		}
+ 
+@@ -456,7 +457,7 @@ void sendMTFValues(EState* s)
+ 
+ 	/*--- Compute MTF values for the selectors. ---*/
+ 	{
+-		UChar pos[BZ_N_GROUPS], ll_i, tmp2, tmp;
++		uint8_t pos[BZ_N_GROUPS], ll_i, tmp2, tmp;
+ 
+ 		for (i = 0; i < nGroups; i++)
+ 			pos[i] = i;
+@@ -490,31 +491,34 @@ void sendMTFValues(EState* s)
+ 
+ 	/*--- Transmit the mapping table. ---*/
+ 	{
+-		Bool inUse16[16];
++		/* bbox: optimized a bit more than in bzip2 */
++		int inUse16 = 0;
+ 		for (i = 0; i < 16; i++) {
+-			inUse16[i] = False;
+-			for (j = 0; j < 16; j++)
+-				if (s->inUse[i * 16 + j])
+-					inUse16[i] = True;
++			if (sizeof(long) <= 4) {
++				inUse16 = inUse16*2 +
++					((*(uint32_t*)&(s->inUse[i * 16 + 0])
++					| *(uint32_t*)&(s->inUse[i * 16 + 4])
++					| *(uint32_t*)&(s->inUse[i * 16 + 8])
++					| *(uint32_t*)&(s->inUse[i * 16 + 12])) != 0);
++			} else { /* Our CPU can do better */
++				inUse16 = inUse16*2 +
++					((*(uint64_t*)&(s->inUse[i * 16 + 0])
++					| *(uint64_t*)&(s->inUse[i * 16 + 8])) != 0);
++			}
+ 		}
+-	
++
+ 		nBytes = s->numZ;
+-		for (i = 0; i < 16; i++) {
+-			if (inUse16[i])
+-				bsW(s, 1, 1);
+-			else
+-				bsW(s, 1, 0);
+-		}
++		bsW(s, 16, inUse16);
+ 
++		inUse16 <<= (sizeof(int)*8 - 16); /* move 15th bit into sign bit */
+ 		for (i = 0; i < 16; i++) {
+-			if (inUse16[i]) {
+-				for (j = 0; j < 16; j++) {
+-					if (s->inUse[i * 16 + j])
+-						bsW(s, 1, 1);
+-					else
+-						bsW(s, 1, 0);
+-				}
++			if (inUse16 < 0) {
++				unsigned v16 = 0;
++				for (j = 0; j < 16; j++)
++					v16 = v16*2 + s->inUse[i * 16 + j];
++				bsW(s, 16, v16);
+ 			}
++			inUse16 <<= 1;
+ 		}
+ 	}
+ 
+@@ -558,7 +562,7 @@ void sendMTFValues(EState* s)
+ 		if (nGroups == 6 && 50 == ge-gs+1) {
+ 			/*--- fast track the common case ---*/
+ 			uint16_t mtfv_i;
+-			UChar* s_len_sel_selCtr	= &(s->len[s->selector[selCtr]][0]);
++			uint8_t* s_len_sel_selCtr  = &(s->len[s->selector[selCtr]][0]);
+ 			int32_t* s_code_sel_selCtr = &(s->code[s->selector[selCtr]][0]);
+ #define BZ_ITAH(nn) \
+ 	mtfv_i = mtfv[gs+(nn)]; \
+@@ -580,7 +584,7 @@ void sendMTFValues(EState* s)
+ 		{
+ 			/*--- slow version which correctly handles all situations ---*/
+ 			/* code is bit bigger, but moves multiply out of the loop */
+-			UChar*   s_len_sel_selCtr  = &(s->len [s->selector[selCtr]][0]);
++			uint8_t* s_len_sel_selCtr  = &(s->len [s->selector[selCtr]][0]);
+ 			int32_t* s_code_sel_selCtr = &(s->code[s->selector[selCtr]][0]);
+ 			while (gs <= ge) {
+ 				bsW(s,
+@@ -599,7 +603,7 @@ void sendMTFValues(EState* s)
+ 
+ /*---------------------------------------------------*/
+ static
+-void BZ2_compressBlock(EState* s, Bool is_last_block)
++void BZ2_compressBlock(EState* s, int is_last_block)
+ {
+ 	if (s->nblock > 0) {
+ 		BZ_FINALISE_CRC(s->blockCRC);
+@@ -611,26 +615,27 @@ void BZ2_compressBlock(EState* s, Bool is_last_block)
+ 		BZ2_blockSort(s);
+ 	}
+ 
+-	s->zbits = (UChar*) (&((UChar*)s->arr2)[s->nblock]);
++	s->zbits = &((uint8_t*)s->arr2)[s->nblock];
+ 
+ 	/*-- If this is the first block, create the stream header. --*/
+ 	if (s->blockNo == 1) {
+ 		BZ2_bsInitWrite(s);
+-		/*bsPutUChar(s, BZ_HDR_B);*/
+-		/*bsPutUChar(s, BZ_HDR_Z);*/
+-		/*bsPutUChar(s, BZ_HDR_h);*/
+-		/*bsPutUChar(s, (UChar)(BZ_HDR_0 + s->blockSize100k));*/
++		/*bsPutU8(s, BZ_HDR_B);*/
++		/*bsPutU8(s, BZ_HDR_Z);*/
++		/*bsPutU8(s, BZ_HDR_h);*/
++		/*bsPutU8(s, BZ_HDR_0 + s->blockSize100k);*/
+ 		bsPutU32(s, BZ_HDR_BZh0 + s->blockSize100k);
+ 	}
+ 
+ 	if (s->nblock > 0) {
+-		/*bsPutUChar(s, 0x31);*/
+-		/*bsPutUChar(s, 0x41);*/
+-		/*bsPutUChar(s, 0x59);*/
+-		/*bsPutUChar(s, 0x26);*/
++		/*bsPutU8(s, 0x31);*/
++		/*bsPutU8(s, 0x41);*/
++		/*bsPutU8(s, 0x59);*/
++		/*bsPutU8(s, 0x26);*/
+ 		bsPutU32(s, 0x31415926);
+-		bsPutUChar(s, 0x53);
+-		bsPutUChar(s, 0x59);
++		/*bsPutU8(s, 0x53);*/
++		/*bsPutU8(s, 0x59);*/
++		bsPutU16(s, 0x5359);
+ 
+ 		/*-- Now the block's CRC, so it is in a known place. --*/
+ 		bsPutU32(s, s->blockCRC);
+@@ -653,13 +658,14 @@ void BZ2_compressBlock(EState* s, Bool is_last_block)
+ 
+ 	/*-- If this is the last block, add the stream trailer. --*/
+ 	if (is_last_block) {
+-		/*bsPutUChar(s, 0x17);*/
+-		/*bsPutUChar(s, 0x72);*/
+-		/*bsPutUChar(s, 0x45);*/
+-		/*bsPutUChar(s, 0x38);*/
++		/*bsPutU8(s, 0x17);*/
++		/*bsPutU8(s, 0x72);*/
++		/*bsPutU8(s, 0x45);*/
++		/*bsPutU8(s, 0x38);*/
+ 		bsPutU32(s, 0x17724538);
+-		bsPutUChar(s, 0x50);
+-		bsPutUChar(s, 0x90);
++		/*bsPutU8(s, 0x50);*/
++		/*bsPutU8(s, 0x90);*/
++		bsPutU16(s, 0x5090);
+ 		bsPutU32(s, s->combinedCRC);
+ 		bsFinishWrite(s);
+ 	}
+diff --git a/archival/bz/huffman.c b/archival/bz/huffman.c
+index d01af11..89e5460 100644
+--- a/archival/bz/huffman.c
++++ b/archival/bz/huffman.c
+@@ -68,7 +68,7 @@ in the file LICENSE.
+ 
+ /*---------------------------------------------------*/
+ static
+-void BZ2_hbMakeCodeLengths(UChar *len,
++void BZ2_hbMakeCodeLengths(uint8_t *len,
+ 		int32_t *freq,
+ 		int32_t alphaSize,
+ 		int32_t maxLen)
+@@ -163,7 +163,7 @@ void BZ2_hbMakeCodeLengths(UChar *len,
+ /*---------------------------------------------------*/
+ static
+ void BZ2_hbAssignCodes(int32_t *code,
+-		UChar *length,
++		uint8_t *length,
+ 		int32_t minLen,
+ 		int32_t maxLen,
+ 		int32_t alphaSize)
+diff --git a/archival/bzip2.c b/archival/bzip2.c
+index 04478ee..bb1610e 100644
+--- a/archival/bzip2.c
++++ b/archival/bzip2.c
+@@ -9,8 +9,28 @@
+ 
+ #include "libbb.h"
+ 
+-/* This buys 6% speed for nearly 4k code */
+-/*#define FAST_GROUP6 1*/
++#define CONFIG_BZIP2_FEATURE_SPEED 1
++
++/* Speed test:
++ * Compiled with gcc 4.2.1, run on Athlon 64 1800 MHz (512K L2 cache).
++ * Stock bzip2 is 26.4% slower than bbox bzip2 at SPEED 1
++ * (time to compress gcc-4.2.1.tar is 126.4% compared to bbox).
++ * At SPEED 5 difference is 32.7%.
++ *
++ * Test run of all CONFIG_BZIP2_FEATURE_SPEED values on a 11Mb text file:
++ *     Size   Time (3 runs)
++ * 0:  10828  4.145 4.146 4.148
++ * 1:  11097  3.845 3.860 3.861
++ * 2:  11392  3.763 3.767 3.768
++ * 3:  11892  3.722 3.724 3.727
++ * 4:  12740  3.637 3.640 3.644
++ * 5:  17273  3.497 3.509 3.509
++ */
++
++
++#define BZ_DEBUG 0
++/* Takes ~300 bytes, detects corruption caused by bad RAM etc */
++#define BZ_LIGHT_DEBUG 0
+ 
+ #include "bz/bzlib.h"
+ 
+@@ -19,9 +39,7 @@
+ #include "bz/blocksort.c"
+ #include "bz/bzlib.c"
+ #include "bz/compress.c"
+-#include "bz/crctable.c"
+ #include "bz/huffman.c"
+-#include "bz/randtable.c"
+ 
+ /* No point in being shy and having very small buffer here.
+  * bzip2 internal buffers are much bigger anyway, hundreds of kbytes.
+@@ -36,7 +54,7 @@ enum {
+ /* Returns:
+  * <0 on write errors (examine errno),
+  * >0 on short writes (errno == 0)
+- * 0  no error (entire input consume, gimme more)
++ * 0  no error (entire input consumed, gimme more)
+  * on "impossible" errors (internal bzip2 compressor bug) dies
+  */
+ static
+@@ -44,8 +62,6 @@ ssize_t bz_write(bz_stream *strm, void* rbuf, ssize_t rlen, void *wbuf)
+ {
+ 	int n, n2, ret;
+ 
+-	/* if (len == 0) return 0; */
+-
+ 	strm->avail_in = rlen;
+ 	strm->next_in  = rbuf;
+ 	while (1) {

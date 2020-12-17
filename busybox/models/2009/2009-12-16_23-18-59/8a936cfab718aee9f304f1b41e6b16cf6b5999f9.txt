@@ -1,0 +1,109 @@
+2009-12-16 23:18:59 +0100
+diff --git a/archival/libunarchive/data_extract_all.c b/archival/libunarchive/data_extract_all.c
+index ae242df..874d37d 100644
+--- a/archival/libunarchive/data_extract_all.c
++++ b/archival/libunarchive/data_extract_all.c
+@@ -72,8 +72,11 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 		switch (file_header->mode & S_IFMT) {
+ 		case S_IFREG: {
+ 			/* Regular file */
++			int flags = O_WRONLY | O_CREAT | O_EXCL;
++			if (archive_handle->ah_flags & ARCHIVE_O_TRUNC)
++				flags = O_WRONLY | O_CREAT | O_TRUNC;
+ 			dst_fd = xopen3(file_header->name,
+-				O_WRONLY | O_CREAT | O_EXCL,
++				flags,
+ 				file_header->mode
+ 				);
+ 			bb_copyfd_exact_size(archive_handle->src_fd, dst_fd, file_header->size);
+diff --git a/archival/tar.c b/archival/tar.c
+index 7ec101d..5994d89 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -751,6 +751,7 @@ enum {
+ #if ENABLE_FEATURE_TAR_LONG_OPTIONS
+ 	OPTBIT_NUMERIC_OWNER,
+ 	OPTBIT_NOPRESERVE_PERM,
++	OPTBIT_OVERWRITE,
+ #endif
+ 	OPT_TEST         = 1 << 0, // t
+ 	OPT_EXTRACT      = 1 << 1, // x
+@@ -771,6 +772,7 @@ enum {
+ 	OPT_COMPRESS     = IF_FEATURE_SEAMLESS_Z(   (1 << OPTBIT_COMPRESS    )) + 0, // Z
+ 	OPT_NUMERIC_OWNER   = IF_FEATURE_TAR_LONG_OPTIONS((1 << OPTBIT_NUMERIC_OWNER  )) + 0, // numeric-owner
+ 	OPT_NOPRESERVE_PERM = IF_FEATURE_TAR_LONG_OPTIONS((1 << OPTBIT_NOPRESERVE_PERM)) + 0, // no-same-permissions
++	OPT_OVERWRITE       = IF_FEATURE_TAR_LONG_OPTIONS((1 << OPTBIT_OVERWRITE      )) + 0, // overwrite
+ };
+ #if ENABLE_FEATURE_TAR_LONG_OPTIONS
+ static const char tar_longopts[] ALIGN1 =
+@@ -807,9 +809,11 @@ static const char tar_longopts[] ALIGN1 =
+ 	"compress\0"            No_argument       "Z"
+ # endif
+ 	/* use numeric uid/gid from tar header, not textual */
+-	"numeric-owner\0"       No_argument       "\xfd"
++	"numeric-owner\0"       No_argument       "\xfc"
+ 	/* do not restore mode */
+-	"no-same-permissions\0" No_argument       "\xfe"
++	"no-same-permissions\0" No_argument       "\xfd"
++	/* on unpack, open with O_TRUNC and !O_EXCL */
++	"overwrite\0"           No_argument       "\xfe"
+ 	/* --exclude takes next bit position in option mask, */
+ 	/* therefore we have to put it _after_ --no-same-permissions */
+ # if ENABLE_FEATURE_TAR_FROM
+@@ -924,6 +928,11 @@ int tar_main(int argc UNUSED_PARAM, char **argv)
+ 	if (opt & OPT_NOPRESERVE_PERM)
+ 		tar_handle->ah_flags |= ARCHIVE_DONT_RESTORE_PERM;
+ 
++	if (opt & OPT_OVERWRITE) {
++		tar_handle->ah_flags &= ~ARCHIVE_UNLINK_OLD;
++		tar_handle->ah_flags |= ARCHIVE_O_TRUNC;
++	}
++
+ 	if (opt & OPT_GZIP)
+ 		get_header_ptr = get_header_tar_gz;
+ 
+diff --git a/include/unarchive.h b/include/unarchive.h
+index 35ce521..68e83f0 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -58,7 +58,7 @@ typedef struct archive_handle_t {
+ 	char *ah_buffer;
+ 
+ 	/* Flags and misc. stuff */
+-	unsigned char ah_flags;
++	unsigned ah_flags;
+ 
+ 	/* "Private" storage for archivers */
+ //	unsigned char ah_priv_inited;
+@@ -74,6 +74,7 @@ typedef struct archive_handle_t {
+ #define ARCHIVE_DONT_RESTORE_OWNER  (1 << 5)
+ #define ARCHIVE_DONT_RESTORE_PERM   (1 << 6)
+ #define ARCHIVE_NUMERIC_OWNER       (1 << 7)
++#define ARCHIVE_O_TRUNC             (1 << 8)
+ 
+ 
+ /* Info struct unpackers can fill out to inform users of thing like
+diff --git a/testsuite/tar.tests b/testsuite/tar.tests
+index 35f96b7..6c136a6 100755
+--- a/testsuite/tar.tests
++++ b/testsuite/tar.tests
+@@ -31,6 +31,19 @@ Ok
+ " \
+ "" ""
+ 
++testing "tar --overwrite" "\
++rm -rf input_* test.tar 2>/dev/null
++ln input input_hard
++tar cf test.tar input_hard
++echo WRONG >input
++# --overwrite opens 'input_hard' without unlinking,
++# thus 'input_hard' still linked to 'input' and we write 'Ok' into it
++tar xf test.tar --overwrite 2>&1 && cat input
++" "\
++Ok
++" \
++"Ok\n" ""
++
+ cd .. && rm -rf tempdir || exit 1
+ 
+ exit $FAILCOUNT

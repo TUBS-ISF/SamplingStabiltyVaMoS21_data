@@ -1,0 +1,171 @@
+2008-06-01 10:10:22 +0000
+diff --git a/init/halt.c b/init/halt.c
+index c14f0f2..4fac3a8 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -37,7 +37,6 @@ RB_AUTOBOOT
+ 	int which, flags, rc = 1;
+ #if ENABLE_FEATURE_WTMP
+ 	struct utmp utmp;
+-	struct timeval tv;
+ 	struct utsname uts;
+ #endif
+ 
+@@ -56,9 +55,7 @@ RB_AUTOBOOT
+ 		close(creat(bb_path_wtmp_file, 0664));
+ 	}
+ 	memset(&utmp, 0, sizeof(utmp));
+-	gettimeofday(&tv, NULL);
+-	utmp.ut_tv.tv_sec = tv.tv_sec;
+-	utmp.ut_tv.tv_usec = tv.tv_usec;
++	utmp.ut_tv.tv_sec = time(NULL);
+ 	safe_strncpy(utmp.ut_user, "shutdown", UT_NAMESIZE);
+ 	utmp.ut_type = RUN_LVL;
+ 	safe_strncpy(utmp.ut_id, "~~", sizeof(utmp.ut_id));
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index ae183a6..13a8c0c 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -605,7 +605,7 @@ static void update_utmp(const char *line, char *fakehost)
+ 	safe_strncpy(ut.ut_line, line, sizeof(ut.ut_line));
+ 	if (fakehost)
+ 		safe_strncpy(ut.ut_host, fakehost, sizeof(ut.ut_host));
+-	ut.ut_time = time(NULL);
++	ut.ut_tv.tv_sec = time(NULL);
+ 	ut.ut_type = LOGIN_PROCESS;
+ 	ut.ut_pid = mypid;
+ 
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 900a7c0..d9a2f8a 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -80,7 +80,7 @@ static void read_or_build_utent(struct utmp *utptr, int picky)
+ 		 * remotely meaningful by skipping "tty"... */
+ 		strncpy(utptr->ut_id, short_tty + 3, sizeof(utptr->ut_id));
+ 		strncpy(utptr->ut_user, "LOGIN", sizeof(utptr->ut_user));
+-		utptr->ut_time = time(NULL);
++		utptr->ut_tv.tv_sec = time(NULL);
+ 	}
+ 	if (!picky)	/* root login */
+ 		memset(utptr->ut_host, 0, sizeof(utptr->ut_host));
+@@ -96,7 +96,7 @@ static void write_utent(struct utmp *utptr, const char *username)
+ {
+ 	utptr->ut_type = USER_PROCESS;
+ 	strncpy(utptr->ut_user, username, sizeof(utptr->ut_user));
+-	utptr->ut_time = time(NULL);
++	utptr->ut_tv.tv_sec = time(NULL);
+ 	/* other fields already filled in by read_or_build_utent above */
+ 	setutent();
+ 	pututline(utptr);
+diff --git a/miscutils/last.c b/miscutils/last.c
+index a84e776..a8800bf 100644
+--- a/miscutils/last.c
++++ b/miscutils/last.c
+@@ -83,17 +83,17 @@ int last_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ 				ut.ut_type = RUN_LVL;
+ #endif
+ 		} else {
+-			if (ut.ut_name[0] == '\0' || strcmp(ut.ut_name, "LOGIN") == 0) {
++			if (ut.ut_user[0] == '\0' || strcmp(ut.ut_user, "LOGIN") == 0) {
+ 				/* Don't bother.  This means we can't find how long
+ 				 * someone was logged in for.  Oh well. */
+ 				goto next;
+ 			}
+ 			if (ut.ut_type != DEAD_PROCESS
+-			 && ut.ut_name[0] && ut.ut_line[0]
++			 && ut.ut_user[0] && ut.ut_line[0]
+ 			) {
+ 				ut.ut_type = USER_PROCESS;
+ 			}
+-			if (strcmp(ut.ut_name, "date") == 0) {
++			if (strcmp(ut.ut_user, "date") == 0) {
+ 				if (n == TYPE_OLD_TIME) { /* '|' */
+ 					ut.ut_type = OLD_TIME;
+ 				}
+diff --git a/miscutils/last_fancy.c b/miscutils/last_fancy.c
+index d234a48..0dba9dc 100644
+--- a/miscutils/last_fancy.c
++++ b/miscutils/last_fancy.c
+@@ -46,7 +46,7 @@ static void show_entry(struct utmp *ut, int state, time_t dur_secs)
+ 	const char *logout_str;
+ 	const char *duration_str;
+ 
+-	safe_strncpy(login_time, ctime(&(ut->ut_time)), 17);
++	safe_strncpy(login_time, ctime(&(ut->ut_tv.tv_sec)), 17);
+ 	snprintf(logout_time, 8, "- %s", ctime(&dur_secs) + 11);
+ 
+ 	dur_secs = MAX(dur_secs - (time_t)ut->ut_tv.tv_sec, (time_t)0);
+@@ -87,7 +87,7 @@ static void show_entry(struct utmp *ut, int state, time_t dur_secs)
+ 	}
+ 
+ 	printf(HEADER_FORMAT,
+-		   ut->ut_name,
++		   ut->ut_user,
+ 		   ut->ut_line,
+ 		   show_wide ? INET6_ADDRSTRLEN : INET_ADDRSTRLEN,
+ 		   show_wide ? INET6_ADDRSTRLEN : INET_ADDRSTRLEN,
+@@ -112,19 +112,19 @@ static int get_ut_type(struct utmp *ut)
+ 		return ut->ut_type;
+ 	}
+ 
+-	if (ut->ut_name[0] == 0) {
++	if (ut->ut_user[0] == 0) {
+ 		return DEAD_PROCESS;
+ 	}
+ 
+ 	if ((ut->ut_type != DEAD_PROCESS)
+-	 && (strcmp(ut->ut_name, "LOGIN") != 0)
+-	 && ut->ut_name[0]
++	 && (strcmp(ut->ut_user, "LOGIN") != 0)
++	 && ut->ut_user[0]
+ 	 && ut->ut_line[0]
+ 	) {
+ 		ut->ut_type = USER_PROCESS;
+ 	}
+ 
+-	if (strcmp(ut->ut_name, "date") == 0) {
++	if (strcmp(ut->ut_user, "date") == 0) {
+ 		if (ut->ut_line[0] == '|') {
+ 			return OLD_TIME;
+ 		}
+@@ -196,18 +196,18 @@ int last_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		xlseek(file, pos, SEEK_SET);
+ 		xread(file, &ut, sizeof(ut));
+ 		/* rewritten by each record, eventially will have
+-		 * first record's ut_time: */
+-		start_time = ut.ut_time;
++		 * first record's ut_tv.tv_sec: */
++		start_time = ut.ut_tv.tv_sec;
+ 
+ 		switch (get_ut_type(&ut)) {
+ 		case SHUTDOWN_TIME:
+-			down_time = ut.ut_time;
++			down_time = ut.ut_tv.tv_sec;
+ 			boot_down = DOWN;
+ 			going_down = 1;
+ 			break;
+ 		case RUN_LVL:
+ 			if (is_runlevel_shutdown(&ut)) {
+-				down_time = ut.ut_time;
++				down_time = ut.ut_tv.tv_sec;
+ 				going_down = 1;
+ 				boot_down = DOWN;
+ 			}
+@@ -240,7 +240,7 @@ int last_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					next = el->link;
+ 					if (strncmp(up->ut_line, ut.ut_line, UT_LINESIZE) == 0) {
+ 						if (show) {
+-							show_entry(&ut, NORMAL, up->ut_time);
++							show_entry(&ut, NORMAL, up->ut_tv.tv_sec);
+ 							show = 0;
+ 						}
+ 						llist_unlink(&zlist, el);
+@@ -271,7 +271,7 @@ int last_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		}
+ 
+ 		if (going_down) {
+-			boot_time = ut.ut_time;
++			boot_time = ut.ut_tv.tv_sec;
+ 			llist_free(zlist, free);
+ 			zlist = NULL;
+ 			going_down = 0;

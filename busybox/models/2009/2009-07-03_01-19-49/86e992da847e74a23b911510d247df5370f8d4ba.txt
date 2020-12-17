@@ -1,0 +1,10 @@
+2009-07-03 01:19:49 +0200
+diff --git a/TODO b/TODO
+index 6c1fb21..732078d 100644
+--- a/TODO
++++ b/TODO
+@@ -318,4 +318,3 @@ vdprintf() -> similar sized functionality
+   most likely there is more
+ 
+ * even more support for statistics: mpstat, iostat, powertop....
+-

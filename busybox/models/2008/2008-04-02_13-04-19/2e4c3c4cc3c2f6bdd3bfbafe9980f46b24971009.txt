@@ -1,0 +1,216 @@
+2008-04-02 13:04:19 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 3be317b..529a228 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4116,7 +4116,7 @@
+        "Adjust filesystem options on ext[23] filesystems"
+ 
+ #define udhcpc_trivial_usage \
+-       "[-Cfbnqtv] [-c CID] [-V VCLS] [-H HOSTNAME] [-i INTERFACE]\n" \
++       "[-Cfbnqtvo] [-c CID] [-V VCLS] [-H HOSTNAME] [-i INTERFACE]\n" \
+        "	[-p pidfile] [-r IP] [-s script] [-O dhcp-option]..." USE_FEATURE_UDHCP_PORT(" [-P N]")
+ #define udhcpc_full_usage \
+ 	USE_GETOPT_LONG( \
+@@ -4127,17 +4127,18 @@
+      "\n	-C,--clientid-none	Suppress default client identifier" \
+      "\n	-p,--pidfile=file	Create pidfile" \
+      "\n	-r,--request=IP		IP address to request" \
+-     "\n	-s,--script=file	Run file at dhcp events (default /usr/share/udhcpc/default.script)" \
++     "\n	-s,--script=file	Run file at DHCP events (default "CONFIG_DHCPC_DEFAULT_SCRIPT")" \
+      "\n	-t,--retries=N		Send up to N request packets" \
+      "\n	-T,--timeout=N		Try to get a lease for N seconds (default 3)" \
+      "\n	-A,--tryagain=N		Wait N seconds (default 20) after failure" \
++     "\n	-O,--request-option=OPT	Request DHCP option OPT (cumulative)" \
++     "\n	-o,--no-default-options	Do not request any options (unless -O is also given)" \
+      "\n	-f,--foreground	Run in foreground" \
+      "\n	-b,--background	Background if lease is not immediately obtained" \
+      "\n	-S,--syslog	Log to syslog too" \
+      "\n	-n,--now	Exit with failure if lease is not immediately obtained" \
+      "\n	-q,--quit	Quit after obtaining lease" \
+      "\n	-R,--release	Release IP on quit" \
+-     "\n	-O,--request-option=OPT	Request DHCP option OPT from server" \
+ 	USE_FEATURE_UDHCP_PORT( \
+      "\n	-P,--client-port N  Use port N instead of default 68" \
+ 	) \
+@@ -4153,17 +4154,18 @@
+      "\n	-C		Suppress default client identifier" \
+      "\n	-p file		Create pidfile" \
+      "\n	-r IP		IP address to request" \
+-     "\n	-s file		Run file at dhcp events (default /usr/share/udhcpc/default.script)" \
++     "\n	-s file		Run file at DHCP events (default "CONFIG_DHCPC_DEFAULT_SCRIPT")" \
+      "\n	-t N		Send up to N request packets" \
+      "\n	-T N		Try to get a lease for N seconds (default 3)" \
+      "\n	-A N		Wait N seconds (default 20) after failure" \
++     "\n	-O OPT		Request DHCP option OPT (cumulative)" \
++     "\n	-o		Do not request any options (unless -O is also given)" \
+      "\n	-f		Run in foreground" \
+      "\n	-b		Background if lease is not immediately obtained" \
+      "\n	-S		Log to syslog too" \
+      "\n	-n		Exit with failure if lease is not immediately obtained" \
+      "\n	-q		Quit after obtaining lease" \
+      "\n	-R		Release IP on quit" \
+-     "\n	-O OPT		Request DHCP option OPT from server" \
+ 	USE_FEATURE_UDHCP_PORT( \
+      "\n	-P N		Use port N instead of default 68" \
+ 	) \
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 7c31448..50b9626 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -476,7 +476,8 @@ static const struct dhcp_client_t ext_dhcp_clients[] = {
+ 		"pump -i %iface% -k",
+ 	},
+ 	{ "udhcpc",
+-		"udhcpc -R -n -p /var/run/udhcpc.%iface%.pid -i %iface%[[ -H %hostname%]][[ -c %clientid%]][[ -s %script%]][[ -t %retries%]]",
++		"udhcpc -R -n -p /var/run/udhcpc.%iface%.pid -i %iface%[[ -H %hostname%]][[ -c %clientid%]]"
++				"[[ -s %script%]][[ %udhcpc_opts%]]",
+ 		"kill `cat /var/run/udhcpc.%iface%.pid` 2>/dev/null",
+ 	},
+ };
+@@ -507,7 +508,7 @@ static int dhcp_up(struct interface_defn_t *ifd, execfn *exec)
+ 		return 0;
+ #endif
+ 	return execute("udhcpc -R -n -p /var/run/udhcpc.%iface%.pid "
+-			"-i %iface%[[ -H %hostname%]][[ -c %clientid%]][[ -s %script%]][[ -t %retries%]]",
++			"-i %iface%[[ -H %hostname%]][[ -c %clientid%]][[ -s %script%]][[ %udhcpc_opts%]]",
+ 			ifd, exec);
+ }
+ #else
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 29d0d9a..f826c1b 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -62,17 +62,20 @@ static void add_param_req_option(struct dhcpMessage *packet)
+ 	int end = end_option(packet->options);
+ 	int i, len = 0;
+ 
+-	packet->options[end + OPT_CODE] = DHCP_PARAM_REQ;
+ 	for (i = 0; (c = dhcp_options[i].code) != 0; i++) {
+-		if ((dhcp_options[i].flags & OPTION_REQ)
++		if (((dhcp_options[i].flags & OPTION_REQ)
++                     && !client_config.no_default_options)
+ 		 || (client_config.opt_mask[c >> 3] & (1 << (c & 7)))
+ 		) {
+ 			packet->options[end + OPT_DATA + len] = c;
+ 			len++;
+ 		}
+ 	}
+-	packet->options[end + OPT_LEN] = len;
+-	packet->options[end + OPT_DATA + len] = DHCP_END;
++	if (len) {
++		packet->options[end + OPT_CODE] = DHCP_PARAM_REQ;
++		packet->options[end + OPT_LEN] = len;
++		packet->options[end + OPT_DATA + len] = DHCP_END;
++	}
+ }
+ 
+ 
+@@ -107,7 +110,9 @@ int send_discover(uint32_t xid, uint32_t requested)
+ 	/* Explicitly saying that we want RFC-compliant packets helps
+ 	 * some buggy DHCP servers to NOT send bigger packets */
+ 	add_simple_option(packet.options, DHCP_MAX_SIZE, htons(576));
++
+ 	add_param_req_option(&packet);
++
+ 	bb_info_msg("Sending discover...");
+ 	return udhcp_send_raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST,
+ 			SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
+@@ -125,8 +130,8 @@ int send_selecting(uint32_t xid, uint32_t server, uint32_t requested)
+ 
+ 	add_simple_option(packet.options, DHCP_REQUESTED_IP, requested);
+ 	add_simple_option(packet.options, DHCP_SERVER_ID, server);
+-
+ 	add_param_req_option(&packet);
++
+ 	addr.s_addr = requested;
+ 	bb_info_msg("Sending select for %s...", inet_ntoa(addr));
+ 	return udhcp_send_raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST,
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index bc06761..fb328cb 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -182,6 +182,7 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		OPT_W = 1 << 21,
+ #endif
+ 		OPT_P = 1 << 22,
++		OPT_o = 1 << 23,
+ 	};
+ #if ENABLE_GETOPT_LONG
+ 	static const char udhcpc_longopts[] ALIGN1 =
+@@ -211,6 +212,7 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #if ENABLE_FEATURE_UDHCP_PORT
+ 		"client-port\0"	   Required_argument "P"
+ #endif
++		"no-default-options\0" No_argument   "o"
+ 		;
+ #endif
+ 	/* Default options. */
+@@ -230,7 +232,7 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	opt = getopt32(argv, "c:CV:fbH:h:F:i:np:qRr:s:T:t:vSA:"
+ 		USE_FEATURE_UDHCPC_ARPING("aW:")
+ 		USE_FEATURE_UDHCP_PORT("P:")
+-		"O:"
++		"O:o"
+ 		, &str_c, &str_V, &str_h, &str_h, &str_F
+ 		, &client_config.interface, &client_config.pidfile, &str_r
+ 		, &client_config.script
+@@ -291,6 +293,8 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		SERVER_PORT = CLIENT_PORT - 1;
+ 	}
+ #endif
++	if (opt & OPT_o)
++		client_config.no_default_options = 1;
+ 	while (list_O) {
+ 		int n = index_in_strings(dhcp_option_strings, list_O->data);
+ 		if (n < 0)
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index d0fde73..c8acd49 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -21,6 +21,7 @@ struct client_config_t {
+ 	char release_on_quit;           /* Perform release on quit */
+ 	char abort_if_no_lease;         /* Abort if no lease */
+ 	char background_if_no_lease;    /* Fork to background if no lease */
++	char no_default_options;        /* Do not include default optins in request */
+ 	const char *interface;          /* The name of the interface to use */
+ 	char *pidfile;                  /* Optionally store the process ID */
+ 	const char *script;             /* User script to run at dhcp events */
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 6a93bd0..043a95b 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -396,6 +396,7 @@ void write_leases(void)
+ 	close(fp);
+ 
+ 	if (server_config.notify_file) {
++// TODO: vfork-based child creation
+ 		char *cmd = xasprintf("%s %s", server_config.notify_file, server_config.lease_file);
+ 		system(cmd);
+ 		free(cmd);
+@@ -406,7 +407,7 @@ void write_leases(void)
+ void read_leases(const char *file)
+ {
+ 	int fp;
+-	unsigned int i = 0;
++	unsigned i;
+ 	struct dhcpOfferedAddr lease;
+ 
+ 	fp = open_or_warn(file, O_RDONLY);
+@@ -414,6 +415,7 @@ void read_leases(const char *file)
+ 		return;
+ 	}
+ 
++	i = 0;
+ 	while (i < server_config.max_leases
+ 	 && full_read(fp, &lease, sizeof(lease)) == sizeof(lease)
+ 	) {
+@@ -422,7 +424,7 @@ void read_leases(const char *file)
+ 		if (y >= server_config.start_ip && y <= server_config.end_ip) {
+ 			lease.expires = ntohl(lease.expires);
+ 			if (!server_config.remaining)
+-				lease.expires -= time(0);
++				lease.expires -= time(NULL);
+ 			if (!(add_lease(lease.chaddr, lease.yiaddr, lease.expires))) {
+ 				bb_error_msg("too many leases while loading %s", file);
+ 				break;

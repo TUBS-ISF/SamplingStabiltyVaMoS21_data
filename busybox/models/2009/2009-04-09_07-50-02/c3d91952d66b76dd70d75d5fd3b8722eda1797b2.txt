@@ -1,0 +1,21 @@
+2009-04-09 07:50:02 +0000
+diff --git a/shell/hush_test/hush-parsing/negate.tests b/shell/hush_test/hush-parsing/negate.tests
+index 72e731f..c25127d 100755
+--- a/shell/hush_test/hush-parsing/negate.tests
++++ b/shell/hush_test/hush-parsing/negate.tests
+@@ -8,9 +8,9 @@ echo $?
+ if ! false; then ! false; echo $?; fi
+ echo $?
+ for a in ! a b c; do echo $a; done
+-for a in ! a b c; do ! echo -n "$a "; echo $?; done
+-for a in ! a b c; do ! /bin/echo -n "$a "; echo $?; done
+-for a in ! a b c; do ! echo -n "$a " | false; echo $?; done
+-for a in ! a b c; do ! echo -n "$a " | true; echo $?; done
+-for a in ! a b c; do ! { echo -n "$a " | false; }; echo $?; done
+-for a in ! a b c; do ! { echo -n "$a " | true; }; echo $?; done
++for a in ! a b c; do ! printf "$a "; echo $?; done
++for a in ! a b c; do ! /usr/bin/printf "$a "; echo $?; done
++for a in ! a b c; do ! printf "$a " | false; echo $?; done
++for a in ! a b c; do ! printf "$a " | true; echo $?; done
++for a in ! a b c; do ! { printf "$a " | false; }; echo $?; done
++for a in ! a b c; do ! { printf "$a " | true; }; echo $?; done

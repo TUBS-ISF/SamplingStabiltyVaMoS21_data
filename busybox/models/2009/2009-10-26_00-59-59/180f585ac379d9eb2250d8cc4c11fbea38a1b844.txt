@@ -1,0 +1,29 @@
+2009-10-26 00:59:59 +0100
+diff --git a/include/libbb.h b/include/libbb.h
+index 6274ea2..9865121 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1222,7 +1222,7 @@ enum {
+ 	KEYCODE_FUN11    = -22,
+ 	KEYCODE_FUN12    = -23,
+ #endif
+-	KEYCODE_CURSOR_POS = -0x100,
++	KEYCODE_CURSOR_POS = -0x100, /* 0xfff..fff00 */
+ 	/* How long is the longest ESC sequence we know?
+ 	 * We want it big enough to be able to contain
+ 	 * cursor position sequence "ESC [ 9999 ; 9999 R"
+diff --git a/libbb/read_key.c b/libbb/read_key.c
+index 88ea79d..02c381d 100644
+--- a/libbb/read_key.c
++++ b/libbb/read_key.c
+@@ -83,8 +83,8 @@ int64_t FAST_FUNC read_key(int fd, char *buffer)
+ 		/* ESC [ 2 4 ; 5 ~ - Ctrl-F12 */
+ 		/* ESC [ 2 4 ; 6 ~ - Ctrl-Shift-F12 */
+ #endif
+-		'[','1',';','5','A' |0x80,KEYCODE_CTRL_UP   ,
+-		'[','1',';','5','B' |0x80,KEYCODE_CTRL_DOWN ,
++		/* '[','1',';','5','A' |0x80,KEYCODE_CTRL_UP   , - unused */
++		/* '[','1',';','5','B' |0x80,KEYCODE_CTRL_DOWN , - unused */
+ 		'[','1',';','5','C' |0x80,KEYCODE_CTRL_RIGHT,
+ 		'[','1',';','5','D' |0x80,KEYCODE_CTRL_LEFT ,
+ 		0

@@ -1,0 +1,54 @@
+2007-10-07 21:00:41 +0000
+diff --git a/applets/applets.c b/applets/applets.c
+index 49ad859..55f8e6b 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -538,7 +538,7 @@ void run_applet_and_exit(const char *name, char **argv)
+ 
+ int main(int argc, char **argv)
+ {
+-	bbox_prepare_main();
++	bbox_prepare_main(argv);
+ 
+ #if !BB_MMU
+ 	/* NOMMU re-exec trick sets high-order bit in first byte of name */
+diff --git a/include/busybox.h b/include/busybox.h
+index 3ab90d5..1ab51cf 100644
+--- a/include/busybox.h
++++ b/include/busybox.h
+@@ -51,6 +51,6 @@ struct bb_applet {
+ /* Defined in appletlib.c */
+ extern const struct bb_applet applets[];
+ extern const unsigned short NUM_APPLETS;
+-void bbox_prepare_main(void);
++void bbox_prepare_main(char **argv);
+ 
+ #endif	/* _BB_INTERNAL_H_ */
+diff --git a/scripts/trylink b/scripts/trylink
+index e756461..d6538f1 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -155,20 +155,17 @@ if test "$CONFIG_FEATURE_INDIVIDUAL" = y; then
+     | grep -v "^#" \
+     | grep -v "^$" \
+     > applet.lst
+-    while read name main cname; do
+-
+-	test x"$cname" = "x[" && cname=test
+-	test x"$cname" = "x[[" && cname=test
++    while read name main junk; do
+ 
+ 	echo "\
+-void bbox_prepare_main(void);
++void bbox_prepare_main(char **argv);
+ int $main(int argc, char **argv);
+ 
+ const char *applet_name = \"$name\";
+ 
+ int main(int argc, char **argv)
+ {
+-	bbox_prepare_main();
++	bbox_prepare_main(argv);
+ 	return $main(argc, argv);
+ }
+ " >"$sharedlib_dir/applet.c"

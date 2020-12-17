@@ -1,0 +1,83 @@
+2008-01-28 22:47:03 +0000
+diff --git a/include/applets.h b/include/applets.h
+index 830ff28..a78ce1c 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -299,6 +299,7 @@ USE_RUNSV(APPLET(runsv, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_RUNSVDIR(APPLET(runsvdir, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_RX(APPLET(rx, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_SED(APPLET(sed, _BB_DIR_BIN, _BB_SUID_NEVER))
++USE_SENDMAIL(APPLET(sendmail, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_SELINUXENABLED(APPLET(selinuxenabled, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_SEQ(APPLET_NOFORK(seq, seq, _BB_DIR_USR_BIN, _BB_SUID_NEVER, seq))
+ USE_SESTATUS(APPLET(sestatus, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index 2fa8780..0ef17b5 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3134,6 +3134,29 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+ #define selinuxenabled_trivial_usage
+ #define selinuxenabled_full_usage
+ 
++#define sendmail_trivial_usage \
++       "[-d] {-t to}+ [-f from] [-n[notify]] [-s subject] [-b file]*\n" \
++       "[-a attachment]* [-c charset] [-w timeout] [-h server] [-p port] [-U user] [-P password]"
++#define sendmail_full_usage \
++       "Send an email from to with subject and optional attachments.\n" \
++       "Body is read from stdin or from optional files" \
++       "\n\nArguments:\n" \
++       "	-d		Just dump composed message\n" \
++       "	-t to		Recipient email. May be multiple\n" \
++       "	-f from		Sender email\n" \
++       "	-n[notify]	Optional notification address. If just -n given then notifies the sender\n" \
++       "	-s subject	Optional subject\n" \
++       "	-b filename	Optional body content file. May be multiple\n" \
++       "	-a filename	Optional file attachment. May be multiple\n" \
++       "	-c charset	Assumed charset for body and subject [koi8-r]" \
++       USE_FEATURE_SENDMAIL_NETWORK("\n" \
++       "	-w timeout	Set timeout on network operations\n" \
++       "	-h server	Optional mail server name or IP [127.0.0.1]\n" \
++       "	-p port		Optional mail server port [25]\n" \
++       "	-U username	Authenticate using AUTH LOGIN with specified username\n" \
++       "	-P password	Authenticate using AUTH LOGIN with specified password"\
++       )
++
+ #define seq_trivial_usage \
+        "[first [increment]] last"
+ #define seq_full_usage \
+diff --git a/networking/Config.in b/networking/Config.in
+index f1f7ae0..cd986b8 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -665,6 +665,19 @@ config ROUTE
+ 	help
+ 	  Route displays or manipulates the kernel's IP routing tables.
+ 
++config SENDMAIL
++	bool "sendmail"
++	default n
++	help
++	  Barebones sendmail.
++
++config FEATURE_SENDMAIL_NETWORK
++	bool "Support network connectivity"
++	default y
++	depends on SENDMAIL
++	help
++	  Add ability to send, not only compose messages.
++
+ config SLATTACH
+ 	bool "slattach"
+ 	default n
+diff --git a/networking/Kbuild b/networking/Kbuild
+index 3bcbe02..2819e85 100644
+--- a/networking/Kbuild
++++ b/networking/Kbuild
+@@ -28,6 +28,7 @@ lib-$(CONFIG_PING)         += ping.o
+ lib-$(CONFIG_PING6)        += ping.o
+ lib-$(CONFIG_PSCAN)        += pscan.o
+ lib-$(CONFIG_ROUTE)        += route.o
++lib-$(CONFIG_SENDMAIL)     += sendmail.o
+ lib-$(CONFIG_SLATTACH)     += slattach.o
+ lib-$(CONFIG_TELNET)       += telnet.o
+ lib-$(CONFIG_TELNETD)      += telnetd.o

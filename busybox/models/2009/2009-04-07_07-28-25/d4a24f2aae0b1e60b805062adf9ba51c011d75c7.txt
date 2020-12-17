@@ -1,0 +1,13 @@
+2009-04-07 07:28:25 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 1740187..dc59d73 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -40,7 +40,6 @@
+  * POSIX syntax not implemented:
+  *      aliases
+  *      <(list) and >(list) Process Substitution
+- *      Here Documents ( << word )
+  *      Functions
+  *      Tilde Expansion
+  *

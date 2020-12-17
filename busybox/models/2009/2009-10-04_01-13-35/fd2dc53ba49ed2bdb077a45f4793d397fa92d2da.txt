@@ -1,0 +1,14 @@
+2009-10-04 01:13:35 +0200
+diff --git a/networking/libiproute/utils.c b/networking/libiproute/utils.c
+index 5f09717..85034c0 100644
+--- a/networking/libiproute/utils.c
++++ b/networking/libiproute/utils.c
+@@ -136,7 +136,7 @@ static int get_prefix_1(inet_prefix *dst, char *arg, int family)
+ 				if (!(host & (host + 1))) {
+ 					for (plen = 0; mask; mask <<= 1)
+ 						++plen;
+-					if (plen >= 0 && plen <= dst->bitlen) {
++					if (plen <= dst->bitlen) {
+ 						dst->bitlen = plen;
+ 						/* dst->flags |= PREFIXLEN_SPECIFIED; */
+ 					} else

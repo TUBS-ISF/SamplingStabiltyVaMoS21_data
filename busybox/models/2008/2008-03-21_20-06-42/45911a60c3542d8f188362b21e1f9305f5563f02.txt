@@ -1,0 +1,19 @@
+2008-03-21 20:06:42 +0000
+diff --git a/docs/busybox.net/news.html b/docs/busybox.net/news.html
+index a1af9b2..bba96b4 100644
+--- a/docs/busybox.net/news.html
++++ b/docs/busybox.net/news.html
+@@ -1,12 +1,9 @@
+ <!--#include file="header.html" -->
+ 
+ <ul>
+-<!--#include file="header.html" -->
+-
+-<ul>
+   <li><b>21 March 2008 -- BusyBox stable releases</b>
+     <p>
+-    Bugfix-only releases for four past brances. Links to locations
++    Bugfix-only releases for four past branches. Links to locations
+     for future hot patches are in parentheses.
+     <p>
+     <a href=http://busybox.net/downloads/busybox-1.9.2.tar.bz2>1.9.2</a>

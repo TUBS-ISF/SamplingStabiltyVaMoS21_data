@@ -1,0 +1,50 @@
+2008-04-21 05:05:17 +0000
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index aa626c2..c4eb108 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -437,11 +437,11 @@ config RX
+ 	help
+ 	  Receive files using the Xmodem protocol.
+ 
+-config SCRIPT
+-	bool "script"
++config SETSID
++	bool "setsid"
+ 	default n
+ 	help
+-	  The script makes typescript of terminal session.
++	  setsid runs a program in a new session
+ 
+ config STRINGS
+ 	bool "strings"
+@@ -450,12 +450,6 @@ config STRINGS
+ 	  strings prints the printable character sequences for each file
+ 	  specified.
+ 
+-config SETSID
+-	bool "setsid"
+-	default n
+-	help
+-	  setsid runs a program in a new session
+-
+ config TASKSET
+ 	bool "taskset"
+ 	default n
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 869ec61..8b5bf75 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -717,6 +717,12 @@ config RTCWAKE
+ 	help
+ 	  Enter a system sleep state until specified wakeup time.
+ 
++config SCRIPT
++	bool "script"
++	default n
++	help
++	  The script makes typescript of terminal session.
++
+ config SETARCH
+ 	bool "setarch"
+ 	default n

@@ -1,0 +1,15 @@
+2007-05-30 00:55:52 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 7aad6e6..2a4076e 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3151,7 +3151,9 @@ static FILE *generate_stream_from_list(struct pipe *head)
+ 			close(channel[1]);
+ 		}
+ 		/* Prevent it from trying to handle ctrl-z etc */
++#if ENABLE_HUSH_JOB
+ 		run_list_level = 1;
++#endif
+ 		/* Process substitution is not considered to be usual
+ 		 * 'command execution'.
+ 		 * SUSv3 says ctrl-Z should be ignored, ctrl-C should not. */

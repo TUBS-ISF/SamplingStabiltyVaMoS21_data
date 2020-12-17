@@ -1,0 +1,1597 @@
+2008-03-17 09:21:26 +0000
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index 29c7580..e628568 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -510,8 +510,6 @@ CONFIG_FEATURE_VOLUMEID_HPFS=y
+ CONFIG_FEATURE_VOLUMEID_ROMFS=y
+ CONFIG_FEATURE_VOLUMEID_SYSV=y
+ CONFIG_FEATURE_VOLUMEID_MINIX=y
+-CONFIG_FEATURE_VOLUMEID_MAC=y
+-CONFIG_FEATURE_VOLUMEID_MSDOS=y
+ CONFIG_FEATURE_VOLUMEID_OCFS2=y
+ CONFIG_FEATURE_VOLUMEID_HIGHPOINTRAID=y
+ CONFIG_FEATURE_VOLUMEID_ISWRAID=y
+diff --git a/include/applets.h b/include/applets.h
+index c2a089c..13c4648 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -155,7 +155,7 @@ USE_FDISK(APPLET(fdisk, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_FETCHMAIL(APPLET_ODDNAME(fetchmail, sendgetmail, _BB_DIR_USR_BIN, _BB_SUID_NEVER, fetchmail))
+ USE_FEATURE_GREP_FGREP_ALIAS(APPLET_NOUSAGE(fgrep, grep, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_FIND(APPLET_NOEXEC(find, find, _BB_DIR_USR_BIN, _BB_SUID_NEVER, find))
+-//USE_FINDFS(APPLET_NOUSAGE(findfs, tune2fs, _BB_DIR_SBIN, _BB_SUID_NEVER))
++USE_FINDFS(APPLET(findfs, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_FOLD(APPLET(fold, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_FREE(APPLET(free, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_FREERAMDISK(APPLET(freeramdisk, _BB_DIR_SBIN, _BB_SUID_NEVER))
+diff --git a/scripts/defconfig b/scripts/defconfig
+index a42f6e4..6dbe5d1 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -506,8 +506,6 @@ CONFIG_FEATURE_USE_TERMIOS=y
+ # CONFIG_FEATURE_VOLUMEID_ROMFS is not set
+ # CONFIG_FEATURE_VOLUMEID_SYSV is not set
+ # CONFIG_FEATURE_VOLUMEID_MINIX is not set
+-# CONFIG_FEATURE_VOLUMEID_MAC is not set
+-# CONFIG_FEATURE_VOLUMEID_MSDOS is not set
+ # CONFIG_FEATURE_VOLUMEID_OCFS2 is not set
+ # CONFIG_FEATURE_VOLUMEID_HIGHPOINTRAID is not set
+ # CONFIG_FEATURE_VOLUMEID_ISWRAID is not set
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 25c7a1e..a1e843a 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -159,7 +159,7 @@ config FINDFS
+ 	  package.  However, the e2fsprogs version only support ext2/3.  This
+ 	  version supports those in addition to FAT, swap, and ReiserFS.
+ 	  WARNING:
+-	  With all submodules selected, it will add ~11k to busybox.
++	  With all submodules selected, it will add ~9k to busybox.
+ 
+ config FREERAMDISK
+ 	bool "freeramdisk"
+@@ -518,19 +518,20 @@ config FEATURE_VOLUMEID_MINIX
+ 	help
+ 	  TODO
+ 
+-config FEATURE_VOLUMEID_MAC
+-	bool "mac filesystem"
+-	default n
+-	depends on VOLUMEID
+-	help
+-	  TODO
+-
+-config FEATURE_VOLUMEID_MSDOS
+-	bool "msdos filesystem"
+-	default n
+-	depends on VOLUMEID
+-	help
+-	  TODO
++### These only detect partition tables - not used (yet?)
++### config FEATURE_VOLUMEID_MAC
++### 	bool "mac filesystem"
++### 	default n
++### 	depends on VOLUMEID
++### 	help
++### 	  TODO
++### 
++### config FEATURE_VOLUMEID_MSDOS
++### 	bool "msdos filesystem"
++### 	default n
++### 	depends on VOLUMEID
++### 	help
++### 	  TODO
+ 
+ config FEATURE_VOLUMEID_OCFS2
+ 	bool "ocfs2 filesystem"
+@@ -638,7 +639,6 @@ config FEATURE_MOUNT_LABEL
+ 	bool "Support specifiying devices by label or UUID"
+ 	default n
+ 	depends on MOUNT
+-	select FINDFS
+ 	help
+ 	  This allows for specifying a device by label or uuid, rather than by
+ 	  name.  This feature utilizes the same functionality as findfs.
+diff --git a/util-linux/Kbuild b/util-linux/Kbuild
+index 0f33c6b..b4e0515 100644
+--- a/util-linux/Kbuild
++++ b/util-linux/Kbuild
+@@ -5,31 +5,31 @@
+ # Licensed under the GPL v2, see the file LICENSE in this tarball.
+ 
+ lib-y:=
+-lib-$(CONFIG_DMESG)		+=dmesg.o
+-lib-$(CONFIG_FBSET)		+=fbset.o
+-lib-$(CONFIG_FDFLUSH)		+=freeramdisk.o
+-lib-$(CONFIG_FDFORMAT)		+=fdformat.o
+-lib-$(CONFIG_FDISK)		+=fdisk.o
+-lib-$(CONFIG_FINDFS)		+=findfs.o
+-lib-$(CONFIG_FREERAMDISK)	+=freeramdisk.o
+-lib-$(CONFIG_FSCK_MINIX)	+=fsck_minix.o
+-lib-$(CONFIG_GETOPT)		+=getopt.o
+-lib-$(CONFIG_HEXDUMP)		+=hexdump.o
+-lib-$(CONFIG_HWCLOCK)		+=hwclock.o
+-lib-$(CONFIG_IPCRM)		+=ipcrm.o
+-lib-$(CONFIG_IPCS)		+=ipcs.o
+-lib-$(CONFIG_LOSETUP)		+=losetup.o
+-lib-$(CONFIG_MDEV)		+=mdev.o
+-lib-$(CONFIG_MKFS_MINIX)	+=mkfs_minix.o
+-lib-$(CONFIG_MKSWAP)		+=mkswap.o
+-lib-$(CONFIG_MORE)		+=more.o
+-lib-$(CONFIG_MOUNT)		+=mount.o
+-lib-$(CONFIG_PIVOT_ROOT)	+=pivot_root.o
+-lib-$(CONFIG_RDATE)		+=rdate.o
+-lib-$(CONFIG_READPROFILE)	+=readprofile.o
+-lib-$(CONFIG_RTCWAKE)		+=rtcwake.o
+-lib-$(CONFIG_SCRIPT)		+=script.o
+-lib-$(CONFIG_SETARCH)		+=setarch.o
+-lib-$(CONFIG_SWAPONOFF)		+=swaponoff.o
+-lib-$(CONFIG_SWITCH_ROOT)	+=switch_root.o
+-lib-$(CONFIG_UMOUNT)		+=umount.o
++lib-$(CONFIG_DMESG)		+= dmesg.o
++lib-$(CONFIG_FBSET)		+= fbset.o
++lib-$(CONFIG_FDFLUSH)		+= freeramdisk.o
++lib-$(CONFIG_FDFORMAT)		+= fdformat.o
++lib-$(CONFIG_FDISK)		+= fdisk.o
++lib-$(CONFIG_FINDFS)		+= findfs.o
++lib-$(CONFIG_FREERAMDISK)	+= freeramdisk.o
++lib-$(CONFIG_FSCK_MINIX)	+= fsck_minix.o
++lib-$(CONFIG_GETOPT)		+= getopt.o
++lib-$(CONFIG_HEXDUMP)		+= hexdump.o
++lib-$(CONFIG_HWCLOCK)		+= hwclock.o
++lib-$(CONFIG_IPCRM)		+= ipcrm.o
++lib-$(CONFIG_IPCS)		+= ipcs.o
++lib-$(CONFIG_LOSETUP)		+= losetup.o
++lib-$(CONFIG_MDEV)		+= mdev.o
++lib-$(CONFIG_MKFS_MINIX)	+= mkfs_minix.o
++lib-$(CONFIG_MKSWAP)		+= mkswap.o
++lib-$(CONFIG_MORE)		+= more.o
++lib-$(CONFIG_MOUNT)		+= mount.o
++lib-$(CONFIG_PIVOT_ROOT)	+= pivot_root.o
++lib-$(CONFIG_RDATE)		+= rdate.o
++lib-$(CONFIG_READPROFILE)	+= readprofile.o
++lib-$(CONFIG_RTCWAKE)		+= rtcwake.o
++lib-$(CONFIG_SCRIPT)		+= script.o
++lib-$(CONFIG_SETARCH)		+= setarch.o
++lib-$(CONFIG_SWAPONOFF)		+= swaponoff.o
++lib-$(CONFIG_SWITCH_ROOT)	+= switch_root.o
++lib-$(CONFIG_UMOUNT)		+= umount.o
+diff --git a/util-linux/volume_id/Kbuild b/util-linux/volume_id/Kbuild
+index c2eb015..96cd880 100644
+--- a/util-linux/volume_id/Kbuild
++++ b/util-linux/volume_id/Kbuild
+@@ -25,8 +25,9 @@ lib-$(CONFIG_FEATURE_VOLUMEID_JFS)              += jfs.o
+ lib-$(CONFIG_FEATURE_VOLUMEID_LINUXRAID)        += linux_raid.o
+ lib-$(CONFIG_FEATURE_VOLUMEID_LINUXSWAP)        += linux_swap.o
+ lib-$(CONFIG_FEATURE_VOLUMEID_LVM)              += lvm.o
+-lib-$(CONFIG_FEATURE_VOLUMEID_MAC)              += mac.o
+-lib-$(CONFIG_FEATURE_VOLUMEID_MSDOS)            += msdos.o
++### unused
++### lib-$(CONFIG_FEATURE_VOLUMEID_MAC)              += mac.o
++### lib-$(CONFIG_FEATURE_VOLUMEID_MSDOS)            += msdos.o
+ lib-$(CONFIG_FEATURE_VOLUMEID_NTFS)             += ntfs.o
+ lib-$(CONFIG_FEATURE_VOLUMEID_REISERFS)         += reiserfs.o
+ lib-$(CONFIG_FEATURE_VOLUMEID_UDF)              += udf.o
+diff --git a/util-linux/volume_id/cramfs.c b/util-linux/volume_id/cramfs.c
+index fd6e875..63b0c7c 100644
+--- a/util-linux/volume_id/cramfs.c
++++ b/util-linux/volume_id/cramfs.c
+@@ -21,7 +21,7 @@
+ #include "volume_id_internal.h"
+ 
+ struct cramfs_super {
+-	uint8_t		magic[4];
++	uint32_t	magic;
+ 	uint32_t	size;
+ 	uint32_t	flags;
+ 	uint32_t	future;
+@@ -45,12 +45,12 @@ int volume_id_probe_cramfs(struct volume_id *id, uint64_t off)
+ 	if (cs == NULL)
+ 		return -1;
+ 
+-	if (memcmp(cs->magic, "\x45\x3d\xcd\x28", 4) == 0) {
+-		volume_id_set_label_raw(id, cs->name, 16);
++	if (cs->magic == cpu_to_be32(0x453dcd28)) {
++//		volume_id_set_label_raw(id, cs->name, 16);
+ 		volume_id_set_label_string(id, cs->name, 16);
+ 
+-		volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-		id->type = "cramfs";
++//		volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//		id->type = "cramfs";
+ 		return 0;
+ 	}
+ 
+diff --git a/util-linux/volume_id/ext.c b/util-linux/volume_id/ext.c
+index 3c07f53..db29dae 100644
+--- a/util-linux/volume_id/ext.c
++++ b/util-linux/volume_id/ext.c
+@@ -47,25 +47,27 @@ int volume_id_probe_ext(struct volume_id *id, uint64_t off)
+ {
+ 	struct ext2_super_block *es;
+ 
+-	dbg("probing at offset 0x%llx", (unsigned long long) off);
++	dbg("ext: probing at offset 0x%llx", (unsigned long long) off);
+ 
+ 	es = volume_id_get_buffer(id, off + EXT_SUPERBLOCK_OFFSET, 0x200);
+ 	if (es == NULL)
+ 		return -1;
+ 
+-	if (es->magic[0] != 0123 ||
+-	    es->magic[1] != 0357)
++	if (es->magic[0] != 0123 || es->magic[1] != 0357) {
++		dbg("ext: no magic found");
+ 		return -1;
++	}
+ 
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	volume_id_set_label_raw(id, es->volume_name, 16);
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	volume_id_set_label_raw(id, es->volume_name, 16);
+ 	volume_id_set_label_string(id, es->volume_name, 16);
+ 	volume_id_set_uuid(id, es->uuid, UUID_DCE);
++	dbg("ext: label '%s' uuid '%s'", id->label, id->uuid);
+ 
+-	if ((le32_to_cpu(es->feature_compat) & EXT3_FEATURE_COMPAT_HAS_JOURNAL) != 0)
+-		id->type = "ext3";
+-	else
+-		id->type = "ext2";
++//	if ((le32_to_cpu(es->feature_compat) & EXT3_FEATURE_COMPAT_HAS_JOURNAL) != 0)
++//		id->type = "ext3";
++//	else
++//		id->type = "ext2";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/fat.c b/util-linux/volume_id/fat.c
+index 4c2a917..779971c 100644
+--- a/util-linux/volume_id/fat.c
++++ b/util-linux/volume_id/fat.c
+@@ -227,14 +227,16 @@ int volume_id_probe_vfat(struct volume_id *id, uint64_t off)
+ 	cluster_count /= vs->sectors_per_cluster;
+ 	dbg("cluster_count 0x%x", cluster_count);
+ 
+-	if (cluster_count < FAT12_MAX) {
+-		strcpy(id->type_version, "FAT12");
+-	} else if (cluster_count < FAT16_MAX) {
+-		strcpy(id->type_version, "FAT16");
+-	} else {
+-		strcpy(id->type_version, "FAT32");
++//	if (cluster_count < FAT12_MAX) {
++//		strcpy(id->type_version, "FAT12");
++//	} else if (cluster_count < FAT16_MAX) {
++//		strcpy(id->type_version, "FAT16");
++//	} else {
++//		strcpy(id->type_version, "FAT32");
++//		goto fat32;
++//	}
++	if (cluster_count >= FAT16_MAX)
+ 		goto fat32;
+-	}
+ 
+ 	/* the label may be an attribute in the root directory */
+ 	root_start = (reserved + fat_size) * sector_size;
+@@ -256,10 +258,10 @@ int volume_id_probe_vfat(struct volume_id *id, uint64_t off)
+ 		return -1;
+ 
+ 	if (label != NULL && memcmp(label, "NO NAME    ", 11) != 0) {
+-		volume_id_set_label_raw(id, label, 11);
++//		volume_id_set_label_raw(id, label, 11);
+ 		volume_id_set_label_string(id, label, 11);
+ 	} else if (memcmp(vs->type.fat.label, "NO NAME    ", 11) != 0) {
+-		volume_id_set_label_raw(id, vs->type.fat.label, 11);
++//		volume_id_set_label_raw(id, vs->type.fat.label, 11);
+ 		volume_id_set_label_string(id, vs->type.fat.label, 11);
+ 	}
+ 	volume_id_set_uuid(id, vs->type.fat.serno, UUID_DOS);
+@@ -317,17 +319,17 @@ int volume_id_probe_vfat(struct volume_id *id, uint64_t off)
+ 		return -1;
+ 
+ 	if (label != NULL && memcmp(label, "NO NAME    ", 11) != 0) {
+-		volume_id_set_label_raw(id, label, 11);
++//		volume_id_set_label_raw(id, label, 11);
+ 		volume_id_set_label_string(id, label, 11);
+ 	} else if (memcmp(vs->type.fat32.label, "NO NAME    ", 11) != 0) {
+-		volume_id_set_label_raw(id, vs->type.fat32.label, 11);
++//		volume_id_set_label_raw(id, vs->type.fat32.label, 11);
+ 		volume_id_set_label_string(id, vs->type.fat32.label, 11);
+ 	}
+ 	volume_id_set_uuid(id, vs->type.fat32.serno, UUID_DOS);
+ 
+  found:
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "vfat";
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "vfat";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/get_devname.c b/util-linux/volume_id/get_devname.c
+index af03d07..bb3043c 100644
+--- a/util-linux/volume_id/get_devname.c
++++ b/util-linux/volume_id/get_devname.c
+@@ -10,22 +10,19 @@
+ 
+ #include "volume_id_internal.h"
+ 
+-#define BLKGETSIZE64 _IOR(0x12,114,size_t)
+-
+-#define PROC_PARTITIONS "/proc/partitions"
+-#define PROC_CDROMS	"/proc/sys/dev/cdrom/info"
+-#define DEVLABELDIR	"/dev"
+-#define SYS_BLOCK	"/sys/block"
++//#define BLKGETSIZE64 _IOR(0x12,114,size_t)
+ 
+ static struct uuidCache_s {
+ 	struct uuidCache_s *next;
+-	char uuid[16];
++//	int major, minor;
+ 	char *device;
+ 	char *label;
+-	int major, minor;
++	char *uc_uuid; /* prefix makes it easier to grep for */
+ } *uuidCache;
+ 
+-/* for now, only ext2, ext3 and xfs are supported */
++/* Returns !0 on error.
++ * Otherwise, returns malloc'ed strings for label and uuid
++ * (and they can't be NULL, although they can be "") */
+ #if !ENABLE_FEATURE_VOLUMEID_ISO9660
+ #define get_label_uuid(device, label, uuid, iso_only) \
+ 	get_label_uuid(device, label, uuid)
+@@ -38,15 +35,18 @@ get_label_uuid(const char *device, char **label, char **uuid, int iso_only)
+ 	struct volume_id *vid;
+ 
+ 	vid = volume_id_open_node(device);
++	if (!vid)
++		return rv;
+ 
+-	if (ioctl(vid->fd, BLKGETSIZE64, &size) != 0) {
++	if (ioctl(vid->fd, BLKGETSIZE64, &size) != 0)
+ 		size = 0;
+-	}
+ 
+ #if ENABLE_FEATURE_VOLUMEID_ISO9660
+-	if (iso_only ?
+-	    volume_id_probe_iso9660(vid, 0) != 0 :
+-	    volume_id_probe_all(vid, 0, size) != 0) {
++	if ((iso_only ?
++	     volume_id_probe_iso9660(vid, 0) :
++	     volume_id_probe_all(vid, 0, size)
++	    ) != 0
++	) {
+ 		goto ret;
+ 	}
+ #else
+@@ -55,10 +55,10 @@ get_label_uuid(const char *device, char **label, char **uuid, int iso_only)
+ 	}
+ #endif
+ 
+-	if (vid->label[0] != '\0') {
++	if (vid->label[0] != '\0' || vid->uuid[0] != '\0') {
+ 		*label = xstrndup(vid->label, sizeof(vid->label));
+ 		*uuid  = xstrndup(vid->uuid, sizeof(vid->uuid));
+-		printf("Found label %s on %s (uuid:%s)\n", *label, device, *uuid);
++		dbg("found label '%s', uuid '%s' on %s", *label, *uuid, device);
+ 		rv = 0;
+ 	}
+  ret:
+@@ -66,8 +66,9 @@ get_label_uuid(const char *device, char **label, char **uuid, int iso_only)
+ 	return rv;
+ }
+ 
++/* NB: we take ownership of (malloc'ed) label and uuid */
+ static void
+-uuidcache_addentry(char * device, int major, int minor, char *label, char *uuid)
++uuidcache_addentry(char *device, /*int major, int minor,*/ char *label, char *uuid)
+ {
+ 	struct uuidCache_s *last;
+     
+@@ -80,13 +81,16 @@ uuidcache_addentry(char * device, int major, int minor, char *label, char *uuid)
+ 		last = last->next;
+ 	}
+ 	/*last->next = NULL; - xzalloc did it*/
+-	last->label = label;
++//	last->major = major;
++//	last->minor = minor;
+ 	last->device = device;
+-	last->major = major;
+-	last->minor = minor;
+-	memcpy(last->uuid, uuid, sizeof(last->uuid));
++	last->label = label;
++	last->uc_uuid = uuid;
+ }
+ 
++/* If get_label_uuid() on device_name returns success,
++ * add a cache entry for this device.
++ * If device node does not exist, it will be temporarily created. */
+ #if !ENABLE_FEATURE_VOLUMEID_ISO9660
+ #define uuidcache_check_device(device_name, ma, mi, iso_only) \
+ 	uuidcache_check_device(device_name, ma, mi)
+@@ -94,45 +98,62 @@ uuidcache_addentry(char * device, int major, int minor, char *label, char *uuid)
+ static void
+ uuidcache_check_device(const char *device_name, int ma, int mi, int iso_only)
+ {
+-	char device[110];
+-	char *uuid = NULL, *label = NULL;
++	char *device, *last_slash;
++	char *uuid, *label;
+ 	char *ptr;
+-	char *deviceDir = NULL;
+-	int mustRemove = 0;
+-	int mustRemoveDir = 0;
+-	int i;
++	int must_remove = 0;
++	int added = 0;
++
++	last_slash = NULL;
++	device = xasprintf("/dev/%s", device_name);
++	if (access(device, F_OK) != 0) {
++		/* device does not exist, temporarily create */
++		int slash_cnt = 0;
++
++		if ((ma | mi) < 0)
++			goto ret; /* we don't know major:minor! */
+ 
+-	sprintf(device, "%s/%s", DEVLABELDIR, device_name);
+-	if (access(device, F_OK)) {
+ 		ptr = device;
+-		i = 0;
+ 		while (*ptr)
+ 			if (*ptr++ == '/')
+-				i++;
+-		if (i > 2) {
+-			deviceDir = alloca(strlen(device) + 1);
+-			strcpy(deviceDir, device);
+-			ptr = deviceDir + (strlen(device) - 1);
+-			while (*ptr != '/')
+-				*ptr-- = '\0';
+-			if (mkdir(deviceDir, 0644)) {
+-				printf("mkdir: cannot create directory %s: %d\n", deviceDir, errno);
++				slash_cnt++;
++		if (slash_cnt > 2) {
++// BUG: handles only slash_cnt == 3 case
++			last_slash = strrchr(device, '/');
++			*last_slash = '\0';
++			if (mkdir(device, 0644)) {
++				bb_perror_msg("can't create directory %s", device);
++				*last_slash = '/';
++				last_slash = NULL; /* prevents rmdir */
+ 			} else {
+-				mustRemoveDir = 1;
++				*last_slash = '/';
+ 			}
+ 		}
+-
+ 		mknod(device, S_IFBLK | 0600, makedev(ma, mi));
+-		mustRemove = 1;
++		must_remove = 1;
++	}
++
++	uuid = NULL;
++	label = NULL;
++	if (get_label_uuid(device, &label, &uuid, iso_only) == 0) {
++		uuidcache_addentry(device, /*ma, mi,*/ label, uuid);
++		/* "device" is owned by cache now, don't free */
++		added = 1;
+ 	}
+-	if (!get_label_uuid(device, &label, &uuid, iso_only))
+-		uuidcache_addentry(strdup(device), ma, mi, 
+-				   label, uuid);
+ 
+-	if (mustRemove) unlink(device);
+-	if (mustRemoveDir) rmdir(deviceDir);
++	if (must_remove)
++		unlink(device);
++	if (last_slash) {
++		*last_slash = '\0';
++		rmdir(device);
++	}
++ ret:
++	if (!added)
++		free(device);
+ }
+ 
++/* Run uuidcache_check_device() for every device mentioned
++ * in /proc/partitions */
+ static void
+ uuidcache_init_partitions(void)
+ {
+@@ -144,7 +165,7 @@ uuidcache_init_partitions(void)
+ 	int handleOnFirst;
+ 	char *chptr;
+ 
+-	procpt = xfopen(PROC_PARTITIONS, "r");
++	procpt = xfopen("/proc/partitions", "r");
+ /*
+ # cat /proc/partitions
+ major minor  #blocks  name
+@@ -165,7 +186,7 @@ major minor  #blocks  name
+ 			   diet's sscanf is quite limited */
+ 			chptr = line;
+ 			if (*chptr != ' ') continue;
+-			chptr++;
++			chptr = skip_whitespace(chptr);
+ 
+ 			ma = bb_strtou(chptr, &chptr, 0);
+ 			if (ma < 0) continue;
+@@ -185,6 +206,8 @@ major minor  #blocks  name
+ 
+ 			*strchrnul(chptr, '\n') = '\0';
+ 			/* now chptr => device name */
++			dbg("/proc/partitions: maj:%d min:%d sz:%llu name:'%s'",
++						ma, mi, sz, chptr);
+ 			if (!chptr[0])
+ 				continue;
+ 
+@@ -203,36 +226,35 @@ major minor  #blocks  name
+ 	fclose(procpt);
+ }
+ 
+-static int
++static void
+ dev_get_major_minor(char *device_name, int *major, int *minor)
+ {
+-	char * dev_path;
+-	int fd;
+-	char dev[7];
+-	char *major_ptr, *minor_ptr;
+-
+-	dev_path = alloca(strlen(SYS_BLOCK) + strlen(device_name) + 6);
+-	sprintf(dev_path, "%s/%s/dev", SYS_BLOCK, device_name);
+-
+-	fd = open(dev_path, O_RDONLY);
+-	if (fd < 0) return 1;
+-	full_read(fd, dev, sizeof(dev));
+-	close(fd);
+-
+-	major_ptr = dev;
+-	minor_ptr = strchr(dev, ':');
+-	if (!minor_ptr) return 1;
+-	*minor_ptr++ = '\0';
++	char dev[16];
++	char *dev_path;
++	char *colon;
++	int sz;
++
++	dev_path = xasprintf("/sys/block/%s/dev", device_name);
++	sz = open_read_close(dev_path, dev, sizeof(dev) - 1);
++	if (sz < 0)
++		goto ret;
++	dev[sz] = '\0';
+ 
+-	*major = strtol(major_ptr, NULL, 10);
+-	*minor = strtol(minor_ptr, NULL, 10);
++	colon = strchr(dev, ':');
++	if (!colon)
++		goto ret;
++	*major = strtol(dev, NULL, 10);
++	*minor = strtol(colon + 1, NULL, 10);
+ 
+-	return 0;
++ ret:
++	free(dev_path);
++	return;
+ }
+ 
+ static void
+ uuidcache_init_cdroms(void)
+ {
++#define PROC_CDROMS "/proc/sys/dev/cdrom/info"
+ 	char line[100];
+ 	int ma, mi;
+ 	FILE *proccd;
+@@ -250,11 +272,13 @@ uuidcache_init_cdroms(void)
+ 	}
+ 
+ 	while (fgets(line, sizeof(line), proccd)) {
+-		const char *drive_name_string = "drive name:\t\t";
+-		if (!strncmp(line, drive_name_string, strlen(drive_name_string))) {
++		static const char drive_name_string[] ALIGN1 = "drive name:\t\t";
++
++		if (strncmp(line, drive_name_string, sizeof(drive_name_string) - 1) == 0) {
+ 			char *device_name;
+-			device_name = strtok(line + strlen(drive_name_string), "\t\n");
++			device_name = strtok(line + sizeof(drive_name_string) - 1, "\t\n");
+ 			while (device_name) {
++				ma = mi = -1;
+ 				dev_get_major_minor(device_name, &ma, &mi);
+ 				uuidcache_check_device(device_name, ma, mi, 1);
+ 				device_name = strtok(NULL, "\t\n");
+@@ -281,24 +305,24 @@ uuidcache_init(void)
+ 
+ #ifdef UNUSED
+ static char *
+-get_spec_by_x(int n, const char *t, int * majorPtr, int * minorPtr)
++get_spec_by_x(int n, const char *t, int *majorPtr, int *minorPtr)
+ {
+ 	struct uuidCache_s *uc;
+ 
+ 	uuidcache_init();
+ 	uc = uuidCache;
+ 
+-	while(uc) {
++	while (uc) {
+ 		switch (n) {
+ 		case UUID:
+-			if (!memcmp(t, uc->uuid, sizeof(uc->uuid))) {
++			if (strcmp(t, uc->uc_uuid) == 0) {
+ 				*majorPtr = uc->major;
+ 				*minorPtr = uc->minor;
+ 				return uc->device;
+ 			}
+ 			break;
+ 		case VOL:
+-			if (!strcmp(t, uc->label)) {
++			if (strcmp(t, uc->label) == 0) {
+ 				*majorPtr = uc->major;
+ 				*minorPtr = uc->minor;
+ 				return uc->device;
+@@ -315,26 +339,27 @@ fromhex(char c)
+ {
+ 	if (isdigit(c))
+ 		return (c - '0');
+-	if (islower(c))
+-		return (c - 'a' + 10);
+-	return (c - 'A' + 10);
++	return ((c|0x20) - 'a' + 10);
+ }
+ 
+ static char *
+-get_spec_by_uuid(const char *s, int * major, int * minor)
++get_spec_by_uuid(const char *s, int *major, int *minor)
+ {
+ 	unsigned char uuid[16];
+ 	int i;
+ 
+-	if (strlen(s) != 36 ||
+-	    s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-')
++	if (strlen(s) != 36 || s[8] != '-' || s[13] != '-'
++	 || s[18] != '-' || s[23] != '-'
++	) {
+ 		goto bad_uuid;
+-	for (i=0; i<16; i++) {
+-	    if (*s == '-') s++;
+-	    if (!isxdigit(s[0]) || !isxdigit(s[1]))
+-		    goto bad_uuid;
+-	    uuid[i] = ((fromhex(s[0])<<4) | fromhex(s[1]));
+-	    s += 2;
++	}
++	for (i = 0; i < 16; i++) {
++		if (*s == '-')
++			s++;
++		if (!isxdigit(s[0]) || !isxdigit(s[1]))
++			goto bad_uuid;
++		uuid[i] = ((fromhex(s[0]) << 4) | fromhex(s[1]));
++		s += 2;
+ 	}
+ 	return get_spec_by_x(UUID, (char *)uuid, major, minor);
+ 
+@@ -358,13 +383,7 @@ static int display_uuid_cache(void)
+ 
+ 	u = uuidCache;
+ 	while (u) {
+-		printf("%s %s ", u->device, u->label);
+-		for (i = 0; i < sizeof(u->uuid); i++) {
+-			if (i == 4 || i == 6 || i == 8 || i == 10)
+-				printf("-");
+-			printf("%x", u->uuid[i] & 0xff);
+-		}
+-		printf("\n");
++		printf("%s %s %s\n", u->device, u->label, u->uc_uuid);
+ 		u = u->next;
+ 	}
+ 
+@@ -383,7 +402,8 @@ char *get_devname_from_label(const char *spec)
+ 	uuidcache_init();
+ 	uc = uuidCache;
+ 	while (uc) {
+-		if (uc->label && !strncmp(spec, uc->label, spec_len)) {
++// FIXME: empty label ("LABEL=") matches anything??!
++		if (uc->label[0] && strncmp(spec, uc->label, spec_len) == 0) {
+ 			return xstrdup(uc->device);
+ 		}
+ 		uc = uc->next;
+@@ -398,7 +418,7 @@ char *get_devname_from_uuid(const char *spec)
+ 	uuidcache_init();
+ 	uc = uuidCache;
+ 	while (uc) {
+-		if (!memcmp(spec, uc->uuid, sizeof(uc->uuid))) {
++		if (strcmp(spec, uc->uc_uuid) == 0) {
+ 			return xstrdup(uc->device);
+ 		}
+ 		uc = uc->next;
+diff --git a/util-linux/volume_id/hfs.c b/util-linux/volume_id/hfs.c
+index 71a3df0..a7667f7 100644
+--- a/util-linux/volume_id/hfs.c
++++ b/util-linux/volume_id/hfs.c
+@@ -167,7 +167,7 @@ int volume_id_probe_hfs_hfsplus(struct volume_id *id, uint64_t off)
+ 		goto checkplus;
+ 
+ 	/* it may be just a hfs wrapper for hfs+ */
+-	if (memcmp(hfs->embed_sig, "H+", 2) == 0) {
++	if (hfs->embed_sig[0] == 'H' && hfs->embed_sig[1] == '+') {
+ 		alloc_block_size = be32_to_cpu(hfs->al_blk_size);
+ 		dbg("alloc_block_size 0x%x", alloc_block_size);
+ 
+@@ -188,14 +188,13 @@ int volume_id_probe_hfs_hfsplus(struct volume_id *id, uint64_t off)
+ 	}
+ 
+ 	if (hfs->label_len > 0 && hfs->label_len < 28) {
+-		volume_id_set_label_raw(id, hfs->label, hfs->label_len);
++//		volume_id_set_label_raw(id, hfs->label, hfs->label_len);
+ 		volume_id_set_label_string(id, hfs->label, hfs->label_len) ;
+ 	}
+ 
+ 	volume_id_set_uuid(id, hfs->finder_info.id, UUID_HFS);
+-
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "hfs";
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "hfs";
+ 
+ 	return 0;
+ 
+@@ -281,12 +280,12 @@ int volume_id_probe_hfs_hfsplus(struct volume_id *id, uint64_t off)
+ 
+ 	label_len = be16_to_cpu(key->unicode_len) * 2;
+ 	dbg("label unicode16 len %i", label_len);
+-	volume_id_set_label_raw(id, key->unicode, label_len);
++//	volume_id_set_label_raw(id, key->unicode, label_len);
+ 	volume_id_set_label_unicode16(id, key->unicode, BE, label_len);
+ 
+  found:
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "hfsplus";
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "hfsplus";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/highpoint.c b/util-linux/volume_id/highpoint.c
+index de31a2a..57c5cad 100644
+--- a/util-linux/volume_id/highpoint.c
++++ b/util-linux/volume_id/highpoint.c
+@@ -52,8 +52,8 @@ int volume_id_probe_highpoint_37x_raid(struct volume_id *id, uint64_t off)
+ 	if (magic != cpu_to_le32(HPT37X_MAGIC_OK) && magic != cpu_to_le32(HPT37X_MAGIC_BAD))
+ 		return -1;
+ 
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	id->type = "highpoint_raid_member";
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	id->type = "highpoint_raid_member";
+ 
+ 	return 0;
+ }
+@@ -79,8 +79,8 @@ int volume_id_probe_highpoint_45x_raid(struct volume_id *id, uint64_t off, uint6
+ 	if (magic != cpu_to_le32(HPT45X_MAGIC_OK) && magic != cpu_to_le32(HPT45X_MAGIC_BAD))
+ 		return -1;
+ 
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	id->type = "highpoint_raid_member";
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	id->type = "highpoint_raid_member";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/hpfs.c b/util-linux/volume_id/hpfs.c
+index b43fb79..8b51756 100644
+--- a/util-linux/volume_id/hpfs.c
++++ b/util-linux/volume_id/hpfs.c
+@@ -39,10 +39,9 @@ int volume_id_probe_hpfs(struct volume_id *id, uint64_t off)
+ 		return -1;
+ 
+ 	if (memcmp(hs->magic, "\x49\xe8\x95\xf9", 4) == 0) {
+-		sprintf(id->type_version, "%u", hs->version);
+-
+-		volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-		id->type = "hpfs";
++//		sprintf(id->type_version, "%u", hs->version);
++//		volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//		id->type = "hpfs";
+ 		return 0;
+ 	}
+ 
+diff --git a/util-linux/volume_id/iso9660.c b/util-linux/volume_id/iso9660.c
+index fa92277..c15608c 100644
+--- a/util-linux/volume_id/iso9660.c
++++ b/util-linux/volume_id/iso9660.c
+@@ -66,7 +66,7 @@ int volume_id_probe_iso9660(struct volume_id *id, uint64_t off)
+ 		int i;
+ 
+ 		dbg("read label from PVD");
+-		volume_id_set_label_raw(id, is->volume_id, 32);
++//		volume_id_set_label_raw(id, is->volume_id, 32);
+ 		volume_id_set_label_string(id, is->volume_id, 32);
+ 
+ 		dbg("looking for SVDs");
+@@ -81,9 +81,10 @@ int volume_id_probe_iso9660(struct volume_id *id, uint64_t off)
+ 				continue;
+ 
+ 			dbg("found SVD at offset 0x%llx", (unsigned long long) (off + vd_offset));
+-			if (memcmp(is->escape_sequences, "%/@", 3) == 0||
+-			    memcmp(is->escape_sequences, "%/C", 3) == 0||
+-			    memcmp(is->escape_sequences, "%/E", 3) == 0) {
++			if (memcmp(is->escape_sequences, "%/@", 3) == 0
++			 || memcmp(is->escape_sequences, "%/C", 3) == 0
++			 || memcmp(is->escape_sequences, "%/E", 3) == 0
++			) {
+ 				dbg("Joliet extension found");
+ 				volume_id_set_unicode16((char *)svd_label, sizeof(svd_label), is->volume_id, BE, 32);
+ 				if (memcmp(id->label, svd_label, 16) == 0) {
+@@ -91,9 +92,9 @@ int volume_id_probe_iso9660(struct volume_id *id, uint64_t off)
+ 					break;
+ 				}
+ 
+-				volume_id_set_label_raw(id, is->volume_id, 32);
++//				volume_id_set_label_raw(id, is->volume_id, 32);
+ 				volume_id_set_label_string(id, svd_label, 32);
+-				strcpy(id->type_version, "Joliet Extension");
++//				strcpy(id->type_version, "Joliet Extension");
+ 				goto found;
+ 			}
+ 			vd_offset += ISO_SECTOR_SIZE;
+@@ -104,15 +105,15 @@ int volume_id_probe_iso9660(struct volume_id *id, uint64_t off)
+ 	hs = (struct high_sierra_volume_descriptor *) buf;
+ 
+ 	if (memcmp(hs->id, "CDROM", 5) == 0) {
+-		strcpy(id->type_version, "High Sierra");
++//		strcpy(id->type_version, "High Sierra");
+ 		goto found;
+ 	}
+ 
+ 	return -1;
+ 
+  found:
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "iso9660";
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "iso9660";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/isw_raid.c b/util-linux/volume_id/isw_raid.c
+index 8f55f49..d928245 100644
+--- a/util-linux/volume_id/isw_raid.c
++++ b/util-linux/volume_id/isw_raid.c
+@@ -50,9 +50,9 @@ int volume_id_probe_intel_software_raid(struct volume_id *id, uint64_t off, uint
+ 	if (memcmp(isw->sig, ISW_SIGNATURE, sizeof(ISW_SIGNATURE)-1) != 0)
+ 		return -1;
+ 
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	memcpy(id->type_version, &isw->sig[sizeof(ISW_SIGNATURE)-1], 6);
+-	id->type = "isw_raid_member";
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	memcpy(id->type_version, &isw->sig[sizeof(ISW_SIGNATURE)-1], 6);
++//	id->type = "isw_raid_member";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/jfs.c b/util-linux/volume_id/jfs.c
+index 28b4eb6..63692f9 100644
+--- a/util-linux/volume_id/jfs.c
++++ b/util-linux/volume_id/jfs.c
+@@ -48,12 +48,12 @@ int volume_id_probe_jfs(struct volume_id *id, uint64_t off)
+ 	if (memcmp(js->magic, "JFS1", 4) != 0)
+ 		return -1;
+ 
+-	volume_id_set_label_raw(id, js->label, 16);
++//	volume_id_set_label_raw(id, js->label, 16);
+ 	volume_id_set_label_string(id, js->label, 16);
+ 	volume_id_set_uuid(id, js->uuid, UUID_DCE);
+ 
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "jfs";
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "jfs";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/linux_raid.c b/util-linux/volume_id/linux_raid.c
+index bb9b3c5..a113060 100644
+--- a/util-linux/volume_id/linux_raid.c
++++ b/util-linux/volume_id/linux_raid.c
+@@ -66,14 +66,14 @@ int volume_id_probe_linux_raid(struct volume_id *id, uint64_t off, uint64_t size
+ 	memcpy(&uuid[4], &mdp->set_uuid1, 12);
+ 	volume_id_set_uuid(id, uuid, UUID_DCE);
+ 
+-	snprintf(id->type_version, sizeof(id->type_version)-1, "%u.%u.%u",
+-		 le32_to_cpu(mdp->major_version),
+-		 le32_to_cpu(mdp->minor_version),
+-		 le32_to_cpu(mdp->patch_version));
++//	snprintf(id->type_version, sizeof(id->type_version)-1, "%u.%u.%u",
++//		 le32_to_cpu(mdp->major_version),
++//		 le32_to_cpu(mdp->minor_version),
++//		 le32_to_cpu(mdp->patch_version));
+ 
+ 	dbg("found raid signature");
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	id->type = "linux_raid_member";
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	id->type = "linux_raid_member";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/linux_swap.c b/util-linux/volume_id/linux_swap.c
+index 56b5d50..e608454 100644
+--- a/util-linux/volume_id/linux_swap.c
++++ b/util-linux/volume_id/linux_swap.c
+@@ -46,8 +46,8 @@ int volume_id_probe_linux_swap(struct volume_id *id, uint64_t off)
+ 				return -1;
+ 
+ 			if (memcmp(buf, "SWAP-SPACE", 10) == 0) {
+-				id->type_version[0] = '1';
+-				id->type_version[1] = '\0';
++//				id->type_version[0] = '1';
++//				id->type_version[1] = '\0';
+ 				goto found;
+ 			}
+ 
+@@ -55,9 +55,9 @@ int volume_id_probe_linux_swap(struct volume_id *id, uint64_t off)
+ 				sw = volume_id_get_buffer(id, off, sizeof(struct swap_header_v1_2));
+ 				if (sw == NULL)
+ 					return -1;
+-				id->type_version[0] = '2';
+-				id->type_version[1] = '\0';
+-				volume_id_set_label_raw(id, sw->volume_name, 16);
++//				id->type_version[0] = '2';
++//				id->type_version[1] = '\0';
++//				volume_id_set_label_raw(id, sw->volume_name, 16);
+ 				volume_id_set_label_string(id, sw->volume_name, 16);
+ 				volume_id_set_uuid(id, sw->uuid, UUID_DCE);
+ 				goto found;
+@@ -66,8 +66,8 @@ int volume_id_probe_linux_swap(struct volume_id *id, uint64_t off)
+ 	return -1;
+ 
+ found:
+-	volume_id_set_usage(id, VOLUME_ID_OTHER);
+-	id->type = "swap";
++//	volume_id_set_usage(id, VOLUME_ID_OTHER);
++//	id->type = "swap";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/lsi_raid.c b/util-linux/volume_id/lsi_raid.c
+index 0eab1c7..730a313 100644
+--- a/util-linux/volume_id/lsi_raid.c
++++ b/util-linux/volume_id/lsi_raid.c
+@@ -45,8 +45,8 @@ int volume_id_probe_lsi_mega_raid(struct volume_id *id, uint64_t off, uint64_t s
+ 	if (memcmp(lsi->sig, LSI_SIGNATURE, sizeof(LSI_SIGNATURE)-1) != 0)
+ 		return -1;
+ 
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	id->type = "lsi_mega_raid_member";
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	id->type = "lsi_mega_raid_member";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/luks.c b/util-linux/volume_id/luks.c
+index e73ce3a..51dda4e 100644
+--- a/util-linux/volume_id/luks.c
++++ b/util-linux/volume_id/luks.c
+@@ -67,10 +67,9 @@ int volume_id_probe_luks(struct volume_id *id, uint64_t off)
+ 	if (memcmp(header->magic, LUKS_MAGIC, LUKS_MAGIC_L))
+ 		return -1;
+ 
+-	volume_id_set_usage(id, VOLUME_ID_CRYPTO);
++//	volume_id_set_usage(id, VOLUME_ID_CRYPTO);
+ 	volume_id_set_uuid(id, header->uuid, UUID_DCE_STRING);
+-
+-	id->type = "crypto_LUKS";
++//	id->type = "crypto_LUKS";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/lvm.c b/util-linux/volume_id/lvm.c
+index baa8456..f9f9395 100644
+--- a/util-linux/volume_id/lvm.c
++++ b/util-linux/volume_id/lvm.c
+@@ -33,7 +33,6 @@ struct lvm2_super_block {
+ } __attribute__((packed));
+ 
+ #define LVM1_SB_OFF			0x400
+-#define LVM1_MAGIC			"HM"
+ 
+ int volume_id_probe_lvm1(struct volume_id *id, uint64_t off)
+ {
+@@ -48,11 +47,11 @@ int volume_id_probe_lvm1(struct volume_id *id, uint64_t off)
+ 
+ 	lvm = (struct lvm1_super_block *) buf;
+ 
+-	if (memcmp(lvm->id, LVM1_MAGIC, 2) != 0)
++	if (lvm->id[0] != 'H' || lvm->id[1] != 'M')
+ 		return -1;
+ 
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	id->type = "LVM1_member";
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	id->type = "LVM1_member";
+ 
+ 	return 0;
+ }
+@@ -83,9 +82,9 @@ int volume_id_probe_lvm2(struct volume_id *id, uint64_t off)
+ 	return -1;
+ 
+  found:
+-	memcpy(id->type_version, lvm->type, 8);
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	id->type = "LVM2_member";
++//	memcpy(id->type_version, lvm->type, 8);
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	id->type = "LVM2_member";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/minix.c b/util-linux/volume_id/minix.c
+index ede23cb..2f52093 100644
+--- a/util-linux/volume_id/minix.c
++++ b/util-linux/volume_id/minix.c
+@@ -20,8 +20,7 @@
+ 
+ #include "volume_id_internal.h"
+ 
+-struct minix_super_block
+-{
++struct minix_super_block {
+ 	uint16_t	s_ninodes;
+ 	uint16_t	s_nzones;
+ 	uint16_t	s_imap_blocks;
+@@ -46,31 +45,31 @@ int volume_id_probe_minix(struct volume_id *id, uint64_t off)
+ 	if (ms == NULL)
+ 		return -1;
+ 
+-	if (le16_to_cpu(ms->s_magic) == 0x137f) {
+-		id->type_version[0] = '1';
++	if (ms->s_magic == cpu_to_le16(0x137f)) {
++//		id->type_version[0] = '1';
+ 		goto found;
+ 	}
+ 
+-	if (le16_to_cpu(ms->s_magic) == 0x1387) {
+-		id->type_version[0] = '1';
++	if (ms->s_magic == cpu_to_le16(0x1387)) {
++//		id->type_version[0] = '1';
+ 		goto found;
+ 	}
+ 
+-	if (le16_to_cpu(ms->s_magic) == 0x2468) {
+-		id->type_version[0] = '2';
++	if (ms->s_magic == cpu_to_le16(0x2468)) {
++//		id->type_version[0] = '2';
+ 		goto found;
+ 	}
+ 
+-	if (le16_to_cpu(ms->s_magic) == 0x2478) {
+-		id->type_version[0] = '2';
++	if (ms->s_magic == cpu_to_le16(0x2478)) {
++//		id->type_version[0] = '2';
+ 		goto found;
+ 	}
+ 
+ 	return -1;
+ 
+  found:
+-	id->type_version[1] = '\0';
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "minix";
++//	id->type_version[1] = '\0';
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "minix";
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/ntfs.c b/util-linux/volume_id/ntfs.c
+index cbd5d5b..7488a41 100644
+--- a/util-linux/volume_id/ntfs.c
++++ b/util-linux/volume_id/ntfs.c
+@@ -166,13 +166,13 @@ int volume_id_probe_ntfs(struct volume_id *id, uint64_t off)
+ 		dbg("found attribute type 0x%x, len %i, at offset %i",
+ 		    attr_type, attr_len, attr_off);
+ 
+-		if (attr_type == MFT_RECORD_ATTR_VOLUME_INFO) {
+-			struct volume_info *info;
+-			dbg("found info, len %i", val_len);
+-			info = (struct volume_info*) (((uint8_t *) attr) + val_off);
+-			snprintf(id->type_version, sizeof(id->type_version)-1,
+-				 "%u.%u", info->major_ver, info->minor_ver);
+-		}
++//		if (attr_type == MFT_RECORD_ATTR_VOLUME_INFO) {
++//			struct volume_info *info;
++//			dbg("found info, len %i", val_len);
++//			info = (struct volume_info*) (((uint8_t *) attr) + val_off);
++//			snprintf(id->type_version, sizeof(id->type_version)-1,
++//				 "%u.%u", info->major_ver, info->minor_ver);
++//		}
+ 
+ 		if (attr_type == MFT_RECORD_ATTR_VOLUME_NAME) {
+ 			dbg("found label, len %i", val_len);
+@@ -180,14 +180,14 @@ int volume_id_probe_ntfs(struct volume_id *id, uint64_t off)
+ 				val_len = VOLUME_ID_LABEL_SIZE;
+ 
+ 			val = ((uint8_t *) attr) + val_off;
+-			volume_id_set_label_raw(id, val, val_len);
++//			volume_id_set_label_raw(id, val, val_len);
+ 			volume_id_set_label_unicode16(id, val, LE, val_len);
+ 		}
+ 	}
+ 
+  found:
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "ntfs";
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "ntfs";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/nvidia_raid.c b/util-linux/volume_id/nvidia_raid.c
+index 8619565..692aad1 100644
+--- a/util-linux/volume_id/nvidia_raid.c
++++ b/util-linux/volume_id/nvidia_raid.c
+@@ -48,9 +48,9 @@ int volume_id_probe_nvidia_raid(struct volume_id *id, uint64_t off, uint64_t siz
+ 	if (memcmp(nv->vendor, NVIDIA_SIGNATURE, sizeof(NVIDIA_SIGNATURE)-1) != 0)
+ 		return -1;
+ 
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	snprintf(id->type_version, sizeof(id->type_version)-1, "%u", le16_to_cpu(nv->version));
+-	id->type = "nvidia_raid_member";
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	snprintf(id->type_version, sizeof(id->type_version)-1, "%u", le16_to_cpu(nv->version));
++//	id->type = "nvidia_raid_member";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/ocfs2.c b/util-linux/volume_id/ocfs2.c
+index bc490df..9fd4565 100644
+--- a/util-linux/volume_id/ocfs2.c
++++ b/util-linux/volume_id/ocfs2.c
+@@ -94,12 +94,12 @@ int volume_id_probe_ocfs2(struct volume_id *id, uint64_t		off)
+ 		return -1;
+ 	}
+ 
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	volume_id_set_label_raw(id, os->s_label, OCFS2_MAX_VOL_LABEL_LEN < VOLUME_ID_LABEL_SIZE ?
+-					OCFS2_MAX_VOL_LABEL_LEN : VOLUME_ID_LABEL_SIZE);
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	volume_id_set_label_raw(id, os->s_label, OCFS2_MAX_VOL_LABEL_LEN < VOLUME_ID_LABEL_SIZE ?
++//					OCFS2_MAX_VOL_LABEL_LEN : VOLUME_ID_LABEL_SIZE);
+ 	volume_id_set_label_string(id, os->s_label, OCFS2_MAX_VOL_LABEL_LEN < VOLUME_ID_LABEL_SIZE ?
+ 					OCFS2_MAX_VOL_LABEL_LEN : VOLUME_ID_LABEL_SIZE);
+ 	volume_id_set_uuid(id, os->s_uuid, UUID_DCE);
+-	id->type = "ocfs2";
++//	id->type = "ocfs2";
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/promise_raid.c b/util-linux/volume_id/promise_raid.c
+index 9195c63..75c6f89 100644
+--- a/util-linux/volume_id/promise_raid.c
++++ b/util-linux/volume_id/promise_raid.c
+@@ -56,8 +56,8 @@ int volume_id_probe_promise_fasttrack_raid(struct volume_id *id, uint64_t off, u
+ 	return -1;
+ 
+  found:
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	id->type = "promise_fasttrack_raid_member";
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	id->type = "promise_fasttrack_raid_member";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/reiserfs.c b/util-linux/volume_id/reiserfs.c
+index 98ecec2..d9a3745 100644
+--- a/util-linux/volume_id/reiserfs.c
++++ b/util-linux/volume_id/reiserfs.c
+@@ -53,31 +53,35 @@ int volume_id_probe_reiserfs(struct volume_id *id, uint64_t off)
+ 	struct reiserfs_super_block *rs;
+ 	struct reiser4_super_block *rs4;
+ 
+-	dbg("probing at offset 0x%llx", (unsigned long long) off);
++	dbg("reiserfs: probing at offset 0x%llx", (unsigned long long) off);
+ 
+ 	rs = volume_id_get_buffer(id, off + REISERFS_SUPERBLOCK_OFFSET, 0x200);
+ 	if (rs == NULL)
+ 		return -1;
+ 
+ 	if (memcmp(rs->magic, "ReIsErFs", 8) == 0) {
+-		strcpy(id->type_version, "3.5");
++		dbg("reiserfs: ReIsErFs, no label");
++//		strcpy(id->type_version, "3.5");
+ 		goto found;
+ 	}
+ 	if (memcmp(rs->magic, "ReIsEr2Fs", 9) == 0) {
+-		strcpy(id->type_version, "3.6");
++		dbg("reiserfs: ReIsEr2Fs");
++//		strcpy(id->type_version, "3.6");
+ 		goto found_label;
+ 	}
+ 	if (memcmp(rs->magic, "ReIsEr3Fs", 9) == 0) {
+-		strcpy(id->type_version, "JR");
++		dbg("reiserfs: ReIsEr3Fs");
++//		strcpy(id->type_version, "JR");
+ 		goto found_label;
+ 	}
+ 
+ 	rs4 = (struct reiser4_super_block *) rs;
+ 	if (memcmp(rs4->magic, "ReIsEr4", 7) == 0) {
+-		strcpy(id->type_version, "4");
+-		volume_id_set_label_raw(id, rs4->label, 16);
++//		strcpy(id->type_version, "4");
++//		volume_id_set_label_raw(id, rs4->label, 16);
+ 		volume_id_set_label_string(id, rs4->label, 16);
+ 		volume_id_set_uuid(id, rs4->uuid, UUID_DCE);
++		dbg("reiserfs: ReIsEr4, label '%s' uuid '%s'", id->label, id->uuid);
+ 		goto found;
+ 	}
+ 
+@@ -86,20 +90,23 @@ int volume_id_probe_reiserfs(struct volume_id *id, uint64_t off)
+ 		return -1;
+ 
+ 	if (memcmp(rs->magic, "ReIsErFs", 8) == 0) {
+-		strcpy(id->type_version, "3.5");
++		dbg("reiserfs: ReIsErFs, no label");
++//		strcpy(id->type_version, "3.5");
+ 		goto found;
+ 	}
+ 
++	dbg("reiserfs: no signature found");
+ 	return -1;
+ 
+  found_label:
+-	volume_id_set_label_raw(id, rs->label, 16);
++//	volume_id_set_label_raw(id, rs->label, 16);
+ 	volume_id_set_label_string(id, rs->label, 16);
+ 	volume_id_set_uuid(id, rs->uuid, UUID_DCE);
++	dbg("reiserfs: label '%s' uuid '%s'", id->label, id->uuid);
+ 
+  found:
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "reiserfs";
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "reiserfs";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/romfs.c b/util-linux/volume_id/romfs.c
+index 7c4fc0f..400bdce 100644
+--- a/util-linux/volume_id/romfs.c
++++ b/util-linux/volume_id/romfs.c
+@@ -41,12 +41,12 @@ int volume_id_probe_romfs(struct volume_id *id, uint64_t off)
+ 		size_t len = strlen((char *)rfs->name);
+ 
+ 		if (len) {
+-			volume_id_set_label_raw(id, rfs->name, len);
++//			volume_id_set_label_raw(id, rfs->name, len);
+ 			volume_id_set_label_string(id, rfs->name, len);
+ 		}
+ 
+-		volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-		id->type = "romfs";
++//		volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//		id->type = "romfs";
+ 		return 0;
+ 	}
+ 
+diff --git a/util-linux/volume_id/silicon_raid.c b/util-linux/volume_id/silicon_raid.c
+index ea00174..5143112 100644
+--- a/util-linux/volume_id/silicon_raid.c
++++ b/util-linux/volume_id/silicon_raid.c
+@@ -60,10 +60,10 @@ int volume_id_probe_silicon_medley_raid(struct volume_id *id, uint64_t off, uint
+ 	if (sil->magic != cpu_to_le32(SILICON_MAGIC))
+ 		return -1;
+ 
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	snprintf(id->type_version, sizeof(id->type_version)-1, "%u.%u",
+-		 le16_to_cpu(sil->major_ver), le16_to_cpu(sil->minor_ver));
+-	id->type = "silicon_medley_raid_member";
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	snprintf(id->type_version, sizeof(id->type_version)-1, "%u.%u",
++//		 le16_to_cpu(sil->major_ver), le16_to_cpu(sil->minor_ver));
++//	id->type = "silicon_medley_raid_member";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/sysv.c b/util-linux/volume_id/sysv.c
+index 71c0fd4..7671962 100644
+--- a/util-linux/volume_id/sysv.c
++++ b/util-linux/volume_id/sysv.c
+@@ -97,9 +97,9 @@ int volume_id_probe_sysv(struct volume_id *id, uint64_t off)
+ 			return -1;
+ 
+ 		if (vs->s_magic == cpu_to_le32(SYSV_MAGIC) || vs->s_magic == cpu_to_be32(SYSV_MAGIC)) {
+-			volume_id_set_label_raw(id, vs->s_fname, 6);
++//			volume_id_set_label_raw(id, vs->s_fname, 6);
+ 			volume_id_set_label_string(id, vs->s_fname, 6);
+-			id->type = "sysv";
++//			id->type = "sysv";
+ 			goto found;
+ 		}
+ 	}
+@@ -110,9 +110,9 @@ int volume_id_probe_sysv(struct volume_id *id, uint64_t off)
+ 			return -1;
+ 
+ 		if (xs->s_magic == cpu_to_le32(XENIX_MAGIC) || xs->s_magic == cpu_to_be32(XENIX_MAGIC)) {
+-			volume_id_set_label_raw(id, xs->s_fname, 6);
++//			volume_id_set_label_raw(id, xs->s_fname, 6);
+ 			volume_id_set_label_string(id, xs->s_fname, 6);
+-			id->type = "xenix";
++//			id->type = "xenix";
+ 			goto found;
+ 		}
+ 	}
+@@ -120,6 +120,6 @@ int volume_id_probe_sysv(struct volume_id *id, uint64_t off)
+ 	return -1;
+ 
+  found:
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/udf.c b/util-linux/volume_id/udf.c
+index 5cdb49c..55e97a7 100644
+--- a/util-linux/volume_id/udf.c
++++ b/util-linux/volume_id/udf.c
+@@ -155,7 +155,7 @@ anchor:
+ 	goto found;
+ 
+  pvd:
+-	volume_id_set_label_raw(id, &(vd->type.primary.ident.clen), 32);
++//	volume_id_set_label_raw(id, &(vd->type.primary.ident.clen), 32);
+ 
+ 	clen = vd->type.primary.ident.clen;
+ 	dbg("label string charsize=%i bit", clen);
+@@ -165,8 +165,8 @@ anchor:
+ 		volume_id_set_label_unicode16(id, vd->type.primary.ident.c, BE, 31);
+ 
+  found:
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "udf";
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "udf";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/ufs.c b/util-linux/volume_id/ufs.c
+index 768670e..ba76876 100644
+--- a/util-linux/volume_id/ufs.c
++++ b/util-linux/volume_id/ufs.c
+@@ -199,8 +199,8 @@ int volume_id_probe_ufs(struct volume_id *id, uint64_t off)
+ 	return -1;
+ 
+  found:
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "ufs";
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "ufs";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/util.c b/util-linux/volume_id/util.c
+index d2265c2..ce7de23 100644
+--- a/util-linux/volume_id/util.c
++++ b/util-linux/volume_id/util.c
+@@ -23,7 +23,7 @@
+ void volume_id_set_unicode16(char *str, size_t len, const uint8_t *buf, enum endian endianess, size_t count)
+ {
+ 	unsigned i, j;
+-	uint16_t c;
++	unsigned c;
+ 
+ 	j = 0;
+ 	for (i = 0; i + 2 <= count; i += 2) {
+@@ -54,6 +54,7 @@ void volume_id_set_unicode16(char *str, size_t len, const uint8_t *buf, enum end
+ 	str[j] = '\0';
+ }
+ 
++#ifdef UNUSED
+ static const char *usage_to_string(enum volume_id_usage usage_id)
+ {
+ 	switch (usage_id) {
+@@ -94,6 +95,7 @@ void volume_id_set_label_raw(struct volume_id *id, const uint8_t *buf, size_t co
+ 	memcpy(id->label_raw, buf, count);
+ 	id->label_raw_len = count;
+ }
++#endif
+ 
+ #ifdef NOT_NEEDED
+ static size_t strnlen(const char *s, size_t maxlen)
+@@ -131,7 +133,7 @@ void volume_id_set_uuid(struct volume_id *id, const uint8_t *buf, enum uuid_form
+ 	unsigned i;
+ 	unsigned count = 0;
+ 
+-	switch(format) {
++	switch (format) {
+ 	case UUID_DOS:
+ 		count = 4;
+ 		break;
+@@ -143,20 +145,21 @@ void volume_id_set_uuid(struct volume_id *id, const uint8_t *buf, enum uuid_form
+ 		count = 16;
+ 		break;
+ 	case UUID_DCE_STRING:
+-		count = 36;
++		/* 36 is ok, id->uuid has one extra byte for NUL */
++		count = VOLUME_ID_UUID_SIZE;
+ 		break;
+ 	}
+-	memcpy(id->uuid_raw, buf, count);
+-	id->uuid_raw_len = count;
++//	memcpy(id->uuid_raw, buf, count);
++//	id->uuid_raw_len = count;
+ 
+ 	/* if set, create string in the same format, the native platform uses */
+ 	for (i = 0; i < count; i++)
+ 		if (buf[i] != 0)
+ 			goto set;
+-	return;
++	return; /* all bytes are zero, leave it empty ("") */
+ 
+ set:
+-	switch(format) {
++	switch (format) {
+ 	case UUID_DOS:
+ 		sprintf(id->uuid, "%02X%02X-%02X%02X",
+ 			buf[3], buf[2], buf[1], buf[0]);
+diff --git a/util-linux/volume_id/via_raid.c b/util-linux/volume_id/via_raid.c
+index a9bd5b7..a3e94e0 100644
+--- a/util-linux/volume_id/via_raid.c
++++ b/util-linux/volume_id/via_raid.c
+@@ -59,10 +59,10 @@ int volume_id_probe_via_raid(struct volume_id *id, uint64_t off, uint64_t size)
+ 	if (via->version_number > 1)
+ 		return -1;
+ 
+-	volume_id_set_usage(id, VOLUME_ID_RAID);
+-	id->type_version[0] = '0' + via->version_number;
+-	id->type_version[1] = '\0';
+-	id->type = "via_raid_member";
++//	volume_id_set_usage(id, VOLUME_ID_RAID);
++//	id->type_version[0] = '0' + via->version_number;
++//	id->type_version[1] = '\0';
++//	id->type = "via_raid_member";
+ 
+ 	return 0;
+ }
+diff --git a/util-linux/volume_id/volume_id.c b/util-linux/volume_id/volume_id.c
+index 809884a..a26e2bc 100644
+--- a/util-linux/volume_id/volume_id.c
++++ b/util-linux/volume_id/volume_id.c
+@@ -68,9 +68,10 @@ static const probe_fptr fs1[] = {
+ #if ENABLE_FEATURE_VOLUMEID_FAT
+ 	volume_id_probe_vfat,
+ #endif
+-#if ENABLE_FEATURE_VOLUMEID_MAC
+-	volume_id_probe_mac_partition_map,
+-#endif
++// This one only looks for partitions, we don't use it
++//#if ENABLE_FEATURE_VOLUMEID_MAC
++//	volume_id_probe_mac_partition_map,
++//#endif
+ #if ENABLE_FEATURE_VOLUMEID_XFS
+ 	volume_id_probe_xfs,
+ #endif
+@@ -170,7 +171,9 @@ struct volume_id *volume_id_open_node(const char *path)
+ 	struct volume_id *id;
+ 	int fd;
+ 
+-	fd = xopen(path, O_RDONLY);
++	fd = open(path, O_RDONLY);
++	if (fd < 0)
++		return NULL;
+ 	id = xzalloc(sizeof(struct volume_id));
+ 	id->fd = fd;
+ 	///* close fd on device close */
+@@ -209,6 +212,8 @@ void free_volume_id(struct volume_id *id)
+ 	//if (id->fd_close != 0) - always true
+ 		close(id->fd);
+ 	volume_id_free_buffer(id);
++#ifdef UNUSED_PARTITION_CODE
+ 	free(id->partitions);
++#endif
+ 	free(id);
+ }
+diff --git a/util-linux/volume_id/volume_id_internal.h b/util-linux/volume_id/volume_id_internal.h
+index 5a38562..8c7ca03 100644
+--- a/util-linux/volume_id/volume_id_internal.h
++++ b/util-linux/volume_id/volume_id_internal.h
+@@ -23,6 +23,7 @@
+ 
+ 
+ #define dbg(...) ((void)0)
++/* #define dbg(...) bb_error_msg(__VA_ARGS__) */
+ 
+ 
+ /* volume_id.h */
+@@ -45,29 +46,34 @@ enum volume_id_usage {
+ 	VOLUME_ID_CRYPTO,
+ };
+ 
++#ifdef UNUSED_PARTITION_CODE
+ struct volume_id_partition {
+-	enum		volume_id_usage usage_id;
+-	const char	*usage;
+-	const char	*type;
+-	uint64_t	off;
+-	uint64_t	len;
+-	uint8_t		partition_type_raw;
++//	const char	*type;
++//	const char	*usage;
++//	smallint	usage_id;
++//	uint8_t		pt_type_raw;
++//	uint64_t	pt_off;
++//	uint64_t	pt_len;
+ };
++#endif
+ 
+ struct volume_id {
+-	uint8_t		label_raw[VOLUME_ID_LABEL_SIZE];
+-	size_t		label_raw_len;
++//	uint8_t		label_raw[VOLUME_ID_LABEL_SIZE];
++//	size_t		label_raw_len;
+ 	char		label[VOLUME_ID_LABEL_SIZE+1];
+-	uint8_t		uuid_raw[VOLUME_ID_UUID_SIZE];
+-	size_t		uuid_raw_len;
++//	uint8_t		uuid_raw[VOLUME_ID_UUID_SIZE];
++//	size_t		uuid_raw_len;
++	/* uuid is stored in ASCII (not binary) form here: */
+ 	char		uuid[VOLUME_ID_UUID_SIZE+1];
+-	enum		volume_id_usage usage_id;
+-	const char	*usage;
+-	const char	*type;
+-	char		type_version[VOLUME_ID_FORMAT_SIZE];
++//	char		type_version[VOLUME_ID_FORMAT_SIZE];
++//	smallint	usage_id;
++//	const char	*usage;
++//	const char	*type;
+ 
++#ifdef UNUSED_PARTITION_CODE
+ 	struct volume_id_partition *partitions;
+ 	size_t		partition_count;
++#endif
+ 
+ 	int		fd;
+ 	uint8_t		*sbbuf;
+@@ -143,9 +149,9 @@ enum endian {
+ };
+ 
+ void volume_id_set_unicode16(char *str, size_t len, const uint8_t *buf, enum endian endianess, size_t count);
+-void volume_id_set_usage(struct volume_id *id, enum volume_id_usage usage_id);
+-void volume_id_set_usage_part(struct volume_id_partition *part, enum volume_id_usage usage_id);
+-void volume_id_set_label_raw(struct volume_id *id, const uint8_t *buf, size_t count);
++//void volume_id_set_usage(struct volume_id *id, enum volume_id_usage usage_id);
++//void volume_id_set_usage_part(struct volume_id_partition *part, enum volume_id_usage usage_id);
++//void volume_id_set_label_raw(struct volume_id *id, const uint8_t *buf, size_t count);
+ void volume_id_set_label_string(struct volume_id *id, const uint8_t *buf, size_t count);
+ void volume_id_set_label_unicode16(struct volume_id *id, const uint8_t *buf, enum endian endianess, size_t count);
+ void volume_id_set_uuid(struct volume_id *id, const uint8_t *buf, enum uuid_format format);
+@@ -197,11 +203,11 @@ int volume_id_probe_linux_swap(struct volume_id *id, uint64_t off);
+ 
+ int volume_id_probe_luks(struct volume_id *id, uint64_t off);
+ 
+-int volume_id_probe_mac_partition_map(struct volume_id *id, uint64_t off);
++//int volume_id_probe_mac_partition_map(struct volume_id *id, uint64_t off);
+ 
+ int volume_id_probe_minix(struct volume_id *id, uint64_t off);
+ 
+-int volume_id_probe_msdos_part_table(struct volume_id *id, uint64_t off);
++//int volume_id_probe_msdos_part_table(struct volume_id *id, uint64_t off);
+ 
+ int volume_id_probe_ntfs(struct volume_id *id, uint64_t off);
+ 
+diff --git a/util-linux/volume_id/xfs.c b/util-linux/volume_id/xfs.c
+index 343ac70..0d90437 100644
+--- a/util-linux/volume_id/xfs.c
++++ b/util-linux/volume_id/xfs.c
+@@ -48,12 +48,12 @@ int volume_id_probe_xfs(struct volume_id *id, uint64_t off)
+ 	if (memcmp(xs->magic, "XFSB", 4) != 0)
+ 		return -1;
+ 
+-	volume_id_set_label_raw(id, xs->fname, 12);
++//	volume_id_set_label_raw(id, xs->fname, 12);
+ 	volume_id_set_label_string(id, xs->fname, 12);
+ 	volume_id_set_uuid(id, xs->uuid, UUID_DCE);
+ 
+-	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
+-	id->type = "xfs";
++//	volume_id_set_usage(id, VOLUME_ID_FILESYSTEM);
++//	id->type = "xfs";
+ 
+ 	return 0;
+ }

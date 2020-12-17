@@ -1,0 +1,36 @@
+2010-01-04 23:58:13 +0100
+diff --git a/include/usage.h b/include/usage.h
+index 5a25241..eab57d8 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3233,7 +3233,7 @@
+ /* -N exists for mostly compat reasons, thus not essential to inform */ \
+ /* the user that it exists: user may use nice as well */ \
+ /*   "\n	-N	Run at high priority" */ \
+-     "\n	-w	Do not set time (used to look at peer data)" \
++     "\n	-w	Do not set time (only query peers), implies -n" \
+      "\n	-l	Run as server on port 123" \
+      "\n	-p PEER	Obtain time from PEER (may be repeated)" \
+ 
+diff --git a/networking/ntpd.c b/networking/ntpd.c
+index 84ee543..ab1c58c 100644
+--- a/networking/ntpd.c
++++ b/networking/ntpd.c
+@@ -1466,7 +1466,7 @@ recv_and_process_peer_pkt(peer_t *p)
+ 	}
+ 
+ 	p->reachable_bits |= 1;
+-	VERB1 {
++	if ((MAX_VERBOSE && G.verbose) || (option_mask32 & OPT_w)) {
+ 		bb_error_msg("reply from %s: reach 0x%02x offset %f delay %f status 0x%02x strat %d refid 0x%08x rootdelay %f",
+ 			p->p_dotted,
+ 			p->reachable_bits,
+@@ -1733,7 +1733,7 @@ static NOINLINE void ntp_init(char **argv)
+ 
+ 	/* Parse options */
+ 	peers = NULL;
+-	opt_complementary = "dd:p::"; /* d: counter, p: list */
++	opt_complementary = "dd:p::wn"; /* d: counter; p: list; -w implies -n */
+ 	opts = getopt32(argv,
+ 			"nqNx" /* compat */
+ 			"wp:"IF_FEATURE_NTPD_SERVER("l") /* NOT compat */

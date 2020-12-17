@@ -1,0 +1,72 @@
+2008-06-12 12:58:20 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 735526a..77a3051 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3498,6 +3498,13 @@ static void add_till_closing_curly_brace(o_string *dest, struct in_str *input)
+ 			o_addqchr(dest, ch, 1);
+ 			continue;
+ 		}
++		if (ch == '\\') { /* \x. Copy verbatim. Important for  \(, \) */
++			ch = i_getch(input);
++			if (ch == EOF)
++				break;
++			o_addqchr(dest, ch, 1);
++			continue;
++		}
+ 	}
+ }
+ #endif /* ENABLE_HUSH_TICK */
+@@ -3556,13 +3563,16 @@ static int handle_dollar(o_string *dest, struct in_str *input)
+ 			o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ 			break;
+ #if ENABLE_HUSH_TICK
+-		case '(':
++		case '(': {
++			//int pos = dest->length;
+ 			i_getch(input);
+ 			o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ 			o_addchr(dest, quote_mask | '`');
+ 			add_till_closing_curly_brace(dest, input);
++			//bb_error_msg("RES '%s'", dest->data + pos);
+ 			o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ 			break;
++		}
+ #endif
+ 		case '-':
+ 		case '_':
+diff --git a/shell/hush_test/hush-psubst/tick3.tests b/shell/hush_test/hush-psubst/tick3.tests
+index 97b45e4..2b055bb 100755
+--- a/shell/hush_test/hush-psubst/tick3.tests
++++ b/shell/hush_test/hush-psubst/tick3.tests
+@@ -1,4 +1,3 @@
+-#!/bin/sh
+ TEST=Q
+ # \` is special
+ echo `echo '\'TEST\`echo ZZ\`BEST`
+diff --git a/shell/hush_test/hush-psubst/tick4.right b/shell/hush_test/hush-psubst/tick4.right
+new file mode 100644
+index 0000000..d8030ea
+--- /dev/null
++++ b/shell/hush_test/hush-psubst/tick4.right
+@@ -0,0 +1,7 @@
++(TEST) BEST
++TEST) BEST
++((TEST) BEST
++)
++abc
++a)c
++OK: 0
+diff --git a/shell/hush_test/hush-psubst/tick4.tests b/shell/hush_test/hush-psubst/tick4.tests
+new file mode 100755
+index 0000000..f2305fb
+--- /dev/null
++++ b/shell/hush_test/hush-psubst/tick4.tests
+@@ -0,0 +1,7 @@
++echo $(echo '(TEST)' BEST)
++echo $(echo 'TEST)' BEST)
++echo $(echo \(\(TEST\) BEST)
++echo $(echo \))
++echo $(echo a"`echo "b"`"c )
++echo $(echo a"`echo ")"`"c )
++echo OK: $?

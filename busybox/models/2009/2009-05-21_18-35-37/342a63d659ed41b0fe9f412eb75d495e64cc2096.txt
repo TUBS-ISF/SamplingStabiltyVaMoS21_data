@@ -1,0 +1,48 @@
+2009-05-21 18:35:37 -0400
+diff --git a/shell/hush_test/hush-misc/compound.right b/shell/hush_test/hush-misc/compound.right
+new file mode 100644
+index 0000000..757d42f
+--- /dev/null
++++ b/shell/hush_test/hush-misc/compound.right
+@@ -0,0 +1,14 @@
++new group
++0
++1
++2
++3
++4
++5
++6
++new group
++new group
++0
++1
++2
++3
+diff --git a/shell/hush_test/hush-misc/compound.tests b/shell/hush_test/hush-misc/compound.tests
+new file mode 100644
+index 0000000..a5e85c3
+--- /dev/null
++++ b/shell/hush_test/hush-misc/compound.tests
+@@ -0,0 +1,21 @@
++echo new group
++echo 0;  { :; }
++echo 1;  { : ;}
++echo 2; ({ :; })
++echo 3; ({ : ;})
++echo 4;  ( :  )
++echo 5;  ( :; )
++echo 6;  ( : ;)
++# not sure if POSIX requires these, but bash accepts them ...
++#echo 7; {( :  )}
++#echo 8; {( :; )}
++#echo 9; {( : ;)}
++
++echo new group
++#echo 0;  {(:);}
++
++echo new group
++echo 0;  (:)
++echo 1;  (:;)
++echo 2;  (:);
++echo 3;  (:;);

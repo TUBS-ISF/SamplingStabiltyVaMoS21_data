@@ -1,0 +1,66 @@
+2009-10-23 16:07:37 +0200
+diff --git a/coreutils/date.c b/coreutils/date.c
+index 09ced0e..a230fe2 100644
+--- a/coreutils/date.c
++++ b/coreutils/date.c
+@@ -69,6 +69,18 @@ static void maybe_set_utc(int opt)
+ 		putenv((char*)"TZ=UTC0");
+ }
+ 
++#if ENABLE_LONG_OPTS
++static const char date_longopts[] ALIGN1 =
++		"rfc-822\0" No_argument "R"
++		"rfc-2822\0" No_argument "R"
++		"set\0" Required_argument "s"
++		"utc\0" No_argument "u"
++		/*"universal\0" No_argument "u"*/
++		"date\0" Required_argument "d"
++		"reference\0" Required_argument "r"
++		;
++#endif
++
+ int date_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int date_main(int argc UNUSED_PARAM, char **argv)
+ {
+@@ -84,6 +96,7 @@ int date_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	opt_complementary = "d--s:s--d"
+ 		IF_FEATURE_DATE_ISOFMT(":R--I:I--R");
++	IF_LONG_OPTS(applet_long_options = date_longopts;)
+ 	opt = getopt32(argv, "Rs:ud:r:"
+ 			IF_FEATURE_DATE_ISOFMT("I::D:"),
+ 			&date_str, &date_str, &filename
+diff --git a/include/usage.h b/include/usage.h
+index 8316c43..ca88106 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -673,17 +673,27 @@
+ #define date_full_usage "\n\n" \
+        "Display time (using +FMT), or set time\n" \
+      "\nOptions:" \
++	IF_NOT_LONG_OPTS( \
+      "\n	[-s] TIME	Set time to TIME" \
+      "\n	-u		Work in UTC (don't convert to local time)" \
+-     "\n	-R		Output RFC-822 compliant date string" \
++     "\n	-R		Output RFC-2822 compliant date string" \
++	) IF_LONG_OPTS( \
++     "\n	[-s,--set] TIME	Set time to TIME" \
++     "\n	-u,--utc		Work in UTC (don't convert to local time)" \
++     "\n	-R,--rfc-2822		Output RFC-2822 compliant date string" \
++	) \
+ 	IF_FEATURE_DATE_ISOFMT( \
+      "\n	-I[SPEC]	Output ISO-8601 compliant date string" \
+      "\n			SPEC='date' (default) for date only," \
+      "\n			'hours', 'minutes', or 'seconds' for date and" \
+      "\n			time to the indicated precision" \
+-	) \
++	) IF_NOT_LONG_OPTS( \
+      "\n	-r FILE		Display last modification time of FILE" \
+      "\n	-d TIME		Display TIME, not 'now'" \
++	) IF_LONG_OPTS( \
++     "\n	-r,--reference FILE		Display last modification time of FILE" \
++     "\n	-d,--date TIME		Display TIME, not 'now'" \
++	) \
+ 	IF_FEATURE_DATE_ISOFMT( \
+      "\n	-D FMT		Use FMT for -d TIME conversion" \
+ 	) \

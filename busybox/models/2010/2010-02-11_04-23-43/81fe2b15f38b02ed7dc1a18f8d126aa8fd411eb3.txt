@@ -1,0 +1,13 @@
+2010-02-11 04:23:43 +0100
+diff --git a/networking/wget.c b/networking/wget.c
+index 2b9ba55..5b73b93 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -592,6 +592,7 @@ int wget_main(int argc UNUSED_PARAM, char **argv)
+ 	if (use_proxy) {
+ 		proxy = getenv(target.is_ftp ? "ftp_proxy" : "http_proxy");
+ 		if (proxy && proxy[0]) {
++			server.user = NULL;
+ 			parse_url(proxy, &server);
+ 		} else {
+ 			use_proxy = 0;

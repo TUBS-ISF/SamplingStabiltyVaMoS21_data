@@ -1,0 +1,524 @@
+2010-01-04 20:49:58 +0100
+diff --git a/coreutils/df.c b/coreutils/df.c
+index 83794ad..bcde783 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -58,7 +58,7 @@ int df_main(int argc UNUSED_PARAM, char **argv)
+ 	const char *disp_units_hdr = NULL;
+ 	char *chp;
+ 
+-	check_unicode_in_env();
++	init_unicode();
+ 
+ #if ENABLE_FEATURE_HUMAN_READABLE && ENABLE_FEATURE_DF_FANCY
+ 	opt_complementary = "k-mB:m-Bk:B-km";
+diff --git a/coreutils/expand.c b/coreutils/expand.c
+index e08eb1d..649b4c1 100644
+--- a/coreutils/expand.c
++++ b/coreutils/expand.c
+@@ -144,7 +144,7 @@ int expand_main(int argc UNUSED_PARAM, char **argv)
+ 		"all\0"              No_argument       "a"
+ 	;
+ #endif
+-	check_unicode_in_env();
++	init_unicode();
+ 
+ 	if (ENABLE_EXPAND && (!ENABLE_UNEXPAND || applet_name[0] == 'e')) {
+ 		IF_FEATURE_EXPAND_LONG_OPTIONS(applet_long_options = expand_longopts);
+diff --git a/coreutils/fold.c b/coreutils/fold.c
+index 56a3466..cbea31f 100644
+--- a/coreutils/fold.c
++++ b/coreutils/fold.c
+@@ -9,8 +9,8 @@
+ 
+    Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ */
+-
+ #include "libbb.h"
++#include "unicode.h"
+ 
+ /* Must match getopt32 call */
+ #define FLAG_COUNT_BYTES        1
+@@ -20,39 +20,53 @@
+ /* Assuming the current column is COLUMN, return the column that
+    printing C will move the cursor to.
+    The first column is 0. */
+-static int adjust_column(int column, char c)
++static int adjust_column(unsigned column, char c)
+ {
+-	if (!(option_mask32 & FLAG_COUNT_BYTES)) {
+-		if (c == '\b') {
+-			if (column > 0)
+-				column--;
+-		} else if (c == '\r')
++	if (option_mask32 & FLAG_COUNT_BYTES)
++		return ++column;
++
++	if (c == '\t')
++		return column + 8 - column % 8;
++
++	if (c == '\b') {
++		if ((int)--column < 0)
+ 			column = 0;
+-		else if (c == '\t')
+-			column = column + 8 - column % 8;
+-		else			/* if (isprint(c)) */
++	}
++	else if (c == '\r')
++		column = 0;
++	else { /* just a printable char */
++		if (unicode_status != UNICODE_ON /* every byte is a new char */
++		 || (c & 0xc0) != 0x80 /* it isn't a 2nd+ byte of a Unicode char */
++		) {
+ 			column++;
+-	} else
+-		column++;
++		}
++	}
+ 	return column;
+ }
+ 
++/* Note that this function can write NULs, unlike fputs etc. */
++static void write2stdout(const void *buf, unsigned size)
++{
++	fwrite(buf, 1, size, stdout);
++}
++
+ int fold_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int fold_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	char *line_out = NULL;
+-	int allocated_out = 0;
+-	char *w_opt;
+-	int width = 80;
+-	int i;
+-	int errs = 0;
++	const char *w_opt = "80";
++	unsigned width;
++	smallint exitcode = EXIT_SUCCESS;
++
++	init_unicode();
+ 
+ 	if (ENABLE_INCLUDE_SUSv2) {
+ 		/* Turn any numeric options into -w options.  */
++		int i;
+ 		for (i = 1; argv[i]; i++) {
+-			char const *a = argv[i];
+-
+-			if (*a++ == '-') {
++			const char *a = argv[i];
++			if (*a == '-') {
++				a++;
+ 				if (*a == '-' && !a[1]) /* "--" */
+ 					break;
+ 				if (isdigit(*a))
+@@ -62,8 +76,7 @@ int fold_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	getopt32(argv, "bsw:", &w_opt);
+-	if (option_mask32 & FLAG_WIDTH)
+-		width = xatoul_range(w_opt, 1, 10000);
++	width = xatou_range(w_opt, 1, 10000);
+ 
+ 	argv += optind;
+ 	if (!*argv)
+@@ -72,79 +85,81 @@ int fold_main(int argc UNUSED_PARAM, char **argv)
+ 	do {
+ 		FILE *istream = fopen_or_warn_stdin(*argv);
+ 		int c;
+-		int column = 0;		/* Screen column where next char will go. */
+-		int offset_out = 0;	/* Index in 'line_out' for next char. */
++		unsigned column = 0;     /* Screen column where next char will go */
++		unsigned offset_out = 0; /* Index in 'line_out' for next char */
+ 
+ 		if (istream == NULL) {
+-			errs |= EXIT_FAILURE;
++			exitcode = EXIT_FAILURE;
+ 			continue;
+ 		}
+ 
+ 		while ((c = getc(istream)) != EOF) {
+-			if (offset_out + 1 >= allocated_out) {
+-				allocated_out += 1024;
+-				line_out = xrealloc(line_out, allocated_out);
++			/* We grow line_out in chunks of 0x1000 bytes */
++			if ((offset_out & 0xfff) == 0) {
++				line_out = xrealloc(line_out, offset_out + 0x1000);
+ 			}
+-
++ rescan:
++			line_out[offset_out] = c;
+ 			if (c == '\n') {
+-				line_out[offset_out++] = c;
+-				fwrite(line_out, sizeof(char), (size_t) offset_out, stdout);
++				write2stdout(line_out, offset_out + 1);
+ 				column = offset_out = 0;
+ 				continue;
+ 			}
+- rescan:
+ 			column = adjust_column(column, c);
++			if (column <= width || offset_out == 0) {
++				/* offset_out == 0 case happens
++				 * with small width (say, 1) and tabs.
++				 * The very first tab already goes to column 8,
++				 * but we must not wrap it */
++				offset_out++;
++				continue;
++			}
+ 
+-			if (column > width) {
+-				/* This character would make the line too long.
+-				   Print the line plus a newline, and make this character
+-				   start the next line. */
+-				if (option_mask32 & FLAG_BREAK_SPACES) {
+-					/* Look for the last blank. */
+-					int logical_end;
+-
+-					for (logical_end = offset_out - 1; logical_end >= 0; logical_end--) {
+-						if (isblank(line_out[logical_end])) {
+-							break;
+-						}
++			/* This character would make the line too long.
++			 * Print the line plus a newline, and make this character
++			 * start the next line */
++			if (option_mask32 & FLAG_BREAK_SPACES) {
++				unsigned i;
++				unsigned logical_end;
++
++				/* Look for the last blank. */
++				for (logical_end = offset_out - 1; (int)logical_end >= 0; logical_end--) {
++					if (!isblank(line_out[logical_end]))
++						continue;
++
++					/* Found a space or tab.
++					 * Output up to and including it, and start a new line */
++					logical_end++;
++					/*line_out[logical_end] = '\n'; - NO! this nukes one buffered character */
++					write2stdout(line_out, logical_end);
++					putchar('\n');
++					/* Move the remainder to the beginning of the next line.
++					 * The areas being copied here might overlap. */
++					memmove(line_out, line_out + logical_end, offset_out - logical_end);
++					offset_out -= logical_end;
++					for (column = i = 0; i < offset_out; i++) {
++						column = adjust_column(column, line_out[i]);
+ 					}
+-					if (logical_end >= 0) {
+-						/* Found a blank.  Don't output the part after it. */
+-						logical_end++;
+-						fwrite(line_out, sizeof(char), (size_t) logical_end, stdout);
+-						bb_putchar('\n');
+-						/* Move the remainder to the beginning of the next line.
+-						   The areas being copied here might overlap. */
+-						memmove(line_out, line_out + logical_end, offset_out - logical_end);
+-						offset_out -= logical_end;
+-						for (column = i = 0; i < offset_out; i++) {
+-							column = adjust_column(column, line_out[i]);
+-						}
+-						goto rescan;
+-					}
+-				}
+-				if (offset_out == 0) {
+-					line_out[offset_out++] = c;
+-					continue;
++					goto rescan;
+ 				}
+-				line_out[offset_out++] = '\n';
+-				fwrite(line_out, sizeof(char), (size_t) offset_out, stdout);
+-				column = offset_out = 0;
+-				goto rescan;
++				/* No blank found, wrap will split the overlong word */
+ 			}
+-
+-			line_out[offset_out++] = c;
+-		}
++			/* Output what we accumulated up to now, and start a new line */
++			line_out[offset_out] = '\n';
++			write2stdout(line_out, offset_out + 1);
++			column = offset_out = 0;
++			goto rescan;
++		} /* while (not EOF) */
+ 
+ 		if (offset_out) {
+-			fwrite(line_out, sizeof(char), (size_t) offset_out, stdout);
++			write2stdout(line_out, offset_out);
+ 		}
+ 
+ 		if (fclose_if_not_stdin(istream)) {
+-			bb_simple_perror_msg(*argv);	/* Avoid multibyte problems. */
+-			errs |= EXIT_FAILURE;
++			bb_simple_perror_msg(*argv);
++			exitcode = EXIT_FAILURE;
+ 		}
+ 	} while (*++argv);
+ 
+-	fflush_stdout_and_exit(errs);
++	fflush_stdout_and_exit(exitcode);
+ }
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 13c863c..5ea3a0b 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -945,7 +945,7 @@ int ls_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	INIT_G();
+ 
+-	check_unicode_in_env();
++	init_unicode();
+ 
+ 	all_fmt = LIST_SHORT |
+ 		(ENABLE_FEATURE_LS_SORTFILES * (SORT_NAME | SORT_FORWARD));
+diff --git a/include/unicode.h b/include/unicode.h
+index e006147..9f27657 100644
+--- a/include/unicode.h
++++ b/include/unicode.h
+@@ -5,10 +5,17 @@
+ #ifndef UNICODE_H
+ #define UNICODE_H 1
+ 
++enum {
++	UNICODE_UNKNOWN = 0,
++	UNICODE_OFF = 1,
++	UNICODE_ON = 2,
++};
++
+ #if !ENABLE_FEATURE_ASSUME_UNICODE
+ 
+ # define bb_mbstrlen(string) strlen(string)
+-# define check_unicode_in_env() ((void)0)
++# define unicode_status UNICODE_OFF
++# define init_unicode() ((void)0)
+ 
+ #else
+ 
+@@ -18,16 +25,19 @@ size_t bb_mbstrlen(const char *string) FAST_FUNC;
+ 
+ #  include <wchar.h>
+ #  include <wctype.h>
+-#  define check_unicode_in_env() ((void)0)
++extern uint8_t unicode_status;
++void init_unicode(void) FAST_FUNC;
+ 
+ # else
+ 
+ /* Crude "locale support" which knows only C and Unicode locales */
+ 
+ #  if !ENABLE_FEATURE_CHECK_UNICODE_IN_ENV
+-#   define check_unicode_in_env() ((void)0)
++#   define unicode_status UNICODE_ON
++#   define init_unicode() ((void)0)
+ #  else
+-void check_unicode_in_env(void) FAST_FUNC;
++extern uint8_t unicode_status;
++void init_unicode(void) FAST_FUNC;
+ #  endif
+ 
+ #  undef MB_CUR_MAX
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index c73e6b7..b73f1d6 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1763,7 +1763,7 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ 		return len;
+ 	}
+ 
+-	check_unicode_in_env();
++	init_unicode();
+ 
+ // FIXME: audit & improve this
+ 	if (maxsize > MAX_LINELEN)
+diff --git a/libbb/progress.c b/libbb/progress.c
+index f6f2692..3a245ae 100644
+--- a/libbb/progress.c
++++ b/libbb/progress.c
+@@ -78,7 +78,7 @@ void FAST_FUNC bb_progress_update(bb_progress_t *p,
+ 	}
+ 
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+-	check_unicode_in_env();
++	init_unicode();
+ 	/* libbb candidate? */
+ 	{
+ 		wchar_t wbuf21[21];
+diff --git a/libbb/unicode.c b/libbb/unicode.c
+index 544528a..9d316df 100644
+--- a/libbb/unicode.c
++++ b/libbb/unicode.c
+@@ -7,7 +7,9 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ #include "libbb.h"
+-# include "unicode.h"
++#include "unicode.h"
++
++uint8_t unicode_status;
+ 
+ size_t FAST_FUNC bb_mbstrlen(const char *string)
+ {
+@@ -17,32 +19,38 @@ size_t FAST_FUNC bb_mbstrlen(const char *string)
+ 	return width;
+ }
+ 
+-#if !ENABLE_LOCALE_SUPPORT
++#if ENABLE_LOCALE_SUPPORT
++
++/* Unicode support using libc */
++
++void FAST_FUNC init_unicode(void)
++{
++	/* In unicode, this is a one character string */
++	static const char unicode_0x394[] = { 0xce, 0x94, 0 };
++
++	if (unicode_status != UNICODE_UNKNOWN)
++		return;
++
++	unicode_status = bb_mbstrlen(unicode_0x394) == 1 ? UNICODE_ON : UNICODE_OFF;
++}
++
++#else
+ 
+ /* Crude "locale support" which knows only C and Unicode locales */
+ 
+-/* unicode_is_enabled:
+- * 0: not known yet,
+- * 1: not unicode (IOW: assuming one char == one byte)
+- * 2: unicode
+- */
+-# if !ENABLE_FEATURE_CHECK_UNICODE_IN_ENV
+-#  define unicode_is_enabled 2
+-# else
+-static smallint unicode_is_enabled;
+-void FAST_FUNC check_unicode_in_env(void)
++# if ENABLE_FEATURE_CHECK_UNICODE_IN_ENV
++void FAST_FUNC init_unicode(void)
+ {
+ 	char *lang;
+ 
+-	if (unicode_is_enabled)
++	if (unicode_status != UNICODE_UNKNOWN)
+ 		return;
+-	unicode_is_enabled = 1;
+ 
++	unicode_status = UNICODE_OFF;
+ 	lang = getenv("LANG");
+ 	if (!lang || !(strstr(lang, ".utf") || strstr(lang, ".UTF")))
+ 		return;
+-
+-	unicode_is_enabled = 2;
++	unicode_status = UNICODE_ON;
+ }
+ # endif
+ 
+@@ -85,7 +93,7 @@ static size_t wcrtomb_internal(char *s, wchar_t wc)
+ 
+ size_t FAST_FUNC wcrtomb(char *s, wchar_t wc, mbstate_t *ps UNUSED_PARAM)
+ {
+-	if (unicode_is_enabled != 2) {
++	if (unicode_status != UNICODE_ON) {
+ 		*s = wc;
+ 		return 1;
+ 	}
+@@ -97,7 +105,7 @@ size_t FAST_FUNC wcstombs(char *dest, const wchar_t *src, size_t n)
+ {
+ 	size_t org_n = n;
+ 
+-	if (unicode_is_enabled != 2) {
++	if (unicode_status != UNICODE_ON) {
+ 		while (n) {
+ 			wchar_t c = *src++;
+ 			*dest++ = c;
+@@ -137,7 +145,7 @@ size_t FAST_FUNC mbstowcs(wchar_t *dest, const char *src, size_t n)
+ {
+ 	size_t org_n = n;
+ 
+-	if (unicode_is_enabled != 2) {
++	if (unicode_status != UNICODE_ON) {
+ 		while (n) {
+ 			unsigned char c = *src++;
+ 
+diff --git a/modutils/lsmod.c b/modutils/lsmod.c
+index 582503b..20d9cf1 100644
+--- a/modutils/lsmod.c
++++ b/modutils/lsmod.c
+@@ -49,7 +49,7 @@ int lsmod_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ # if ENABLE_FEATURE_ASSUME_UNICODE
+ 	size_t name_len;
+ # endif
+-	check_unicode_in_env();
++	init_unicode();
+ 
+ 	printf("%-24sSize  Used by", "Module");
+ 	check_tainted();
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 017c801..97605f0 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -43,7 +43,7 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	applet_long_options = dumpleases_longopts;
+ #endif
+-	check_unicode_in_env();
++	init_unicode();
+ 
+ 	opt_complementary = "=0:a--r:r--a";
+ 	opt = getopt32(argv, "arf:", &file);
+diff --git a/testsuite/fold.tests b/testsuite/fold.tests
+index ca0e511..17721a1 100755
+--- a/testsuite/fold.tests
++++ b/testsuite/fold.tests
+@@ -7,8 +7,53 @@
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+ testing "fold -s" "fold -w 7 -s" \
+-	"123456\n\t\nasdf" \
++        "123456\n\t\nasdf" \
++        "" \
++        "123456\tasdf" \
++
++testing "fold -w1" "fold -w1" \
++	"q\nq\n \nw\n \ne\ne\ne\n \nr\n \nt\nt\nt\nt\n \ny" \
++	"" \
++	"qq w eee r tttt y" \
++
++testing "fold with NULs" "fold -sw22" \
++	"\
++The NUL is here:>\0< \n\
++and another one is \n\
++here:>\0< - they must \n\
++be preserved
++" \
++	"" \
++	"The NUL is here:>\0< and another one \
++is here:>\0< - they must be preserved
++" \
++
++# The text was taken from English and Ukrainian wikipedia pages
++testing "fold -sw66 with unicode input" "fold -sw66" \
++	"\
++The Andromeda Galaxy (pronounced /ænˈdrɒmədə/, also known as \n\
++Messier 31, M31, or NGC224; often referred to as the Great \n\
++Andromeda Nebula in older texts) is a spiral galaxy approximately \n\
++2,500,000 light-years (1.58×10^11 AU) away in the constellation \n\
++Andromeda. It is the nearest spiral galaxy to our own, the Milky \n\
++Way.\n\
++Галактика або Туманність Андромеди (також відома як M31 за \n\
++каталогом Мессьє та NGC224 за Новим загальним каталогом) — \n\
++спіральна галактика, що знаходиться на відстані приблизно у 2,5 \n\
++мільйони світлових років від нашої планети у сузір'ї Андромеди. \n\
++На початку ХХІ ст. в центрі галактики виявлено чорну дірку." \
+ 	"" \
+-	"123456\tasdf" \
++	"\
++The Andromeda Galaxy (pronounced /ænˈdrɒmədə/, also known as \
++Messier 31, M31, or NGC224; often referred to as the Great \
++Andromeda Nebula in older texts) is a spiral galaxy approximately \
++2,500,000 light-years (1.58×10^11 AU) away in the constellation \
++Andromeda. It is the nearest spiral galaxy to our own, the Milky \
++Way.
++Галактика або Туманність Андромеди (також відома як M31 за \
++каталогом Мессьє та NGC224 за Новим загальним каталогом) — \
++спіральна галактика, що знаходиться на відстані приблизно у 2,5 \
++мільйони світлових років від нашої планети у сузір'ї Андромеди. \
++На початку ХХІ ст. в центрі галактики виявлено чорну дірку." \
+ 
+ exit $FAILCOUNT

@@ -1,0 +1,343 @@
+2009-07-05 03:34:12 +0200
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index e02fe7c..5506fdb 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -68,6 +68,10 @@
+ # define CSWTCH _POSIX_VDISABLE
+ #endif
+ 
++#ifndef IUCLC
++# define IUCLC 0
++#endif
++
+ /* SunOS 5.3 loses (^Z doesn't work) if 'swtch' is the same as 'susp'.
+    So the default is to disable 'swtch.'  */
+ #if defined(__sparc__) && defined(__svr4__)
+diff --git a/include/libbb.h b/include/libbb.h
+index 77674f8..835beb2 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -29,6 +29,10 @@
+ #include <sys/ioctl.h>
+ #include <sys/mman.h>
+ #include <sys/socket.h>
++#if defined __FreeBSD__
++#include <netinet/in.h>
++#include <arpa/inet.h>
++#endif
+ #include <sys/stat.h>
+ #include <sys/time.h>
+ #include <sys/types.h>
+@@ -86,7 +90,9 @@ int klogctl(int type, char *b, int len);
+ /* This is declared here rather than #including <libgen.h> in order to avoid
+  * confusing the two versions of basename.  See the dirname/basename man page
+  * for details. */
++#if !defined __FreeBSD__
+ char *dirname(char *path);
++#endif
+ /* Include our own copy of struct sysinfo to avoid binary compatibility
+  * problems with Linux 2.4, which changed things.  Grumble, grumble. */
+ struct sysinfo {
+diff --git a/include/platform.h b/include/platform.h
+index e2136a2..99e747f 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -36,12 +36,10 @@
+ #undef inline
+ #if defined(__STDC_VERSION__) && __STDC_VERSION__ > 199901L
+ /* it's a keyword */
++#elif __GNUC_PREREQ(2,7)
++# define inline __inline__
+ #else
+-# if __GNUC_PREREQ(2,7)
+-#  define inline __inline__
+-# else
+-#  define inline
+-# endif
++# define inline
+ #endif
+ 
+ #ifndef __const
+@@ -52,6 +50,7 @@
+ #define NORETURN __attribute__ ((__noreturn__))
+ #define PACKED __attribute__ ((__packed__))
+ #define ALIGNED(m) __attribute__ ((__aligned__(m)))
++
+ /* __NO_INLINE__: some gcc's do not honor inlining! :( */
+ #if __GNUC_PREREQ(3,0) && !defined(__NO_INLINE__)
+ # define ALWAYS_INLINE __attribute__ ((always_inline)) inline
+@@ -122,24 +121,34 @@
+ 
+ /* ---- Endian Detection ------------------------------------ */
+ 
+-#if (defined __digital__ && defined __unix__)
++#if defined(__digital__) && defined(__unix__)
+ # include <sex.h>
+ # define __BIG_ENDIAN__ (BYTE_ORDER == BIG_ENDIAN)
+ # define __BYTE_ORDER BYTE_ORDER
++#elif defined __FreeBSD__
++char *strchrnul(const char *s, int c);
++# include <sys/resource.h>	/* rlimit */
++# include <machine/endian.h>
++# define bswap_64 __bswap64
++# define bswap_32 __bswap32
++# define bswap_16 __bswap16
++# define __BIG_ENDIAN__ (_BYTE_ORDER == _BIG_ENDIAN)
+ #elif !defined __APPLE__
+ # include <byteswap.h>
+ # include <endian.h>
+ #endif
+ 
+-#ifdef __BIG_ENDIAN__
++#if defined(__BIG_ENDIAN__) && __BIG_ENDIAN__
+ # define BB_BIG_ENDIAN 1
+ # define BB_LITTLE_ENDIAN 0
+ #elif __BYTE_ORDER == __BIG_ENDIAN
+ # define BB_BIG_ENDIAN 1
+ # define BB_LITTLE_ENDIAN 0
+-#else
++#elif __BYTE_ORDER == __LITTLE_ENDIAN
+ # define BB_BIG_ENDIAN 0
+ # define BB_LITTLE_ENDIAN 1
++#else
++# error "Can't determine endiannes"
+ #endif
+ 
+ /* SWAP_LEnn means "convert CPU<->little_endian by swapping bytes" */
+@@ -183,7 +192,7 @@
+ 
+ #ifndef __APPLE__
+ # include <arpa/inet.h>
+-# ifndef __socklen_t_defined
++# if !defined(__socklen_t_defined) && !defined(_SOCKLEN_T_DECLARED)
+ typedef int socklen_t;
+ # endif
+ #else
+@@ -192,20 +201,13 @@ typedef int socklen_t;
+ 
+ /* ---- Compiler dependent settings ------------------------- */
+ 
+-#if (defined __digital__ && defined __unix__) || defined __APPLE__
++#if (defined __digital__ && defined __unix__) \
++ || defined __APPLE__ || defined __FreeBSD__
+ # undef HAVE_MNTENT_H
+ # undef HAVE_SYS_STATFS_H
+ #else
+ # define HAVE_MNTENT_H 1
+ # define HAVE_SYS_STATFS_H 1
+-#endif /* ___digital__ && __unix__ */
+-
+-/* linux/loop.h relies on __u64. Make sure we have that as a proper type
+- * until userspace is widely fixed.  */
+-#if (defined __INTEL_COMPILER && !defined __GNUC__) || \
+-	(defined __GNUC__ && defined __STRICT_ANSI__)
+-__extension__ typedef long long __s64;
+-__extension__ typedef unsigned long long __u64;
+ #endif
+ 
+ /*----- Kernel versioning ------------------------------------*/
+@@ -224,14 +226,15 @@ __extension__ typedef unsigned long long __u64;
+ /* Don't perpetuate e2fsck crap into the headers.  Clean up e2fsck instead. */
+ 
+ #if defined __GLIBC__ || defined __UCLIBC__ \
+-	|| defined __dietlibc__ || defined _NEWLIB_VERSION
++ || defined __dietlibc__ || defined _NEWLIB_VERSION
+ # include <features.h>
+ # define HAVE_FEATURES_H
+ # include <stdint.h>
+ # define HAVE_STDINT_H
+ #elif !defined __APPLE__
+-/* Largest integral types.  */
+-# if __BIG_ENDIAN__
++/* Largest integral types. */
++# if BB_BIG_ENDIAN
++/* Looks BROKEN! */
+ typedef long                intmax_t;
+ typedef unsigned long       uintmax_t;
+ # else
+@@ -308,18 +311,15 @@ static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+ }
+ #endif
+ 
+-/* Don't use lchown with glibc older than 2.1.x ... uClibc lacks it */
+-#if (defined __GLIBC__ && __GLIBC__ <= 2 && __GLIBC_MINOR__ < 1) || \
+-    defined __UC_LIBC__
++/* Don't use lchown with glibc older than 2.1.x */
++#if defined(__GLIBC__) && __GLIBC__ <= 2 && __GLIBC_MINOR__ < 1
+ # define lchown chown
+ #endif
+ 
+-#if (defined __digital__ && defined __unix__)
++#if defined(__digital__) && defined(__unix__)
+ 
+ # include <standards.h>
+-# define HAVE_STANDARDS_H
+ # include <inttypes.h>
+-# define HAVE_INTTYPES_H
+ # define PRIu32 "u"
+ /* use legacy setpgrp(pid_t,pid_t) for now.  move to platform.c */
+ # define bb_setpgrp() do { pid_t __me = getpid(); setpgrp(__me,__me); } while (0)
+@@ -336,7 +336,7 @@ static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+ #  define ADJ_TICK MOD_CLKB
+ # endif
+ 
+-#else /* !__digital__ */
++#else
+ 
+ # define bb_setpgrp() setpgrp()
+ 
+@@ -387,9 +387,4 @@ static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+ # define HAVE_NO_UTSNAME_DOMAINNAME
+ #endif
+ 
+-/* If this system doesn't have IUCLC bit in struct termios::c_iflag... */
+-#ifndef IUCLC
+-# define IUCLC 0
+-#endif
+-
+ #endif
+diff --git a/libbb/bb_askpass.c b/libbb/bb_askpass.c
+index c0dcf0c..073175c 100644
+--- a/libbb/bb_askpass.c
++++ b/libbb/bb_askpass.c
+@@ -37,6 +37,9 @@ char* FAST_FUNC bb_ask(const int fd, int timeout, const char *prompt)
+ 	tcgetattr(fd, &oldtio);
+ 	tcflush(fd, TCIFLUSH);
+ 	tio = oldtio;
++#ifndef IUCLC
++# define IUCLC 0
++#endif
+ 	tio.c_iflag &= ~(IUCLC|IXON|IXOFF|IXANY);
+ 	tio.c_lflag &= ~(ECHO|ECHOE|ECHOK|ECHONL|TOSTOP);
+ 	tcsetattr_stdin_TCSANOW(&tio);
+diff --git a/libbb/loop.c b/libbb/loop.c
+index 7d2b420..24dab1a 100644
+--- a/libbb/loop.c
++++ b/libbb/loop.c
+@@ -7,27 +7,35 @@
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+-
+ #include "libbb.h"
+-
+-/* For 2.6, use the cleaned up header to get the 64 bit API. */
+ #include <linux/version.h>
++
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+-#include <linux/loop.h>
++
++/* For 2.6, use the cleaned up header to get the 64 bit API. */
++/* linux/loop.h relies on __u64. Make sure we have that as a proper type
++ * until userspace is widely fixed. */
++# if (defined __INTEL_COMPILER && !defined __GNUC__) \
++  || (defined __GNUC__ && defined __STRICT_ANSI__)
++__extension__ typedef long long __s64;
++__extension__ typedef unsigned long long __u64;
++# endif
++# include <linux/loop.h>
+ typedef struct loop_info64 bb_loop_info;
+-#define BB_LOOP_SET_STATUS LOOP_SET_STATUS64
+-#define BB_LOOP_GET_STATUS LOOP_GET_STATUS64
++# define BB_LOOP_SET_STATUS LOOP_SET_STATUS64
++# define BB_LOOP_GET_STATUS LOOP_GET_STATUS64
+ 
+-/* For 2.4 and earlier, use the 32 bit API (and don't trust the headers) */
+ #else
+-/* Stuff stolen from linux/loop.h for 2.4 and earlier kernels*/
+-#include <linux/posix_types.h>
+-#define LO_NAME_SIZE        64
+-#define LO_KEY_SIZE         32
+-#define LOOP_SET_FD         0x4C00
+-#define LOOP_CLR_FD         0x4C01
+-#define BB_LOOP_SET_STATUS  0x4C02
+-#define BB_LOOP_GET_STATUS  0x4C03
++
++/* For 2.4 and earlier, use the 32 bit API (and don't trust the headers) */
++/* Stuff stolen from linux/loop.h for 2.4 and earlier kernels */
++# include <linux/posix_types.h>
++# define LO_NAME_SIZE        64
++# define LO_KEY_SIZE         32
++# define LOOP_SET_FD         0x4C00
++# define LOOP_CLR_FD         0x4C01
++# define BB_LOOP_SET_STATUS  0x4C02
++# define BB_LOOP_GET_STATUS  0x4C03
+ typedef struct {
+ 	int                lo_number;
+ 	__kernel_dev_t     lo_device;
+@@ -60,7 +68,6 @@ char* FAST_FUNC query_loop(const char *device)
+ 	return dev;
+ }
+ 
+-
+ int FAST_FUNC del_loop(const char *device)
+ {
+ 	int fd, rc;
+diff --git a/libpwdgrp/pwd_grp.c b/libpwdgrp/pwd_grp.c
+index 56bfcbe..e2077ad 100644
+--- a/libpwdgrp/pwd_grp.c
++++ b/libpwdgrp/pwd_grp.c
+@@ -19,7 +19,7 @@
+  */
+ 
+ #include "libbb.h"
+-#include <features.h>
++//#include <features.h>
+ #include <assert.h>
+ 
+ #ifndef _PATH_SHADOW
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 24a182f..34b09ce 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -22,6 +22,10 @@
+ #include <utmp.h> /* updwtmp() */
+ #endif
+ 
++#ifndef IUCLC
++# define IUCLC 0
++#endif
++
+ /*
+  * Some heuristics to find out what environment we are in: if it is not
+  * System V, assume it is SunOS 4.
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 84a6765..0a3e644 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -8,7 +8,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <features.h>
++//#include <features.h>
+ #if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined _NEWLIB_VERSION
+ #include <netpacket/packet.h>
+ #include <net/ethernet.h>
+diff --git a/networking/udhcp/clientsocket.c b/networking/udhcp/clientsocket.c
+index 851d5ab..0febc04 100644
+--- a/networking/udhcp/clientsocket.c
++++ b/networking/udhcp/clientsocket.c
+@@ -21,7 +21,7 @@
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
+ 
+-#include <features.h>
++//#include <features.h>
+ #include <asm/types.h>
+ #if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined(_NEWLIB_VERSION)
+ #include <netpacket/packet.h>
+diff --git a/networking/udhcp/socket.c b/networking/udhcp/socket.c
+index 6b15766..a0ffbf8 100644
+--- a/networking/udhcp/socket.c
++++ b/networking/udhcp/socket.c
+@@ -24,7 +24,7 @@
+  */
+ 
+ #include <net/if.h>
+-#include <features.h>
++//#include <features.h>
+ #if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined _NEWLIB_VERSION
+ #include <netpacket/packet.h>
+ #include <net/ethernet.h>

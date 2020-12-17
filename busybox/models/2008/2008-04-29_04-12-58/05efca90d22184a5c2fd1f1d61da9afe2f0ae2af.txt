@@ -1,0 +1,14 @@
+2008-04-29 04:12:58 +0000
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index 9134d6d..29aed18 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -112,7 +112,7 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 	archive_handle->offset += 512;
+ 
+ 	/* If there is no filename its an empty header */
+-	if (tar.name[0] == 0) {
++	if (tar.name[0] == 0 && tar.prefix[0] == 0) {
+ 		if (end) {
+ 			/* This is the second consecutive empty header! End of archive!
+ 			 * Read until the end to empty the pipe from gz or bz2

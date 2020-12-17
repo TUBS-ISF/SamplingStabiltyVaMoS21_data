@@ -1,0 +1,659 @@
+2010-01-04 14:15:38 +0100
+diff --git a/archival/ar.c b/archival/ar.c
+index a1bcb1f..1b43502 100644
+--- a/archival/ar.c
++++ b/archival/ar.c
+@@ -38,7 +38,7 @@ static void FAST_FUNC header_verbose_list_ar(const file_header_t *file_header)
+ #define AR_OPT_INSERT		0x40
+ 
+ int ar_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ar_main(int argc, char **argv)
++int ar_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	static const char msg_unsupported_err[] ALIGN1 =
+ 		"archive %s is not supported";
+@@ -51,6 +51,7 @@ int ar_main(int argc, char **argv)
+ 	/* Prepend '-' to the first argument if required */
+ 	opt_complementary = "--:p:t:x:-1:p--tx:t--px:x--pt";
+ 	opt = getopt32(argv, "ptxovcr");
++	argv += optind;
+ 
+ 	if (opt & AR_CTX_PRINT) {
+ 		archive_handle->action_data = data_extract_to_stdout;
+@@ -76,9 +77,9 @@ int ar_main(int argc, char **argv)
+ 
+ 	archive_handle->src_fd = xopen(argv[optind++], O_RDONLY);
+ 
+-	while (optind < argc) {
++	while (*argv) {
+ 		archive_handle->filter = filter_accept_list;
+-		llist_add_to(&(archive_handle->accept), argv[optind++]);
++		llist_add_to(&archive_handle->accept, *argv++);
+ 	}
+ 
+ 	unpack_ar_archive(archive_handle);
+diff --git a/archival/rpm.c b/archival/rpm.c
+index 27c6b78..cdaf50f 100644
+--- a/archival/rpm.c
++++ b/archival/rpm.c
+@@ -116,7 +116,9 @@ int rpm_main(int argc, char **argv)
+ 	}
+ 	argv += optind;
+ 	//argc -= optind;
+-	if (!argv[0]) bb_show_usage();
++	if (!argv[0]) {
++		bb_show_usage();
++	}
+ 
+ 	while (*argv) {
+ 		rpm_fd = xopen(*argv++, O_RDONLY);
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index 7973b82..1f498fb 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -77,7 +77,7 @@ static char *build_row(char *p, unsigned *dp);
+ #define	HEAD_SEP	2		/* spaces between day headings */
+ 
+ int cal_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int cal_main(int argc, char **argv)
++int cal_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct tm *local_time;
+ 	struct tm zero_tm;
+@@ -92,13 +92,8 @@ int cal_main(int argc, char **argv)
+ 	option_mask32 &= 1;
+ 	month = 0;
+ 	argv += optind;
+-	argc -= optind;
+ 
+-	if (argc > 2) {
+-		bb_show_usage();
+-	}
+-
+-	if (!argc) {
++	if (!argv[0]) {
+ 		time(&now);
+ 		local_time = localtime(&now);
+ 		year = local_time->tm_year + 1900;
+@@ -106,7 +101,10 @@ int cal_main(int argc, char **argv)
+ 			month = local_time->tm_mon + 1;
+ 		}
+ 	} else {
+-		if (argc == 2) {
++		if (argv[1]) {
++			if (argv[2]) {
++				bb_show_usage();
++			}
+ 			month = xatou_range(*argv++, 1, 12);
+ 		}
+ 		year = xatou_range(*argv, 1, 9999);
+diff --git a/coreutils/hostid.c b/coreutils/hostid.c
+index 6f007d8..a537e3a 100644
+--- a/coreutils/hostid.c
++++ b/coreutils/hostid.c
+@@ -14,9 +14,9 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int hostid_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int hostid_main(int argc, char **argv UNUSED_PARAM)
++int hostid_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ {
+-	if (argc > 1) {
++	if (argv[1]) {
+ 		bb_show_usage();
+ 	}
+ 
+diff --git a/coreutils/logname.c b/coreutils/logname.c
+index 7e50132..8357b9a 100644
+--- a/coreutils/logname.c
++++ b/coreutils/logname.c
+@@ -25,11 +25,11 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int logname_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int logname_main(int argc, char **argv UNUSED_PARAM)
++int logname_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ {
+ 	char buf[64];
+ 
+-	if (argc > 1) {
++	if (argv[1]) {
+ 		bb_show_usage();
+ 	}
+ 
+diff --git a/coreutils/nohup.c b/coreutils/nohup.c
+index c9e65d2..4f6385f 100644
+--- a/coreutils/nohup.c
++++ b/coreutils/nohup.c
+@@ -39,7 +39,9 @@ int nohup_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	xfunc_error_retval = 127;
+ 
+-	if (!argv[1]) bb_show_usage();
++	if (!argv[1]) {
++		bb_show_usage();
++	}
+ 
+ 	/* If stdin is a tty, detach from it. */
+ 	if (isatty(STDIN_FILENO)) {
+diff --git a/coreutils/uuencode.c b/coreutils/uuencode.c
+index e19f996..bf66185 100644
+--- a/coreutils/uuencode.c
++++ b/coreutils/uuencode.c
+@@ -16,7 +16,7 @@ enum {
+ };
+ 
+ int uuencode_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int uuencode_main(int argc, char **argv)
++int uuencode_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct stat stat_buf;
+ 	int src_fd = STDIN_FILENO;
+@@ -32,7 +32,7 @@ int uuencode_main(int argc, char **argv)
+ 		tbl = bb_uuenc_tbl_base64;
+ 	}
+ 	argv += optind;
+-	if (argc == optind + 2) {
++	if (argv[1]) {
+ 		src_fd = xopen(*argv, O_RDONLY);
+ 		fstat(src_fd, &stat_buf);
+ 		mode = stat_buf.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+diff --git a/coreutils/whoami.c b/coreutils/whoami.c
+index 1031cdb..22d722e 100644
+--- a/coreutils/whoami.c
++++ b/coreutils/whoami.c
+@@ -14,9 +14,9 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int whoami_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int whoami_main(int argc, char **argv UNUSED_PARAM)
++int whoami_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ {
+-	if (argc > 1)
++	if (argv[1])
+ 		bb_show_usage();
+ 
+ 	/* Will complain and die if username not found */
+diff --git a/findutils/find.c b/findutils/find.c
+index 76cd18c..1b24668 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -835,7 +835,7 @@ static action*** parse_params(char **argv)
+ 
+ 
+ int find_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int find_main(int argc, char **argv)
++int find_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	static const char options[] ALIGN1 =
+ 	                  "-follow\0"
+@@ -859,7 +859,7 @@ IF_FEATURE_FIND_MAXDEPTH(OPT_MINDEPTH,)
+ 
+ 	INIT_G();
+ 
+-	for (firstopt = 1; firstopt < argc; firstopt++) {
++	for (firstopt = 1; argv[firstopt]; firstopt++) {
+ 		if (argv[firstopt][0] == '-')
+ 			break;
+ 		if (ENABLE_FEATURE_FIND_NOT && LONE_CHAR(argv[firstopt], '!'))
+diff --git a/findutils/grep.c b/findutils/grep.c
+index 9dc2f19..193b48c 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -519,7 +519,7 @@ static int grep_dir(const char *dir)
+ }
+ 
+ int grep_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int grep_main(int argc, char **argv)
++int grep_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	FILE *file;
+ 	int matched;
+@@ -606,7 +606,6 @@ int grep_main(int argc, char **argv)
+ 	}
+ 
+ 	argv += optind;
+-	argc -= optind;
+ 
+ 	/* if we didn't get a pattern from -e and no command file was specified,
+ 	 * first parameter should be the pattern. no pattern, no worky */
+@@ -616,12 +615,11 @@ int grep_main(int argc, char **argv)
+ 			bb_show_usage();
+ 		pattern = new_grep_list_data(*argv++, 0);
+ 		llist_add_to(&pattern_head, pattern);
+-		argc--;
+ 	}
+ 
+ 	/* argv[0..(argc-1)] should be names of file to grep through. If
+ 	 * there is more than one file to grep, we will print the filenames. */
+-	if (argc > 1)
++	if (argv[0] && argv[1])
+ 		print_filename = 1;
+ 	/* -H / -h of course override */
+ 	if (option_mask32 & OPT_H)
+@@ -633,7 +631,7 @@ int grep_main(int argc, char **argv)
+ 	 * stdin. Otherwise, we grep through all the files specified. */
+ 	matched = 0;
+ 	do {
+-		cur_file = *argv++;
++		cur_file = *argv;
+ 		file = stdin;
+ 		if (!cur_file || LONE_DASH(cur_file)) {
+ 			cur_file = "(standard input)";
+@@ -659,7 +657,7 @@ int grep_main(int argc, char **argv)
+ 		matched += grep_file(file);
+ 		fclose_if_not_stdin(file);
+  grep_done: ;
+-	} while (--argc > 0);
++	} while (*argv && *++argv);
+ 
+ 	/* destroy all the elments in the pattern list */
+ 	if (ENABLE_FEATURE_CLEAN_UP) {
+diff --git a/init/mesg.c b/init/mesg.c
+index ca230f3..2e8b16e 100644
+--- a/init/mesg.c
++++ b/init/mesg.c
+@@ -16,21 +16,23 @@
+ #endif
+ 
+ int mesg_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int mesg_main(int argc, char **argv)
++int mesg_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct stat sb;
+ 	const char *tty;
+ 	char c = 0;
+ 
+-	if (--argc == 0
+-	 || (argc == 1 && ((c = **++argv) == 'y' || c == 'n'))
++	argv++;
++
++	if (!argv[0]
++	 || (!argv[1] && ((c = argv[0][0]) == 'y' || c == 'n'))
+ 	) {
+ 		tty = xmalloc_ttyname(STDERR_FILENO);
+ 		if (tty == NULL) {
+ 			tty = "ttyname";
+ 		} else if (stat(tty, &sb) == 0) {
+ 			mode_t m;
+-			if (argc == 0) {
++			if (c == 0) {
+ 				puts((sb.st_mode & (S_IWGRP|S_IWOTH)) ? "is y" : "is n");
+ 				return EXIT_SUCCESS;
+ 			}
+diff --git a/miscutils/last.c b/miscutils/last.c
+index f8c3013..6e3ed90 100644
+--- a/miscutils/last.c
++++ b/miscutils/last.c
+@@ -35,7 +35,7 @@
+ #endif
+ 
+ int last_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int last_main(int argc, char **argv UNUSED_PARAM)
++int last_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ {
+ 	struct utmp ut;
+ 	int n, file = STDIN_FILENO;
+@@ -56,7 +56,7 @@ int last_main(int argc, char **argv UNUSED_PARAM)
+ 		TYPE_OLD_TIME	/* OLD_TIME, 4 */
+ 	};
+ 
+-	if (argc > 1) {
++	if (argv[1]) {
+ 		bb_show_usage();
+ 	}
+ 	file = xopen(bb_path_wtmp_file, O_RDONLY);
+diff --git a/miscutils/readahead.c b/miscutils/readahead.c
+index fb71ce8..f3b21a2 100644
+--- a/miscutils/readahead.c
++++ b/miscutils/readahead.c
+@@ -13,11 +13,13 @@
+ #include "libbb.h"
+ 
+ int readahead_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int readahead_main(int argc, char **argv)
++int readahead_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+ 
+-	if (argc == 1) bb_show_usage();
++	if (!argv[1]) {
++		bb_show_usage();
++	}
+ 
+ 	while (*++argv) {
+ 		int fd = open_or_warn(*argv, O_RDONLY);
+diff --git a/miscutils/ttysize.c b/miscutils/ttysize.c
+index 0545554..ca9a2ec 100644
+--- a/miscutils/ttysize.c
++++ b/miscutils/ttysize.c
+@@ -12,7 +12,7 @@
+ #include "libbb.h"
+ 
+ int ttysize_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ttysize_main(int argc, char **argv)
++int ttysize_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	unsigned w, h;
+ 	struct winsize wsz;
+@@ -24,7 +24,7 @@ int ttysize_main(int argc, char **argv)
+ 		h = wsz.ws_row;
+ 	}
+ 
+-	if (argc == 1) {
++	if (!argv[1]) {
+ 		printf("%u %u", w, h);
+ 	} else {
+ 		const char *fmt, *arg;
+diff --git a/networking/ifconfig.c b/networking/ifconfig.c
+index 863d6e4..1e960d4 100644
+--- a/networking/ifconfig.c
++++ b/networking/ifconfig.c
+@@ -260,7 +260,7 @@ static int in_ether(const char *bufp, struct sockaddr *sap);
+  * Our main function.
+  */
+ int ifconfig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ifconfig_main(int argc, char **argv)
++int ifconfig_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct ifreq ifr;
+ 	struct sockaddr_in sai;
+@@ -291,19 +291,17 @@ int ifconfig_main(int argc, char **argv)
+ 
+ 	/* skip argv[0] */
+ 	++argv;
+-	--argc;
+ 
+ #if ENABLE_FEATURE_IFCONFIG_STATUS
+-	if (argc > 0 && (argv[0][0] == '-' && argv[0][1] == 'a' && !argv[0][2])) {
++	if (argv[0] && (argv[0][0] == '-' && argv[0][1] == 'a' && !argv[0][2])) {
+ 		interface_opt_a = 1;
+-		--argc;
+ 		++argv;
+ 	}
+ #endif
+ 
+-	if (argc <= 1) {
++	if (!argv[0] || !argv[1]) { /* one or no args */
+ #if ENABLE_FEATURE_IFCONFIG_STATUS
+-		return display_interfaces(argc ? *argv : NULL);
++		return display_interfaces(argv[0] /* can be NULL */);
+ #else
+ 		bb_error_msg_and_die("no support for status display");
+ #endif
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index d28c0b8..51b3626 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -1142,7 +1142,7 @@ static llist_t *read_iface_state(void)
+ 
+ 
+ int ifupdown_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ifupdown_main(int argc, char **argv)
++int ifupdown_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	int (*cmds)(struct interface_defn_t *);
+ 	struct interfaces_file_t *defn;
+@@ -1161,7 +1161,8 @@ int ifupdown_main(int argc, char **argv)
+ 	}
+ 
+ 	getopt32(argv, OPTION_STR, &interfaces);
+-	if (argc - optind > 0) {
++	argv += optind;
++	if (argv[0]) {
+ 		if (DO_ALL) bb_show_usage();
+ 	} else {
+ 		if (!DO_ALL) bb_show_usage();
+@@ -1175,7 +1176,7 @@ int ifupdown_main(int argc, char **argv)
+ 	if (DO_ALL) {
+ 		target_list = defn->autointerfaces;
+ 	} else {
+-		llist_add_to_end(&target_list, argv[optind]);
++		llist_add_to_end(&target_list, argv[0]);
+ 	}
+ 
+ 	/* Update the interfaces */
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index ad98bed..9d7c23d 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -673,7 +673,7 @@ Debug("wrote %d to net, errno %d", rr, errno);
+ 
+ /* main: now we pull it all together... */
+ int nc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int nc_main(int argc, char **argv)
++int nc_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	char *str_p, *str_s;
+ 	IF_NC_EXTRA(char *str_i, *str_o;)
+@@ -702,7 +702,6 @@ int nc_main(int argc, char **argv)
+ 	while (*++proggie) {
+ 		if (strcmp(*proggie, "-e") == 0) {
+ 			*proggie = NULL;
+-			argc = proggie - argv;
+ 			proggie++;
+ 			goto e_found;
+ 		}
+diff --git a/networking/zcip.c b/networking/zcip.c
+index df4c0ec..a4da5cb 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -182,7 +182,7 @@ static ALWAYS_INLINE unsigned random_delay_ms(unsigned secs)
+  * main program
+  */
+ int zcip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int zcip_main(int argc, char **argv)
++int zcip_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	int state;
+ 	char *r_opt;
+@@ -241,7 +241,6 @@ int zcip_main(int argc, char **argv)
+ 			bb_error_msg_and_die("invalid link address");
+ 		}
+ 	}
+-	argc -= optind;
+ 	argv += optind - 1;
+ 
+ 	/* Now: argv[0]:junk argv[1]:intf argv[2]:script argv[3]:NULL */
+diff --git a/procps/free.c b/procps/free.c
+index e76dd21..b138591 100644
+--- a/procps/free.c
++++ b/procps/free.c
+@@ -12,7 +12,7 @@
+ #include "libbb.h"
+ 
+ int free_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int free_main(int argc, char **argv)
++int free_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct sysinfo info;
+ 	sysinfo(&info);
+@@ -46,7 +46,7 @@ int free_main(int argc, char **argv)
+ 		info.bufferram*=info.mem_unit;
+ 	}
+ 
+-	if (argc > 1 && *argv[1] == '-')
++	if (argv[1] && argv[1][0] == '-')
+ 		bb_show_usage();
+ 
+ 	printf("%6s%13s%13s%13s%13s%13s\n", "", "total", "used", "free",
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index 5c3525d..bb1e819 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -785,7 +785,7 @@ static init_func *const init_functions[] = {
+ };
+ 
+ int nmeter_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int nmeter_main(int argc, char **argv)
++int nmeter_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	char buf[32];
+ 	s_stat *first = NULL;
+@@ -797,7 +797,7 @@ int nmeter_main(int argc, char **argv)
+ 
+ 	xchdir("/proc");
+ 
+-	if (argc != 2)
++	if (!argv[1])
+ 		bb_show_usage();
+ 
+ 	if (open_read_close("version", buf, sizeof(buf)-1) > 0) {
+diff --git a/selinux/load_policy.c b/selinux/load_policy.c
+index 4bc873e..ea7c913 100644
+--- a/selinux/load_policy.c
++++ b/selinux/load_policy.c
+@@ -7,11 +7,11 @@
+ #include "libbb.h"
+ 
+ int load_policy_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int load_policy_main(int argc, char **argv UNUSED_PARAM)
++int load_policy_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ {
+ 	int rc;
+ 
+-	if (argc != 1) {
++	if (argv[1]) {
+ 		bb_show_usage();
+ 	}
+ 
+diff --git a/selinux/setenforce.c b/selinux/setenforce.c
+index a2d0428..45f8223 100644
+--- a/selinux/setenforce.c
++++ b/selinux/setenforce.c
+@@ -21,11 +21,11 @@ static const char *const setenforce_cmd[] = {
+ };
+ 
+ int setenforce_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int setenforce_main(int argc, char **argv)
++int setenforce_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	int i, rc;
+ 
+-	if (argc != 2)
++	if (!argv[1] || argv[2])
+ 		bb_show_usage();
+ 
+ 	selinux_or_die();
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index 0a46437..4686d80 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -490,7 +490,7 @@ static int process_one(char *name)
+ }
+ 
+ int setfiles_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int setfiles_main(int argc, char **argv)
++int setfiles_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct stat sb;
+ 	int rc, i = 0;
+@@ -549,6 +549,7 @@ int setfiles_main(int argc, char **argv)
+ 				 IF_FEATURE_SETFILES_CHECK_OPTION(&policyfile,)
+ 			&verbose);
+ 	}
++	argv += optind;
+ 
+ #if ENABLE_FEATURE_SETFILES_CHECK_OPTION
+ 	if ((applet_name[0] == 's') && (flags & OPT_c)) {
+@@ -595,24 +596,20 @@ int setfiles_main(int argc, char **argv)
+ 		   we can support either checking against the active policy or
+ 		   checking against a binary policy file. */
+ 		set_matchpathcon_canoncon(&canoncon);
+-		if (argc == 1)
++		if (!argv[0])
+ 			bb_show_usage();
+-		if (stat(argv[optind], &sb) < 0) {
+-			bb_simple_perror_msg_and_die(argv[optind]);
+-		}
++		xstat(argv[0], &sb);
+ 		if (!S_ISREG(sb.st_mode)) {
+-			bb_error_msg_and_die("spec file %s is not a regular file", argv[optind]);
++			bb_error_msg_and_die("spec file %s is not a regular file", argv[0]);
+ 		}
+ 		/* Load the file contexts configuration and check it. */
+-		rc = matchpathcon_init(argv[optind]);
++		rc = matchpathcon_init(argv[0]);
+ 		if (rc < 0) {
+-			bb_simple_perror_msg_and_die(argv[optind]);
++			bb_simple_perror_msg_and_die(argv[0]);
+ 		}
+-
+-		optind++;
+-
+ 		if (nerr)
+ 			exit(EXIT_FAILURE);
++		argv++;
+ 	}
+ 
+ 	if (input_filename) {
+@@ -628,9 +625,9 @@ int setfiles_main(int argc, char **argv)
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			fclose_if_not_stdin(f);
+ 	} else {
+-		if (optind >= argc)
++		if (!argv[0])
+ 			bb_show_usage();
+-		for (i = optind; i < argc; i++) {
++		for (i = 0; argv[i]; i++) {
+ 			errors |= process_one(argv[i]);
+ 		}
+ 	}
+diff --git a/shell/bbsh.c b/shell/bbsh.c
+index c372626..83132f9 100644
+--- a/shell/bbsh.c
++++ b/shell/bbsh.c
+@@ -199,7 +199,7 @@ static void handle(char *command)
+ }
+ 
+ int bbsh_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int bbsh_main(int argc, char **argv)
++int bbsh_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	char *command=NULL;
+ 	FILE *f;
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index 759981c..def8330 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -69,7 +69,7 @@ static int pencode(char *s)
+ #define strbuf bb_common_bufsiz1
+ 
+ int logger_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int logger_main(int argc, char **argv)
++int logger_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	char *str_p, *str_t;
+ 	int opt;
+@@ -89,9 +89,8 @@ int logger_main(int argc, char **argv)
+ 	if (opt & 0x1) /* -p */
+ 		i = pencode(str_p);
+ 
+-	argc -= optind;
+ 	argv += optind;
+-	if (!argc) {
++	if (!argv[0]) {
+ 		while (fgets(strbuf, COMMON_BUFSIZE, stdin)) {
+ 			if (strbuf[0]
+ 			 && NOT_LONE_CHAR(strbuf, '\n')
+diff --git a/util-linux/acpid.c b/util-linux/acpid.c
+index 7dd4f5b..3429309 100644
+--- a/util-linux/acpid.c
++++ b/util-linux/acpid.c
+@@ -74,6 +74,7 @@ int acpid_main(int argc, char **argv)
+ 	}
+ 
+ 	argv += optind;
++	argc -= optind;
+ 
+ 	// goto configuration directory
+ 	xchdir(opt_conf);
+@@ -102,7 +103,7 @@ int acpid_main(int argc, char **argv)
+ 	// evdev files given, use evdev interface
+ 
+ 	// open event devices
+-	pfd = xzalloc(sizeof(*pfd) * (argc - optind));
++	pfd = xzalloc(sizeof(*pfd) * argc);
+ 	nfd = 0;
+ 	while (*argv) {
+ 		pfd[nfd].fd = open_or_warn(*argv++, O_RDONLY | O_NONBLOCK);

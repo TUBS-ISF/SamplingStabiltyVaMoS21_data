@@ -1,0 +1,14 @@
+2007-12-22 19:57:28 +0000
+diff --git a/shell/cttyhack.c b/shell/cttyhack.c
+index 2015700..4041817 100644
+--- a/shell/cttyhack.c
++++ b/shell/cttyhack.c
+@@ -37,7 +37,7 @@ struct serial_struct {
+ 	int	reserved[1];
+ };
+ 
+-int cttyhack_main(int argc, char **argv) ATTRIBUTE_NORETURN;
++int cttyhack_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cttyhack_main(int argc, char **argv)
+ {
+ 	int fd;

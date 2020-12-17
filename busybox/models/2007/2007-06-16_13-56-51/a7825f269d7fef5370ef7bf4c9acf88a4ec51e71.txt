@@ -1,0 +1,104 @@
+2007-06-16 13:56:51 +0000
+diff --git a/Config.in b/Config.in
+index a04e11b..54bcd9d 100644
+--- a/Config.in
++++ b/Config.in
+@@ -101,8 +101,7 @@ config FEATURE_INSTALLER
+ 	help
+ 	  Enable 'busybox --install [-s]' support.  This will allow you to use
+ 	  busybox at runtime to create hard links or symlinks for all the
+-	  applets that are compiled into busybox.  This feature requires the
+-	  /proc filesystem.
++	  applets that are compiled into busybox.
+ 
+ config LOCALE_SUPPORT
+ 	bool "Enable locale support (system needs locale for this to work)"
+@@ -146,7 +145,7 @@ config FEATURE_PIDFILE
+ 	default n
+ 	help
+ 	  This option makes some applets (crond, syslogd and inetd) write
+-	  a pidfile in /var/run. Some applications rely on them
++	  a pidfile in /var/run. Some applications rely on them.
+ 
+ config FEATURE_SUID
+ 	bool "Support for SUID/SGID handling"
+@@ -163,13 +162,6 @@ config FEATURE_SUID
+ 	  are login, passwd, su, ping, traceroute, crontab, dnsd, ipcrm, ipcs,
+ 	  and vlock.
+ 
+-config FEATURE_SYSLOG
+-	bool "Support for syslog"
+-	default n
+-	help
+-	  This option is auto-selected when you select any applet which may
+-	  send its output to syslog. You do not need to select it manually.
+-
+ config FEATURE_SUID_CONFIG
+ 	bool "Runtime SUID/SGID configuration via /etc/busybox.conf"
+ 	default n if FEATURE_SUID
+@@ -210,14 +202,6 @@ config FEATURE_SUID_CONFIG_QUIET
+ 	  /etc/busybox.conf should be readable by the user needing the SUID, check
+ 	  this option to avoid users to be notified about missing permissions.
+ 
+-config FEATURE_HAVE_RPC
+-	bool "RPC support"
+-	default y
+-	help
+-	  Select this if you have rpc support.
+-	  This automatically turns off all configuration options that rely
+-	  on RPC.
+-
+ config SELINUX
+ 	bool "Support NSA Security Enhanced Linux"
+ 	default n
+@@ -262,6 +246,22 @@ config BUSYBOX_EXEC_PATH
+ 	  executable.  If you haven't got /proc, set this to wherever you
+ 	  want to run BusyBox from.
+ 
++# These are auto-selected by other options
++
++config FEATURE_SYSLOG
++	bool "Support for logging to syslog"
++	default n
++	help
++	  This option is auto-selected when you select any applet which may
++	  send its output to syslog. You do not need to select it manually.
++
++config FEATURE_HAVE_RPC
++	bool "RPC support"
++	default n
++	help
++	  This is automatically selected if any of enabled applets need it.
++	  You do not need to select it manually.
++
+ endmenu
+ 
+ menu 'Build Options'
+diff --git a/networking/Config.in b/networking/Config.in
+index efa6aae..13ad13f 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -347,7 +347,8 @@ config FEATURE_INETD_SUPPORT_BUILTIN_CHARGEN
+ config FEATURE_INETD_RPC
+ 	bool "Support RPC services"
+ 	default n
+-	depends on INETD && FEATURE_HAVE_RPC
++	depends on INETD
++	select FEATURE_HAVE_RPC
+ 	help
+ 	  Support Sun-RPC based services
+ 
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 1040ce2..c910813 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -363,7 +363,8 @@ config MOUNT
+ config FEATURE_MOUNT_NFS
+ 	bool "Support mounting NFS file systems"
+ 	default n
+-	depends on MOUNT && FEATURE_HAVE_RPC
++	depends on MOUNT
++	select FEATURE_HAVE_RPC
+ 	select FEATURE_SYSLOG
+ 	help
+ 	  Enable mounting of NFS file systems.

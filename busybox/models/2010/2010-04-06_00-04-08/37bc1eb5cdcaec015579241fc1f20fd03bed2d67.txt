@@ -1,0 +1,14 @@
+2010-04-06 00:04:08 +0200
+diff --git a/include/usage.h b/include/usage.h
+index f4ab39b..4c85512 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1220,7 +1220,7 @@
+ 	) \
+      "\n	-b 2048		(for certain MO disks) use 2048-byte sectors" \
+      "\n	-C CYLINDERS	Set number of cylinders/heads/sectors" \
+-     "\n	-H HEADS\n" \
++     "\n	-H HEADS" \
+      "\n	-S SECTORS" \
+ 
+ #define blkid_trivial_usage \

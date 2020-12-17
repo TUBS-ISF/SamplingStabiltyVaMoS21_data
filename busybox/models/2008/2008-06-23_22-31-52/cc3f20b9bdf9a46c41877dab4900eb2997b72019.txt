@@ -1,0 +1,172 @@
+2008-06-23 22:31:52 +0000
+diff --git a/Config.in b/Config.in
+index e70caf5..416ffaa 100644
+--- a/Config.in
++++ b/Config.in
+@@ -293,10 +293,12 @@ config NOMMU
+ 
+ 	  Most people will leave this set to 'N'.
+ 
++# PIE can be made to work with BUILD_LIBBUSYBOX, but currently
++# build system does not support that
+ config BUILD_LIBBUSYBOX
+ 	bool "Build shared libbusybox"
+ 	default n
+-	depends on !FEATURE_PREFER_APPLETS
++	depends on !FEATURE_PREFER_APPLETS && !PIE
+ 	help
+ 	  Build a shared library libbusybox.so.N.N.N which contains all
+ 	  busybox code.
+diff --git a/Makefile b/Makefile
+index 37b6d9b..1bcf1e1 100644
+--- a/Makefile
++++ b/Makefile
+@@ -698,6 +698,8 @@ ifeq ($(SKIP_STRIP),y)
+ else
+ 	$(Q)$(STRIP) -s --remove-section=.note --remove-section=.comment \
+ 		busybox_unstripped -o $@
++# strip is confused by PIE executable and does not set exec bits
++	$(Q)chmod a+x $@
+ endif
+ 
+ # The actual objects are generated when descending,
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 56be12a..83ad8cd 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -171,8 +171,8 @@ enum {
+ /* memset: we have to zero it out because of NOEXEC */
+ #define INIT_G() { \
+ 	memset(&G, 0, sizeof(G)); \
+-	tabstops = COLUMN_GAP; \
+-	terminal_width = TERMINAL_WIDTH; \
++	USE_FEATURE_AUTOWIDTH(tabstops = COLUMN_GAP;) \
++	USE_FEATURE_AUTOWIDTH(terminal_width = TERMINAL_WIDTH;) \
+ 	USE_FEATURE_LS_TIMESTAMPS(time(&current_time_t);) \
+ }
+ 
+diff --git a/editors/diff.c b/editors/diff.c
+index 26f3527..ad089e2 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -161,14 +161,14 @@ struct globals {
+ } while (0)
+ 
+ 
+-/*static void print_only(const char *path, size_t dirlen, const char *entry)*/
++#if ENABLE_FEATURE_DIFF_DIR
+ static void print_only(const char *path, const char *entry)
+ {
+ 	printf("Only in %s: %s\n", path, entry);
+ }
++#endif
+ 
+ 
+-/*static void print_status(int val, char *path1, char *path2, char *entry)*/
+ static void print_status(int val, char *_path1, char *_path2)
+ {
+ 	/*const char *const _entry = entry ? entry : "";*/
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 7bb0f3b..5cbecd5 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -119,9 +119,9 @@ lib-$(CONFIG_CHPASSWD) += pw_encrypt.o crypt_make_salt.o update_passwd.o
+ lib-$(CONFIG_CRYPTPW) += pw_encrypt.o crypt_make_salt.o
+ lib-$(CONFIG_SULOGIN) += pw_encrypt.o
+ lib-$(CONFIG_FEATURE_HTTPD_AUTH_MD5) += pw_encrypt.o
+-lib-$(CONFIG_VLOCK) += correct_password.o
+-lib-$(CONFIG_SU) += correct_password.o
+-lib-$(CONFIG_LOGIN) += correct_password.o
++lib-$(CONFIG_VLOCK) += pw_encrypt.o correct_password.o
++lib-$(CONFIG_SU) += pw_encrypt.o correct_password.o
++lib-$(CONFIG_LOGIN) += pw_encrypt.o correct_password.o
+ lib-$(CONFIG_DF) += find_mount_point.o
+ lib-$(CONFIG_MKFS_MINIX) += find_mount_point.o
+ lib-$(CONFIG_SELINUX) += selinux_common.o
+diff --git a/shell/ash.c b/shell/ash.c
+index d4da391..dd20fe3 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -8983,7 +8983,7 @@ preadfd(void)
+ 		}
+ 	}
+ #else
+-	nr = nonblock_safe_read(parsefile->fd, buf, BUFSIZ - 1);
++	nr = nonblock_safe_read(g_parsefile->fd, buf, BUFSIZ - 1);
+ #endif
+ 
+ #if 0
+diff --git a/shell/hush.c b/shell/hush.c
+index 02eae7d..01c9dc8 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -399,11 +399,11 @@ struct globals {
+ #if ENABLE_FEATURE_EDITING
+ 	line_input_t *line_input_state;
+ #endif
++	pid_t root_pid;
+ #if ENABLE_HUSH_JOB
+ 	int run_list_level;
+ 	pid_t saved_task_pgrp;
+ 	pid_t saved_tty_pgrp;
+-	pid_t root_pid;
+ 	int last_jobid;
+ 	struct pipe *job_list;
+ 	struct pipe *toplevel_list;
+@@ -446,11 +446,11 @@ enum { run_list_level = 0 };
+ #if ENABLE_FEATURE_EDITING
+ #define line_input_state (G.line_input_state)
+ #endif
++#define root_pid         (G.root_pid        )
+ #if ENABLE_HUSH_JOB
+ #define run_list_level   (G.run_list_level  )
+ #define saved_task_pgrp  (G.saved_task_pgrp )
+ #define saved_tty_pgrp   (G.saved_tty_pgrp  )
+-#define root_pid         (G.root_pid        )
+ #define last_jobid       (G.last_jobid      )
+ #define job_list         (G.job_list        )
+ #define toplevel_list    (G.toplevel_list   )
+@@ -1065,7 +1065,7 @@ static int o_save_ptr_helper(o_string *o, int n)
+ 		debug_printf_list("list[%d]=%d string_start=%d (empty slot)\n", n, string_len, string_start);
+ 		o->has_empty_slot = 0;
+ 	}
+-	list[n] = (char*)string_len;
++	list[n] = (char*)(ptrdiff_t)string_len;
+ 	return n + 1;
+ }
+ 
+@@ -1075,7 +1075,7 @@ static int o_get_last_ptr(o_string *o, int n)
+ 	char **list = (char**)o->data;
+ 	int string_start = ((n + 0xf) & ~0xf) * sizeof(list[0]);
+ 
+-	return ((int)list[n-1]) + string_start;
++	return ((int)(ptrdiff_t)list[n-1]) + string_start;
+ }
+ 
+ /* o_glob performs globbing on last list[], saving each result
+@@ -1152,7 +1152,7 @@ static char **o_finalize_list(o_string *o, int n)
+ 	list[--n] = NULL;
+ 	while (n) {
+ 		n--;
+-		list[n] = o->data + (int)list[n] + string_start;
++		list[n] = o->data + (int)(ptrdiff_t)list[n] + string_start;
+ 	}
+ 	return list;
+ }
+@@ -2012,6 +2012,7 @@ static int run_list(struct pipe *pi)
+ #else
+ 	enum { if_code = 0, next_if_code = 0 };
+ #endif
++// TODO: rword and ->res_word are not needed if !LOOPS and !IF
+ 	reserved_style rword;
+ 	reserved_style skip_more_for_this_rword = RES_XXXX;
+ 
+@@ -3009,7 +3010,7 @@ static void done_pipe(struct p_context *ctx, pipe_style type)
+ 	 * IOW: it is safe to do it unconditionally.
+ 	 * RES_IN case is for "for a in; do ..." (empty IN set)
+ 	 * to work. */
+-	if (not_null || ctx->pipe->res_word == RES_IN) {
++	if (not_null USE_HUSH_LOOPS(|| ctx->pipe->res_word == RES_IN)) {
+ 		struct pipe *new_p = new_pipe();
+ 		ctx->pipe->next = new_p;
+ 		ctx->pipe = new_p;

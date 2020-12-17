@@ -1,0 +1,29 @@
+2008-08-28 14:29:54 +0000
+diff --git a/scripts/kconfig/lxdialog/Makefile b/scripts/kconfig/lxdialog/Makefile
+index a8b0263..2c9dc48 100644
+--- a/scripts/kconfig/lxdialog/Makefile
++++ b/scripts/kconfig/lxdialog/Makefile
+@@ -12,7 +12,7 @@ HOST_EXTRACFLAGS += -DLOCALE
+ 
+ PHONY += dochecklxdialog
+ $(obj)/dochecklxdialog:
+-	$(Q)$(CONFIG_SHELL) $(check-lxdialog) -check $(HOSTCC) $(HOST_LOADLIBES)
++	$(Q)$(CONFIG_SHELL) $(check-lxdialog) -check $(HOSTCC) $(HOST_EXTRACFLAGS) $(HOST_LOADLIBES)
+ 
+ hostprogs-y	:= lxdialog
+ always		:= $(hostprogs-y) dochecklxdialog
+diff --git a/scripts/kconfig/lxdialog/check-lxdialog.sh b/scripts/kconfig/lxdialog/check-lxdialog.sh
+index 260743f..5552154 100644
+--- a/scripts/kconfig/lxdialog/check-lxdialog.sh
++++ b/scripts/kconfig/lxdialog/check-lxdialog.sh
+@@ -13,9 +13,7 @@ ldflags()
+ 			fi
+ 		done
+ 	done
+-	#bbox# exit 1
+-	echo '-lcurses'
+-	exit
++	exit 1
+ }
+ 
+ # Where is ncurses.h?

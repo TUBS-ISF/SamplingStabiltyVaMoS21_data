@@ -1,0 +1,37 @@
+2008-02-07 22:10:07 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 028116f..ccfe1b7 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -17,7 +17,6 @@
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <inttypes.h>
+-#include <mntent.h>
+ #include <netdb.h>
+ #include <setjmp.h>
+ #include <signal.h>
+@@ -46,6 +45,10 @@
+ #define PATH_MAX 256
+ #endif
+ 
++#ifdef HAVE_MNTENT_H
++#include <mntent.h>
++#endif
++
+ #if ENABLE_SELINUX
+ #include <selinux/selinux.h>
+ #include <selinux/context.h>
+diff --git a/include/platform.h b/include/platform.h
+index 2daa077..050338c 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -146,7 +146,7 @@ typedef int socklen_t;
+ #endif
+ 
+ /* ---- Compiler dependent settings ------------------------- */
+-#if (defined __digital__ && defined __unix__)
++#if (defined __digital__ && defined __unix__) || defined __APPLE__
+ # undef HAVE_MNTENT_H
+ #else
+ # define HAVE_MNTENT_H 1

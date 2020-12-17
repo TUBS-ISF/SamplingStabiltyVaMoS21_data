@@ -1,0 +1,1214 @@
+2008-03-17 09:09:09 +0000
+diff --git a/console-tools/deallocvt.c b/console-tools/deallocvt.c
+index 1172245..1200cae 100644
+--- a/console-tools/deallocvt.c
++++ b/console-tools/deallocvt.c
+@@ -16,19 +16,15 @@
+ enum { VT_DISALLOCATE = 0x5608 }; /* free memory associated to vt */
+ 
+ int deallocvt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int deallocvt_main(int argc, char **argv)
++int deallocvt_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	/* num = 0 deallocate all unused consoles */
+ 	int num = 0;
+ 
+-	switch (argc) {
+-	case 2:
++	if (argv[1]) {
++		if (argv[2])
++			bb_show_usage();
+ 		num = xatou_range(argv[1], 1, 63);
+-		/* Fallthrough */
+-	case 1:
+-		break;
+-	default:
+-		bb_show_usage();
+ 	}
+ 
+ 	/* double cast suppresses "cast to ptr from int of different size" */
+diff --git a/console-tools/openvt.c b/console-tools/openvt.c
+index ff16953..39b9859 100644
+--- a/console-tools/openvt.c
++++ b/console-tools/openvt.c
+@@ -27,9 +27,10 @@ int openvt_main(int argc, char **argv)
+ 	/* grab new one */
+ 	close(0);
+ 	xopen(vtname, O_RDWR);
+-	dup2(0, STDOUT_FILENO);
+-	dup2(0, STDERR_FILENO);
++	xdup2(0, STDOUT_FILENO);
++	xdup2(0, STDERR_FILENO);
+ 
+-	BB_EXECVP(argv[2], &argv[2]);
++	argv += 2;
++	BB_EXECVP(argv[0], argv);
+ 	_exit(1);
+ }
+diff --git a/console-tools/setkeycodes.c b/console-tools/setkeycodes.c
+index ba3d2e4..e9a0508 100644
+--- a/console-tools/setkeycodes.c
++++ b/console-tools/setkeycodes.c
+@@ -14,7 +14,7 @@
+ 
+ /* From <linux/kd.h> */
+ struct kbkeycode {
+-	unsigned int scancode, keycode;
++	unsigned scancode, keycode;
+ };
+ enum {
+ 	KDSETKEYCODE = 0x4B4D  /* write kernel keycode table entry */
+@@ -33,7 +33,7 @@ int setkeycodes_main(int argc, char **argv)
+ 	fd = get_console_fd();
+ 
+ 	while (argc > 2) {
+-		a.keycode = xatoul_range(argv[2], 0, 127);
++		a.keycode = xatou_range(argv[2], 0, 127);
+ 		a.scancode = sc = xstrtoul_range(argv[1], 16, 0, 255);
+ 		if (a.scancode > 127) {
+ 			a.scancode -= 0xe000;
+diff --git a/console-tools/setlogcons.c b/console-tools/setlogcons.c
+index 0f6491c..b312fa7 100644
+--- a/console-tools/setlogcons.c
++++ b/console-tools/setlogcons.c
+@@ -12,7 +12,7 @@
+ #include "libbb.h"
+ 
+ int setlogcons_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int setlogcons_main(int argc, char **argv)
++int setlogcons_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct {
+ 		char fn;
+@@ -22,8 +22,8 @@ int setlogcons_main(int argc, char **argv)
+ 	arg.fn = 11;    /* redirect kernel messages */
+ 	arg.subarg = 0; /* to specified console (current as default) */
+ 
+-	if (argc == 2)
+-		arg.subarg = xatoul_range(argv[1], 0, 63);
++	if (argv[1])
++		arg.subarg = xatou_range(argv[1], 0, 63);
+ 
+ 	xioctl(xopen(VC_1, O_RDONLY), TIOCLINUX, &arg);
+ 
+diff --git a/coreutils/du.c b/coreutils/du.c
+index 7495f7a..b469824 100644
+--- a/coreutils/du.c
++++ b/coreutils/du.c
+@@ -146,7 +146,6 @@ int du_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	unsigned long total;
+ 	int slink_depth_save;
+ 	bool print_final_total;
+-	char *smax_print_depth;
+ 	unsigned opt;
+ 
+ #if ENABLE_FEATURE_HUMAN_READABLE
+@@ -168,8 +167,8 @@ int du_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	 * ignore -a.  This is consistent with -s being equivalent to -d 0.
+ 	 */
+ #if ENABLE_FEATURE_HUMAN_READABLE
+-	opt_complementary = "h-km:k-hm:m-hk:H-L:L-H:s-d:d-s";
+-	opt = getopt32(argv, "aHkLsx" "d:" "lc" "hm", &smax_print_depth);
++	opt_complementary = "h-km:k-hm:m-hk:H-L:L-H:s-d:d-s:d+";
++	opt = getopt32(argv, "aHkLsx" "d:" "lc" "hm", &G.max_print_depth);
+ 	argv += optind;
+ 	if (opt & (1 << 9)) {
+ 		/* -h opt */
+@@ -184,8 +183,8 @@ int du_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		G.disp_hr = 1024;
+ 	}
+ #else
+-	opt_complementary = "H-L:L-H:s-d:d-s";
+-	opt = getopt32(argv, "aHkLsx" "d:" "lc", &smax_print_depth);
++	opt_complementary = "H-L:L-H:s-d:d-s:d+";
++	opt = getopt32(argv, "aHkLsx" "d:" "lc", &G.max_print_depth);
+ 	argv += optind;
+ #if !ENABLE_FEATURE_DU_DEFAULT_BLOCKSIZE_1K
+ 	if (opt & (1 << 2)) {
+@@ -211,10 +210,6 @@ int du_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		G.max_print_depth = 0;
+ 	}
+ 	G.one_file_system = opt & (1 << 5); /* -x opt */
+-	if (opt & (1 << 6)) {
+-		/* -d opt */
+-		G.max_print_depth = xatoi_u(smax_print_depth);
+-	}
+ 	if (opt & (1 << 7)) {
+ 		/* -l opt */
+ 		G.count_hardlinks = MAXINT(nlink_t);
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index dbf1c5b..9e5c6de 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -799,8 +799,6 @@ int ls_main(int argc, char **argv)
+ 	int ac;
+ 	int i;
+ 	char **av;
+-	USE_FEATURE_AUTOWIDTH(char *tabstops_str = NULL;)
+-	USE_FEATURE_AUTOWIDTH(char *terminal_width_str = NULL;)
+ 	USE_FEATURE_LS_COLOR(char *color_opt;)
+ 
+ #if ENABLE_FEATURE_LS_TIMESTAMPS
+@@ -820,12 +818,9 @@ int ls_main(int argc, char **argv)
+ 	/* process options */
+ 	USE_FEATURE_LS_COLOR(applet_long_options = ls_color_opt;)
+ #if ENABLE_FEATURE_AUTOWIDTH
+-	opt = getopt32(argv, ls_options, &tabstops_str, &terminal_width_str
++	opt_complementary = "T+:w+"; /* -T N, -w N */
++	opt = getopt32(argv, ls_options, &tabstops, &terminal_width
+ 				USE_FEATURE_LS_COLOR(, &color_opt));
+-	if (tabstops_str)
+-		tabstops = xatou(tabstops_str);
+-	if (terminal_width_str)
+-		terminal_width = xatou(terminal_width_str);
+ #else
+ 	opt = getopt32(argv, ls_options USE_FEATURE_LS_COLOR(, &color_opt));
+ #endif
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index a083114..4526f0e 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -188,7 +188,7 @@ static off_t pseudo_offset;
+    a multiple of the least common multiple of the sizes associated with
+    the specified output types.  It should be as large as possible, but
+    no larger than 16 -- unless specified with the -w option.  */
+-static size_t bytes_per_block;
++static unsigned bytes_per_block = 32; /* have to use unsigned, not size_t */
+ 
+ /* A NULL-terminated list of the file-arguments from the command line.  */
+ static const char *const *file_list;
+@@ -1218,7 +1218,6 @@ int od_main(int argc, char **argv)
+ 		;
+ #endif
+ 	char *str_A, *str_N, *str_j, *str_S;
+-	char *str_w = NULL;
+ 	llist_t *lst_t = NULL;
+ 	unsigned opt;
+ 	int l_c_m;
+@@ -1239,7 +1238,7 @@ int od_main(int argc, char **argv)
+ 	/* flag_dump_strings = 0; - already is */
+ 
+ 	/* Parse command line */
+-	opt_complementary = "t::"; // list
++	opt_complementary = "w+:t::"; /* -w N, -t is a list */
+ #if ENABLE_GETOPT_LONG
+ 	applet_long_options = od_longopts;
+ #endif
+@@ -1248,7 +1247,7 @@ int od_main(int argc, char **argv)
+ 		// -S was -s and also had optional parameter
+ 		// but in coreutils 6.3 it was renamed and now has
+ 		// _mandatory_ parameter
+-		&str_A, &str_N, &str_j, &lst_t, &str_S, &str_w);
++		&str_A, &str_N, &str_j, &lst_t, &str_S, &bytes_per_block);
+ 	argc -= optind;
+ 	argv += optind;
+ 	if (opt & OPT_A) {
+@@ -1404,9 +1403,6 @@ int od_main(int argc, char **argv)
+ 	l_c_m = get_lcm();
+ 
+ 	if (opt & OPT_w) { /* -w: width */
+-		bytes_per_block = 32;
+-		if (str_w)
+-			bytes_per_block = xatou(str_w);
+ 		if (!bytes_per_block || bytes_per_block % l_c_m != 0) {
+ 			bb_error_msg("warning: invalid width %u; using %d instead",
+ 					(unsigned)bytes_per_block, l_c_m);
+diff --git a/coreutils/printenv.c b/coreutils/printenv.c
+index 06d68d0..31d76d7 100644
+--- a/coreutils/printenv.c
++++ b/coreutils/printenv.c
+@@ -11,10 +11,10 @@
+ #include "libbb.h"
+ 
+ int printenv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int printenv_main(int argc, char **argv)
++int printenv_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	/* no variables specified, show whole env */
+-	if (argc == 1) {
++	if (!argv[1]) {
+ 		int e = 0;
+ 		while (environ[e])
+ 			puts(environ[e++]);
+diff --git a/coreutils/realpath.c b/coreutils/realpath.c
+index bcb73a8..6766524 100644
+--- a/coreutils/realpath.c
++++ b/coreutils/realpath.c
+@@ -13,7 +13,7 @@
+ #include "libbb.h"
+ 
+ int realpath_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int realpath_main(int argc, char **argv)
++int realpath_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+ 
+@@ -25,19 +25,18 @@ int realpath_main(int argc, char **argv)
+ # define resolved_path_MUST_FREE 0
+ #endif
+ 
+-	if (--argc == 0) {
++	if (!*++argv) {
+ 		bb_show_usage();
+ 	}
+ 
+ 	do {
+-		argv++;
+ 		if (realpath(*argv, resolved_path) != NULL) {
+ 			puts(resolved_path);
+ 		} else {
+ 			retval = EXIT_FAILURE;
+ 			bb_simple_perror_msg(*argv);
+ 		}
+-	} while (--argc);
++	} while (*++argv);
+ 
+ #if ENABLE_FEATURE_CLEAN_UP && resolved_path_MUST_FREE
+ 	RELEASE_CONFIG_BUFFER(resolved_path);
+diff --git a/coreutils/sleep.c b/coreutils/sleep.c
+index 6890e35..78f9a8e 100644
+--- a/coreutils/sleep.c
++++ b/coreutils/sleep.c
+@@ -34,17 +34,16 @@ static const struct suffix_mult sfx[] = {
+ #endif
+ 
+ int sleep_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sleep_main(int argc, char **argv)
++int sleep_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned duration;
+ 
+-#if ENABLE_FEATURE_FANCY_SLEEP
+-
+-	if (argc < 2) {
++	++argv;
++	if (!*argv)
+ 		bb_show_usage();
+-	}
+ 
+-	++argv;
++#if ENABLE_FEATURE_FANCY_SLEEP
++
+ 	duration = 0;
+ 	do {
+ 		duration += xatoul_range_sfx(*argv, 0, UINT_MAX-duration, sfx);
+@@ -52,11 +51,7 @@ int sleep_main(int argc, char **argv)
+ 
+ #else  /* FEATURE_FANCY_SLEEP */
+ 
+-	if (argc != 2) {
+-		bb_show_usage();
+-	}
+-
+-	duration = xatou(argv[1]);
++	duration = xatou(*argv);
+ 
+ #endif /* FEATURE_FANCY_SLEEP */
+ 
+diff --git a/coreutils/split.c b/coreutils/split.c
+index cf26a93..2306789 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -68,15 +68,13 @@ int split_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	ssize_t bytes_read, to_write;
+ 	char *src;
+ 
+-	opt_complementary = "?2";
+-	opt = getopt32(argv, "l:b:a:", &count_p, &count_p, &sfx);
++	opt_complementary = "?2:a+"; /* max 2 args; -a N */
++	opt = getopt32(argv, "l:b:a:", &count_p, &count_p, &suffix_len);
+ 
+ 	if (opt & SPLIT_OPT_l)
+-		cnt = xatoul(count_p);
+-	if (opt & SPLIT_OPT_b)
+-		cnt = xatoul_sfx(count_p, split_suffices);
+-	if (opt & SPLIT_OPT_a)
+-		suffix_len = xatou(sfx);
++		cnt = XATOOFF(count_p);
++	if (opt & SPLIT_OPT_b) // FIXME: also needs XATOOFF
++		cnt = xatoull_sfx(count_p, split_suffices);
+ 	sfx = "x";
+ 
+ 	argv += optind;
+diff --git a/coreutils/tail.c b/coreutils/tail.c
+index 52aa8f6..35b25a4 100644
+--- a/coreutils/tail.c
++++ b/coreutils/tail.c
+@@ -87,7 +87,6 @@ int tail_main(int argc, char **argv)
+ 	bool from_top;
+ 	int header_threshhold = 1;
+ 	const char *str_c, *str_n;
+-	USE_FEATURE_FANCY_TAIL(const char *str_s;)
+ 
+ 	char *tailbuf;
+ 	size_t tailbufsize;
+@@ -110,8 +109,9 @@ int tail_main(int argc, char **argv)
+ 	}
+ #endif
+ 
++	USE_FEATURE_FANCY_TAIL(opt_complementary = "s+";) /* -s N */
+ 	opt = getopt32(argv, "fc:n:" USE_FEATURE_FANCY_TAIL("qs:v"),
+-			&str_c, &str_n USE_FEATURE_FANCY_TAIL(,&str_s));
++			&str_c, &str_n USE_FEATURE_FANCY_TAIL(,&sleep_period));
+ #define FOLLOW (opt & 0x1)
+ #define COUNT_BYTES (opt & 0x2)
+ 	//if (opt & 0x1) // -f
+@@ -119,7 +119,6 @@ int tail_main(int argc, char **argv)
+ 	if (opt & 0x4) count = eat_num(str_n); // -n
+ #if ENABLE_FEATURE_FANCY_TAIL
+ 	if (opt & 0x8) header_threshhold = INT_MAX; // -q
+-	if (opt & 0x10) sleep_period = xatou(str_s); // -s
+ 	if (opt & 0x20) header_threshhold = 0; // -v
+ #endif
+ 	argc -= optind;
+diff --git a/coreutils/usleep.c b/coreutils/usleep.c
+index 1c90223..d34880d 100644
+--- a/coreutils/usleep.c
++++ b/coreutils/usleep.c
+@@ -14,9 +14,9 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int usleep_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int usleep_main(int argc, char **argv)
++int usleep_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	if (argc != 2) {
++	if (!argv[1]) {
+ 		bb_show_usage();
+ 	}
+ 
+diff --git a/editors/diff.c b/editors/diff.c
+index f9e82ba..4860778 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -1208,17 +1208,16 @@ int diff_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int diff_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	bool gotstdin = 0;
+-	char *U_opt;
+ 	char *f1, *f2;
+ 	llist_t *L_arg = NULL;
+ 
+ 	INIT_G();
+ 
+-	/* exactly 2 params; collect multiple -L <label> */
+-	opt_complementary = "=2:L::";
++	/* exactly 2 params; collect multiple -L <label>; -U N */
++	opt_complementary = "=2:L::U+";
+ 	getopt32(argv, "abdiL:NqrsS:tTU:wu"
+ 			"p" /* ignored (for compatibility) */,
+-			&L_arg, &start, &U_opt);
++			&L_arg, &start, &context);
+ 	/*argc -= optind;*/
+ 	argv += optind;
+ 	while (L_arg) {
+@@ -1233,8 +1232,6 @@ int diff_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		/* we leak L_arg here... */
+ 		L_arg = L_arg->link;
+ 	}
+-	if (option_mask32 & FLAG_U)
+-		context = xatoi_u(U_opt);
+ 
+ 	/*
+ 	 * Do sanity checks, fill in stb1 and stb2 and call the appropriate
+diff --git a/editors/ed.c b/editors/ed.c
+index 15f0147..9606cfd 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -89,7 +89,7 @@ static char *skip_blank(const char *cp)
+ 
+ 
+ int ed_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ed_main(int argc, char **argv)
++int ed_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	INIT_G();
+ 
+@@ -99,7 +99,7 @@ int ed_main(int argc, char **argv)
+ 	lines.next = &lines;
+ 	lines.prev = &lines;
+ 
+-	if (argc > 1) {
++	if (argv[1]) {
+ 		fileName = xstrdup(argv[1]);
+ 		if (!readLines(fileName, 1)) {
+ 			return EXIT_SUCCESS;
+diff --git a/findutils/grep.c b/findutils/grep.c
+index c4cfcb8..259026e 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -7,7 +7,7 @@
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+-/* BB_AUDIT SUSv3 defects - unsupported option -x.  */
++/* BB_AUDIT SUSv3 defects - unsupported option -x "match whole line only". */
+ /* BB_AUDIT GNU defects - always acts as -a.  */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/grep.html */
+ /*
+@@ -299,7 +299,7 @@ static int grep_file(FILE *file)
+ 				free(before_buf[curpos]);
+ 				before_buf[curpos] = line;
+ 				curpos = (curpos + 1) % lines_before;
+-				/* avoid free(line) - we took line */
++				/* avoid free(line) - we took the line */
+ 				line = NULL;
+ 			}
+ 		}
+@@ -371,7 +371,10 @@ static void load_regexes_from_file(llist_t *fopt)
+ 	}
+ }
+ 
+-static int file_action_grep(const char *filename, struct stat *statbuf ATTRIBUTE_UNUSED, void* matched, int depth ATTRIBUTE_UNUSED)
++static int file_action_grep(const char *filename,
++			struct stat *statbuf ATTRIBUTE_UNUSED,
++			void* matched,
++			int depth ATTRIBUTE_UNUSED)
+ {
+ 	FILE *file = fopen(filename, "r");
+ 	if (file == NULL) {
+@@ -405,35 +408,28 @@ int grep_main(int argc, char **argv)
+ {
+ 	FILE *file;
+ 	int matched;
+-	char *mopt;
+ 	llist_t *fopt = NULL;
+ 
+ 	/* do normal option parsing */
+ #if ENABLE_FEATURE_GREP_CONTEXT
+-	char *slines_after;
+-	char *slines_before;
+-	char *Copt;
++	int Copt;
+ 
+-	opt_complementary = "H-h:e::f::C-AB";
++	/* -H unsets -h; -C unsets -A,-B; -e,-f are lists;
++	 * -m,-A,-B,-C have numeric param */
++	opt_complementary = "H-h:C-AB:e::f::m+:A+:B+:C+";
+ 	getopt32(argv,
+ 		OPTSTR_GREP,
+-		&pattern_head, &fopt, &mopt,
+-		&slines_after, &slines_before, &Copt);
++		&pattern_head, &fopt, &max_matches,
++		&lines_after, &lines_before, &Copt);
+ 
+ 	if (option_mask32 & OPT_C) {
+ 		/* -C unsets prev -A and -B, but following -A or -B
+ 		   may override it */
+ 		if (!(option_mask32 & OPT_A)) /* not overridden */
+-			slines_after = Copt;
++			lines_after = Copt;
+ 		if (!(option_mask32 & OPT_B)) /* not overridden */
+-			slines_before = Copt;
+-		option_mask32 |= OPT_A|OPT_B; /* for parser */
+-	}
+-	if (option_mask32 & OPT_A) {
+-		lines_after = xatoi_u(slines_after);
+-	}
+-	if (option_mask32 & OPT_B) {
+-		lines_before = xatoi_u(slines_before);
++			lines_before = Copt;
++		//option_mask32 |= OPT_A|OPT_B; /* for parser */
+ 	}
+ 	/* sanity checks */
+ 	if (option_mask32 & (OPT_c|OPT_q|OPT_l|OPT_L)) {
+@@ -444,13 +440,11 @@ int grep_main(int argc, char **argv)
+ 		before_buf = xzalloc(lines_before * sizeof(char *));
+ #else
+ 	/* with auto sanity checks */
+-	opt_complementary = "H-h:e::f::c-n:q-n:l-n";
++	/* -H unsets -h; -c,-q or -l unset -n; -e,-f are lists; -m N */
++	opt_complementary = "H-h:c-n:q-n:l-n:e::f::m+";
+ 	getopt32(argv, OPTSTR_GREP,
+-		&pattern_head, &fopt, &mopt);
++		&pattern_head, &fopt, &max_matches);
+ #endif
+-	if (option_mask32 & OPT_m) {
+-		max_matches = xatoi_u(mopt);
+-	}
+ 	invert_search = ((option_mask32 & OPT_v) != 0); /* 0 | 1 */
+ 
+ 	if (pattern_head != NULL) {
+@@ -481,8 +475,8 @@ int grep_main(int argc, char **argv)
+ 	argv += optind;
+ 	argc -= optind;
+ 
+-	/* if we didn't get a pattern from a -e and no command file was specified,
+-	 * argv[optind] should be the pattern. no pattern, no worky */
++	/* if we didn't get a pattern from -e and no command file was specified,
++	 * first parameter should be the pattern. no pattern, no worky */
+ 	if (pattern_head == NULL) {
+ 		char *pattern;
+ 		if (*argv == NULL)
+@@ -508,7 +502,7 @@ int grep_main(int argc, char **argv)
+ 	do {
+ 		cur_file = *argv++;
+ 		file = stdin;
+-		if (!cur_file || (*cur_file == '-' && !cur_file[1])) {
++		if (!cur_file || LONE_DASH(cur_file)) {
+ 			cur_file = "(standard input)";
+ 		} else {
+ 			if (option_mask32 & OPT_r) {
+diff --git a/init/halt.c b/init/halt.c
+index 1f0fae3..c14f0f2 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -33,7 +33,7 @@ RB_AUTOBOOT
+ 	};
+ 	static const smallint signals[] = { SIGUSR1, SIGUSR2, SIGTERM };
+ 
+-	char *delay;
++	int delay = 0;
+ 	int which, flags, rc = 1;
+ #if ENABLE_FEATURE_WTMP
+ 	struct utmp utmp;
+@@ -46,9 +46,10 @@ RB_AUTOBOOT
+ 		continue;
+ 
+ 	/* Parse and handle arguments */
++	opt_complementary = "d+"; /* -d N */
+ 	flags = getopt32(argv, "d:nfw", &delay);
+-	if (flags & 1)
+-		sleep(xatou(delay));
++
++	sleep(delay);
+ 
+ #if ENABLE_FEATURE_WTMP
+ 	if (access(bb_path_wtmp_file, R_OK|W_OK) == -1) {
+diff --git a/init/init.c b/init/init.c
+index 1145c04..6d4969c 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -818,14 +818,14 @@ static void reload_signal(int sig ATTRIBUTE_UNUSED)
+ }
+ 
+ int init_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int init_main(int argc, char **argv)
++int init_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	struct init_action *a;
+ 	pid_t wpid;
+ 
+ 	die_sleep = 30 * 24*60*60; /* if xmalloc will ever die... */
+ 
+-	if (argc > 1 && !strcmp(argv[1], "-q")) {
++	if (argv[1] && !strcmp(argv[1], "-q")) {
+ 		return kill(1, SIGHUP);
+ 	}
+ 
+@@ -868,7 +868,7 @@ int init_main(int argc, char **argv)
+ 			putenv((char *) *e);
+ 	}
+ 
+-	if (argc > 1) setenv("RUNLEVEL", argv[1], 1);
++	if (argv[1]) setenv("RUNLEVEL", argv[1], 1);
+ 
+ 	/* Hello world */
+ 	message(MAYBE_CONSOLE | L_LOG, "init started: %s", bb_banner);
+@@ -890,7 +890,7 @@ int init_main(int argc, char **argv)
+ 	}
+ 
+ 	/* Check if we are supposed to be in single user mode */
+-	if (argc > 1
++	if (argv[1]
+ 	 && (!strcmp(argv[1], "single") || !strcmp(argv[1], "-s") || LONE_CHAR(argv[1], '1'))
+ 	) {
+ 		/* Start a shell on console */
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index 8f23ca6..8f6616f 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -163,7 +163,7 @@ static void sig_child_handler(int sig ATTRIBUTE_UNUSED)
+ int tcpudpsvd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tcpudpsvd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	char *str_c, *str_C, *str_b, *str_t;
++	char *str_C, *str_t;
+ 	char *user;
+ 	struct hcc *hccp;
+ 	const char *instructs;
+@@ -189,21 +189,20 @@ int tcpudpsvd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	tcp = (applet_name[0] == 't');
+ 
+-	/* 3+ args, -i at most once, -p implies -h, -v is counter */
+-	opt_complementary = "-3:i--i:ph:vv";
++	/* 3+ args, -i at most once, -p implies -h, -v is counter, -b N, -c N */
++	opt_complementary = "-3:i--i:ph:vv:b+:c+";
+ #ifdef SSLSVD
+ 	getopt32(argv, "+c:C:i:x:u:l:Eb:hpt:vU:/:Z:K:",
+-		&str_c, &str_C, &instructs, &instructs, &user, &preset_local_hostname,
+-		&str_b, &str_t, &ssluser, &root, &cert, &key, &verbose
++		&cmax, &str_C, &instructs, &instructs, &user, &preset_local_hostname,
++		&backlog, &str_t, &ssluser, &root, &cert, &key, &verbose
+ 	);
+ #else
++	/* "+": stop on first non-option */
+ 	getopt32(argv, "+c:C:i:x:u:l:Eb:hpt:v",
+-		&str_c, &str_C, &instructs, &instructs, &user, &preset_local_hostname,
+-		&str_b, &str_t, &verbose
++		&cmax, &str_C, &instructs, &instructs, &user, &preset_local_hostname,
++		&backlog, &str_t, &verbose
+ 	);
+ #endif
+-	if (option_mask32 & OPT_c)
+-		cmax = xatou_range(str_c, 1, INT_MAX);
+ 	if (option_mask32 & OPT_C) { /* -C n[:message] */
+ 		max_per_host = bb_strtou(str_C, &str_C, 10);
+ 		if (str_C[0]) {
+@@ -219,8 +218,6 @@ int tcpudpsvd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		if (!get_uidgid(&ugid, user, 1))
+ 			bb_error_msg_and_die("unknown user/group: %s", user);
+ 	}
+-	if (option_mask32 & OPT_b)
+-		backlog = xatou(str_b);
+ #ifdef SSLSVD
+ 	if (option_mask32 & OPT_U) ssluser = optarg;
+ 	if (option_mask32 & OPT_slash) root = optarg;
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 9e53dfd..51e0306 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -117,7 +117,7 @@ const char *opt_complementary
+         if w is given once, GNU ps sets the width to 132,
+         if w is given more than once, it is "unlimited"
+ 
+-        int w_counter = 0;
++        int w_counter = 0; // must be initialized!
+         opt_complementary = "ww";
+         getopt32(argv, "w", &w_counter);
+         if (w_counter)
+@@ -220,7 +220,7 @@ Special characters:
+  "x--x" Variation of the above, it means that -x option should occur
+         at most once.
+ 
+- "a+:"  A plus after a char in opt_complementary means that the parameter
++ "a+"   A plus after a char in opt_complementary means that the parameter
+         for this option is a nonnegative integer. It will be processed
+         with xatoi_u() - allowed range is 0..INT_MAX.
+ 
+@@ -255,7 +255,7 @@ Special characters:
+         For example from "id" applet:
+ 
+         // Don't allow -n -r -rn -ug -rug -nug -rnug
+-        opt_complementary = "r?ug:n?ug:?u--g:g--u";
++        opt_complementary = "r?ug:n?ug:u--g:g--u";
+         flags = getopt32(argv, "rnug");
+ 
+         This example allowed only:
+@@ -545,11 +545,14 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 		if (on_off->counter)
+ 			(*(on_off->counter))++;
+ 		if (on_off->param_type == PARAM_LIST) {
+-			llist_add_to_end((llist_t **)(on_off->optarg), optarg);
++			if (optarg)
++				llist_add_to_end((llist_t **)(on_off->optarg), optarg);
+ 		} else if (on_off->param_type == PARAM_INT) {
+-			*(unsigned*)(on_off->optarg) = xatoi_u(optarg);
++			if (optarg)
++				*(unsigned*)(on_off->optarg) = xatoi_u(optarg);
+ 		} else if (on_off->optarg) {
+-			*(char **)(on_off->optarg) = optarg;
++			if (optarg)
++				*(char **)(on_off->optarg) = optarg;
+ 		}
+ 		if (pargv != NULL)
+ 			break;
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index 31e5070..b25f817 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -123,7 +123,7 @@ static void add_user_to_group(char **args,
+  * will add an existing user to an existing group.
+  */
+ int addgroup_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int addgroup_main(int argc, char **argv)
++int addgroup_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *group;
+ 	gid_t gid = 0;
+@@ -144,10 +144,10 @@ int addgroup_main(int argc, char **argv)
+ 	}
+ 	/* move past the commandline options */
+ 	argv += optind;
+-	argc -= optind;
++	//argc -= optind;
+ 
+ #if ENABLE_FEATURE_ADDUSER_TO_GROUP
+-	if (argc == 2) {
++	if (argv[1]) {
+ 		struct group *gr;
+ 
+ 		if (option_mask32) {
+@@ -170,7 +170,7 @@ int addgroup_main(int argc, char **argv)
+ 		add_user_to_group(argv, bb_path_group_file, xfopen);
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+ 		add_user_to_group(argv, bb_path_gshadow_file, fopen_or_warn);
+-#endif /* ENABLE_FEATURE_SHADOWPASSWDS */
++#endif
+ 	} else
+ #endif /* ENABLE_FEATURE_ADDUSER_TO_GROUP */
+ 		new_group(argv[0], gid);
+diff --git a/loginutils/login.c b/loginutils/login.c
+index d7eb8d3..e8fe74e 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -221,7 +221,7 @@ static void alarm_handler(int sig ATTRIBUTE_UNUSED)
+ }
+ 
+ int login_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int login_main(int argc, char **argv)
++int login_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	enum {
+ 		LOGIN_OPT_f = (1<<0),
+@@ -269,8 +269,9 @@ int login_main(int argc, char **argv)
+ 			bb_error_msg_and_die("-f is for root only");
+ 		safe_strncpy(username, opt_user, sizeof(username));
+ 	}
+-	if (optind < argc) /* user from command line (getty) */
+-		safe_strncpy(username, argv[optind], sizeof(username));
++	argv += optind;
++	if (argv[0]) /* user from command line (getty) */
++		safe_strncpy(username, argv[0], sizeof(username));
+ 
+ 	/* Let's find out and memorize our tty */
+ 	if (!isatty(0) || !isatty(1) || !isatty(2))
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index caa1a83..17bb15e 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -19,7 +19,6 @@ int sulogin_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *cp;
+ 	int timeout = 0;
+-	char *timeout_arg;
+ 	struct passwd *pwd;
+ 	const char *shell;
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+@@ -31,9 +30,8 @@ int sulogin_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	logmode = LOGMODE_BOTH;
+ 	openlog(applet_name, 0, LOG_AUTH);
+ 
+-	if (getopt32(argv, "t:", &timeout_arg)) {
+-		timeout = xatoi_u(timeout_arg);
+-	}
++	opt_complementary = "t+"; /* -t N */
++	getopt32(argv, "t:", &timeout);
+ 
+ 	if (argv[optind]) {
+ 		close(0);
+@@ -43,6 +41,7 @@ int sulogin_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		dup(0);
+ 	}
+ 
++	/* Malicious use like "sulogin /dev/sda"? */
+ 	if (!isatty(0) || !isatty(1) || !isatty(2)) {
+ 		logmode = LOGMODE_SYSLOG;
+ 		bb_error_msg_and_die("not a tty");
+diff --git a/miscutils/mt.c b/miscutils/mt.c
+index c16073c..c56a8e0 100644
+--- a/miscutils/mt.c
++++ b/miscutils/mt.c
+@@ -81,24 +81,22 @@ static const char opcode_name[] ALIGN1 =
+ 	"weof"            "\0";
+ 
+ int mt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int mt_main(int argc, char **argv)
++int mt_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *file = "/dev/tape";
+ 	struct mtop op;
+ 	struct mtpos position;
+ 	int fd, mode, idx;
+ 
+-	if (argc < 2) {
++	if (!argv[1]) {
+ 		bb_show_usage();
+ 	}
+ 
+ 	if (strcmp(argv[1], "-f") == 0) {
+-		if (argc < 4) {
++		if (!argv[2] || !argv[3])
+ 			bb_show_usage();
+-		}
+ 		file = argv[2];
+ 		argv += 2;
+-		argc -= 2;
+ 	}
+ 
+ 	idx = index_in_strings(opcode_name, argv[1]);
+@@ -107,7 +105,7 @@ int mt_main(int argc, char **argv)
+ 		bb_error_msg_and_die("unrecognized opcode %s", argv[1]);
+ 
+ 	op.mt_op = opcode_value[idx];
+-	if (argc >= 3)
++	if (argv[2])
+ 		op.mt_count = xatoi_u(argv[2]);
+ 	else
+ 		op.mt_count = 1;		/* One, not zero, right? */
+diff --git a/networking/arping.c b/networking/arping.c
+index 6a17b18..39dcb7c 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -264,16 +264,14 @@ int arping_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	err_str = xasprintf("interface %s %%s", device);
+ 	{
+ 		unsigned opt;
+-		char *str_count, *str_timeout;
++		char *str_timeout;
+ 
+ 		/* Dad also sets quit_on_reply.
+ 		 * Advert also sets unsolicited.
+ 		 */
+-		opt_complementary = "=1:Df:AU";
++		opt_complementary = "=1:Df:AU:c+";
+ 		opt = getopt32(argv, "DUAqfbc:w:I:s:",
+-				&str_count, &str_timeout, &device, &source);
+-		if (opt & 0x40) /* -c: count */
+-			count = xatoi_u(str_count);
++				&count, &str_timeout, &device, &source);
+ 		if (opt & 0x80) /* -w: timeout */
+ 			timeout_us = xatou_range(str_timeout, 0, INT_MAX/2000000) * 1000000 + 500000;
+ 		//if (opt & 0x200) /* -s: source */
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 34f715f..dd94a14 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -674,7 +674,7 @@ Debug("wrote %d to net, errno %d", rr, errno);
+ int nc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int nc_main(int argc, char **argv)
+ {
+-	char *str_p, *str_s, *str_w;
++	char *str_p, *str_s;
+ 	USE_NC_EXTRA(char *str_i, *str_o;)
+ 	char *themdotted = themdotted; /* gcc */
+ 	char **proggie;
+@@ -710,10 +710,10 @@ int nc_main(int argc, char **argv)
+  e_found:
+ 
+ 	// -g -G -t -r deleted, unimplemented -a deleted too
+-	opt_complementary = "?2:vv"; /* max 2 params, -v is a counter */
++	opt_complementary = "?2:vv:w+"; /* max 2 params; -v is a counter; -w N */
+ 	getopt32(argv, "hnp:s:uvw:" USE_NC_SERVER("l")
+ 			USE_NC_EXTRA("i:o:z"),
+-			&str_p, &str_s, &str_w
++			&str_p, &str_s, &o_wait
+ 			USE_NC_EXTRA(, &str_i, &str_o, &o_verbose));
+ 	argv += optind;
+ #if ENABLE_NC_EXTRA
+@@ -731,9 +731,7 @@ int nc_main(int argc, char **argv)
+ 	//if (option_mask32 & OPT_r) /* randomize various things */
+ 	//if (option_mask32 & OPT_u) /* use UDP */
+ 	//if (option_mask32 & OPT_v) /* verbose */
+-	if (option_mask32 & OPT_w) { /* wait time */
+-		o_wait = xatoi_u(str_w);
+-	}
++	//if (option_mask32 & OPT_w) /* wait time */
+ 	//if (option_mask32 & OPT_z) /* little or no data xfer */
+ 
+ 	/* We manage our fd's so that they are never 0,1,2 */
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 14c340b..1872615 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -397,9 +397,6 @@ int tftp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	len_and_sockaddr *peer_lsa;
+ 	const char *localfile = NULL;
+ 	const char *remotefile = NULL;
+-#if ENABLE_FEATURE_TFTP_BLOCKSIZE
+-	const char *sblocksize = NULL;
+-#endif
+ 	int port;
+ 	USE_GETPUT(int cmd;)
+ 	int fd = -1;
+@@ -409,13 +406,14 @@ int tftp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	/* -p or -g is mandatory, and they are mutually exclusive */
+ 	opt_complementary = "" USE_FEATURE_TFTP_GET("g:") USE_FEATURE_TFTP_PUT("p:")
+-			USE_GETPUT("?g--p:p--g");
++			USE_GETPUT("g--p:p--g:")
++			USE_FEATURE_TFTP_BLOCKSIZE("b+");
+ 
+ 	USE_GETPUT(cmd =) getopt32(argv,
+ 			USE_FEATURE_TFTP_GET("g") USE_FEATURE_TFTP_PUT("p")
+ 				"l:r:" USE_FEATURE_TFTP_BLOCKSIZE("b:"),
+ 			&localfile, &remotefile
+-			USE_FEATURE_TFTP_BLOCKSIZE(, &sblocksize));
++			USE_FEATURE_TFTP_BLOCKSIZE(, &blocksize));
+ 	argv += optind;
+ 
+ 	flags = O_RDONLY;
+@@ -423,12 +421,8 @@ int tftp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		flags = O_WRONLY | O_CREAT | O_TRUNC;
+ 
+ #if ENABLE_FEATURE_TFTP_BLOCKSIZE
+-	if (sblocksize) {
+-		blocksize = xatoi_u(sblocksize);
+-		if (!tftp_blocksize_check(blocksize, 0)) {
+-			return EXIT_FAILURE;
+-		}
+-	}
++	if (!tftp_blocksize_check(blocksize, 0))
++		return EXIT_FAILURE;
+ #endif
+ 
+ 	if (!localfile)
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 576b1cb..fe8f4c8 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -132,7 +132,7 @@ int udhcpc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	uint8_t *temp, *message;
+-	char *str_c, *str_V, *str_h, *str_F, *str_r, *str_T, *str_A, *str_t;
++	char *str_c, *str_V, *str_h, *str_F, *str_r;
+ 	USE_FEATURE_UDHCP_PORT(char *str_P;)
+ 	llist_t *list_O = NULL;
+ #if ENABLE_FEATURE_UDHCPC_ARPING
+@@ -223,7 +223,8 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	client_config.script = DEFAULT_SCRIPT;
+ 
+ 	/* Parse command line */
+-	opt_complementary = "c--C:C--c:O::"; // Cc: mutually exclusive; O: list
++	/* Cc: mutually exclusive; O: list; -T,-t,-A take numeric param */
++	opt_complementary = "c--C:C--c:O::T+:t+:A+";
+ #if ENABLE_GETOPT_LONG
+ 	applet_long_options = udhcpc_longopts;
+ #endif
+@@ -233,7 +234,8 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		"O:"
+ 		, &str_c, &str_V, &str_h, &str_h, &str_F
+ 		, &client_config.interface, &client_config.pidfile, &str_r
+-		, &client_config.script, &str_T, &str_t, &str_A
++		, &client_config.script
++		, &discover_timeout, &discover_retries, &tryagain_timeout
+ 		USE_FEATURE_UDHCPC_ARPING(, &str_W)
+ 		USE_FEATURE_UDHCP_PORT(, &str_P)
+ 		, &list_O
+@@ -273,12 +275,9 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	if (opt & OPT_r)
+ 		requested_ip = inet_addr(str_r);
+ 	// if (opt & OPT_s) client_config.script = ...
+-	if (opt & OPT_T)
+-		discover_timeout = xatoi_u(str_T);
+-	if (opt & OPT_t)
+-		discover_retries = xatoi_u(str_t);
+-	if (opt & OPT_A)
+-		tryagain_timeout = xatoi_u(str_A);
++	// if (opt & OPT_T) discover_timeout = xatoi_u(str_T);
++	// if (opt & OPT_t) discover_retries = xatoi_u(str_t);
++	// if (opt & OPT_A) tryagain_timeout = xatoi_u(str_A);
+ 	if (opt & OPT_v) {
+ 		puts("version "BB_VER);
+ 		return 0;
+diff --git a/runit/sv.c b/runit/sv.c
+index 45d5572..d5a9bd9 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -422,7 +422,7 @@ int sv_main(int argc, char **argv)
+ 	char **servicex;
+ 	unsigned waitsec = 7;
+ 	smallint kll = 0;
+-	smallint verbose = 0;
++	int verbose = 0;
+ 	int (*act)(const char*);
+ 	int (*cbk)(const char*);
+ 	int curdir;
+@@ -436,9 +436,8 @@ int sv_main(int argc, char **argv)
+ 	x = getenv("SVWAIT");
+ 	if (x) waitsec = xatou(x);
+ 
+-	opt = getopt32(argv, "w:v", &x);
+-	if (opt & 1) waitsec = xatou(x); // -w
+-	if (opt & 2) verbose = 1; // -v
++	opt_complementary = "w+:vv"; /* -w N, -v is a counter */
++	opt = getopt32(argv, "w:v", &waitsec, &verbose);
+ 	argc -= optind;
+ 	argv += optind;
+ 	action = *argv++;
+diff --git a/util-linux/fdformat.c b/util-linux/fdformat.c
+index c4f97ae..eac7b15 100644
+--- a/util-linux/fdformat.c
++++ b/util-linux/fdformat.c
+@@ -41,7 +41,7 @@ struct format_descr {
+ #define FD_FILL_BYTE 0xF6 /* format fill byte. */
+ 
+ int fdformat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int fdformat_main(int argc, char **argv)
++int fdformat_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int fd, n, cyl, read_bytes, verify;
+ 	unsigned char *data;
+@@ -49,9 +49,7 @@ int fdformat_main(int argc, char **argv)
+ 	struct floppy_struct param;
+ 	struct format_descr descr;
+ 
+-	if (argc < 2) {
+-		bb_show_usage();
+-	}
++	opt_complementary = "=1"; /* must have 1 param */
+ 	verify = !getopt32(argv, "n");
+ 	argv += optind;
+ 
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 3fbdc20..60031a5 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -627,7 +627,7 @@ int mkfs_minix_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	unsigned opt;
+ 	char *tmp;
+ 	struct stat statbuf;
+-	char *str_i, *str_n;
++	char *str_i;
+ 	char *listfile = NULL;
+ 
+ 	INIT_G();
+@@ -643,13 +643,13 @@ int mkfs_minix_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		bb_error_msg_and_die("bad inode size");
+ #endif
+ 
+-	opt = getopt32(argv, "ci:l:n:v", &str_i, &listfile, &str_n);
++	opt_complementary = "n+"; /* -n N */
++	opt = getopt32(argv, "ci:l:n:v", &str_i, &listfile, &G.namelen);
+ 	argv += optind;
+ 	//if (opt & 1) -c
+ 	if (opt & 2) G.req_nr_inodes = xatoul(str_i); // -i
+ 	//if (opt & 4) -l
+ 	if (opt & 8) { // -n
+-		G.namelen = xatoi_u(str_n);
+ 		if (G.namelen == 14) G.magic = MINIX1_SUPER_MAGIC;
+ 		else if (G.namelen == 30) G.magic = MINIX1_SUPER_MAGIC2;
+ 		else bb_show_usage();
+diff --git a/util-linux/readprofile.c b/util-linux/readprofile.c
+index ef78659..e25d07d 100644
+--- a/util-linux/readprofile.c
++++ b/util-linux/readprofile.c
+@@ -8,7 +8,7 @@
+  */
+ 
+ /*
+- * 1999-02-22 Arkadiusz Mi¶kiewicz <misiek@pld.ORG.PL>
++ * 1999-02-22 Arkadiusz Mickiewicz <misiek@pld.ORG.PL>
+  * - added Native Language Support
+  * 1999-09-01 Stephane Eranian <eranian@cello.hpl.hp.com>
+  * - 64bit clean patch
+@@ -45,7 +45,7 @@ int readprofile_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int readprofile_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	FILE *map;
+-	const char *mapFile, *proFile, *mult = 0;
++	const char *mapFile, *proFile;
+ 	unsigned long indx = 1;
+ 	size_t len;
+ 	uint64_t add0 = 0;
+@@ -55,37 +55,49 @@ int readprofile_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	char fn_name[S_LEN], next_name[S_LEN];   /* current and next name */
+ 	char mapline[S_LEN];
+ 	char mode[8];
+-	int optAll = 0, optInfo = 0, optReset = 0;
+-	int optVerbose = 0, optNative = 0;
+-	int optBins = 0, optSub = 0;
+ 	int maplineno = 1;
+ 	int header_printed;
++	int multiplier = 0;
++	unsigned opt;
++	enum {
++		OPT_M = (1 << 0),
++		OPT_m = (1 << 1),
++		OPT_p = (1 << 2),
++		OPT_n = (1 << 3),
++		OPT_a = (1 << 4),
++		OPT_b = (1 << 5),
++		OPT_s = (1 << 6),
++		OPT_i = (1 << 7),
++		OPT_r = (1 << 8),
++		OPT_v = (1 << 9),
++	};
++#define optMult    (opt & OPT_M)
++#define optNative  (opt & OPT_n)
++#define optAll     (opt & OPT_a)
++#define optBins    (opt & OPT_b)
++#define optSub     (opt & OPT_s)
++#define optInfo    (opt & OPT_i)
++#define optReset   (opt & OPT_r)
++#define optVerbose (opt & OPT_v)
+ 
+ #define next (current^1)
+ 
+ 	proFile = defaultpro;
+ 	mapFile = defaultmap;
+ 
+-	opt_complementary = "nn:aa:bb:ss:ii:rr:vv";
+-	getopt32(argv, "M:m:p:nabsirv",
+-			&mult, &mapFile, &proFile,
+-			&optNative, &optAll, &optBins, &optSub,
+-			&optInfo, &optReset, &optVerbose);
++	opt_complementary = "M+"; /* -M N */
++	opt = getopt32(argv, "M:m:p:nabsirv", &multiplier, &mapFile, &proFile);
+ 
+-	if (optReset || mult) {
+-		int multiplier, fd, to_write;
++	if (opt & (OPT_M|OPT_r)) { /* mult or reset, or both */
++		int fd, to_write;
+ 
+ 		/*
+ 		 * When writing the multiplier, if the length of the write is
+ 		 * not sizeof(int), the multiplier is not changed
+ 		 */
+-		if (mult) {
+-			multiplier = xatoi_u(mult);
+-			to_write = sizeof(int);
+-		} else {
+-			multiplier = 0;
++		to_write = sizeof(int);
++		if (!optMult)
+ 			to_write = 1;	/* sth different from sizeof(int) */
+-		}
+ 
+ 		fd = xopen(defaultpro, O_WRONLY);
+ 		xwrite(fd, &multiplier, to_write);
+@@ -187,8 +199,9 @@ int readprofile_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		if (optBins) {
+ 			if (optVerbose || this > 0)
+ 				printf("  total\t\t\t\t%u\n", this);
+-		} else if ((this || optAll) &&
+-			   (fn_len = next_add-fn_add) != 0) {
++		} else if ((this || optAll)
++		        && (fn_len = next_add-fn_add) != 0
++		) {
+ 			if (optVerbose)
+ 				printf("%016llx %-40s %6i %8.4f\n", fn_add,
+ 				       fn_name, this, this/(double)fn_len);
+diff --git a/util-linux/setarch.c b/util-linux/setarch.c
+index dbc02de..1f979a7 100644
+--- a/util-linux/setarch.c
++++ b/util-linux/setarch.c
+@@ -12,7 +12,7 @@
+ #include "libbb.h"
+ 
+ int setarch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int setarch_main(int ATTRIBUTE_UNUSED argc, char **argv)
++int setarch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int pers = -1;
+ 
+diff --git a/util-linux/swaponoff.c b/util-linux/swaponoff.c
+index 48f6f4e..beefac0 100644
+--- a/util-linux/swaponoff.c
++++ b/util-linux/swaponoff.c
+@@ -59,11 +59,11 @@ static int do_em_all(void)
+ }
+ 
+ int swap_on_off_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int swap_on_off_main(int argc, char **argv)
++int swap_on_off_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int ret;
+ 
+-	if (argc == 1)
++	if (!argv[1])
+ 		bb_show_usage();
+ 
+ 	ret = getopt32(argv, "a");

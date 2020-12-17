@@ -1,0 +1,189 @@
+2009-06-16 10:23:55 +0200
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index ca96847..fef0b66 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -36,7 +36,7 @@ struct dhcpMessage {
+ 	uint32_t yiaddr; /* 'your' (client) IP address */
+ 	uint32_t siaddr; /* IP address of next server to use in bootstrap,
+ 	                  * returned in DHCPOFFER, DHCPACK by server */
+-	uint32_t giaddr; /* relay agent IP address */
++	uint32_t gateway_nip; /* relay agent IP address */
+ 	uint8_t chaddr[16];/* link-layer client hardware address (MAC) */
+ 	uint8_t sname[64]; /* server host name (ASCIZ) */
+ 	uint8_t file[128]; /* boot file name (ASCIZ) */
+@@ -88,7 +88,7 @@ void udhcp_run_script(struct dhcpMessage *packet, const char *name) FAST_FUNC;
+ void udhcp_sp_setup(void) FAST_FUNC;
+ int udhcp_sp_fd_set(fd_set *rfds, int extra_fd) FAST_FUNC;
+ int udhcp_sp_read(const fd_set *rfds) FAST_FUNC;
+-int udhcp_read_interface(const char *interface, int *ifindex, uint32_t *addr, uint8_t *arp) FAST_FUNC;
++int udhcp_read_interface(const char *interface, int *ifindex, uint32_t *nip, uint8_t *arp) FAST_FUNC;
+ int udhcp_raw_socket(int ifindex) FAST_FUNC;
+ int udhcp_listen_socket(/*uint32_t ip,*/ int port, const char *inf) FAST_FUNC;
+ /* Returns 1 if no reply received */
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 61e4a1d..09524e2 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -94,7 +94,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 	read_leases(server_config.lease_file);
+ 
+ 	if (udhcp_read_interface(server_config.interface, &server_config.ifindex,
+-			   &server_config.server, server_config.arp)) {
++			   &server_config.server_nip, server_config.arp)) {
+ 		retval = 1;
+ 		goto ret;
+ 	}
+@@ -202,7 +202,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 				if (server_id) {
+ 					/* SELECTING State */
+ 					DEBUG("server_id = %08x", ntohl(server_id_aligned));
+-					if (server_id_aligned == server_config.server
++					if (server_id_aligned == server_config.server_nip
+ 					 && requested
+ 					 && requested_aligned == lease->lease_nip
+ 					) {
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index a3ace92..bb281c5 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -28,7 +28,7 @@ struct static_lease {
+ };
+ 
+ struct server_config_t {
+-	uint32_t server;                /* Our IP, in network order */
++	uint32_t server_nip;            /* Our IP, in network order */
+ #if ENABLE_FEATURE_UDHCP_PORT
+ 	uint16_t port;
+ #endif
+diff --git a/networking/udhcp/dhcprelay.c b/networking/udhcp/dhcprelay.c
+index 53540d1..2fee49a 100644
+--- a/networking/udhcp/dhcprelay.c
++++ b/networking/udhcp/dhcprelay.c
+@@ -247,7 +247,7 @@ int dhcprelay_main(int argc, char **argv)
+ 	char **client_ifaces;
+ 	int *fds;
+ 	int num_sockets, max_socket;
+-	uint32_t our_ip;
++	uint32_t our_nip;
+ 
+ 	server_addr.sin_family = AF_INET;
+ 	server_addr.sin_port = htons(SERVER_PORT);
+@@ -272,7 +272,7 @@ int dhcprelay_main(int argc, char **argv)
+ 	max_socket = init_sockets(client_ifaces, num_sockets, argv[2], fds);
+ 
+ 	/* Get our IP on server_iface */
+-	if (udhcp_read_interface(argv[2], NULL, &our_ip, NULL))
++	if (udhcp_read_interface(argv[2], NULL, &our_nip, NULL))
+ 		return 1;
+ 
+ 	/* Main loop */
+@@ -309,10 +309,10 @@ int dhcprelay_main(int argc, char **argv)
+ 
+ 				/* Get our IP on corresponding client_iface */
+ //why? what if server can't route such IP?
+-				if (udhcp_read_interface(client_ifaces[i-1], NULL, &dhcp_msg.giaddr, NULL)) {
++				if (udhcp_read_interface(client_ifaces[i-1], NULL, &dhcp_msg.gateway_nip, NULL)) {
+ 					/* Fall back to our server_iface's IP */
+ //this makes more sense!
+-					dhcp_msg.giaddr = our_ip;
++					dhcp_msg.gateway_nip = our_nip;
+ 				}
+ //maybe set dhcp_msg.flags |= BROADCAST_FLAG too?
+ 				pass_to_server(&dhcp_msg, packlen, i, fds, &client_addr, &server_addr);
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index 040126f..403a8bc 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -128,7 +128,7 @@ static int nobody_responds_to_arp(uint32_t addr, const uint8_t *safe_mac)
+ 	int r;
+ 
+ 	r = arpping(addr, safe_mac,
+-			server_config.server, server_config.arp,
++			server_config.server_nip, server_config.arp,
+ 			server_config.interface);
+ 	if (r)
+ 		return r;
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index 6aa2d34..55ed4a8 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -26,14 +26,14 @@
+ #include "options.h"
+ 
+ 
+-/* send a packet to giaddr using the kernel ip stack */
++/* send a packet to gateway_nip using the kernel ip stack */
+ static int send_packet_to_relay(struct dhcpMessage *payload)
+ {
+ 	DEBUG("Forwarding packet to relay");
+ 
+ 	return udhcp_send_kernel_packet(payload,
+-			server_config.server, SERVER_PORT,
+-			payload->giaddr, SERVER_PORT);
++			server_config.server_nip, SERVER_PORT,
++			payload->gateway_nip, SERVER_PORT);
+ }
+ 
+ 
+@@ -69,7 +69,7 @@ static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcas
+ 	}
+ 
+ 	return udhcp_send_raw_packet(payload,
+-		/*src*/ server_config.server, SERVER_PORT,
++		/*src*/ server_config.server_nip, SERVER_PORT,
+ 		/*dst*/ ciaddr, CLIENT_PORT, chaddr,
+ 		server_config.ifindex);
+ }
+@@ -78,7 +78,7 @@ static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcas
+ /* send a dhcp packet, if force broadcast is set, the packet will be broadcast to the client */
+ static int send_packet(struct dhcpMessage *payload, int force_broadcast)
+ {
+-	if (payload->giaddr)
++	if (payload->gateway_nip)
+ 		return send_packet_to_relay(payload);
+ 	return send_packet_to_client(payload, force_broadcast);
+ }
+@@ -90,9 +90,9 @@ static void init_packet(struct dhcpMessage *packet, struct dhcpMessage *oldpacke
+ 	packet->xid = oldpacket->xid;
+ 	memcpy(packet->chaddr, oldpacket->chaddr, 16);
+ 	packet->flags = oldpacket->flags;
+-	packet->giaddr = oldpacket->giaddr;
++	packet->gateway_nip = oldpacket->gateway_nip;
+ 	packet->ciaddr = oldpacket->ciaddr;
+-	add_simple_option(packet->options, DHCP_SERVER_ID, server_config.server);
++	add_simple_option(packet->options, DHCP_SERVER_ID, server_config.server_nip);
+ }
+ 
+ 
+diff --git a/networking/udhcp/socket.c b/networking/udhcp/socket.c
+index edf4355..449fcb7 100644
+--- a/networking/udhcp/socket.c
++++ b/networking/udhcp/socket.c
+@@ -37,7 +37,7 @@
+ #include "common.h"
+ 
+ 
+-int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t *addr, uint8_t *arp)
++int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t *nip, uint8_t *arp)
+ {
+ 	int fd;
+ 	struct ifreq ifr;
+@@ -48,7 +48,7 @@ int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t
+ 
+ 	ifr.ifr_addr.sa_family = AF_INET;
+ 	strncpy_IFNAMSIZ(ifr.ifr_name, interface);
+-	if (addr) {
++	if (nip) {
+ 		if (ioctl_or_perror(fd, SIOCGIFADDR, &ifr,
+ 			"is interface %s up and configured?", interface)
+ 		) {
+@@ -56,7 +56,7 @@ int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t
+ 			return -1;
+ 		}
+ 		our_ip = (struct sockaddr_in *) &ifr.ifr_addr;
+-		*addr = our_ip->sin_addr.s_addr;
++		*nip = our_ip->sin_addr.s_addr;
+ 		DEBUG("ip of %s = %s", interface, inet_ntoa(our_ip->sin_addr));
+ 	}
+ 

@@ -1,0 +1,24 @@
+2008-04-13 17:45:56 +0000
+diff --git a/shell/ash_test/ash-vars/var_leak.right b/shell/ash_test/ash-vars/var_leak.right
+new file mode 100644
+index 0000000..45c5458
+--- /dev/null
++++ b/shell/ash_test/ash-vars/var_leak.right
+@@ -0,0 +1,2 @@
++should be empty: ''
++should be empty: ''
+diff --git a/shell/ash_test/ash-vars/var_leak.tests b/shell/ash_test/ash-vars/var_leak.tests
+new file mode 100755
+index 0000000..1b1123f
+--- /dev/null
++++ b/shell/ash_test/ash-vars/var_leak.tests
+@@ -0,0 +1,9 @@
++# This currently fails with CONFIG_FEATURE_SH_NOFORK=y
++VAR=''
++VAR=qwe true
++echo "should be empty: '$VAR'"
++
++# This fails (always)
++VAR=''
++VAR=qwe exec 2>&1
++echo "should be empty: '$VAR'"

@@ -1,0 +1,137 @@
+2008-10-24 10:49:49 +0000
+diff --git a/Config.in b/Config.in
+index 3cb9a4b..f575e91 100644
+--- a/Config.in
++++ b/Config.in
+@@ -494,8 +494,8 @@ config INCLUDE_SUSv2
+ 	  will be supported in head, tail, and fold. (Note: should
+ 	  affect renice too.)
+ 
+-config PARSE
+-	bool "Uniform config file parser debugging applet: parse"
++### config PARSE
++### 	bool "Uniform config file parser debugging applet: parse"
+ 
+ endmenu
+ 
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index 4ed69e0..3554689 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -58,7 +58,6 @@ CONFIG_NO_DEBUG_LIB=y
+ # CONFIG_DMALLOC is not set
+ # CONFIG_EFENCE is not set
+ CONFIG_INCLUDE_SUSv2=y
+-# CONFIG_PARSE is not set
+ 
+ #
+ # Installation Options
+@@ -306,7 +305,7 @@ CONFIG_WHICH=y
+ # Editors
+ #
+ CONFIG_AWK=y
+-CONFIG_FEATURE_AWK_MATH=y
++CONFIG_FEATURE_AWK_LIBM=y
+ CONFIG_CMP=y
+ CONFIG_DIFF=y
+ CONFIG_FEATURE_DIFF_BINARY=y
+diff --git a/editors/Config.in b/editors/Config.in
+index 0388737..7dbc9b6 100644
+--- a/editors/Config.in
++++ b/editors/Config.in
+@@ -12,7 +12,7 @@ config AWK
+ 	  Awk is used as a pattern scanning and processing language. This is
+ 	  the BusyBox implementation of that programming language.
+ 
+-config FEATURE_AWK_MATH
++config FEATURE_AWK_LIBM
+ 	bool "Enable math functions (requires libm)"
+ 	default n
+ 	depends on AWK
+diff --git a/editors/awk.c b/editors/awk.c
+index bdf2a7f..1d0792e 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -512,7 +512,7 @@ static const char EMSG_TOO_FEW_ARGS[] ALIGN1 = "Too few arguments for builtin";
+ static const char EMSG_NOT_ARRAY[] ALIGN1 = "Not an array";
+ static const char EMSG_POSSIBLE_ERROR[] ALIGN1 = "Possible syntax error";
+ static const char EMSG_UNDEF_FUNC[] ALIGN1 = "Call to undefined function";
+-#if !ENABLE_FEATURE_AWK_MATH
++#if !ENABLE_FEATURE_AWK_LIBM
+ static const char EMSG_NO_MATH[] ALIGN1 = "Math support is not compiled in";
+ #endif
+ 
+@@ -2024,7 +2024,7 @@ static var *exec_builtin(node *op, var *res)
+ 	switch (info & OPNMASK) {
+ 
+ 	case B_a2:
+-#if ENABLE_FEATURE_AWK_MATH
++#if ENABLE_FEATURE_AWK_LIBM
+ 		setvar_i(res, atan2(getvar_i(av[0]), getvar_i(av[1])));
+ #else
+ 		syntax_error(EMSG_NO_MATH);
+@@ -2465,7 +2465,7 @@ static var *evaluate(node *op, var *res)
+ 			case F_rn:
+ 				R.d = (double)rand() / (double)RAND_MAX;
+ 				break;
+-#if ENABLE_FEATURE_AWK_MATH
++#if ENABLE_FEATURE_AWK_LIBM
+ 			case F_co:
+ 				R.d = cos(L.d);
+ 				break;
+@@ -2633,7 +2633,7 @@ static var *evaluate(node *op, var *res)
+ 				L.d /= R.d;
+ 				break;
+ 			case '&':
+-#if ENABLE_FEATURE_AWK_MATH
++#if ENABLE_FEATURE_AWK_LIBM
+ 				L.d = pow(L.d, R.d);
+ #else
+ 				syntax_error(EMSG_NO_MATH);
+diff --git a/include/applets.h b/include/applets.h
+index 9c16c5d..e3f9294 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -270,7 +270,7 @@ USE_NOHUP(APPLET(nohup, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_NSLOOKUP(APPLET(nslookup, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_OD(APPLET(od, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_OPENVT(APPLET(openvt, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+-USE_PARSE(APPLET(parse, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
++//USE_PARSE(APPLET(parse, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_PASSWD(APPLET(passwd, _BB_DIR_USR_BIN, _BB_SUID_ALWAYS))
+ USE_PATCH(APPLET(patch, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_PGREP(APPLET(pgrep, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+diff --git a/libbb/parse_config.c b/libbb/parse_config.c
+index a0599d4..9a85786 100644
+--- a/libbb/parse_config.c
++++ b/libbb/parse_config.c
+@@ -9,7 +9,7 @@
+ 
+ #include "libbb.h"
+ 
+-#if ENABLE_PARSE
++#if defined ENABLE_PARSE && ENABLE_PARSE
+ int parse_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int parse_main(int argc UNUSED_PARAM, char **argv)
+ {
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 6cd82c3..dc926c8 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -58,7 +58,6 @@ CONFIG_NO_DEBUG_LIB=y
+ # CONFIG_DMALLOC is not set
+ # CONFIG_EFENCE is not set
+ CONFIG_INCLUDE_SUSv2=y
+-# CONFIG_PARSE is not set
+ 
+ #
+ # Installation Options
+@@ -304,7 +303,7 @@ CONFIG_WHICH=y
+ # Editors
+ #
+ CONFIG_AWK=y
+-CONFIG_FEATURE_AWK_MATH=y
++CONFIG_FEATURE_AWK_LIBM=y
+ CONFIG_CMP=y
+ CONFIG_DIFF=y
+ CONFIG_FEATURE_DIFF_BINARY=y

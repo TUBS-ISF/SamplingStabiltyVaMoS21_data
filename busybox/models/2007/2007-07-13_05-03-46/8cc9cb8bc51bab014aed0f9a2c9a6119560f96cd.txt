@@ -1,0 +1,11 @@
+2007-07-13 05:03:46 +0000
+diff --git a/docs/busybox_footer.pod b/docs/busybox_footer.pod
+index c678e21..74575bd 100644
+--- a/docs/busybox_footer.pod
++++ b/docs/busybox_footer.pod
+@@ -254,5 +254,3 @@ Tito Ragusa <farmatito@tiscali.it>
+ 
+ =cut
+ 
+-# $LastChangedDate$
+-

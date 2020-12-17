@@ -1,0 +1,62 @@
+2008-09-01 15:24:52 +0000
+diff --git a/include/usage.h b/include/usage.h
+index a09f7ea..b901090 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1424,7 +1424,7 @@
+        "-rw-rw-r--    1 andersen andersen   554058 Apr 14 17:49 /tmp/busybox.tar.gz\n"
+ 
+ #define halt_trivial_usage \
+-       "[-d delay] [-n] [-f]"
++       "[-d delay] [-n] [-f]" USE_FEATURE_WTMP(" [-w]")
+ #define halt_full_usage "\n\n" \
+        "Halt the system\n" \
+      "\nOptions:" \
+diff --git a/init/halt.c b/init/halt.c
+index 8c1f30b..42b9edc 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -20,16 +20,16 @@ int halt_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	static const int magic[] = {
+ #ifdef RB_HALT_SYSTEM
+-RB_HALT_SYSTEM,
++		RB_HALT_SYSTEM,
+ #elif defined RB_HALT
+-RB_HALT,
++		RB_HALT,
+ #endif
+ #ifdef RB_POWER_OFF
+-RB_POWER_OFF,
++		RB_POWER_OFF,
+ #elif defined RB_POWERDOWN
+-RB_POWERDOWN,
++		RB_POWERDOWN,
+ #endif
+-RB_AUTOBOOT
++		RB_AUTOBOOT
+ 	};
+ 	static const smallint signals[] = { SIGUSR1, SIGUSR2, SIGTERM };
+ 
+@@ -46,7 +46,7 @@ RB_AUTOBOOT
+ 
+ 	/* Parse and handle arguments */
+ 	opt_complementary = "d+"; /* -d N */
+-	flags = getopt32(argv, "d:nfw", &delay);
++	flags = getopt32(argv, "d:nf" USE_FEATURE_WTMP("w"), &delay);
+ 
+ 	sleep(delay);
+ 
+@@ -63,10 +63,11 @@ RB_AUTOBOOT
+ 	if (uname(&uts) == 0)
+ 		safe_strncpy(utmp.ut_host, uts.release, sizeof(utmp.ut_host));
+ 	updwtmp(bb_path_wtmp_file, &utmp);
+-#endif /* !ENABLE_FEATURE_WTMP */
+ 
+ 	if (flags & 8) /* -w */
+ 		return EXIT_SUCCESS;
++#endif /* !ENABLE_FEATURE_WTMP */
++
+ 	if (!(flags & 2)) /* no -n */
+ 		sync();
+ 

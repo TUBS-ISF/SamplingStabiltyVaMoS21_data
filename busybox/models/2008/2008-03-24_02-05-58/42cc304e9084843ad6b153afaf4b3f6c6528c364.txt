@@ -1,0 +1,200 @@
+2008-03-24 02:05:58 +0000
+diff --git a/editors/patch.c b/editors/patch.c
+index a37f4e6..a2d593d 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -136,7 +136,7 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		src_stream = NULL;
+ 
+ 		if (backup_filename && !stat(original_filename, &saved_stat)) {
+-			src_stream = xfopen((strcmp(original_filename, new_filename)) ? 
++			src_stream = xfopen((strcmp(original_filename, new_filename)) ?
+ 							    original_filename : backup_filename, "r");
+ 		}
+ 
+diff --git a/editors/vi.c b/editors/vi.c
+index 22bd2ff..65fb026 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -1718,7 +1718,7 @@ static int find_range(char ** start, char ** stop, char c)
+ 		p = t;
+ 	}
+ 
+-	// backward char movements don't include start position 
++	// backward char movements don't include start position
+ 	if (q > p && strchr("^0bBh\b\177", c)) q--;
+ 
+ 	multiline = 0;
+diff --git a/include/unarchive.h b/include/unarchive.h
+index bfd6488..b49e6cb 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -14,7 +14,7 @@ typedef struct file_header_t {
+ 	char *name;
+ 	char *link_target;
+ #if ENABLE_FEATURE_TAR_UNAME_GNAME
+-	char *uname; 
++	char *uname;
+ 	char *gname;
+ #endif
+ 	off_t size;
+diff --git a/miscutils/chrt.c b/miscutils/chrt.c
+index 13557fe..a0f684b 100644
+--- a/miscutils/chrt.c
++++ b/miscutils/chrt.c
+@@ -67,7 +67,7 @@ int chrt_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		fflush_stdout_and_exit(EXIT_SUCCESS);
+ 	}
+ 
+-	argv += optind; 
++	argv += optind;
+ 	if (opt & OPT_p) {
+ 		pid_str = *argv++;
+ 		if (*argv) { /* "-p <priority> <pid> [...]" */
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index 2eb01dc..2218f2c 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -537,7 +537,7 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		// NOTE: we don't use xatou(buf) since buf is "nmsg nbytes"
+ 		// we only need nmsg and atoi is just exactly what we need
+ 		// if atoi fails to convert buf into number it returns 0
+-		// in this case the following loop simply will not be executed 
++		// in this case the following loop simply will not be executed
+ 		nmsg = atoi(buf);
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			free(buf-4); // buf is "+OK " away from malloc'ed string
+diff --git a/printutils/lpd.c b/printutils/lpd.c
+index cac8813..bc0348e 100644
+--- a/printutils/lpd.c
++++ b/printutils/lpd.c
+@@ -10,37 +10,40 @@
+ /*
+  * A typical usage of BB lpd looks as follows:
+  * # tcpsvd -E 0 515 lpd SPOOLDIR [HELPER-PROG [ARGS...]]
+- * 
+- * This means a network listener is started on port 515 (default for LP protocol). 
++ *
++ * This means a network listener is started on port 515 (default for LP protocol).
+  * When a client connection is made (via lpr) lpd first change its working directory to SPOOLDIR.
+- * 
+- * SPOOLDIR is the spool directory which contains printing queues 
++ *
++ * SPOOLDIR is the spool directory which contains printing queues
+  * and should have the following structure:
+- * 
++ *
+  * SPOOLDIR/
+  * 	<queue1>
+  * 	...
+  * 	<queueN>
+- * 
++ *
+  * <queueX> can be of two types:
+  * 	A. a printer character device or an ordinary file a link to such;
+  * 	B. a directory.
+- * 
+- * In case A lpd just dumps the data it receives from client (lpr) to the 
++ *
++ * In case A lpd just dumps the data it receives from client (lpr) to the
+  * end of queue file/device. This is non-spooling mode.
+- * 
+- * In case B lpd enters spooling mode. It reliably saves client data along with control info 
+- * in two unique files under the queue directory. These files are named dfAXXXHHHH and cfAXXXHHHH, 
+- * where XXX is the job number and HHHH is the client hostname. Unless a printing helper application 
++ *
++ * In case B lpd enters spooling mode. It reliably saves client data along with control info
++ * in two unique files under the queue directory. These files are named dfAXXXHHHH and cfAXXXHHHH,
++ * where XXX is the job number and HHHH is the client hostname. Unless a printing helper application
+  * is specified lpd is done at this point.
+- * 
++ *
++ * NB: file names are produced by peer! They actually may be anything at all!
++ * lpd only sanitizes them (by removing most non-alphanumerics).
++ *
+  * If HELPER-PROG (with optional arguments) is specified then lpd continues to process client data:
+- * 	1. it reads and parses control file (cfA...). The parse process results in setting environment 
+- * 	variables whose values were passed in control file; when parsing is complete, lpd deletes 
++ * 	1. it reads and parses control file (cfA...). The parse process results in setting environment
++ * 	variables whose values were passed in control file; when parsing is complete, lpd deletes
+  * 	control file.
+- * 	2. it spawns specified helper application. It is then the helper application who is responsible 
++ * 	2. it spawns specified helper application. It is then the helper application who is responsible
+  * 	for both actual printing and deleting processed data file.
+- * 
++ *
+  * A good lpr passes control files which when parsed provide the following variables:
+  * $H = host which issues the job
+  * $P = user who prints
+@@ -49,13 +52,17 @@
+  * $L = print banner page
+  * $M = the user to whom a mail should be sent if a problem occurs
+  * $l = name of datafile ("dfAxxx") - file whose content are to be printed
+- * 
++ *
++ * lpd also provides $DATAFILE environment variable - the ACTUAL name
++ * of the datafile under which it was saved.
++ * $l is not reliable (you are at mercy of remote peer), DON'T USE IT.
++ *
+  * Thus, a typical helper can be something like this:
+  * #!/bin/sh
+  * cat "$l" >/dev/lp0
+  * mv -f "$l" save/
+- * 
+  */
++
+ #include "libbb.h"
+ 
+ // strip argument of bad chars
+diff --git a/printutils/lpr.c b/printutils/lpr.c
+index 5313d5a..d0bf587 100644
+--- a/printutils/lpr.c
++++ b/printutils/lpr.c
+@@ -49,7 +49,7 @@ int lpqr_main(int argc ATTRIBUTE_UNUSED, char *argv[])
+ 		OPT_U           = 1 << 1, // -U username
+ 
+ 		LPR_V           = 1 << 2, // -V: be verbose
+-		LPR_h           = 1 << 3, // -h: want banner printed    
++		LPR_h           = 1 << 3, // -h: want banner printed
+ 		LPR_C           = 1 << 4, // -C class: job "class" (? supposedly printed on banner)
+ 		LPR_J           = 1 << 5, // -J title: the job title for the banner page
+ 		LPR_m           = 1 << 6, // -m: send mail back to user
+diff --git a/shell/msh.c b/shell/msh.c
+index 63f3659..cd46954 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -2740,7 +2740,7 @@ static int forkexec(struct op *t, int *pin, int *pout, int no_fork, char **wp)
+ 	// longjmps away (at "Run builtin" below), leaving t->op_words clobbered!
+ 	// See http://bugs.busybox.net/view.php?id=846.
+ 	// Now we do not touch t->op_words, but separately pass wp as param list
+-	// to builtins 
++	// to builtins
+ 	DBGPRINTF(("FORKEXEC: bltin %p, no_fork %d, owp %p\n", bltin,
+ 			no_fork, owp));
+ 	/* Don't fork if it is a lone builtin (not in pipe)
+diff --git a/util-linux/script.c b/util-linux/script.c
+index 1c95ea5..700f0cb 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -168,7 +168,7 @@ int script_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	/* child: make pty slave to be input, output, error; run shell */
+ 	close(pty); /* close pty master */
+ 	/* open pty slave to fd 0,1,2 */
+-	close(0);               
++	close(0);
+ 	xopen(pty_line, O_RDWR); /* uses fd 0 */
+ 	xdup2(0, 1);
+ 	xdup2(0, 2);
+diff --git a/util-linux/volume_id/get_devname.c b/util-linux/volume_id/get_devname.c
+index b46aad4..d1968b7 100644
+--- a/util-linux/volume_id/get_devname.c
++++ b/util-linux/volume_id/get_devname.c
+@@ -71,7 +71,7 @@ static void
+ uuidcache_addentry(char *device, /*int major, int minor,*/ char *label, char *uuid)
+ {
+ 	struct uuidCache_s *last;
+-    
++
+ 	if (!uuidCache) {
+ 		last = uuidCache = xzalloc(sizeof(*uuidCache));
+ 	} else {

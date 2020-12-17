@@ -1,0 +1,16 @@
+2010-04-18 20:16:11 -0700
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 2d52c3d..7a5e7ae 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -105,7 +105,9 @@ static const char *unpack_usage_messages(void)
+ 
+ static void full_write2_str(const char *str)
+ {
+-	xwrite_str(STDERR_FILENO, str);
++	// This uses stdio:
++	//xwrite_str(STDERR_FILENO, str);
++	write(STDERR_FILENO, str, strlen(str));
+ }
+ 
+ void FAST_FUNC bb_show_usage(void)

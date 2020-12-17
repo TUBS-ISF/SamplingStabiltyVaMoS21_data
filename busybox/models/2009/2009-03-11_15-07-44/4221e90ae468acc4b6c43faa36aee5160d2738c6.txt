@@ -1,0 +1,122 @@
+2009-03-11 15:07:44 +0000
+diff --git a/docs/logging_and_backgrounding.txt b/docs/logging_and_backgrounding.txt
+index 39f0158..62a6d15 100644
+--- a/docs/logging_and_backgrounding.txt
++++ b/docs/logging_and_backgrounding.txt
+@@ -27,18 +27,16 @@ acpid - auto-backgrounds unless -d
+ crond - auto-backgrounds unless -f, logs to syslog unless -d or -L.
+     option -d logs to stderr, -L FILE logs to FILE
+ devfsd - (obsolete)
+-dnsd - option -d makes it auto-background and log to syslog
++dnsd - option -d makes it background and log to syslog
+ fakeidentd - inetd service. Auto-backgrounds and logs to syslog
+     if no -f and no -i and no -w (-i is "inetd service" flag,
+     -w is "inetd-wait service" flag)
+-ftpd - inetd service. Logs to syslog always, with -v logs to strerr too
+-httpd - auto-backgrounds unless -f or -i
+-    (-i is "inetd service" flag)
++ftpd - inetd service. Logs to syslog with -S, with -v logs to strerr too
++httpd - auto-backgrounds unless -f or -i (-i is "inetd service" flag)
+ inetd - auto-backgrounds unless -f, logs to syslog unless -e
+ klogd - auto-backgrounds unless -n
+ syslogd - auto-backgrounds unless -n
+-telnetd - auto-backgrounds unless -f or -i
+-    (-i is "inetd service" flag)
++telnetd - auto-backgrounds unless -f or -i (-i is "inetd service" flag)
+ udhcpc - auto-backgrounds unless -f after lease is obtained,
+     option -b makes it background sooner (when lease attempt
+     fails and retries start),
+@@ -48,9 +46,18 @@ udhcpd - auto-backgrounds and do not log to stderr unless -f,
+     otherwise logs to stderr, but option -S makes it log *also* to syslog
+ zcip - auto-backgrounds and logs *also* to syslog unless -f
+ 
++Total: 13 applets (+1 obsolete),
++ 4 log to syslog by default (crond fakeidentd inetd zcip),
++ 5 never log to syslog (acpid httpd telnetd klogd syslogd, last two
++ - for obviously correct reasons),
++ there are no daemons which always log to syslog,
++ 12 auto-background if not run as inetd servies (all except dnsd.
++ Note that there is no "standard" dnsd AFAIKS). But see below
++ for daemons (tcpsvd etc) which don't auto-background.
++
+ miscutils/crond.c:            logmode = LOGMODE_SYSLOG;
+ networking/dnsd.c:            logmode = LOGMODE_SYSLOG;
+-networking/ftpd.c:            logmode = LOGMODE_SYSLOG;
++networking/ftpd.c:            logmode = LOGMODE_NONE;
+ networking/ftpd.c:            logmode |= LOGMODE_SYSLOG;
+ networking/inetd.c:           logmode = LOGMODE_SYSLOG;
+ networking/isrv_identd.c:     logmode = LOGMODE_SYSLOG;
+@@ -63,7 +70,7 @@ networking/udhcp/dhcpd.c:     logmode |= LOGMODE_SYSLOG;
+ networking/zcip.c:            logmode |= LOGMODE_SYSLOG;
+ 
+ 
+-These daemons seem to never auto-background/log to syslog:
++These daemons never auto-background and never log to syslog:
+ 
+ lpd - inetd service. Has nothing to log so far, though
+ dhcprelay - standard behavior
+diff --git a/include/usage.h b/include/usage.h
+index b19803d..e945840 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1281,7 +1281,7 @@
+      "\n	-f	Force file system check" \
+ 
+ #define ftpd_trivial_usage \
+-       "[-vw] [DIR]"
++       "[-wvS] [DIR]"
+ #define ftpd_full_usage "\n\n" \
+        "FTP server\n" \
+        "\n" \
+@@ -1291,8 +1291,9 @@
+        "It also can be ran from tcpsvd:\n" \
+        "	tcpsvd -vE 0.0.0.0 21 ftpd /files/to/serve\n" \
+      "\nOptions:" \
+-     "\n	-v	Log also to stderr" \
+      "\n	-w	Allow upload" \
++     "\n	-v	Log to stderr" \
++     "\n	-S	Log to syslog" \
+      "\n	DIR	Change root to this directory" \
+ 
+ #define ftpget_trivial_usage \
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index 29589d1..3faa3ed 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -80,7 +80,8 @@ enum {
+ 	OPT_l = (1 << 0),
+ 	OPT_1 = (1 << 1),
+ 	OPT_v = (1 << 2),
+-	OPT_w = (1 << 3),
++	OPT_S = (1 << 3),
++	OPT_w = (1 << 4),
+ 
+ #define mk_const4(a,b,c,d) (((a * 0x100 + b) * 0x100 + c) * 0x100 + d)
+ #define mk_const3(a,b,c)    ((a * 0x100 + b) * 0x100 + c)
+@@ -806,7 +807,7 @@ int ftpd_main(int argc, char **argv)
+ {
+ 	smallint opts;
+ 
+-	opts = getopt32(argv, "l1v" USE_FEATURE_FTP_WRITE("w"));
++	opts = getopt32(argv, "l1vS" USE_FEATURE_FTP_WRITE("w"));
+ 
+ 	if (opts & (OPT_l|OPT_1)) {
+ 		/* Our secret backdoor to ls */
+@@ -828,11 +829,13 @@ int ftpd_main(int argc, char **argv)
+ 		 * failure */
+ 	}
+ 
+-	/* LOG_NDELAY is needed since we may chroot later */
+-	openlog(applet_name, LOG_PID | LOG_NDELAY, LOG_DAEMON);
+-	logmode |= LOGMODE_SYSLOG;
+ 	if (!(opts & OPT_v))
+-		logmode = LOGMODE_SYSLOG;
++		logmode = LOGMODE_NONE;
++	if (opts & OPT_S) {
++		/* LOG_NDELAY is needed since we may chroot later */
++		openlog(applet_name, LOG_PID | LOG_NDELAY, LOG_DAEMON);
++		logmode |= LOGMODE_SYSLOG;
++	}
+ 
+ 	G.proc_self_fd = xopen("/proc/self", O_RDONLY | O_DIRECTORY);
+ 

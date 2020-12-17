@@ -1,0 +1,12 @@
+2007-07-23 21:05:06 +0000
+diff --git a/arch/i386/Makefile b/arch/i386/Makefile
+index 385dd52..e6c99c6 100644
+--- a/arch/i386/Makefile
++++ b/arch/i386/Makefile
+@@ -2,4 +2,6 @@
+ # Build system
+ # ==========================================================================
+ 
++# -mpreferred-stack-boundary=2 is essential in preventing gcc 4.2.x
++# from aligning stack to 16 bytes. (Which is gcc's way of supporting SSE).
+ CFLAGS += $(call cc-option,-march=i386 -mpreferred-stack-boundary=2,)

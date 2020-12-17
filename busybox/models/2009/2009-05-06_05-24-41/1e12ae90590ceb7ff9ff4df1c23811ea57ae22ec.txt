@@ -1,0 +1,17 @@
+2009-05-06 05:24:41 -0400
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index 52f5e10..d57dbdf 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -8,6 +8,11 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
++/* Note that unlike older versions of modules.dep/depmod (busybox and m-i-t),
++ * we expect the full dependency list to be specified in modules.dep.  Older
++ * versions would only export the direct dependency list.
++ */
++
+ #include "libbb.h"
+ #include "modutils.h"
+ #include <sys/utsname.h>

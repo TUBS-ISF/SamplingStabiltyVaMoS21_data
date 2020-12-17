@@ -1,0 +1,409 @@
+2009-06-17 18:46:06 +0200
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index d000c91..cfc16cb 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -9,10 +9,9 @@
+  */
+ 
+ /* Note that unlike older versions of modules.dep/depmod (busybox and m-i-t),
+- * we expect the full dependency list to be specified in modules.dep.  Older
+- * versions would only export the direct dependency list.
++ * we expect the full dependency list to be specified in modules.dep.
++ * Older versions would only export the direct dependency list.
+  */
+-
+ #include "libbb.h"
+ #include "modutils.h"
+ #include <sys/utsname.h>
+@@ -21,11 +20,11 @@
+ //#define DBG(fmt, ...) bb_error_msg("%s: " fmt, __func__, ## __VA_ARGS__)
+ #define DBG(...) ((void)0)
+ 
+-#define MODULE_FLAG_LOADED		0x0001
+-#define MODULE_FLAG_NEED_DEPS		0x0002
++#define MODULE_FLAG_LOADED              0x0001
++#define MODULE_FLAG_NEED_DEPS           0x0002
+ /* "was seen in modules.dep": */
+-#define MODULE_FLAG_FOUND_IN_MODDEP	0x0004
+-#define MODULE_FLAG_BLACKLISTED		0x0008
++#define MODULE_FLAG_FOUND_IN_MODDEP     0x0004
++#define MODULE_FLAG_BLACKLISTED         0x0008
+ 
+ struct module_entry { /* I'll call it ME. */
+ 	unsigned flags;
+@@ -38,18 +37,30 @@ struct module_entry { /* I'll call it ME. */
+ 	llist_t *deps; /* strings. modules we depend on */
+ };
+ 
++/* NB: INSMOD_OPT_SILENT bit suppresses ONLY non-existent modules,
++ * not deleted ones (those are still listed in modules.dep).
++ * module-init-tools version 3.4:
++ * # modprobe bogus
++ * FATAL: Module bogus not found. [exitcode 1]
++ * # modprobe -q bogus            [silent, exitcode still 1]
++ * but:
++ * # rm kernel/drivers/net/dummy.ko
++ * # modprobe -q dummy
++ * FATAL: Could not open '/lib/modules/xxx/kernel/drivers/net/dummy.ko': No such file or directory
++ * [exitcode 1]
++ */
+ #define MODPROBE_OPTS  "acdlnrt:VC:" IF_FEATURE_MODPROBE_BLACKLIST("b")
+ enum {
+-	MODPROBE_OPT_INSERT_ALL	= (INSMOD_OPT_UNUSED << 0), /* a */
+-	MODPROBE_OPT_DUMP_ONLY	= (INSMOD_OPT_UNUSED << 1), /* c */
+-	MODPROBE_OPT_D		= (INSMOD_OPT_UNUSED << 2), /* d */
+-	MODPROBE_OPT_LIST_ONLY	= (INSMOD_OPT_UNUSED << 3), /* l */
+-	MODPROBE_OPT_SHOW_ONLY	= (INSMOD_OPT_UNUSED << 4), /* n */
+-	MODPROBE_OPT_REMOVE	= (INSMOD_OPT_UNUSED << 5), /* r */
+-	MODPROBE_OPT_RESTRICT	= (INSMOD_OPT_UNUSED << 6), /* t */
+-	MODPROBE_OPT_VERONLY	= (INSMOD_OPT_UNUSED << 7), /* V */
+-	MODPROBE_OPT_CONFIGFILE	= (INSMOD_OPT_UNUSED << 8), /* C */
+-	MODPROBE_OPT_BLACKLIST	= (INSMOD_OPT_UNUSED << 9) * ENABLE_FEATURE_MODPROBE_BLACKLIST,
++	MODPROBE_OPT_INSERT_ALL = (INSMOD_OPT_UNUSED << 0), /* a */
++	MODPROBE_OPT_DUMP_ONLY  = (INSMOD_OPT_UNUSED << 1), /* c */
++	MODPROBE_OPT_D          = (INSMOD_OPT_UNUSED << 2), /* d */
++	MODPROBE_OPT_LIST_ONLY  = (INSMOD_OPT_UNUSED << 3), /* l */
++	MODPROBE_OPT_SHOW_ONLY  = (INSMOD_OPT_UNUSED << 4), /* n */
++	MODPROBE_OPT_REMOVE     = (INSMOD_OPT_UNUSED << 5), /* r */
++	MODPROBE_OPT_RESTRICT   = (INSMOD_OPT_UNUSED << 6), /* t */
++	MODPROBE_OPT_VERONLY    = (INSMOD_OPT_UNUSED << 7), /* V */
++	MODPROBE_OPT_CONFIGFILE = (INSMOD_OPT_UNUSED << 8), /* C */
++	MODPROBE_OPT_BLACKLIST  = (INSMOD_OPT_UNUSED << 9) * ENABLE_FEATURE_MODPROBE_BLACKLIST,
+ };
+ 
+ struct globals {
+@@ -140,7 +151,7 @@ static int FAST_FUNC config_file_action(const char *filename,
+ {
+ 	char *tokens[3];
+ 	parser_t *p;
+-        struct module_entry *m;
++	struct module_entry *m;
+ 	int rc = TRUE;
+ 
+ 	if (bb_basename(filename)[0] == '.')
+@@ -199,7 +210,7 @@ static int FAST_FUNC config_file_action(const char *filename,
+ 		}
+ 	}
+ 	config_close(p);
+-error:
++ error:
+ 	return rc;
+ }
+ 
+@@ -209,6 +220,11 @@ static int read_config(const char *path)
+ 				config_file_action, NULL, NULL, 1);
+ }
+ 
++/* Return: similar to bb_init_module:
++ * 0 on success,
++ * -errno on open/read error,
++ * errno on init_module() error
++ */
+ static int do_modprobe(struct module_entry *m)
+ {
+ 	struct module_entry *m2 = m2; /* for compiler */
+@@ -217,7 +233,8 @@ static int do_modprobe(struct module_entry *m)
+ 	llist_t *l;
+ 
+ 	if (!(m->flags & MODULE_FLAG_FOUND_IN_MODDEP)) {
+-		DBG("skipping %s, not found in modules.dep", m->modname);
++		if (!(option_mask32 & INSMOD_OPT_SILENT))
++			bb_error_msg("module %s not found in modules.dep", m->probed_name);
+ 		return -ENOENT;
+ 	}
+ 	DBG("do_modprob'ing %s", m->modname);
+@@ -230,43 +247,52 @@ static int do_modprobe(struct module_entry *m)
+ 
+ 	first = 1;
+ 	rc = 0;
+-	while (m->deps && rc == 0) {
+-		fn = llist_pop(&m->deps);
++	while (m->deps) {
++		rc = 0;
++		fn = llist_pop(&m->deps); /* we leak it */
+ 		m2 = get_or_add_modentry(fn);
++
+ 		if (option_mask32 & MODPROBE_OPT_REMOVE) {
++			/* modprobe -r */
+ 			if (m2->flags & MODULE_FLAG_LOADED) {
+-				if (bb_delete_module(m2->modname, O_EXCL) != 0) {
+-					if (first)
+-						rc = errno;
++				rc = bb_delete_module(m2->modname, O_EXCL);
++				if (rc) {
++					if (first) {
++						bb_error_msg("failed to unload module %s: %s",
++							m2->probed_name ? m2->probed_name : m2->modname,
++							moderror(rc));
++						break;
++					}
+ 				} else {
+ 					m2->flags &= ~MODULE_FLAG_LOADED;
+ 				}
+ 			}
+ 			/* do not error out if *deps* fail to unload */
+ 			first = 0;
+-		} else if (!(m2->flags & MODULE_FLAG_LOADED)) {
+-			options = m2->options;
+-			m2->options = NULL;
+-			if (m == m2)
+-				options = gather_options_str(options, G.cmdline_mopts);
+-			rc = bb_init_module(fn, options);
+-			DBG("loaded %s '%s', rc:%d", fn, options, rc);
+-			if (rc == 0)
+-				m2->flags |= MODULE_FLAG_LOADED;
+-			free(options);
+-		} else {
+-			DBG("%s is already loaded, skipping", fn);
++			continue;
+ 		}
+ 
+-		free(fn);
+-	}
++		if (m2->flags & MODULE_FLAG_LOADED) {
++			DBG("%s is already loaded, skipping", fn);
++			continue;
++		}
+ 
+-	if (rc && !(option_mask32 & INSMOD_OPT_SILENT)) {
+-		bb_error_msg("failed to %sload module %s: %s",
+-			(option_mask32 & MODPROBE_OPT_REMOVE) ? "un" : "",
++		options = m2->options;
++		m2->options = NULL;
++		if (m == m2)
++			options = gather_options_str(options, G.cmdline_mopts);
++		rc = bb_init_module(fn, options);
++		DBG("loaded %s '%s', rc:%d", fn, options, rc);
++		free(options);
++		if (rc) {
++			bb_error_msg("failed to load module %s (%s): %s",
+ 			m2->probed_name ? m2->probed_name : m2->modname,
+-			moderror(rc)
+-		);
++				fn,
++				moderror(rc)
++			);
++			break;
++		}
++		m2->flags |= MODULE_FLAG_LOADED;
+ 	}
+ 
+ 	return rc;
+@@ -278,7 +304,7 @@ static void load_modules_dep(void)
+ 	char *colon, *tokens[2];
+ 	parser_t *p;
+ 
+-	/* Modprobe does not work at all without modprobe.dep,
++	/* Modprobe does not work at all without modules.dep,
+ 	 * even if the full module name is given. Returning error here
+ 	 * was making us later confuse user with this message:
+ 	 * "module /full/path/to/existing/file/module.ko not found".
+@@ -387,35 +413,40 @@ int modprobe_main(int argc UNUSED_PARAM, char **argv)
+ 		load_modules_dep();
+ 	}
+ 
++	rc = 0;
+ 	while ((me = llist_pop(&G.probes)) != NULL) {
+ 		if (me->realnames == NULL) {
++			DBG("probing by module name");
+ 			/* This is not an alias. Literal names are blacklisted
+ 			 * only if '-b' is given.
+ 			 */
+ 			if (!(opt & MODPROBE_OPT_BLACKLIST)
+ 			 || !(me->flags & MODULE_FLAG_BLACKLISTED)
+ 			) {
+-				rc = do_modprobe(me);
+-//FIXME: what if rc > 0?
+-				if (rc < 0 && !(opt & INSMOD_OPT_SILENT))
+-					bb_error_msg("module %s not found",
+-						     me->probed_name);
++				rc |= do_modprobe(me);
+ 			}
+-		} else {
+-			/* Probe all realnames */
+-			do {
+-				char *realname = llist_pop(&me->realnames);
+-				struct module_entry *m2;
+-
+-				DBG("probing %s by realname %s", me->modname, realname);
+-				m2 = get_or_add_modentry(realname);
+-				if (!(m2->flags & MODULE_FLAG_BLACKLISTED))
+-					do_modprobe(m2);
+-//FIXME: error check?
+-				free(realname);
+-			} while (me->realnames != NULL);
++			continue;
+ 		}
++
++		/* Probe all real names for the alias */
++		do {
++			char *realname = llist_pop(&me->realnames);
++			struct module_entry *m2;
++
++			DBG("probing alias %s by realname %s", me->modname, realname);
++			m2 = get_or_add_modentry(realname);
++			if (!(m2->flags & MODULE_FLAG_BLACKLISTED)
++			 && (!(m2->flags & MODULE_FLAG_LOADED)
++			    || (opt & MODPROBE_OPT_REMOVE))
++			) {
++//TODO: we can pass "me" as 2nd param to do_modprobe,
++//and make do_modprobe emit more meaningful error messages
++//with alias name included, not just module name alias resolves to.
++				rc |= do_modprobe(m2);
++			}
++			free(realname);
++		} while (me->realnames != NULL);
+ 	}
+ 
+-	return EXIT_SUCCESS;
++	return (rc != 0);
+ }
+diff --git a/modutils/modutils.c b/modutils/modutils.c
+index f437a98..969926d 100644
+--- a/modutils/modutils.c
++++ b/modutils/modutils.c
+@@ -25,7 +25,7 @@ void FAST_FUNC replace(char *s, char what, char with)
+ 	}
+ }
+ 
+-char * FAST_FUNC replace_underscores(char *s)
++char* FAST_FUNC replace_underscores(char *s)
+ {
+ 	replace(s, '-', '_');
+ 	return s;
+@@ -45,7 +45,7 @@ int FAST_FUNC string_to_llist(char *string, llist_t **llist, const char *delim)
+ 	return len;
+ }
+ 
+-char * FAST_FUNC filename2modname(const char *filename, char *modname)
++char* FAST_FUNC filename2modname(const char *filename, char *modname)
+ {
+ 	int i;
+ 	char *from;
+@@ -62,24 +62,6 @@ char * FAST_FUNC filename2modname(const char *filename, char *modname)
+ 	return modname;
+ }
+ 
+-const char * FAST_FUNC moderror(int err)
+-{
+-	switch (err) {
+-	case -1:
+-		return "no such module";
+-	case ENOEXEC:
+-		return "invalid module format";
+-	case ENOENT:
+-		return "unknown symbol in module, or unknown parameter";
+-	case ESRCH:
+-		return "module has wrong symbol version";
+-	case ENOSYS:
+-		return "kernel does not support requested operation";
+-	default:
+-		return strerror(err);
+-	}
+-}
+-
+ char * FAST_FUNC parse_cmdline_module_options(char **argv)
+ {
+ 	char *options;
+@@ -95,6 +77,11 @@ char * FAST_FUNC parse_cmdline_module_options(char **argv)
+ 	return options;
+ }
+ 
++/* Return:
++ * 0 on success,
++ * -errno on open/read error,
++ * errno on init_module() error
++ */
+ int FAST_FUNC bb_init_module(const char *filename, const char *options)
+ {
+ 	size_t len;
+@@ -104,6 +91,7 @@ int FAST_FUNC bb_init_module(const char *filename, const char *options)
+ 	if (!options)
+ 		options = "";
+ 
++//TODO: audit bb_init_module_24 to match error code convention
+ #if ENABLE_FEATURE_2_4_MODULES
+ 	if (get_linux_version_code() < KERNEL_VERSION(2,6,0))
+ 		return bb_init_module_24(filename, options);
+@@ -111,19 +99,40 @@ int FAST_FUNC bb_init_module(const char *filename, const char *options)
+ 
+ 	/* Use the 2.6 way */
+ 	len = INT_MAX - 4095;
+-	rc = ENOENT;
++	errno = ENOMEM; /* may be changed by e.g. open errors below */
+ 	image = xmalloc_open_zipped_read_close(filename, &len);
+-	if (image) {
+-		rc = 0;
+-		if (init_module(image, len, options) != 0)
+-			rc = errno;
+-		free(image);
+-	}
++	if (!image)
++		return -errno;
+ 
++	errno = 0;
++	init_module(image, len, options);
++	rc = errno;
++	free(image);
+ 	return rc;
+ }
+ 
+ int FAST_FUNC bb_delete_module(const char *module, unsigned int flags)
+ {
+-	return delete_module(module, flags);
++	errno = 0;
++	delete_module(module, flags);
++	return errno;
++}
++
++const char* FAST_FUNC moderror(int err)
++{
++	switch (err) {
++	case -1: /* btw: it's -EPERM */
++		return "no such module";
++	case ENOEXEC:
++		return "invalid module format";
++	case ENOENT:
++		return "unknown symbol in module, or unknown parameter";
++	case ESRCH:
++		return "module has wrong symbol version";
++	case ENOSYS:
++		return "kernel does not support requested operation";
++	}
++	if (err < 0) /* should always be */
++		err = -err;
++	return strerror(err);
+ }
+diff --git a/modutils/modutils.h b/modutils/modutils.h
+index 8cca5cc..1cf4bba 100644
+--- a/modutils/modutils.h
++++ b/modutils/modutils.h
+@@ -17,7 +17,6 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+  * internally for the maximum alias name length, which can be quite long */
+ #define MODULE_NAME_LEN 256
+ 
+-const char *moderror(int err) FAST_FUNC;
+ void replace(char *s, char what, char with) FAST_FUNC;
+ char *replace_underscores(char *s) FAST_FUNC;
+ int string_to_llist(char *string, llist_t **llist, const char *delim) FAST_FUNC;
+@@ -52,8 +51,19 @@ enum {
+ #endif
+ };
+ 
++/* Return:
++ * 0 on success,
++ * -errno on open/read error,
++ * errno on init_module() error
++ */
+ int FAST_FUNC bb_init_module(const char *module, const char *options);
++/* Return:
++ * 0 on success,
++ * errno on init_module() error
++ */
+ int FAST_FUNC bb_delete_module(const char *module, unsigned int flags);
++/* Translates error return to a string */
++const char *moderror(int err) FAST_FUNC;
+ 
+ #if ENABLE_FEATURE_2_4_MODULES
+ int FAST_FUNC bb_init_module_24(const char *module, const char *options);

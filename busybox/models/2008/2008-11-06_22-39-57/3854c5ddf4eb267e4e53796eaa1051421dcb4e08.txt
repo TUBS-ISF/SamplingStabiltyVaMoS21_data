@@ -1,0 +1,212 @@
+2008-11-06 22:39:57 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index a6229a5..746db1c 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -743,7 +743,7 @@ int bb_execvp(const char *file, char *const argv[]) FAST_FUNC;
+ pid_t spawn(char **argv) FAST_FUNC;
+ pid_t xspawn(char **argv) FAST_FUNC;
+ 
+-int safe_waitpid(int pid, int *wstat, int options) FAST_FUNC;
++pid_t safe_waitpid(pid_t pid, int *wstat, int options) FAST_FUNC;
+ /* Unlike waitpid, waits ONLY for one process.
+  * It's safe to pass negative 'pids' from failed [v]fork -
+  * wait4pid will return -1 (and will not clobber [v]fork's errno).
+@@ -751,14 +751,14 @@ int safe_waitpid(int pid, int *wstat, int options) FAST_FUNC;
+  *      if (rc < 0) bb_perror_msg("%s", argv[0]);
+  *      if (rc > 0) bb_error_msg("exit code: %d", rc);
+  */
+-int wait4pid(int pid) FAST_FUNC;
+-int wait_any_nohang(int *wstat) FAST_FUNC;
++int wait4pid(pid_t pid) FAST_FUNC;
++pid_t wait_any_nohang(int *wstat) FAST_FUNC;
+ #define wait_crashed(w) ((w) & 127)
+ #define wait_exitcode(w) ((w) >> 8)
+ #define wait_stopsig(w) ((w) >> 8)
+ #define wait_stopped(w) (((w) & 127) == 127)
+ /* wait4pid(spawn(argv)) + NOFORK/NOEXEC (if configured) */
+-int spawn_and_wait(char **argv) FAST_FUNC;
++pid_t spawn_and_wait(char **argv) FAST_FUNC;
+ struct nofork_save_area {
+ 	jmp_buf die_jmp;
+ 	const char *applet_name;
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 17b373c..50dc3af 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -66,9 +66,9 @@ pid_t FAST_FUNC xspawn(char **argv)
+ 	return pid;
+ }
+ 
+-int FAST_FUNC safe_waitpid(int pid, int *wstat, int options)
++pid_t FAST_FUNC safe_waitpid(pid_t pid, int *wstat, int options)
+ {
+-	int r;
++	pid_t r;
+ 
+ 	do
+ 		r = waitpid(pid, wstat, options);
+@@ -76,13 +76,13 @@ int FAST_FUNC safe_waitpid(int pid, int *wstat, int options)
+ 	return r;
+ }
+ 
+-int FAST_FUNC wait_any_nohang(int *wstat)
++pid_t FAST_FUNC wait_any_nohang(int *wstat)
+ {
+ 	return safe_waitpid(-1, wstat, WNOHANG);
+ }
+ 
+ // Wait for the specified child PID to exit, returning child's error return.
+-int FAST_FUNC wait4pid(int pid)
++int FAST_FUNC wait4pid(pid_t pid)
+ {
+ 	int status;
+ 
+diff --git a/networking/tcpudp.c b/networking/tcpudp.c
+index d673119..0d8217e 100644
+--- a/networking/tcpudp.c
++++ b/networking/tcpudp.c
+@@ -147,7 +147,7 @@ static void connection_status(void)
+ static void sig_child_handler(int sig UNUSED_PARAM)
+ {
+ 	int wstat;
+-	int pid;
++	pid_t pid;
+ 
+ 	while ((pid = wait_any_nohang(&wstat)) > 0) {
+ 		if (max_per_host)
+diff --git a/runit/runsv.c b/runit/runsv.c
+index bd0f3dc..56244d0 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -247,7 +247,7 @@ static void update_status(struct svdir *s)
+ 
+ static unsigned custom(struct svdir *s, char c)
+ {
+-	int pid;
++	pid_t pid;
+ 	int w;
+ 	char a[10];
+ 	struct stat st;
+@@ -584,7 +584,7 @@ int runsv_main(int argc UNUSED_PARAM, char **argv)
+ 			continue;
+ 
+ 		for (;;) {
+-			int child;
++			pid_t child;
+ 			int wstat;
+ 
+ 			child = wait_any_nohang(&wstat);
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 581787f..9d560e0 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -107,7 +107,7 @@ static NOINLINE pid_t runsv(const char *name)
+ 	}
+ 	if (pid == 0) {
+ 		/* child */
+-		if (option_mask32) /* -P option? */
++		if (option_mask32 & 1) /* -P option? */
+ 			setsid();
+ /* man execv:
+  * "Signals set to be caught by the calling process image
+@@ -217,17 +217,20 @@ int runsvdir_main(int argc UNUSED_PARAM, char **argv)
+ 	time_t last_mtime = 0;
+ 	int wstat;
+ 	int curdir;
+-	int pid;
++	pid_t pid;
+ 	unsigned deadline;
+ 	unsigned now;
+ 	unsigned stampcheck;
+ 	int i;
+ 	int need_rescan = 1;
++	char *opt_s_argv[3];
+ 
+ 	INIT_G();
+ 
+ 	opt_complementary = "-1";
+-	getopt32(argv, "P");
++	opt_s_argv[0] = NULL;
++	opt_s_argv[2] = NULL;
++	getopt32(argv, "Ps:", &opt_s_argv[0]);
+ 	argv += optind;
+ 
+ 	bb_signals(0
+@@ -335,7 +338,6 @@ int runsvdir_main(int argc UNUSED_PARAM, char **argv)
+ 		pfd[0].revents = 0;
+ #endif
+ 		deadline = (need_rescan ? 1 : 5);
+- do_sleep:
+ 		sig_block(SIGCHLD);
+ #if ENABLE_FEATURE_RUNSVDIR_LOG
+ 		if (rplog)
+@@ -357,27 +359,37 @@ int runsvdir_main(int argc UNUSED_PARAM, char **argv)
+ 			}
+ 		}
+ #endif
++		if (!bb_got_signal)
++			continue;
++
++		/* -s SCRIPT: useful if we are init.
++		 * In this case typically script never returns,
++		 * it halts/powers off/reboots the system. */
++		if (opt_s_argv[0]) {
++			/* Single parameter: signal# */
++			opt_s_argv[1] = utoa(bb_got_signal);
++			pid = spawn(opt_s_argv);
++			if (pid > 0) {
++				/* Remebering to wait for _any_ children,
++				 * not just pid */
++				while (wait(NULL) != pid)
++					continue;
++			}
++		}
++
+ 		switch (bb_got_signal) {
+-		case 0: /* we are not signaled, business as usual */
+-			break;
+ 		case SIGHUP:
+ 			for (i = 0; i < svnum; i++)
+ 				if (sv[i].pid)
+ 					kill(sv[i].pid, SIGTERM);
+-			/* fall through */
+-		case SIGTERM:
+-			/* exit, unless we are init */
+-			if (getpid() != 1)
+-				goto ret;
+-		default:
+-			/* so we are init. do not exit,
+-			 * and pause respawning - we may be rebooting
+-			 * (but SIGHUP is not a reboot, make short pause) */
+-			deadline = (SIGHUP == bb_got_signal) ? 5 : 60;
+-			bb_got_signal = 0;
+-			goto do_sleep;
++			/* Fall through */
++		default: /* SIGTERM (or SIGUSRn if we are init) */
++			/* Exit unless we are init */
++			if (getpid() == 1)
++				break;
++			return (SIGHUP == bb_got_signal) ? 111 : EXIT_SUCCESS;
+ 		}
+-	}
+- ret:
+-	return (SIGHUP == bb_got_signal) ? 111 : EXIT_SUCCESS;
++
++		bb_got_signal = 0;
++	} /* for (;;) */
+ }
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 9608795..6419128 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -797,7 +797,8 @@ static void sig_term_handler(int sig_no UNUSED_PARAM)
+ 
+ static void sig_child_handler(int sig_no UNUSED_PARAM)
+ {
+-	int pid, l;
++	pid_t pid;
++	int l;
+ 
+ 	if (verbose)
+ 		bb_error_msg(INFO"sig%s received", "child");

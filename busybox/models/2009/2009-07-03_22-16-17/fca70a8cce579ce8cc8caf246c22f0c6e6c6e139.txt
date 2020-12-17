@@ -1,0 +1,262 @@
+2009-07-03 22:16:17 +0200
+diff --git a/include/libbb.h b/include/libbb.h
+index e1c36a5..77674f8 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1276,6 +1276,11 @@ typedef struct procps_status_t {
+ 	unsigned sid;
+ 	unsigned uid;
+ 	unsigned gid;
++#if ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS
++	unsigned ruid;
++	unsigned rgid;
++	int niceness;
++#endif
+ 	unsigned tty_major,tty_minor;
+ #if ENABLE_FEATURE_TOPMEM
+ 	unsigned long mapped_rw;
+@@ -1296,6 +1301,7 @@ typedef struct procps_status_t {
+ 	int last_seen_on_cpu;
+ #endif
+ } procps_status_t;
++/* flag bits for procps_scan(xx, flags) calls */
+ enum {
+ 	PSSCAN_PID      = 1 << 0,
+ 	PSSCAN_PPID     = 1 << 1,
+@@ -1322,16 +1328,16 @@ enum {
+ 				),
+ 	IF_SELINUX(PSSCAN_CONTEXT = 1 << 17,)
+ 	PSSCAN_START_TIME = 1 << 18,
+-	PSSCAN_CPU      = 1 << 19,
++	PSSCAN_CPU      = (1 << 19) * ENABLE_FEATURE_TOP_SMP_PROCESS,
++	PSSCAN_NICE     = (1 << 20) * ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS,
++	PSSCAN_RUIDGID  = (1 << 21) * ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS,
+ 	/* These are all retrieved from proc/NN/stat in one go: */
+ 	PSSCAN_STAT     = PSSCAN_PPID | PSSCAN_PGID | PSSCAN_SID
+ 	/**/            | PSSCAN_COMM | PSSCAN_STATE
+ 	/**/            | PSSCAN_VSZ | PSSCAN_RSS
+ 	/**/            | PSSCAN_STIME | PSSCAN_UTIME | PSSCAN_START_TIME
+-	/**/            | PSSCAN_TTY
+-#if ENABLE_FEATURE_TOP_SMP_PROCESS
++	/**/            | PSSCAN_TTY | PSSCAN_NICE
+ 	/**/            | PSSCAN_CPU
+-#endif
+ };
+ //procps_status_t* alloc_procps_scan(void) FAST_FUNC;
+ void free_procps_scan(procps_status_t* sp) FAST_FUNC;
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 445e709..6e122c4 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -151,6 +151,16 @@ static unsigned long fast_strtoul_10(char **endptr)
+ 	*endptr = str + 1; /* We skip trailing space! */
+ 	return n;
+ }
++
++static long fast_strtol_10(char **endptr)
++{
++	if (**endptr != '-')
++		return fast_strtoul_10(endptr);
++
++	(*endptr)++;
++	return - (long)fast_strtoul_10(endptr);
++}
++
+ static char *skip_fields(char *str, int count)
+ {
+ 	do {
+@@ -208,7 +218,7 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 		if (flags & PSSCAN_UIDGID) {
+ 			if (stat(filename, &sb))
+ 				break;
+-			/* Need comment - is this effective or real UID/GID? */
++			/* Effective UID/GID, not real */
+ 			sp->uid = sb.st_uid;
+ 			sp->gid = sb.st_gid;
+ 		}
+@@ -293,7 +303,7 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 			sp->utime = fast_strtoul_10(&cp);
+ 			sp->stime = fast_strtoul_10(&cp);
+ 			cp = skip_fields(cp, 3); /* cutime, cstime, priority */
+-			tasknice = fast_strtoul_10(&cp);
++			tasknice = fast_strtol_10(&cp);
+ 			cp = skip_fields(cp, 2); /* timeout, it_real_value */
+ 			sp->start_time = fast_strtoul_10(&cp);
+ 			/* vsz is in bytes and we want kb */
+@@ -310,6 +320,10 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ #endif
+ #endif /* end of !ENABLE_FEATURE_TOP_SMP_PROCESS */
+ 
++#if ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS
++			sp->niceness = tasknice;
++#endif
++
+ 			if (sp->vsz == 0 && sp->state[0] != 'Z')
+ 				sp->state[1] = 'W';
+ 			else
+@@ -372,7 +386,29 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 			fclose(file);
+ 		}
+ #endif /* TOPMEM */
++#if ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS
++		if (flags & PSSCAN_RUIDGID) {
++			FILE *file;
+ 
++			strcpy(filename_tail, "/status");
++			file = fopen_for_read(filename);
++			if (!file)
++				break;
++			while (fgets(buf, sizeof(buf), file)) {
++				char *tp;
++#define SCAN_TWO(str, name, statement) \
++	if (strncmp(buf, str, sizeof(str)-1) == 0) { \
++		tp = skip_whitespace(buf + sizeof(str)-1); \
++		sscanf(tp, "%u", &sp->name); \
++		statement; \
++	}
++				SCAN_TWO("Uid:", ruid, continue);
++				SCAN_TWO("Gid:", rgid, break);
++#undef SCAN_TWO
++			}
++			fclose(file);
++		}
++#endif /* PS_ADDITIONAL_COLUMNS */
+ #if 0 /* PSSCAN_CMD is not used */
+ 		if (flags & (PSSCAN_CMD|PSSCAN_ARGV0)) {
+ 			free(sp->argv0);
+diff --git a/procps/Config.in b/procps/Config.in
+index 702442a..9146ff6 100644
+--- a/procps/Config.in
++++ b/procps/Config.in
+@@ -91,13 +91,13 @@ config PS
+ 	  ps gives a snapshot of the current processes.
+ 
+ config FEATURE_PS_WIDE
+-	bool "Enable argument for wide output (-w)"
++	bool "Enable wide output option (-w)"
+ 	default n
+ 	depends on PS
+ 	help
+ 	  Support argument 'w' for wide output.
+-	  If given once, 132 chars are printed and given more than
+-	  one, the length is unlimited.
++	  If given once, 132 chars are printed, and if given more
++	  than once, the length is unlimited.
+ 
+ config FEATURE_PS_TIME
+ 	bool "Enable time and elapsed time output"
+@@ -106,6 +106,13 @@ config FEATURE_PS_TIME
+ 	help
+ 	  Support -o time and -o etime output specifiers.
+ 
++config FEATURE_PS_ADDITIONAL_COLUMNS
++	bool "Enable additional ps columns"
++	default n
++	depends on PS && DESKTOP
++	help
++	  Support -o rgroup, -o ruser, -o nice output specifiers.
++
+ config FEATURE_PS_UNUSUAL_SYSTEMS
+ 	bool "Support Linux prior to 2.4.0 and non-ELF systems"
+ 	default n
+diff --git a/procps/ps.c b/procps/ps.c
+index b9a4aef..4a6b60b 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -32,7 +32,7 @@ enum { MAX_WIDTH = 2*1024 };
+ 
+ typedef struct {
+ 	uint16_t width;
+-	char name[6];
++	char name6[6];
+ 	const char *header;
+ 	void (*f)(char *buf, int size, const procps_status_t *ps);
+ 	int ps_flags;
+@@ -174,6 +174,11 @@ static void func_user(char *buf, int size, const procps_status_t *ps)
+ #endif
+ }
+ 
++static void func_group(char *buf, int size, const procps_status_t *ps)
++{
++	safe_strncpy(buf, get_cached_groupname(ps->gid), size+1);
++}
++
+ static void func_comm(char *buf, int size, const procps_status_t *ps)
+ {
+ 	safe_strncpy(buf, ps->comm, size+1);
+@@ -227,6 +232,26 @@ static void func_tty(char *buf, int size, const procps_status_t *ps)
+ 		snprintf(buf, size+1, "%u,%u", ps->tty_major, ps->tty_minor);
+ }
+ 
++
++#if ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS
++
++static void func_rgroup(char *buf, int size, const procps_status_t *ps)
++{
++	safe_strncpy(buf, get_cached_groupname(ps->rgid), size+1);
++}
++
++static void func_ruser(char *buf, int size, const procps_status_t *ps)
++{
++	safe_strncpy(buf, get_cached_username(ps->ruid), size+1);
++}
++
++static void func_nice(char *buf, int size, const procps_status_t *ps)
++{
++	sprintf(buf, "%*d", size, ps->niceness);
++}
++
++#endif /* FEATURE_PS_ADDITIONAL_COLUMNS */
++
+ #if ENABLE_FEATURE_PS_TIME
+ static void func_etime(char *buf, int size, const procps_status_t *ps)
+ {
+@@ -276,6 +301,7 @@ static void func_pcpu(char *buf, int size, const procps_status_t *ps)
+ static const ps_out_t out_spec[] = {
+ // Mandated by POSIX:
+ 	{ 8                  , "user"  ,"USER"   ,func_user  ,PSSCAN_UIDGID  },
++	{ 8                  , "group" ,"GROUP"  ,func_group ,PSSCAN_UIDGID  },
+ 	{ 16                 , "comm"  ,"COMMAND",func_comm  ,PSSCAN_COMM    },
+ 	{ 256                , "args"  ,"COMMAND",func_args  ,PSSCAN_COMM    },
+ 	{ 5                  , "pid"   ,"PID"    ,func_pid   ,PSSCAN_PID     },
+@@ -284,11 +310,12 @@ static const ps_out_t out_spec[] = {
+ #if ENABLE_FEATURE_PS_TIME
+ 	{ sizeof("ELAPSED")-1, "etime" ,"ELAPSED",func_etime ,PSSCAN_START_TIME },
+ #endif
+-//	{ sizeof("GROUP"  )-1, "group" ,"GROUP"  ,func_group ,PSSCAN_UIDGID  },
+-//	{ sizeof("NI"     )-1, "nice"  ,"NI"     ,func_nice  ,PSSCAN_        },
+-//	{ sizeof("%CPU"   )-1, "pcpu"  ,"%CPU"   ,func_pcpu  ,PSSCAN_        },
+-//	{ sizeof("RGROUP" )-1, "rgroup","RGROUP" ,func_rgroup,PSSCAN_UIDGID  },
+-//	{ sizeof("RUSER"  )-1, "ruser" ,"RUSER"  ,func_ruser ,PSSCAN_UIDGID  },
++#if ENABLE_FEATURE_PS_ADDITIONAL_COLUMNS
++	{ 5                  , "nice"  ,"NI"     ,func_nice  ,PSSCAN_NICE    },
++	{ 8                  , "rgroup","RGROUP" ,func_rgroup,PSSCAN_RUIDGID },
++	{ 8                  , "ruser" ,"RUSER"  ,func_ruser ,PSSCAN_RUIDGID },
++//	{ 5                  , "pcpu"  ,"%CPU"   ,func_pcpu  ,PSSCAN_        },
++#endif
+ #if ENABLE_FEATURE_PS_TIME
+ 	{ 6                  , "time"  ,"TIME"   ,func_time  ,PSSCAN_STIME | PSSCAN_UTIME },
+ #endif
+@@ -311,7 +338,7 @@ static const ps_out_t* find_out_spec(const char *name)
+ {
+ 	unsigned i;
+ 	for (i = 0; i < ARRAY_SIZE(out_spec); i++) {
+-		if (!strcmp(name, out_spec[i].name))
++		if (!strncmp(name, out_spec[i].name6, 6))
+ 			return &out_spec[i];
+ 	}
+ 	bb_error_msg_and_die("bad -o argument '%s'", name);
+diff --git a/procps/top.c b/procps/top.c
+index 8738156..62b9c1e 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -871,9 +871,7 @@ enum {
+ 		| PSSCAN_UTIME
+ 		| PSSCAN_STATE
+ 		| PSSCAN_COMM
+-#if ENABLE_FEATURE_TOP_SMP_PROCESS
+ 		| PSSCAN_CPU
+-#endif
+ 		| PSSCAN_UIDGID,
+ 	TOPMEM_MASK = 0
+ 		| PSSCAN_PID

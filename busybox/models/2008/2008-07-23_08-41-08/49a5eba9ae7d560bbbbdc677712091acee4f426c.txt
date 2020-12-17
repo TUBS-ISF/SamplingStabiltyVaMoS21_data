@@ -1,0 +1,40 @@
+2008-07-23 08:41:08 +0000
+diff --git a/include/usage.h b/include/usage.h
+index e1e2343..9a73d08 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2196,7 +2196,7 @@
+ #define lpd_full_usage "\n\n" \
+        "SPOOLDIR must contain (symlinks to) device nodes or directories" \
+      "\nwith names matching print queue names. In the first case, jobs are" \
+-     "\nsent directly to the device. Othervise each job is stored in queue" \
++     "\nsent directly to the device. Otherwise each job is stored in queue" \
+      "\ndirectory and HELPER program is called. Name of file to print" \
+      "\nis passed in $DATAFILE variable." \
+      "\nExample:" \
+diff --git a/include/xatonum.h b/include/xatonum.h
+index 02aacc0..86a3472 100644
+--- a/include/xatonum.h
++++ b/include/xatonum.h
+@@ -112,7 +112,7 @@ static ALWAYS_INLINE uint32_t xatou32(const char *numstr)
+ /* Non-aborting kind of convertors: bb_strto[u][l]l */
+ 
+ /* On exit: errno = 0 only if there was non-empty, '\0' terminated value
+- * errno = EINVAL if value was not '\0' terminated, but othervise ok
++ * errno = EINVAL if value was not '\0' terminated, but otherwise ok
+  *    Return value is still valid, caller should just check whether end[0]
+  *    is a valid terminating char for particular case. OTOH, if caller
+  *    requires '\0' terminated input, [s]he can just check errno == 0.
+diff --git a/libbb/bb_strtonum.c b/libbb/bb_strtonum.c
+index 4a0da0a..87cd744 100644
+--- a/libbb/bb_strtonum.c
++++ b/libbb/bb_strtonum.c
+@@ -10,7 +10,7 @@
+ #include "libbb.h"
+ 
+ /* On exit: errno = 0 only if there was non-empty, '\0' terminated value
+- * errno = EINVAL if value was not '\0' terminated, but othervise ok
++ * errno = EINVAL if value was not '\0' terminated, but otherwise ok
+  *    Return value is still valid, caller should just check whether end[0]
+  *    is a valid terminating char for particular case. OTOH, if caller
+  *    requires '\0' terminated input, [s]he can just check errno == 0.

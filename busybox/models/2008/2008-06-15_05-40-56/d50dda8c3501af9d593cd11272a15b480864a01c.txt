@@ -1,0 +1,257 @@
+2008-06-15 05:40:56 +0000
+diff --git a/archival/tar.c b/archival/tar.c
+index 64a4e35..0162e06 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -659,16 +659,11 @@ int writeTarFile(int tar_fd, int verboseFlag,
+ static llist_t *append_file_list_to_list(llist_t *list)
+ {
+ 	FILE *src_stream;
+-	llist_t *cur = list;
+-	llist_t *tmp;
+ 	char *line;
+ 	llist_t *newlist = NULL;
+ 
+-	while (cur) {
+-		src_stream = xfopen(cur->data, "r");
+-		tmp = cur;
+-		cur = cur->link;
+-		free(tmp);
++	while (list) {
++		src_stream = xfopen(llist_pop(&list), "r");
+ 		while ((line = xmalloc_fgetline(src_stream)) != NULL) {
+ 			/* kill trailing '/' unless the string is just "/" */
+ 			char *cp = last_char_is(line, '/');
+diff --git a/coreutils/env.c b/coreutils/env.c
+index e21740d..8d8753e 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -62,8 +62,7 @@ int env_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		environ = cleanenv;
+ 	} else {
+ 		while (unset_env) {
+-			unsetenv(unset_env->data);
+-			unset_env = unset_env->link;
++			unsetenv(llist_pop(&unset_env));
+ 		}
+ 	}
+ 
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 5e22875..ce963db 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -1281,8 +1281,7 @@ int od_main(int argc, char **argv)
+ 	if (opt & OPT_o) decode_format_string("o2");
+ 	//if (opt & OPT_t)...
+ 	while (lst_t) {
+-		decode_format_string(lst_t->data);
+-		lst_t = lst_t->link;
++		decode_format_string(llist_pop(&lst_t));
+ 	}
+ 	if (opt & OPT_v) verbose = 1;
+ 	if (opt & OPT_x) decode_format_string("x2");
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index 12b463a..1f531fb 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -314,7 +314,7 @@ int sort_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			0
+ 		};
+ 		struct sort_key *key = add_key();
+-		char *str_k = lst_k->data;
++		char *str_k = llist_pop(&lst_k);
+ 		const char *temp2;
+ 
+ 		i = 0; /* i==0 before comma, 1 after (-k3,6) */
+@@ -344,8 +344,6 @@ int sort_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				str_k++;
+ 			}
+ 		}
+-		/* leaking lst_k... */
+-		lst_k = lst_k->link;
+ 	}
+ #endif
+ 	/* global b strips leading and trailing spaces */
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index 47eda8c..c9b0907 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -42,7 +42,7 @@ struct globals {
+ #define cur   (G.cur  )
+ #define cmd   (G.cmd  )
+ 
+-enum { NUM_CMD = (COMMON_BUFSIZE - sizeof(struct globals)) / sizeof(cmd[0]) };
++enum { NUM_CMD = (COMMON_BUFSIZE - sizeof(G)) / sizeof(cmd[0]) - 1 };
+ 
+ enum {
+ 	OPT_r = (1 << 0),
+@@ -130,9 +130,7 @@ int run_parts_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	n = 1;
+ 	while (arg_list && n < NUM_CMD) {
+-		cmd[n] = arg_list->data;
+-		arg_list = arg_list->link;
+-		n++;
++		cmd[n++] = llist_pop(&arg_list);
+ 	}
+ 	/* cmd[n] = NULL; - is already zeroed out */
+ 
+diff --git a/editors/diff.c b/editors/diff.c
+index 4e51f6f..26f3527 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -1289,14 +1289,9 @@ int diff_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	while (L_arg) {
+ 		if (label1 && label2)
+ 			bb_show_usage();
+-		if (!label1)
+-			label1 = L_arg->data;
+-		else { /* then label2 is NULL */
++		if (label1) /* then label2 is NULL */
+ 			label2 = label1;
+-			label1 = L_arg->data;
+-		}
+-		/* we leak L_arg here... */
+-		L_arg = L_arg->link;
++		label1 = llist_pop(&L_arg);
+ 	}
+ 
+ 	/*
+diff --git a/editors/sed.c b/editors/sed.c
+index 817840d..bf01fc6 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1267,21 +1267,17 @@ int sed_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	if (opt & 0x2) G.regex_type |= REG_EXTENDED; // -r
+ 	//if (opt & 0x4) G.be_quiet++; // -n
+ 	while (opt_e) { // -e
+-		add_cmd_block(opt_e->data);
+-		opt_e = opt_e->link;
+-		/* we leak opt_e here... */
++		add_cmd_block(llist_pop(&opt_e));
+ 	}
+ 	while (opt_f) { // -f
+ 		char *line;
+ 		FILE *cmdfile;
+-		cmdfile = xfopen(opt_f->data, "r");
++		cmdfile = xfopen(llist_pop(&opt_f), "r");
+ 		while ((line = xmalloc_fgetline(cmdfile)) != NULL) {
+ 			add_cmd(line);
+ 			free(line);
+ 		}
+ 		fclose(cmdfile);
+-		opt_f = opt_f->link;
+-		/* we leak opt_f here... */
+ 	}
+ 	/* if we didn't get a pattern from -e or -f, use argv[0] */
+ 	if (!(opt & 0x18)) {
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index 352f7e6..3322e9e 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -502,7 +502,7 @@ int xargs_main(int argc, char **argv)
+ 		if (child_error > 0 && child_error != 123) {
+ 			break;
+ 		}
+-	}
++	} /* while */
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		free(max_chars);
+ 	return child_error;
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 4b5a7d2..86c3348 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -137,7 +137,7 @@ const char *opt_complementary
+         opt_complementary = "vv:b::b-c:c-b";
+         f = getopt32(argv, "vb:c", &my_b, &verbose_level);
+         if (f & 2)       // -c after -b unsets -b flag
+-                while (my_b) { dosomething_with(my_b->data); my_b = my_b->link; }
++                while (my_b) dosomething_with(llist_pop(&my_b));
+         if (my_b)        // but llist is stored if -b is specified
+                 free_llist(my_b);
+         if (verbose_level) printf("verbose level is %d\n", verbose_level);
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index e9df275..6a53734 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -1001,17 +1001,11 @@ int traceroute_main(int argc, char **argv)
+ 
+ #if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
+ 	if (source_route_list) {
+-		llist_t *l_sr;
+-
+-		l_sr = source_route_list;
+-		while (l_sr) {
++		while (source_route_list) {
+ 			if (lsrr >= NGATEWAYS)
+ 				bb_error_msg_and_die("no more than %d gateways", NGATEWAYS);
+-			getaddr(gwlist + lsrr, l_sr->data);
++			getaddr(gwlist + lsrr, llist_pop(&source_route_list));
+ 			++lsrr;
+-			l_sr = l_sr->link;
+-			free(source_route_list);
+-			source_route_list = l_sr;
+ 		}
+ 		optlen = (lsrr + 1) * sizeof(gwlist[0]);
+ 	}
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 655d39f..5eb1ed5 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -259,12 +259,11 @@ int udhcpc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	if (opt & OPT_o)
+ 		client_config.no_default_options = 1;
+ 	while (list_O) {
+-		int n = index_in_strings(dhcp_option_strings, list_O->data);
++		int n = index_in_strings(dhcp_option_strings, llist_pop(&list_O));
+ 		if (n < 0)
+ 			bb_error_msg_and_die("unknown option '%s'", list_O->data);
+ 		n = dhcp_options[n].code;
+ 		client_config.opt_mask[n >> 3] |= 1 << (n & 7);
+-		list_O = list_O->link;
+ 	}
+ 
+ 	if (read_interface(client_config.interface, &client_config.ifindex,
+diff --git a/networking/wget.c b/networking/wget.c
+index 84ee1ca..7198197 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -469,8 +469,7 @@ int wget_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		}
+ 		extra_headers = cp = xmalloc(size);
+ 		while (headers_llist) {
+-			cp += sprintf(cp, "%s\r\n", headers_llist->data);
+-			headers_llist = headers_llist->link;
++			cp += sprintf(cp, "%s\r\n", (char*)llist_pop(&headers_llist));
+ 		}
+ 	}
+ #endif
+diff --git a/procps/ps.c b/procps/ps.c
+index 1ab3973..cfca851 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -443,8 +443,7 @@ int ps_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	USE_SELINUX(opt =) getopt32(argv, "Zo:aAdefl", &opt_o);
+ 	if (opt_o) {
+ 		do {
+-			parse_o(opt_o->data);
+-			opt_o = opt_o->link;
++			parse_o(llist_pop(&opt_o));
+ 		} while (opt_o);
+ 	} else {
+ 		/* Below: parse_o() needs char*, NOT const char*... */
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 31790d2..e3b4ca6 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -329,8 +329,7 @@ int getopt_main(int argc, char **argv)
+ 					&optstr, &name, &s_arg, &l_arg);
+ 	/* Effectuate the read options for the applet itself */
+ 	while (l_arg) {
+-		long_options = add_long_options(long_options, l_arg->data);
+-		l_arg = l_arg->link;
++		long_options = add_long_options(long_options, llist_pop(&l_arg));
+ 	}
+ #endif
+ 

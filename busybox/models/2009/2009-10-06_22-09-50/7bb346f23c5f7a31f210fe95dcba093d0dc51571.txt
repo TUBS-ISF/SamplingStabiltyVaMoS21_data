@@ -1,0 +1,96 @@
+2009-10-06 22:09:50 +0200
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index 9b59777..ef70b0e 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -147,7 +147,7 @@ int cal_main(int argc, char **argv)
+ 		unsigned *dp;
+ 		char lineout[80];
+ 
+-		sprintf(lineout, "%d", year);
++		sprintf(lineout, "%u", year);
+ 		center(lineout,
+ 			   (WEEK_LEN * 3 + HEAD_SEP * 2)
+ 			   + julian * (J_WEEK_LEN * 2 + HEAD_SEP
+diff --git a/editors/awk.c b/editors/awk.c
+index d15dbb3..17244f9 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -765,11 +765,9 @@ static var *setvar_u(var *v, const char *value)
+ /* set array element to user string */
+ static void setari_u(var *a, int idx, const char *s)
+ {
+-	char sidx[sizeof(int)*3 + 1];
+ 	var *v;
+ 
+-	sprintf(sidx, "%d", idx);
+-	v = findvar(iamarray(a), sidx);
++	v = findvar(iamarray(a), itoa(idx));
+ 	setvar_u(v, s);
+ }
+ 
+diff --git a/miscutils/fbsplash.c b/miscutils/fbsplash.c
+index ec0f092..3d225e5 100644
+--- a/miscutils/fbsplash.c
++++ b/miscutils/fbsplash.c
+@@ -391,9 +391,7 @@ int fbsplash_main(int argc UNUSED_PARAM, char **argv)
+ 		num = atoi(num_buf);
+ 		if (isdigit(num_buf[0]) && (num <= 100)) {
+ #if DEBUG
+-			char strVal[10];
+-			sprintf(strVal, "%d", num);
+-			DEBUG_MESSAGE(strVal);
++			DEBUG_MESSAGE(itoa(num));
+ #endif
+ 			fb_drawprogressbar(num);
+ 		}
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 4dfdd3d..8b78754 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -311,7 +311,6 @@ static void startservice(struct svdir *s)
+ 	int p;
+ 	const char *arg[4];
+ 	char exitcode[sizeof(int)*3 + 2];
+-	char sigcode[sizeof(int)*3 + 2];
+ 
+ 	if (s->state == S_FINISH) {
+ /* Two arguments are given to ./finish. The first one is ./run exit code,
+@@ -324,13 +323,12 @@ static void startservice(struct svdir *s)
+ 		arg[0] = "./finish";
+ 		arg[1] = "-1";
+ 		if (WIFEXITED(s->wstat)) {
+-			sprintf(exitcode, "%u", (int) WEXITSTATUS(s->wstat));
++			*utoa_to_buf(WEXITSTATUS(s->wstat), exitcode, sizeof(exitcode)) = '\0';
+ 			arg[1] = exitcode;
+ 		}
+ 		//arg[2] = "0";
+ 		//if (WIFSIGNALED(s->wstat)) {
+-			sprintf(sigcode, "%u", (int) WTERMSIG(s->wstat));
+-			arg[2] = sigcode;
++			arg[2] = utoa(WTERMSIG(s->wstat));
+ 		//}
+ 		arg[3] = NULL;
+ 	} else {
+diff --git a/shell/ash.c b/shell/ash.c
+index 44d3a99..2e7228d 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -13083,7 +13083,6 @@ init(void)
+ 	/* from var.c: */
+ 	{
+ 		char **envp;
+-		char ppid[sizeof(int)*3 + 2];
+ 		const char *p;
+ 		struct stat st1, st2;
+ 
+@@ -13094,8 +13093,7 @@ init(void)
+ 			}
+ 		}
+ 
+-		sprintf(ppid, "%u", (unsigned) getppid());
+-		setvar("PPID", ppid, 0);
++		setvar("PPID", utoa(getppid()), 0);
+ 
+ 		p = lookupvar("PWD");
+ 		if (p)

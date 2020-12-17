@@ -1,0 +1,210 @@
+2009-11-09 09:39:50 +0100
+diff --git a/examples/var_service/dhcp_if/convert2ipconf b/examples/var_service/dhcp_if/convert2ipconf
+index cee0854..114ab05 100755
+--- a/examples/var_service/dhcp_if/convert2ipconf
++++ b/examples/var_service/dhcp_if/convert2ipconf
+@@ -19,24 +19,12 @@
+ #let cfg=cfg+1
+ #if[$cfg]=...; ip[$cfg]=...; ipmask[$cfg]=.../...; gw[$cfg]=...; net[$cfg]=... dns[$cfg]=...
+ 
+-exec >"$0.out" 2>&1
++exec >/dev/null
++#exec >"$0.out"  # debug
++exec 2>&1
+ 
+ test "$interface" || exit 1
+-test -f "$1" || exit 1
+-
+-# Unsafe, and does not handle values with spaces:
+-#. "./$1" || exit 1
+-# Safe(r) parsing:
+-sq="'"
+-while read line; do
+-	#echo "line: $line"
+-	# Skip empty lines and lines with single quotes
+-	test "${line##*$sq*}" || continue
+-	var="${line%%=*}"
+-	val="${line#*=}"
+-	#echo "var:$var val:'$val'"
+-	eval "$var='$val'"
+-done <"$1"
++test "$ip" || exit 1
+ 
+ {
+ echo "let cfg=cfg+1"
+@@ -50,4 +38,4 @@ test "$dns"		&& echo "dns[\$cfg]='$dns'"
+ # which subnet(s) is/are available thru advertised router
+ # Assume 0/0
+ echo "net[\$cfg]='0/0'"
+-} >"$2"
++} >"$1"
+diff --git a/examples/var_service/dhcp_if/convert2ntpconf b/examples/var_service/dhcp_if/convert2ntpconf
+new file mode 100755
+index 0000000..debf1eb
+--- /dev/null
++++ b/examples/var_service/dhcp_if/convert2ntpconf
+@@ -0,0 +1,34 @@
++#!/bin/sh
++# convert:
++
++# dhcptype=5
++# serverid=172.16.42.102
++# lease=97200
++# interface=eth0
++# ip=172.16.42.177
++# subnet=255.255.255.0
++# mask=24
++# broadcast=172.16.22.255
++# router=172.16.42.98
++# dns=10.34.32.125 10.32.63.5 10.34.255.7 10.11.255.27
++# domain=lab.example.com example.com
++# ntpsrv=10.34.32.125 10.34.255.7
++
++# into:
++
++#let cfg=cfg+1
++#ntpip[$cfg]=...
++
++exec >/dev/null
++#exec >"$0.out"  # debug
++exec 2>&1
++
++test "$interface" || exit 1
++test "$ip" || exit 1
++
++{
++for n in $ntpsrv; do
++	echo "let cfg=cfg+1"
++	echo "ntpip[\$cfg]='$n'";
++done
++} >"$1"
+diff --git a/examples/var_service/dhcp_if/dhcp_handler b/examples/var_service/dhcp_if/dhcp_handler
+index 9ed3e7a..a119b4d 100755
+--- a/examples/var_service/dhcp_if/dhcp_handler
++++ b/examples/var_service/dhcp_if/dhcp_handler
+@@ -3,56 +3,54 @@
+ # parameters: $1 and environment
+ #
+ # $1 is:
+-#
+ # deconfig: This argument is used when udhcpc starts, and
+-# when a lease is lost. The script should put the interface in an
++# when a leases is lost. The script should put the interface in an
+ # up, but deconfigured state, ie: ifconfig $interface 0.0.0.0.
+-# Environment: interface=ethN
+ #
+ # bound: This argument is used when udhcpc moves from an
+ # unbound, to a bound state. All of the paramaters are set in
+ # enviromental variables, The script should configure the interface,
+-# and set any other relavent parameters (default gateway, dns server, etc).
+-# Environment:
+-# dhcptype=5
+-# serverid=172.16.42.102
+-# lease=97200
+-# interface=eth0
+-# ip=172.16.42.177
+-# subnet=255.255.255.0
+-# mask=24
+-# broadcast=172.16.22.255
+-# router=172.16.42.98
+-# dns=10.34.32.125 10.32.63.5 10.34.255.7 10.11.255.27
+-# domain=lab.example.com example.com
+-# ntpsrv=10.34.32.125 10.34.255.7
++# and set any other relavent parameters (default gateway, dns server,
++# etc).
+ #
+ # renew: This argument is used when a DHCP lease is renewed. All of
+ # the paramaters are set in enviromental variables. This argument is
+ # used when the interface is already configured, so the IP address,
+ # will not change, however, the other DHCP paramaters, such as the
+ # default gateway, subnet mask, and dns server may change.
+-# Environment: same as for "bound".
+ #
+ # nak: This argument is used with udhcpc receives a NAK message.
+ # The script with the deconfig argument will be called directly
+ # afterwards, so no changes to the network interface are neccessary.
+ # This hook is provided for purely informational purposes (the
+ # message option may contain a reason for the NAK).
+-# Environment: interface=ethN, serverid=IP_ADDR
+ #
+-# leasefail: called when lease cannot be obtained
+-# (for example, when DHCP server is down).
+-# Environment: interface=ethN
++# env shows something like:
++# dhcptype=5
++# serverid=172.16.42.102
++# lease=97200
++# interface=eth0
++# ip=172.16.42.177
++# subnet=255.255.255.0
++# mask=24
++# broadcast=172.16.22.255
++# router=172.16.42.98
++# dns=10.34.32.125 10.32.63.5 10.34.255.7 10.11.255.27
++# domain=lab.example.com example.com
++# ntpsrv=10.34.32.125 10.34.255.7
+ 
+ # TODO: put domain into /etc/resolv.conf (thru /var/service/fw)
+ # TODO: feed ntp IPs to /var/service/ntp
+ 
+-service=`basename $PWD`
+-outfile="$service.ipconf"
+-dir="/var/run/service/fw"
++service=${PWD##*/}
++file_ipconf="$service.ipconf"
++file_ntpconf="$service.ntpconf"
++dir_ipconf="/var/run/service/fw"
++dir_ntpconf="/var/run/service/ntp"
+ 
+-exec >>"$0.out" 2>&1
++exec >/dev/null
++#exec >>"$0.out"  #debug
++exec 2>&1
+ 
+ echo "`date`: Params: $*"
+ 
+@@ -60,23 +58,34 @@ if test x"$1" != x"bound" && test x"$1" != x"renew" ; then
+ 	# Reconfigure network with this interface disabled
+ 	echo "Deconfiguring"
+ 	rm "$service.out"
+-	rm "$outfile"
+-	rm "$dir/$outfile"
++	rm "$file_ipconf"
++	rm "$file_ntpconf"
++	rm "$dir_ipconf/$file_ipconf"
++	rm "$dir_ntpconf/$file_ntpconf"
+ 	sv u /var/service/fw
+ 	exit
+ fi
+ 
+ # Bound: we've got the lease
++#env >"$service.out"  # debug
+ 
+-# Process params
+-env >"$service.out"
+-./convert2ipconf "$service.out" "$outfile"
+-
++./convert2ipconf  "$file_ipconf"
+ # Reconfigure routing and firewall if needed
+-diff --brief "$outfile" "$dir/$outfile" >/dev/null 2>&1
++diff --brief "$file_ipconf" "$dir_ipconf/$file_ipconf" >/dev/null 2>&1
+ if test "$?" != "0"; then
+-	echo "Reconfiguring"
+-	mkdir -p "$dir" 2>/dev/null
+-	cp "$outfile" "$dir/$outfile"
++	echo "Reconfiguring fw"
++	mkdir -p "$dir_ipconf" 2>/dev/null
++	cp "$file_ipconf" "$dir_ipconf/$file_ipconf"
+ 	sv u /var/service/fw
+ fi
++
++./convert2ntpconf "$file_ntpconf"
++# Reconfigure ntp server addresses if needed
++diff --brief "$file_ntpconf" "$dir_ntpconf/$file_ntpconf" >/dev/null 2>&1
++if test "$?" != "0"; then
++	echo "Reconfiguring ntp"
++	mkdir -p "$dir_ntpconf" 2>/dev/null
++	cp "$file_ntpconf" "$dir_ntpconf/$file_ntpconf"
++	sv t /var/service/ntp
++	sv u /var/service/ntp
++fi

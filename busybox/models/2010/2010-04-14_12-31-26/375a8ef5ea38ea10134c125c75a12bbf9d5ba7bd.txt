@@ -1,0 +1,67 @@
+2010-04-14 12:31:26 -0700
+diff --git a/libbb/loop.c b/libbb/loop.c
+index abf05dc..204fcc9 100644
+--- a/libbb/loop.c
++++ b/libbb/loop.c
+@@ -104,14 +104,24 @@ int FAST_FUNC set_loop(char **device, const char *file, unsigned long long offse
+ 
+ 	/* Find a loop device.  */
+ 	try = *device ? *device : dev;
+-	for (i = 0; rc; i++) {
++	for (i = 0; rc && i < 256; i++) {
+ 		sprintf(dev, LOOP_FORMAT, i);
+ 
+-		/* Ran out of block devices, return failure.  */
++		IF_FEATURE_MOUNT_LOOP_CREATE(errno = 0;)
+ 		if (stat(try, &statbuf) != 0 || !S_ISBLK(statbuf.st_mode)) {
++			if (ENABLE_FEATURE_MOUNT_LOOP_CREATE
++			 && errno == ENOENT
++			 && try == dev
++			) {
++				/* Node doesn't exist, try to create it.  */
++				if (mknod(dev, S_IFBLK|0644, makedev(7, i)) == 0)
++					goto try_to_open;
++			}
++			/* Ran out of block devices, return failure.  */
+ 			rc = -ENOENT;
+ 			break;
+ 		}
++ try_to_open:
+ 		/* Open the sucker and check its loopiness.  */
+ 		dfd = open(try, mode);
+ 		if (dfd < 0 && errno == EROFS) {
+diff --git a/scripts/defconfig b/scripts/defconfig
+index d13f5b1..0a748fe 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -574,6 +574,7 @@ CONFIG_FEATURE_UMOUNT_ALL=y
+ # Common options for mount/umount
+ #
+ CONFIG_FEATURE_MOUNT_LOOP=y
++# CONFIG_FEATURE_MOUNT_LOOP_CREATE is not set
+ # CONFIG_FEATURE_MTAB_SUPPORT is not set
+ 
+ #
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index acd74a2..a59cc1d 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -901,6 +901,18 @@ config FEATURE_MOUNT_LOOP
+ 	  specify an offset or cryptographic options to the loopback device.
+ 	  (If you don't want umount to free the loop device, use "umount -D".)
+ 
++config FEATURE_MOUNT_LOOP_CREATE
++	bool "Create new loopback devices if needed"
++	default n
++	depends on FEATURE_MOUNT_LOOP
++	help
++	  Linux kernels >= 2.6.24 support unlimited loopback devices. They are
++	  allocated for use when trying to use a loop device. The loop device
++	  must however exist.
++
++	  This feature lets mount to try to create next /dev/loopN device
++	  if it does not find a free one.
++
+ config FEATURE_MTAB_SUPPORT
+ 	bool "Support for the old /etc/mtab file"
+ 	default n

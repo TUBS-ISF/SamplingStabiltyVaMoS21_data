@@ -1,0 +1,14 @@
+2008-07-09 17:56:53 +0000
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index df6bf10..3b55451 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -3082,7 +3082,7 @@ static void obj_allocate_commons(struct obj_file *f)
+ 		if (i == f->header.e_shnum) {
+ 			struct obj_section *sec;
+ 
+-			f->sections = xrealloc(f->sections, 2, i);
++			f->sections = xrealloc_vector(f->sections, 2, i);
+ 			f->sections[i] = sec = arch_new_section();
+ 			f->header.e_shnum = i + 1;
+ 

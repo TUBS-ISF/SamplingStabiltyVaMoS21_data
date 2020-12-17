@@ -1,0 +1,20 @@
+2008-02-20 22:33:38 +0000
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index 443fea6..fb6ef71 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -18,13 +18,8 @@
+ void udhcp_init_header(struct dhcpMessage *packet, char type)
+ {
+ 	memset(packet, 0, sizeof(struct dhcpMessage));
++	packet->op = BOOTREQUEST;
+ 	switch (type) {
+-	case DHCPDISCOVER:
+-	case DHCPREQUEST:
+-	case DHCPRELEASE:
+-	case DHCPINFORM:
+-		packet->op = BOOTREQUEST;
+-		break;
+ 	case DHCPOFFER:
+ 	case DHCPACK:
+ 	case DHCPNAK:

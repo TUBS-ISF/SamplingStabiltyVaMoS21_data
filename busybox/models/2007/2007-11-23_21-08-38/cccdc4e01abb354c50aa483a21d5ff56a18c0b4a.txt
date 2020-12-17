@@ -1,0 +1,93 @@
+2007-11-23 21:08:38 +0000
+diff --git a/shell/README b/shell/README
+index b86f96c..f78ed9d 100644
+--- a/shell/README
++++ b/shell/README
+@@ -1,5 +1,8 @@
+ Various bits of what is known about busybox shells, in no particular order.
+ 
++2007-11-23
++hush: fixed bogus glob handling; fixed exec <"$1"; added test and echo builtins
++
+ 2007-06-13
+ hush: exec <"$1" doesn't do parameter subst
+ 
+diff --git a/shell/hush.c b/shell/hush.c
+index 04afbfd..912cbb5 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1361,8 +1361,11 @@ static int setup_redirects(struct child_prog *prog, int squirrel[])
+ 			continue;
+ 		}
+ 		if (redir->dup == -1) {
++			char *p;
+ 			mode = redir_table[redir->type].mode;
+-			openfd = open_or_warn(redir->glob_word[0], mode);
++			p = expand_string_to_string(redir->glob_word[0]);
++			openfd = open_or_warn(p, mode);
++			free(p);
+ 			if (openfd < 0) {
+ 			/* this could get lost if stderr has been redirected, but
+ 			   bash and ash both lose it as well (though zsh doesn't!) */
+@@ -2579,7 +2582,7 @@ static int expand_vars_to_list(char **list, int n, char **posp, char *arg, char
+ 				}
+ 			} else
+ 			/* If or_mask is nonzero, we handle assignment 'a=....$@.....'
+-			 * and in this case should theat it like '$*' */
++			 * and in this case should treat it like '$*' - see 'else...' below */
+ 			if (first_ch == ('@'|0x80) && !or_mask) { /* quoted $@ */
+ 				while (1) {
+ 					strcpy(pos, global_argv[i]);
+@@ -2593,10 +2596,10 @@ static int expand_vars_to_list(char **list, int n, char **posp, char *arg, char
+ 					list[n++] = pos;
+ 				}
+ 			} else { /* quoted $*: add as one word */
+-				while (1) {
++				if (global_argv[i]) while (1) {
+ 					strcpy(pos, global_argv[i]);
+ 					pos += strlen(global_argv[i]);
+-					if (++i >= global_argc)
++					if (!global_argv[++i])
+ 						break;
+ 					if (ifs[0])
+ 						*pos++ = ifs[0];
+diff --git a/shell/hush_test/hush-vars/var_expand_in_redir.right b/shell/hush_test/hush-vars/var_expand_in_redir.right
+new file mode 100644
+index 0000000..423299c
+--- /dev/null
++++ b/shell/hush_test/hush-vars/var_expand_in_redir.right
+@@ -0,0 +1,3 @@
++TEST1
++TEST2
++TEST3
+diff --git a/shell/hush_test/hush-vars/var_expand_in_redir.tests b/shell/hush_test/hush-vars/var_expand_in_redir.tests
+new file mode 100755
+index 0000000..bda6bdd
+--- /dev/null
++++ b/shell/hush_test/hush-vars/var_expand_in_redir.tests
+@@ -0,0 +1,13 @@
++if test $# = 0; then
++    exec "$THIS_SH" "$0" abc "d e"
++fi
++
++echo TEST1 >"$1.out"
++echo TEST2 >"$2.out"
++# bash says: "$@.out": ambiguous redirect
++# ash handles it as if it is '$*' - we do the same
++echo TEST3 >"$@.out"
++
++cat abc.out "d e.out" "abc d e.out"
++
++rm abc.out "d e.out" "abc d e.out"
+diff --git a/shell/hush_test/run-all b/shell/hush_test/run-all
+index 0d40ae6..c75d81e 100755
+--- a/shell/hush_test/run-all
++++ b/shell/hush_test/run-all
+@@ -11,6 +11,7 @@ export THIS_SH
+ do_test()
+ {
+     test -d "$1" || return 0
++#   echo Running tests in directory "$1"
+     (
+     cd "$1" || { echo "cannot cd $1!"; exit 1; }
+     for x in run-*; do

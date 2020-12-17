@@ -1,0 +1,14 @@
+2008-03-21 21:22:24 +0000
+diff --git a/docs/busybox.net/news.html b/docs/busybox.net/news.html
+index c9f6829..8b87420 100644
+--- a/docs/busybox.net/news.html
++++ b/docs/busybox.net/news.html
+@@ -152,7 +152,7 @@ iproute_list_or_flush   3680 readhere                2308
+ 	<li>unzip: handle short reads correctly
+ 	<li>vi: many fixes
+ 	<li>zcip: don't chdir to root
+-	<li>zcip: open ARP socket before openlog (else we can thrash syslog socket)
++	<li>zcip: open ARP socket before openlog (else we can trash syslog socket)
+       </ul>
+     </p>
+ 

@@ -1,0 +1,154 @@
+2010-04-18 22:09:30 -0700
+diff --git a/editors/Config.in b/editors/Config.in
+index e4fdd0f..5f9566f 100644
+--- a/editors/Config.in
++++ b/editors/Config.in
+@@ -168,6 +168,18 @@ config FEATURE_VI_WIN_RESIZE
+ 	help
+ 	  Make busybox vi behave nicely with terminals that get resized.
+ 
++config FEATURE_VI_ASK_TERMINAL
++	bool "Use 'tell me cursor position' ESC sequence to measure window"
++	default n
++	depends on VI
++	help
++	  If terminal size can't be retrieved and $LINES/$COLUMNS are not set,
++	  this option makes vi perform a last-ditch effort to find it:
++	  vi positions cursor to 999,999 and asks terminal to report real
++	  cursor position using "ESC [ 6 n" escape sequence, then reads stdin.
++
++	  This is not clean but helps a lot on serial lines and such.
++
+ config FEATURE_VI_OPTIMIZE_CURSOR
+ 	bool "Optimize cursor movement"
+ 	default y
+diff --git a/editors/vi.c b/editors/vi.c
+index f925984..d3a35e7 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -138,6 +138,9 @@ struct globals {
+ 	int save_argc;           // how many file names on cmd line
+ 	int cmdcnt;              // repetition count
+ 	unsigned rows, columns;	 // the terminal screen is this size
++#if ENABLE_FEATURE_VI_ASK_TERMINAL
++	int get_rowcol_error;
++#endif
+ 	int crow, ccol;          // cursor is on Crow x Ccol
+ 	int offset;              // chars scrolled off the screen to the left
+ 	int have_status_msg;     // is default edit status needed?
+@@ -503,7 +506,11 @@ static int init_text_buffer(char *fn)
+ #if ENABLE_FEATURE_VI_WIN_RESIZE
+ static void query_screen_dimensions(void)
+ {
+-	get_terminal_width_height(STDIN_FILENO, &columns, &rows);
++# if ENABLE_FEATURE_VI_ASK_TERMINAL
++	if (!G.get_rowcol_error)
++		G.get_rowcol_error =
++# endif
++			get_terminal_width_height(STDIN_FILENO, &columns, &rows);
+ 	if (rows > MAX_SCR_ROWS)
+ 		rows = MAX_SCR_ROWS;
+ 	if (columns > MAX_SCR_COLS)
+@@ -530,6 +537,20 @@ static void edit_file(char *fn)
+ 	columns = 80;
+ 	size = 0;
+ 	query_screen_dimensions();
++#if ENABLE_FEATURE_VI_ASK_TERMINAL
++	if (G.get_rowcol_error /* TODO? && no input on stdin */) {
++		uint64_t k;
++		write1("\033[999;999H" "\033[6n");
++		fflush_all();
++		k = read_key(STDIN_FILENO, readbuffer, /*timeout_ms:*/ 100);
++		if ((int32_t)k == KEYCODE_CURSOR_POS) {
++			uint32_t rc = (k >> 32);
++			columns = (rc & 0x7fff);
++			rows = ((rc >> 16) & 0x7fff);
++		}
++		query_screen_dimensions();
++	}
++#endif
+ 	new_screen(rows, columns);	// get memory for virtual screen
+ 	init_text_buffer(fn);
+ 
+diff --git a/libbb/read_key.c b/libbb/read_key.c
+index 8422976..64557ab 100644
+--- a/libbb/read_key.c
++++ b/libbb/read_key.c
+@@ -214,7 +214,7 @@ int64_t FAST_FUNC read_key(int fd, char *buffer, int timeout)
+ 		}
+ 		n++;
+ 		/* Try to decipher "ESC [ NNN ; NNN R" sequence */
+-		if (ENABLE_FEATURE_EDITING_ASK_TERMINAL
++		if ((ENABLE_FEATURE_EDITING_ASK_TERMINAL || ENABLE_FEATURE_VI_ASK_TERMINAL)
+ 		 && n >= 5
+ 		 && buffer[0] == '['
+ 		 && buffer[n-1] == 'R'
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index aec165f..d93dd2a 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -210,34 +210,40 @@ char* FAST_FUNC xmalloc_ttyname(int fd)
+ 	return buf;
+ }
+ 
+-/* It is perfectly ok to pass in a NULL for either width or for
+- * height, in which case that value will not be set.  */
+-int FAST_FUNC get_terminal_width_height(int fd, unsigned *width, unsigned *height)
++static int wh_helper(int value, int def_val, const char *env_name, int *err)
+ {
+-	struct winsize win = { 0, 0, 0, 0 };
+-	int ret = ioctl(fd, TIOCGWINSZ, &win);
+-
+-	if (height) {
+-		if (!win.ws_row) {
+-			char *s = getenv("LINES");
+-			if (s) win.ws_row = atoi(s);
+-		}
+-		if (win.ws_row <= 1 || win.ws_row >= 30000)
+-			win.ws_row = 24;
+-		*height = (int) win.ws_row;
+-	}
+-
+-	if (width) {
+-		if (!win.ws_col) {
+-			char *s = getenv("COLUMNS");
+-			if (s) win.ws_col = atoi(s);
++	if (value == 0) {
++		char *s = getenv(env_name);
++		if (s) {
++			value = atoi(s);
++			/* If LINES/COLUMNS are set, pretent that there is
++			 * no error getting w/h, this prevents some ugly
++			 * cursor tricks by our callers */
++			*err = 0;
+ 		}
+-		if (win.ws_col <= 1 || win.ws_col >= 30000)
+-			win.ws_col = 80;
+-		*width = (int) win.ws_col;
+ 	}
++	if (value <= 1 || value >= 30000)
++		value = def_val;
++	return value;
++}
+ 
+-	return ret;
++/* It is perfectly ok to pass in a NULL for either width or for
++ * height, in which case that value will not be set.  */
++int FAST_FUNC get_terminal_width_height(int fd, unsigned *width, unsigned *height)
++{
++	struct winsize win;
++	int err;
++
++	win.ws_row = 0;
++	win.ws_col = 0;
++	/* I've seen ioctl returning 0, but row/col is (still?) 0.
++	 * We treat that as an error too.  */
++	err = ioctl(fd, TIOCGWINSZ, &win) != 0 || win.ws_row == 0;
++	if (height)
++		*height = wh_helper(win.ws_row, 24, "LINES", &err);
++	if (width)
++		*width = wh_helper(win.ws_col, 80, "COLUMNS", &err);
++	return err;
+ }
+ 
+ int FAST_FUNC tcsetattr_stdin_TCSANOW(const struct termios *tp)

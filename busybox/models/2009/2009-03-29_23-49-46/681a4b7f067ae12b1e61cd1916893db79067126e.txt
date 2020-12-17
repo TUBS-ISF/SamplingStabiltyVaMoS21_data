@@ -1,0 +1,13 @@
+2009-03-29 23:49:46 +0000
+diff --git a/shell/hush_test/hush-trap/catch.tests b/shell/hush_test/hush-trap/catch.tests
+old mode 100644
+new mode 100755
+diff --git a/shell/hush_test/hush-trap/exit.tests b/shell/hush_test/hush-trap/exit.tests
+old mode 100644
+new mode 100755
+diff --git a/shell/hush_test/hush-trap/save-ret.tests b/shell/hush_test/hush-trap/save-ret.tests
+old mode 100644
+new mode 100755
+diff --git a/shell/hush_test/hush-trap/usage.tests b/shell/hush_test/hush-trap/usage.tests
+old mode 100644
+new mode 100755

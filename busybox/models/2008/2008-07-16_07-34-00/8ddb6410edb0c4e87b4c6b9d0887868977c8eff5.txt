@@ -1,0 +1,21 @@
+2008-07-16 07:34:00 +0000
+diff --git a/coreutils/tee.c b/coreutils/tee.c
+index 8a41285..dc947c9 100644
+--- a/coreutils/tee.c
++++ b/coreutils/tee.c
+@@ -55,12 +55,14 @@ int tee_main(int argc, char **argv)
+ 			*fp = fopen_or_warn(*argv, mode);
+ 			if (*fp == NULL) {
+ 				retval = EXIT_FAILURE;
++				argv++;
+ 				continue;
+ 			}
+ 		}
+ 		*np = *argv++;
+  GOT_NEW_FILE:
+-		setbuf(*fp++, NULL);	/* tee must not buffer output. */
++		setbuf(*fp, NULL);	/* tee must not buffer output. */
++		fp++;
+ 		np++;
+ 	} while (*argv);
+ 	/* names[0] will be filled later */

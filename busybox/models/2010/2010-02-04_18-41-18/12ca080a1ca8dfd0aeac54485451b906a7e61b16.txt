@@ -1,0 +1,221 @@
+2010-02-04 18:41:18 +0100
+diff --git a/include/platform.h b/include/platform.h
+index ab4402e..dcc61a7 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -201,10 +201,14 @@
+  * a lvalue. This makes it more likely to not swap them by mistake
+  */
+ #if defined(i386) || defined(__x86_64__)
+-# define move_from_unaligned_int(v, intp) ((v) = *(int*)(intp))
+-# define move_from_unaligned16(v, u16p) ((v) = *(uint16_t*)(u16p))
+-# define move_from_unaligned32(v, u32p) ((v) = *(uint32_t*)(u32p))
+-# define move_to_unaligned32(u32p, v)   (*(uint32_t*)(u32p) = (v))
++# include <stdint.h>
++typedef int      bb__aliased_int      FIX_ALIASING;
++typedef uint16_t bb__aliased_uint16_t FIX_ALIASING;
++typedef uint32_t bb__aliased_uint32_t FIX_ALIASING;
++# define move_from_unaligned_int(v, intp) ((v) = *(bb__aliased_int*)(intp))
++# define move_from_unaligned16(v, u16p) ((v) = *(bb__aliased_uint16_t*)(u16p))
++# define move_from_unaligned32(v, u32p) ((v) = *(bb__aliased_uint32_t*)(u32p))
++# define move_to_unaligned32(u32p, v)   (*(bb__aliased_uint32_t*)(u32p) = (v))
+ /* #elif ... - add your favorite arch today! */
+ #else
+ /* performs reasonably well (gcc usually inlines memcpy here) */
+diff --git a/libbb/udp_io.c b/libbb/udp_io.c
+index d9375ea..24237be 100644
+--- a/libbb/udp_io.c
++++ b/libbb/udp_io.c
+@@ -152,24 +152,24 @@ recv_from_to(int fd, void *buf, size_t len, int flags,
+ 		if (cmsgptr->cmsg_level == IPPROTO_IP
+ 		 && cmsgptr->cmsg_type == IP_PKTINFO
+ 		) {
+-# define pktinfo(cmsgptr) ( (struct in_pktinfo*)(CMSG_DATA(cmsgptr)) )
++			const int IPI_ADDR_OFF = offsetof(struct in_pktinfo, ipi_addr);
+ 			to->sa_family = AF_INET;
++			/*# define pktinfo(cmsgptr) ( (struct in_pktinfo*)(CMSG_DATA(cmsgptr)) )*/
+ 			/*to4->sin_addr = pktinfo(cmsgptr)->ipi_addr; - may be unaligned */
+-			memcpy(&to4->sin_addr, &pktinfo(cmsgptr)->ipi_addr, sizeof(to4->sin_addr));
++			memcpy(&to4->sin_addr, (char*)(CMSG_DATA(cmsgptr)) + IPI_ADDR_OFF, sizeof(to4->sin_addr));
+ 			/*to4->sin_port = 123; - this data is not supplied by kernel */
+-# undef pktinfo
+ 			break;
+ 		}
+ # if ENABLE_FEATURE_IPV6 && defined(IPV6_PKTINFO)
+ 		if (cmsgptr->cmsg_level == IPPROTO_IPV6
+ 		 && cmsgptr->cmsg_type == IPV6_PKTINFO
+ 		) {
+-#  define pktinfo(cmsgptr) ( (struct in6_pktinfo*)(CMSG_DATA(cmsgptr)) )
++			const int IPI6_ADDR_OFF = offsetof(struct in6_pktinfo, ipi6_addr);
+ 			to->sa_family = AF_INET6;
++			/*#  define pktinfo(cmsgptr) ( (struct in6_pktinfo*)(CMSG_DATA(cmsgptr)) )*/
+ 			/*to6->sin6_addr = pktinfo(cmsgptr)->ipi6_addr; - may be unaligned */
+-			memcpy(&to6->sin6_addr, &pktinfo(cmsgptr)->ipi6_addr, sizeof(to6->sin6_addr));
++			memcpy(&to6->sin6_addr, (char*)(CMSG_DATA(cmsgptr)) + IPI6_ADDR_OFF, sizeof(to6->sin6_addr));
+ 			/*to6->sin6_port = 123; */
+-#  undef pktinfo
+ 			break;
+ 		}
+ # endif
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index 18abc12..7855849 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -75,29 +75,34 @@ int get_prefix(unsigned long netmask);
+ #endif
+ 
+ int ipcalc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int ipcalc_main(int argc, char **argv)
++int ipcalc_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	unsigned opt;
+-	int have_netmask = 0;
+-	in_addr_t netmask, broadcast, network, ipaddr;
+-	struct in_addr a;
++	bool have_netmask = 0;
++	struct in_addr s_netmask, s_broadcast, s_network, s_ipaddr;
++	/* struct in_addr { in_addr_t s_addr; }  and  in_addr_t
++	 * (which in turn is just a typedef to uint32_t)
++	 * are essentially the same type. A few macros for less verbosity: */
++#define netmask   (s_netmask.s_addr)
++#define broadcast (s_broadcast.s_addr)
++#define network   (s_network.s_addr)
++#define ipaddr    (s_ipaddr.s_addr)
+ 	char *ipstr;
+ 
+ #if ENABLE_FEATURE_IPCALC_LONG_OPTIONS
+ 	applet_long_options = ipcalc_longopts;
+ #endif
+ 	opt = getopt32(argv, "mbn" IF_FEATURE_IPCALC_FANCY("phs"));
+-	argc -= optind;
+ 	argv += optind;
++	if (opt & SILENT)
++		logmode = LOGMODE_NONE; /* suppress error_msg() output */
+ 	if (opt & (BROADCAST | NETWORK | NETPREFIX)) {
+-		if (argc > 2 || argc <= 0)
++		if (!argv[0] || !argv[1] || argv[2])
+ 			bb_show_usage();
+ 	} else {
+-		if (argc != 1)
++		if (!argv[0] || argv[1])
+ 			bb_show_usage();
+ 	}
+-	if (opt & SILENT)
+-		logmode = LOGMODE_NONE; /* Suppress error_msg() output */
+ 
+ 	ipstr = argv[0];
+ 	if (ENABLE_FEATURE_IPCALC_FANCY) {
+@@ -108,8 +113,7 @@ int ipcalc_main(int argc, char **argv)
+ 
+ 		while (*prefixstr) {
+ 			if (*prefixstr == '/') {
+-				*prefixstr = (char)0;
+-				prefixstr++;
++				*prefixstr++ = '\0';
+ 				if (*prefixstr) {
+ 					unsigned msk;
+ 					netprefix = xatoul_range(prefixstr, 0, 32);
+@@ -130,42 +134,36 @@ int ipcalc_main(int argc, char **argv)
+ 			prefixstr++;
+ 		}
+ 	}
+-	ipaddr = inet_aton(ipstr, &a);
+ 
+-	if (ipaddr == 0) {
++	if (inet_aton(ipstr, &s_ipaddr) == 0) {
+ 		bb_error_msg_and_die("bad IP address: %s", argv[0]);
+ 	}
+-	ipaddr = a.s_addr;
+ 
+-	if (argc == 2) {
++	if (argv[1]) {
+ 		if (ENABLE_FEATURE_IPCALC_FANCY && have_netmask) {
+ 			bb_error_msg_and_die("use prefix or netmask, not both");
+ 		}
+-
+-		netmask = inet_aton(argv[1], &a);
+-		if (netmask == 0) {
++		if (inet_aton(argv[1], &s_netmask) == 0) {
+ 			bb_error_msg_and_die("bad netmask: %s", argv[1]);
+ 		}
+-		netmask = a.s_addr;
+ 	} else {
+-
+ 		/* JHC - If the netmask wasn't provided then calculate it */
+ 		if (!ENABLE_FEATURE_IPCALC_FANCY || !have_netmask)
+ 			netmask = get_netmask(ipaddr);
+ 	}
+ 
+ 	if (opt & NETMASK) {
+-		printf("NETMASK=%s\n", inet_ntoa((*(struct in_addr *) &netmask)));
++		printf("NETMASK=%s\n", inet_ntoa(s_netmask));
+ 	}
+ 
+ 	if (opt & BROADCAST) {
+ 		broadcast = (ipaddr & netmask) | ~netmask;
+-		printf("BROADCAST=%s\n", inet_ntoa((*(struct in_addr *) &broadcast)));
++		printf("BROADCAST=%s\n", inet_ntoa(s_broadcast));
+ 	}
+ 
+ 	if (opt & NETWORK) {
+ 		network = ipaddr & netmask;
+-		printf("NETWORK=%s\n", inet_ntoa((*(struct in_addr *) &network)));
++		printf("NETWORK=%s\n", inet_ntoa(s_network));
+ 	}
+ 
+ 	if (ENABLE_FEATURE_IPCALC_FANCY) {
+diff --git a/networking/udhcp/arpping.c b/networking/udhcp/arpping.c
+index 548796e..cf18153 100644
+--- a/networking/udhcp/arpping.c
++++ b/networking/udhcp/arpping.c
+@@ -87,6 +87,7 @@ int FAST_FUNC arpping(uint32_t test_nip,
+ 	/* wait for arp reply, and check it */
+ 	timeout_ms = 2000;
+ 	do {
++		typedef uint32_t aliased_uint32_t FIX_ALIASING;
+ 		int r;
+ 		unsigned prevTime = monotonic_ms();
+ 
+@@ -107,7 +108,7 @@ int FAST_FUNC arpping(uint32_t test_nip,
+ 			 && arp.operation == htons(ARPOP_REPLY)
+ 			 /* don't check it: Linux doesn't return proper tHaddr (fixed in 2.6.24?) */
+ 			 /* && memcmp(arp.tHaddr, from_mac, 6) == 0 */
+-			 && *((uint32_t *) arp.sInaddr) == test_nip
++			 && *(aliased_uint32_t*)arp.sInaddr == test_nip
+ 			) {
+ 				/* if ARP source MAC matches safe_mac
+ 				 * (which is client's MAC), then it's not a conflict
+diff --git a/util-linux/mkswap.c b/util-linux/mkswap.c
+index 949c71a..7e32d91 100644
+--- a/util-linux/mkswap.c
++++ b/util-linux/mkswap.c
+@@ -65,7 +65,7 @@ struct swap_header_v1 {
+ 	uint32_t padding[117];   /* 11..127 */
+ 	uint32_t badpages[1];    /* 128 */
+ 	/* total 129 32-bit words in 2nd kilobyte */
+-};
++} FIX_ALIASING;
+ 
+ #define NWORDS 129
+ #define hdr ((struct swap_header_v1*)bb_common_bufsiz1)
+diff --git a/util-linux/volume_id/linux_raid.c b/util-linux/volume_id/linux_raid.c
+index d1bf0c3..e1c8636 100644
+--- a/util-linux/volume_id/linux_raid.c
++++ b/util-linux/volume_id/linux_raid.c
+@@ -44,6 +44,7 @@ struct mdp_super_block {
+ 
+ int FAST_FUNC volume_id_probe_linux_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size)
+ {
++	typedef uint32_t aliased_uint32_t FIX_ALIASING;
+ #define off ((uint64_t)0)
+ 	uint64_t sboff;
+ 	uint8_t uuid[16];
+@@ -63,7 +64,7 @@ int FAST_FUNC volume_id_probe_linux_raid(struct volume_id *id /*,uint64_t off*/,
+ 	if (mdp->md_magic != cpu_to_le32(MD_MAGIC))
+ 		return -1;
+ 
+-	*(uint32_t*)uuid = mdp->set_uuid0;
++	*(aliased_uint32_t*)uuid = mdp->set_uuid0;
+ 	memcpy(&uuid[4], &mdp->set_uuid1, 12);
+ 	volume_id_set_uuid(id, uuid, UUID_DCE);
+ 

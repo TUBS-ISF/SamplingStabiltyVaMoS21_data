@@ -1,0 +1,248 @@
+2007-06-08 13:05:39 +0000
+diff --git a/archival/Config.in b/archival/Config.in
+index 2741982..661c71c 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -133,6 +133,13 @@ config RPM
+ 	help
+ 	  Mini RPM applet - queries and extracts RPM packages.
+ 
++config FEATURE_RPM_BZ2
++	bool "Enable handling of rpms with bzip2-compressed data inside"
++	default n
++	depends on RPM
++	help
++	  Enable handling of rpms with bzip2-compressed data inside.
++
+ config TAR
+ 	bool "tar"
+ 	default n
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index 83b5637..bd1526b 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -155,7 +155,7 @@ char* make_new_name_bunzip2(char *filename)
+ static
+ USE_DESKTOP(long long) int unpack_bunzip2(void)
+ {
+-	return uncompressStream(STDIN_FILENO, STDOUT_FILENO);
++	return unpack_bz2_stream(STDIN_FILENO, STDOUT_FILENO);
+ }
+ 
+ int bunzip2_main(int argc, char **argv);
+@@ -242,7 +242,7 @@ USE_DESKTOP(long long) int unpack_gunzip(void)
+ 			status = uncompress(STDIN_FILENO, STDOUT_FILENO);
+ 		} else if (magic2 == 0x8b) {
+ 			check_header_gzip_or_die(STDIN_FILENO);
+-			status = inflate_gunzip(STDIN_FILENO, STDOUT_FILENO);
++			status = unpack_gz_stream(STDIN_FILENO, STDOUT_FILENO);
+ 		} else {
+ 			goto bad_magic;
+ 		}
+@@ -292,7 +292,7 @@ char* make_new_name_unlzma(char *filename)
+ static
+ USE_DESKTOP(long long) int unpack_unlzma(void)
+ {
+-	return unlzma(STDIN_FILENO, STDOUT_FILENO);
++	return unpack_lzma_stream(STDIN_FILENO, STDOUT_FILENO);
+ }
+ 
+ int unlzma_main(int argc, char **argv);
+diff --git a/archival/libunarchive/decompress_bunzip2.c b/archival/libunarchive/decompress_bunzip2.c
+index a9d5d68..fe1d3ff 100644
+--- a/archival/libunarchive/decompress_bunzip2.c
++++ b/archival/libunarchive/decompress_bunzip2.c
+@@ -700,7 +700,7 @@ void dealloc_bunzip(bunzip_data *bd)
+ /* Decompress src_fd to dst_fd.  Stops at end of bzip data, not end of file. */
+ 
+ USE_DESKTOP(long long) int
+-uncompressStream(int src_fd, int dst_fd)
++unpack_bz2_stream(int src_fd, int dst_fd)
+ {
+ 	USE_DESKTOP(long long total_written = 0;)
+ 	char *outbuf;
+@@ -751,7 +751,7 @@ static char *const bunzip_errors[] = {
+ /* Dumb little test thing, decompress stdin to stdout */
+ int main(int argc, char **argv)
+ {
+-	int i = uncompressStream(0, 1);
++	int i = unpack_bz2_stream(0, 1);
+ 	char c;
+ 
+ 	if (i < 0)
+diff --git a/archival/libunarchive/decompress_unlzma.c b/archival/libunarchive/decompress_unlzma.c
+index 15a0275..907e44e 100644
+--- a/archival/libunarchive/decompress_unlzma.c
++++ b/archival/libunarchive/decompress_unlzma.c
+@@ -228,7 +228,7 @@ enum {
+ 
+ 
+ USE_DESKTOP(long long) int
+-unlzma(int src_fd, int dst_fd)
++unpack_lzma_stream(int src_fd, int dst_fd)
+ {
+ 	USE_DESKTOP(long long total_written = 0;)
+ 	lzma_header_t header;
+diff --git a/archival/libunarchive/decompress_unzip.c b/archival/libunarchive/decompress_unzip.c
+index 19ce509..c698763 100644
+--- a/archival/libunarchive/decompress_unzip.c
++++ b/archival/libunarchive/decompress_unzip.c
+@@ -981,7 +981,7 @@ static int inflate_get_next_window(STATE_PARAM_ONLY)
+ }
+ 
+ 
+-/* Called from inflate_gunzip() and inflate_unzip() */
++/* Called from unpack_gz_stream() and inflate_unzip() */
+ /* NB: bytebuffer is allocated here but freeing it is left to the caller! */
+ static USE_DESKTOP(long long) int
+ inflate_unzip_internal(STATE_PARAM int in, int out)
+@@ -1056,7 +1056,7 @@ inflate_unzip(inflate_unzip_result *res, unsigned bufsize, int in, int out)
+ 
+ 
+ USE_DESKTOP(long long) int
+-inflate_gunzip(int in, int out)
++unpack_gz_stream(int in, int out)
+ {
+ 	uint32_t stored_crc = 0;
+ 	unsigned count;
+diff --git a/archival/libunarchive/get_header_tar_bz2.c b/archival/libunarchive/get_header_tar_bz2.c
+index d8715c0..e11f44c 100644
+--- a/archival/libunarchive/get_header_tar_bz2.c
++++ b/archival/libunarchive/get_header_tar_bz2.c
+@@ -11,7 +11,7 @@ char get_header_tar_bz2(archive_handle_t *archive_handle)
+ 	/* Can't lseek over pipes */
+ 	archive_handle->seek = seek_by_read;
+ 
+-	archive_handle->src_fd = open_transformer(archive_handle->src_fd, uncompressStream);
++	archive_handle->src_fd = open_transformer(archive_handle->src_fd, unpack_bz2_stream);
+ 	archive_handle->offset = 0;
+ 	while (get_header_tar(archive_handle) == EXIT_SUCCESS) /**/;
+ 
+diff --git a/archival/libunarchive/get_header_tar_gz.c b/archival/libunarchive/get_header_tar_gz.c
+index 69126e0..85070d9 100644
+--- a/archival/libunarchive/get_header_tar_gz.c
++++ b/archival/libunarchive/get_header_tar_gz.c
+@@ -20,7 +20,7 @@ char get_header_tar_gz(archive_handle_t *archive_handle)
+ 
+ 	check_header_gzip_or_die(archive_handle->src_fd);
+ 
+-	archive_handle->src_fd = open_transformer(archive_handle->src_fd, inflate_gunzip);
++	archive_handle->src_fd = open_transformer(archive_handle->src_fd, unpack_gz_stream);
+ 	archive_handle->offset = 0;
+ 	while (get_header_tar(archive_handle) == EXIT_SUCCESS) /**/;
+ 
+diff --git a/archival/libunarchive/get_header_tar_lzma.c b/archival/libunarchive/get_header_tar_lzma.c
+index 5c02767..771f664 100644
+--- a/archival/libunarchive/get_header_tar_lzma.c
++++ b/archival/libunarchive/get_header_tar_lzma.c
+@@ -14,7 +14,7 @@ char get_header_tar_lzma(archive_handle_t * archive_handle)
+ 	/* Can't lseek over pipes */
+ 	archive_handle->seek = seek_by_read;
+ 
+-	archive_handle->src_fd = open_transformer(archive_handle->src_fd, unlzma);
++	archive_handle->src_fd = open_transformer(archive_handle->src_fd, unpack_lzma_stream);
+ 	archive_handle->offset = 0;
+ 	while (get_header_tar(archive_handle) == EXIT_SUCCESS) /**/;
+ 
+diff --git a/archival/rpm.c b/archival/rpm.c
+index 71ed32e..674ee26 100644
+--- a/archival/rpm.c
++++ b/archival/rpm.c
+@@ -187,10 +187,11 @@ int rpm_main(int argc, char **argv)
+ 
+ static void extract_cpio_gz(int fd)
+ {
++	USE_DESKTOP(long long) int (*xformer)(int src_fd, int dst_fd);
+ 	archive_handle_t *archive_handle;
+ 	unsigned char magic[2];
+ 
+-	/* Initialise */
++	/* Initialize */
+ 	archive_handle = init_handle();
+ 	archive_handle->seek = seek_by_read;
+ 	//archive_handle->action_header = header_list;
+@@ -201,16 +202,26 @@ static void extract_cpio_gz(int fd)
+ 	archive_handle->offset = 0;
+ 
+ 	xread(archive_handle->src_fd, &magic, 2);
++	xformer = unpack_gz_stream;
+ 	if ((magic[0] != 0x1f) || (magic[1] != 0x8b)) {
+-		bb_error_msg_and_die("invalid gzip magic");
+-	}
+-	check_header_gzip_or_die(archive_handle->src_fd);
+-	xchdir("/"); /* Install RPM's to root */
++		if (ENABLE_FEATURE_RPM_BZ2
++		 && (magic[0] == 0x42) && (magic[1] == 0x5a)) {
++			xformer = unpack_bz2_stream;
++	/* We can do better, need modifying unpack_bz2_stream to not require
++	 * first 2 bytes. Not very hard to do... I mean, TODO :) */
++			xlseek(archive_handle->src_fd, -2, SEEK_CUR);
++		} else
++			bb_error_msg_and_die("no gzip"
++				USE_FEATURE_RPM_BZ2("/bzip")
++				" magic");
++	} else
++		check_header_gzip_or_die(archive_handle->src_fd);
+ 
+-	archive_handle->src_fd = open_transformer(archive_handle->src_fd, inflate_gunzip);
++	xchdir("/"); /* Install RPM's to root */
++	archive_handle->src_fd = open_transformer(archive_handle->src_fd, xformer);
+ 	archive_handle->offset = 0;
+ 	while (get_header_cpio(archive_handle) == EXIT_SUCCESS)
+-		/* loop */;
++		continue;
+ }
+ 
+ 
+diff --git a/archival/rpm2cpio.c b/archival/rpm2cpio.c
+index 460aeaf..dcd9265 100644
+--- a/archival/rpm2cpio.c
++++ b/archival/rpm2cpio.c
+@@ -80,7 +80,7 @@ int rpm2cpio_main(int argc, char **argv)
+ 	}
+ 
+ 	check_header_gzip_or_die(rpm_fd);
+-	if (inflate_gunzip(rpm_fd, STDOUT_FILENO) < 0) {
++	if (unpack_gz_stream(rpm_fd, STDOUT_FILENO) < 0) {
+ 		bb_error_msg("error inflating");
+ 	}
+ 
+diff --git a/docs/keep_data_small.txt b/docs/keep_data_small.txt
+index 55f4fc9..f88fe07 100644
+--- a/docs/keep_data_small.txt
++++ b/docs/keep_data_small.txt
+@@ -65,7 +65,7 @@ archival/libunarchive/decompress_unzip.c:
+ (see the rest of the file to get the idea)
+ 
+ This example completely eliminates globals in that module.
+-Required memory is allocated in inflate_gunzip() [its main module]
++Required memory is allocated in unpack_gz_stream() [its main module]
+ and then passed down to all subroutines which need to access 'globals'
+ as a parameter.
+ 
+diff --git a/include/unarchive.h b/include/unarchive.h
+index 8b2da56..c4e875f 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -101,7 +101,6 @@ extern void data_align(archive_handle_t *archive_handle, const unsigned short bo
+ extern const llist_t *find_list_entry(const llist_t *list, const char *filename);
+ extern const llist_t *find_list_entry2(const llist_t *list, const char *filename);
+ 
+-extern USE_DESKTOP(long long) int uncompressStream(int src_fd, int dst_fd);
+ /* A bit of bunzip2 internals are exposed for compressed help support: */
+ typedef struct bunzip_data bunzip_data;
+ int start_bunzip(bunzip_data **bdp, int in_fd, const unsigned char *inbuf, int len);
+@@ -113,9 +112,10 @@ typedef struct inflate_unzip_result {
+ 	uint32_t crc;
+ } inflate_unzip_result;
+ 
+-extern USE_DESKTOP(long long) int inflate_unzip(inflate_unzip_result *res, unsigned bufsize, int in, int out);
+-extern USE_DESKTOP(long long) int inflate_gunzip(int in, int out);
+-extern USE_DESKTOP(long long) int unlzma(int src_fd, int dst_fd);
++extern USE_DESKTOP(long long) int unpack_bz2_stream(int src_fd, int dst_fd);
++extern USE_DESKTOP(long long) int inflate_unzip(inflate_unzip_result *res, unsigned bufsize, int src_fd, int dst_fd);
++extern USE_DESKTOP(long long) int unpack_gz_stream(int src_fd, int dst_fd);
++extern USE_DESKTOP(long long) int unpack_lzma_stream(int src_fd, int dst_fd);
+ 
+ extern int open_transformer(int src_fd,
+ 	USE_DESKTOP(long long) int (*transformer)(int src_fd, int dst_fd));

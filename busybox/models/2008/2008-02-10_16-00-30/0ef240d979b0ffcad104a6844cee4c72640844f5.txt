@@ -1,0 +1,32 @@
+2008-02-10 16:00:30 +0000
+diff --git a/shell/hush_doc.txt b/shell/hush_doc.txt
+index a3ead59..973fe44 100644
+--- a/shell/hush_doc.txt
++++ b/shell/hush_doc.txt
+@@ -22,11 +22,11 @@ run_list(struct pipe *) - handles "cmd; cmd2 && cmd3", while/for/do loops
+ 
+ /* callsite: run_list */
+ run_pipe - runs "cmd1 | cmd2 | cmd3 [&]"
+-  run_list - used if only one cmd and it is of the form "{ cmd4; cmd5 && cmd6; }"
++  run_list - used if only one cmd and it is of the form "{cmds;}"
+   forks for every cmd if more than one cmd or if & is there
+   pseudo_exec - runs each "cmdN" (handles builtins etc)
+ 
+-/* callsite: run_pipe_real */
++/* callsite: run_pipe */
+ pseudo_exec - runs "cmd" (handles builtins etc)
+   exec - execs external programs
+   run_list - used if cmdN is "(cmds)" or "{cmds;}"
+diff --git a/shell/hush_test/zbad2 b/shell/hush_test/zbad2
+index c30fa85..b6fffe5 100644
+--- a/shell/hush_test/zbad2
++++ b/shell/hush_test/zbad2
+@@ -9,7 +9,7 @@
+ 
+ ## hush does globbing for "VAR=val" too!
+ ## it should do it only for non-assignments.
+-## even if word looks like assignment, it can be non-assignemnt:
++## even if word looks like assignment, it can be non-assignment:
+ ## ZVAR=*.map /bin/echo ZVAR=*.map
+ ## ^dont_glob           ^glob
+ 

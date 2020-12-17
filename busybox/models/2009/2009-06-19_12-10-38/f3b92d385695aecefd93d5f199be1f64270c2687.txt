@@ -1,0 +1,773 @@
+2009-06-19 12:10:38 +0200
+diff --git a/Config.in b/Config.in
+index fff6d83..ee706eb 100644
+--- a/Config.in
++++ b/Config.in
+@@ -114,7 +114,7 @@ config LOCALE_SUPPORT
+ 	  Enable this if your system has locale support and you would like
+ 	  busybox to support locale settings.
+ 
+-config GETOPT_LONG
++config LONG_OPTS
+ 	bool "Support for --long-options"
+ 	default y
+ 	help
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index 2061bfd..9c3e864 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -23,7 +23,7 @@ CONFIG_FEATURE_VERBOSE_USAGE=y
+ CONFIG_FEATURE_COMPRESS_USAGE=y
+ CONFIG_FEATURE_INSTALLER=y
+ # CONFIG_LOCALE_SUPPORT is not set
+-CONFIG_GETOPT_LONG=y
++CONFIG_LONG_OPTS=y
+ CONFIG_FEATURE_DEVPTS=y
+ # CONFIG_FEATURE_CLEAN_UP is not set
+ CONFIG_FEATURE_PIDFILE=y
+diff --git a/archival/Config.in b/archival/Config.in
+index 1ea6f3d..cae7f20 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -256,7 +256,7 @@ config FEATURE_TAR_GNU_EXTENSIONS
+ config FEATURE_TAR_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on TAR && GETOPT_LONG
++	depends on TAR && LONG_OPTS
+ 	help
+ 	  Enable use of long options, increases size by about 400 Bytes
+ 
+diff --git a/archival/cpio.c b/archival/cpio.c
+index 4cf3c2c..a6484e5 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -273,7 +273,7 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 	IF_FEATURE_CPIO_O(const char *cpio_fmt = "";)
+ 	unsigned opt;
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	applet_long_options =
+ 		"extract\0"      No_argument       "i"
+ 		"list\0"         No_argument       "t"
+diff --git a/console-tools/Config.in b/console-tools/Config.in
+index 994140b..cd0a931 100644
+--- a/console-tools/Config.in
++++ b/console-tools/Config.in
+@@ -91,7 +91,7 @@ config SETCONSOLE
+ config FEATURE_SETCONSOLE_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on SETCONSOLE && GETOPT_LONG
++	depends on SETCONSOLE && LONG_OPTS
+ 	help
+ 	  Support long options for the setconsole applet.
+ 
+diff --git a/coreutils/Config.in b/coreutils/Config.in
+index 88642d7..f9db067 100644
+--- a/coreutils/Config.in
++++ b/coreutils/Config.in
+@@ -204,7 +204,7 @@ config ENV
+ config FEATURE_ENV_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on ENV && GETOPT_LONG
++	depends on ENV && LONG_OPTS
+ 	help
+ 	  Support long options for the env applet.
+ 
+@@ -217,7 +217,7 @@ config EXPAND
+ config FEATURE_EXPAND_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on EXPAND && GETOPT_LONG
++	depends on EXPAND && LONG_OPTS
+ 	help
+ 	  Support long options for the expand applet.
+ 
+@@ -291,7 +291,7 @@ config INSTALL
+ config FEATURE_INSTALL_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on INSTALL && GETOPT_LONG
++	depends on INSTALL && LONG_OPTS
+ 	help
+ 	  Support long options for the install applet.
+ 
+@@ -364,7 +364,7 @@ config FEATURE_LS_USERNAME
+ config FEATURE_LS_COLOR
+ 	bool "Allow use of color to identify file types"
+ 	default y
+-	depends on LS && GETOPT_LONG
++	depends on LS && LONG_OPTS
+ 	help
+ 	  This enables the --color option to ls.
+ 
+@@ -394,7 +394,7 @@ config MKDIR
+ config FEATURE_MKDIR_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on MKDIR && GETOPT_LONG
++	depends on MKDIR && LONG_OPTS
+ 	help
+ 	  Support long options for the mkdir applet.
+ 
+@@ -421,7 +421,7 @@ config MV
+ config FEATURE_MV_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on MV && GETOPT_LONG
++	depends on MV && LONG_OPTS
+ 	help
+ 	  Support long options for the mv applet.
+ 
+@@ -498,7 +498,7 @@ config RMDIR
+ config FEATURE_RMDIR_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on RMDIR && GETOPT_LONG
++	depends on RMDIR && LONG_OPTS
+ 	help
+ 	  Support long options for the rmdir applet, including
+ 	  --ignore-fail-on-non-empty for compatibility with GNU rmdir.
+@@ -732,7 +732,7 @@ config UNEXPAND
+ config FEATURE_UNEXPAND_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on UNEXPAND && GETOPT_LONG
++	depends on UNEXPAND && LONG_OPTS
+ 	help
+ 	  Support long options for the unexpand applet.
+ 
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index eb45798..00efec5 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -832,7 +832,7 @@ format_address_std(off_t address, char c)
+ 	printf(address_fmt, address);
+ }
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ /* only used with --traditional */
+ static void
+ format_address_paren(off_t address, char c)
+@@ -953,7 +953,7 @@ get_lcm(void)
+ 	return l_c_m;
+ }
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ /* If S is a valid traditional offset specification with an optional
+    leading '+' return nonzero and set *OFFSET to the offset it denotes.  */
+ 
+@@ -1199,9 +1199,9 @@ int od_main(int argc, char **argv)
+ 		OPT_s = 1 << 15,
+ 		OPT_S = 1 << 16,
+ 		OPT_w = 1 << 17,
+-		OPT_traditional = (1 << 18) * ENABLE_GETOPT_LONG,
++		OPT_traditional = (1 << 18) * ENABLE_LONG_OPTS,
+ 	};
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	static const char od_longopts[] ALIGN1 =
+ 		"skip-bytes\0"        Required_argument "j"
+ 		"address-radix\0"     Required_argument "A"
+@@ -1235,7 +1235,7 @@ int od_main(int argc, char **argv)
+ 
+ 	/* Parse command line */
+ 	opt_complementary = "w+:t::"; /* -w N, -t is a list */
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	applet_long_options = od_longopts;
+ #endif
+ 	opt = getopt32(argv, "A:N:abcdfhij:lot:vxsS:"
+@@ -1306,7 +1306,7 @@ int od_main(int argc, char **argv)
+ 	 * FIXME: POSIX 1003.1-2001 with XSI requires support for the
+ 	 * traditional syntax even if --traditional is not given.  */
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	if (opt & OPT_traditional) {
+ 		off_t o1, o2;
+ 
+diff --git a/coreutils/touch.c b/coreutils/touch.c
+index 1d55417..7d434a2 100644
+--- a/coreutils/touch.c
++++ b/coreutils/touch.c
+@@ -41,7 +41,7 @@ int touch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int touch_main(int argc UNUSED_PARAM, char **argv)
+ {
+ #if ENABLE_DESKTOP
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	static const char longopts[] ALIGN1 =
+ 		/* name, has_arg, val */
+ 		"no-create\0"         No_argument       "c"
+@@ -59,7 +59,7 @@ int touch_main(int argc UNUSED_PARAM, char **argv)
+ 	int opts;
+ 
+ #if ENABLE_DESKTOP
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	applet_long_options = longopts;
+ #endif
+ #endif
+diff --git a/coreutils/uname.c b/coreutils/uname.c
+index 5a790fb..df45660 100644
+--- a/coreutils/uname.c
++++ b/coreutils/uname.c
+@@ -73,7 +73,7 @@ static const unsigned short utsname_offset[] = {
+ int uname_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int uname_main(int argc UNUSED_PARAM, char **argv)
+ {
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	static const char longopts[] ALIGN1 =
+ 		/* name, has_arg, val */
+ 		"all\0"               No_argument       "a"
+@@ -97,7 +97,7 @@ int uname_main(int argc UNUSED_PARAM, char **argv)
+ 	const unsigned short *delta;
+ 	unsigned toprint;
+ 
+-	IF_GETOPT_LONG(applet_long_options = longopts);
++	IF_LONG_OPTS(applet_long_options = longopts);
+ 	toprint = getopt32(argv, options);
+ 
+ 	if (argv[optind]) { /* coreutils-6.9 compat */
+diff --git a/debianutils/Config.in b/debianutils/Config.in
+index 8deb38f..9146f3e 100644
+--- a/debianutils/Config.in
++++ b/debianutils/Config.in
+@@ -35,7 +35,7 @@ config RUN_PARTS
+ config FEATURE_RUN_PARTS_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on RUN_PARTS && GETOPT_LONG
++	depends on RUN_PARTS && LONG_OPTS
+ 	help
+ 	  Support long options for the run-parts applet.
+ 
+@@ -69,7 +69,7 @@ config FEATURE_START_STOP_DAEMON_FANCY
+ config FEATURE_START_STOP_DAEMON_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on START_STOP_DAEMON && GETOPT_LONG
++	depends on START_STOP_DAEMON && LONG_OPTS
+ 	help
+ 	  Support long options for the start-stop-daemon applet.
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index 62a60f9..e1c36a5 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -835,7 +835,7 @@ int sanitize_env_if_suid(void) FAST_FUNC;
+ 
+ extern const char *const bb_argv_dash[]; /* "-", NULL */
+ extern const char *opt_complementary;
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS || ENABLE_FEATURE_GETOPT_LONG
+ #define No_argument "\0"
+ #define Required_argument "\001"
+ #define Optional_argument "\002"
+diff --git a/include/usage.h b/include/usage.h
+index c6006aa..ad6ee83 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -610,13 +610,13 @@
+ #define cryptpw_full_usage "\n\n" \
+        "Crypt the PASSWORD using crypt(3)\n" \
+      "\nOptions:" \
+-	IF_GETOPT_LONG( \
++	IF_LONG_OPTS( \
+      "\n	-P,--password-fd=NUM	Read password from fd NUM" \
+ /*   "\n	-s,--stdin		Use stdin; like -P0" */ \
+      "\n	-m,--method=TYPE	Encryption method TYPE" \
+      "\n	-S,--salt=SALT" \
+ 	) \
+-	IF_NOT_GETOPT_LONG( \
++	IF_NOT_LONG_OPTS( \
+      "\n	-P NUM	Read password from fd NUM" \
+ /*   "\n	-s	Use stdin; like -P0" */ \
+      "\n	-m TYPE	Encryption method TYPE" \
+@@ -631,13 +631,13 @@
+ #define mkpasswd_full_usage "\n\n" \
+        "Crypt the PASSWORD using crypt(3)\n" \
+      "\nOptions:" \
+-	IF_GETOPT_LONG( \
++	IF_LONG_OPTS( \
+      "\n	-P,--password-fd=NUM	Read password from fd NUM" \
+ /*   "\n	-s,--stdin		Use stdin; like -P0" */ \
+      "\n	-m,--method=TYPE	Encryption method TYPE" \
+      "\n	-S,--salt=SALT" \
+ 	) \
+-	IF_NOT_GETOPT_LONG( \
++	IF_NOT_LONG_OPTS( \
+      "\n	-P NUM	Read password from fd NUM" \
+ /*   "\n	-s	Use stdin; like -P0" */ \
+      "\n	-m TYPE	Encryption method TYPE" \
+@@ -969,12 +969,12 @@
+ #define dumpleases_full_usage "\n\n" \
+        "Display DHCP leases granted by udhcpd\n" \
+      "\nOptions:" \
+-	IF_GETOPT_LONG( \
++	IF_LONG_OPTS( \
+      "\n	-f,--file=FILE	Leases file to load" \
+      "\n	-r,--remaining	Interpret lease times as time remaining" \
+      "\n	-a,--absolute	Interpret lease times as expire time" \
+ 	) \
+-	IF_NOT_GETOPT_LONG( \
++	IF_NOT_LONG_OPTS( \
+      "\n	-f FILE	Leases file to load" \
+      "\n	-r	Interpret lease times as time remaining" \
+      "\n	-a	Interpret lease times as expire time" \
+@@ -1396,7 +1396,7 @@
+        "[OPTIONS]..."
+ #define getopt_full_usage "\n\n" \
+        "Parse command options\n" \
+-	IF_GETOPT_LONG( \
++	IF_LONG_OPTS( \
+      "\n	-a,--alternative		Allow long options starting with single -" \
+      "\n	-l,--longoptions=longopts	Long options to be recognized" \
+      "\n	-n,--name=progname		The name under which errors are reported" \
+@@ -1407,7 +1407,7 @@
+      "\n	-T,--test			Test for getopt(1) version" \
+      "\n	-u,--unquoted			Don't quote the output" \
+ 	) \
+-	IF_NOT_GETOPT_LONG( \
++	IF_NOT_LONG_OPTS( \
+      "\n	-a		Allow long options starting with single -" \
+      "\n	-l longopts	Long options to be recognized" \
+      "\n	-n progname	The name under which errors are reported" \
+@@ -3184,16 +3184,16 @@
+      "\n	-u	Unlock (re-enable) account" \
+ 
+ #define chpasswd_trivial_usage \
+-	IF_GETOPT_LONG("[--md5|--encrypted]") IF_NOT_GETOPT_LONG("[-m|-e]")
++	IF_LONG_OPTS("[--md5|--encrypted]") IF_NOT_LONG_OPTS("[-m|-e]")
+ #define chpasswd_full_usage "\n\n" \
+        "Read user:password information from stdin " \
+        "and update /etc/passwd accordingly.\n" \
+      "\nOptions:" \
+-	IF_GETOPT_LONG( \
++	IF_LONG_OPTS( \
+      "\n	-e,--encrypted	Supplied passwords are in encrypted form" \
+      "\n	-m,--md5	Use MD5 encryption instead of DES" \
+ 	) \
+-	IF_NOT_GETOPT_LONG( \
++	IF_NOT_LONG_OPTS( \
+      "\n	-e	Supplied passwords are in encrypted form" \
+      "\n	-m	Use MD5 encryption instead of DES" \
+ 	)
+@@ -3632,7 +3632,7 @@
+        "[-a | -l | -u] [-d DEV] [-m MODE] [-s SEC | -t TIME]"
+ #define rtcwake_full_usage "\n\n" \
+        "Enter a system sleep state until specified wakeup time\n" \
+-	IF_GETOPT_LONG( \
++	IF_LONG_OPTS( \
+      "\n	-a,--auto	Read clock mode from adjtime" \
+      "\n	-l,--local	Clock is set to local time" \
+      "\n	-u,--utc	Clock is set to UTC time" \
+@@ -3641,7 +3641,7 @@
+      "\n	-s,--seconds=SEC Set the timeout in SEC seconds from now" \
+      "\n	-t,--time=TIME	Set the timeout to TIME seconds from epoch" \
+ 	) \
+-	IF_NOT_GETOPT_LONG( \
++	IF_NOT_LONG_OPTS( \
+      "\n	-a	Read clock mode from adjtime" \
+      "\n	-l	Clock is set to local time" \
+      "\n	-u	Clock is set to UTC time" \
+@@ -4640,7 +4640,7 @@ IF_FEATURE_TUNCTL_UG( \
+        "[-Cfbnqtvo] [-c CID] [-V VCLS] [-H HOSTNAME] [-i INTERFACE]\n" \
+        "	[-p pidfile] [-r IP] [-s script] [-O dhcp-option]..." IF_FEATURE_UDHCP_PORT(" [-P N]")
+ #define udhcpc_full_usage "\n\n" \
+-	IF_GETOPT_LONG( \
++	IF_LONG_OPTS( \
+        "	-V,--vendorclass=CLASSID	Vendor class identifier" \
+      "\n	-i,--interface=INTERFACE	Interface to use (default eth0)" \
+      "\n	-H,-h,--hostname=HOSTNAME	Client hostname" \
+@@ -4669,7 +4669,7 @@ IF_FEATURE_TUNCTL_UG( \
+      "\n	-a,--arping	Use arping to validate offered address" \
+ 	) \
+ 	) \
+-	IF_NOT_GETOPT_LONG( \
++	IF_NOT_LONG_OPTS( \
+        "	-V CLASSID	Vendor class identifier" \
+      "\n	-i INTERFACE	Interface to use (default: eth0)" \
+      "\n	-H,-h HOSTNAME	Client hostname" \
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 1eb868c..17b8dd1 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -314,7 +314,7 @@ typedef struct {
+ } t_complementary;
+ 
+ /* You can set applet_long_options for parse called long options */
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS || ENABLE_FEATURE_GETOPT_LONG
+ static const struct option bb_null_long_options[1] = {
+ 	{ 0, 0, 0, 0 }
+ };
+@@ -335,7 +335,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 	const unsigned char *s;
+ 	t_complementary *on_off;
+ 	va_list p;
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS || ENABLE_FEATURE_GETOPT_LONG
+ 	const struct option *l_o;
+ 	struct option *long_options = (struct option *) &bb_null_long_options;
+ #endif
+@@ -384,7 +384,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 		c++;
+ 	}
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS || ENABLE_FEATURE_GETOPT_LONG
+ 	if (applet_long_options) {
+ 		const char *optstr;
+ 		unsigned i, count;
+@@ -424,7 +424,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+  next_long: ;
+ 		}
+ 	}
+-#endif /* ENABLE_GETOPT_LONG */
++#endif /* ENABLE_LONG_OPTS || ENABLE_FEATURE_GETOPT_LONG */
+ 	for (s = (const unsigned char *)opt_complementary; s && *s; s++) {
+ 		t_complementary *pair;
+ 		unsigned *pair_switch;
+@@ -543,7 +543,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 	 * "fake" short options, like this one:
+ 	 * wget $'-\203' "Test: test" http://kernel.org/
+ 	 * (supposed to act as --header, but doesn't) */
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS || ENABLE_FEATURE_GETOPT_LONG
+ 	while ((c = getopt_long(argc, argv, applet_opts,
+ 			long_options, NULL)) != -1) {
+ #else
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index e115036..f6c0e2e 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -100,7 +100,7 @@ config ADDGROUP
+ config FEATURE_ADDGROUP_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on ADDGROUP && GETOPT_LONG
++	depends on ADDGROUP && LONG_OPTS
+ 	help
+ 	  Support long options for the addgroup applet.
+ 
+@@ -148,7 +148,7 @@ config ADDUSER
+ config FEATURE_ADDUSER_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on ADDUSER && GETOPT_LONG
++	depends on ADDUSER && LONG_OPTS
+ 	help
+ 	  Support long options for the adduser applet.
+ 
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index 68b3980..1817231 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -7,7 +7,7 @@
+  */
+ #include "libbb.h"
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ static const char chpasswd_longopts[] ALIGN1 =
+ 	"encrypted\0" No_argument "e"
+ 	"md5\0"       No_argument "m"
+@@ -29,7 +29,7 @@ int chpasswd_main(int argc UNUSED_PARAM, char **argv)
+ 		bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+ 
+ 	opt_complementary = "m--e:e--m";
+-	IF_GETOPT_LONG(applet_long_options = chpasswd_longopts;)
++	IF_LONG_OPTS(applet_long_options = chpasswd_longopts;)
+ 	opt = getopt32(argv, "em");
+ 
+ 	while ((name = xmalloc_fgetline(stdin)) != NULL) {
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index 47212e1..b44993f 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -60,7 +60,7 @@ int cryptpw_main(int argc UNUSED_PARAM, char **argv)
+ 	int len;
+ 	int fd;
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	static const char mkpasswd_longopts[] ALIGN1 =
+ 		"stdin\0"       No_argument       "s"
+ 		"password-fd\0" Required_argument "P"
+diff --git a/networking/Config.in b/networking/Config.in
+index 861d963..83522ff 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -132,7 +132,7 @@ config FTPPUT
+ config FEATURE_FTPGETPUT_LONG_OPTIONS
+ 	bool "Enable long options in ftpget/ftpput"
+ 	default n
+-	depends on GETOPT_LONG && (FTPGET || FTPPUT)
++	depends on LONG_OPTS && (FTPGET || FTPPUT)
+ 	help
+ 	  Support long options for the ftpget/ftpput applet.
+ 
+@@ -578,7 +578,7 @@ config FEATURE_IPCALC_FANCY
+ config FEATURE_IPCALC_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on IPCALC && GETOPT_LONG
++	depends on IPCALC && LONG_OPTS
+ 	help
+ 	  Support long options for the ipcalc applet.
+ 
+@@ -910,7 +910,7 @@ config FEATURE_WGET_AUTHENTICATION
+ config FEATURE_WGET_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default n
+-	depends on WGET && GETOPT_LONG
++	depends on WGET && LONG_OPTS
+ 	help
+ 	  Support long options for the wget applet.
+ 
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index fa22642..16fcd54 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -457,7 +457,7 @@ int ifenslave_main(int argc UNUSED_PARAM, char **argv)
+ 		OPT_d = (1 << 1),
+ 		OPT_f = (1 << 2),
+ 	};
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	static const char ifenslave_longopts[] ALIGN1 =
+ 		"change-active\0"  No_argument "c"
+ 		"detach\0"         No_argument "d"
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 2f8cee3..fca5c2a 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -152,7 +152,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 	struct dhcp_packet packet;
+ 	fd_set rfds;
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	static const char udhcpc_longopts[] ALIGN1 =
+ 		"clientid\0"       Required_argument "c"
+ 		"clientid-none\0"  No_argument       "C"
+@@ -223,7 +223,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		":vv"
+ #endif
+ 		;
+-	IF_GETOPT_LONG(applet_long_options = udhcpc_longopts;)
++	IF_LONG_OPTS(applet_long_options = udhcpc_longopts;)
+ 	opt = getopt32(argv, "c:CV:H:h:F:i:np:qRr:s:T:t:SA:O:of"
+ 		USE_FOR_MMU("b")
+ 		IF_FEATURE_UDHCPC_ARPING("a")
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index d6176fb..cbf9f58 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -33,7 +33,7 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 		OPT_r	= 0x2,	// -r
+ 		OPT_f	= 0x4,	// -f
+ 	};
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	static const char dumpleases_longopts[] ALIGN1 =
+ 		"absolute\0"  No_argument       "a"
+ 		"remaining\0" No_argument       "r"
+diff --git a/scripts/defconfig b/scripts/defconfig
+index a863eca..078b864 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -23,7 +23,7 @@ CONFIG_FEATURE_VERBOSE_USAGE=y
+ CONFIG_FEATURE_COMPRESS_USAGE=y
+ CONFIG_FEATURE_INSTALLER=y
+ CONFIG_LOCALE_SUPPORT=y
+-CONFIG_GETOPT_LONG=y
++CONFIG_LONG_OPTS=y
+ CONFIG_FEATURE_DEVPTS=y
+ # CONFIG_FEATURE_CLEAN_UP is not set
+ CONFIG_FEATURE_PIDFILE=y
+@@ -485,6 +485,7 @@ CONFIG_MKFS_MINIX=y
+ CONFIG_FEATURE_MINIX2=y
+ CONFIG_MKFS_VFAT=y
+ CONFIG_GETOPT=y
++CONFIG_FEATURE_GETOPT_LONG=y
+ CONFIG_HEXDUMP=y
+ CONFIG_FEATURE_HEXDUMP_REVERSE=y
+ CONFIG_HD=y
+diff --git a/selinux/Config.in b/selinux/Config.in
+index e795e73..e46030a 100644
+--- a/selinux/Config.in
++++ b/selinux/Config.in
+@@ -16,7 +16,7 @@ config CHCON
+ config FEATURE_CHCON_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default y
+-	depends on CHCON && GETOPT_LONG
++	depends on CHCON && LONG_OPTS
+ 	help
+ 	  Support long options for the chcon applet.
+ 
+@@ -67,7 +67,7 @@ config RUNCON
+ config FEATURE_RUNCON_LONG_OPTIONS
+ 	bool "Enable long options"
+ 	default y
+-	depends on RUNCON && GETOPT_LONG
++	depends on RUNCON && LONG_OPTS
+ 	help
+ 	  Support long options for the runcon applet.
+ 
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 0245501..bfd51bc 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -250,6 +250,13 @@ config GETOPT
+ 	  written by others, this utility may be for you. Most people will
+ 	  wisely leave this disabled.
+ 
++config FEATURE_GETOPT_LONG
++	bool "Support option -l"
++	default y if LONG_OPTS
++	help
++	  Enable support for recognising long options using the -l option to
++	  getopt.
++
+ config HEXDUMP
+ 	bool "hexdump"
+ 	default n
+@@ -286,7 +293,7 @@ config HWCLOCK
+ config FEATURE_HWCLOCK_LONG_OPTIONS
+ 	bool "Support long options (--hctosys,...)"
+ 	default n
+-	depends on HWCLOCK && GETOPT_LONG
++	depends on HWCLOCK && LONG_OPTS
+ 	help
+ 	  By default, the hwclock utility only uses short options. If you
+ 	  are overly fond of its long options, such as --hctosys, --utc, etc)
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index fd67287..adb9675 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -38,7 +38,7 @@
+    mode */
+ enum {
+ 	NON_OPT = 1,
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_FEATURE_GETOPT_LONG
+ /* LONG_OPT is the code that is returned when a long option is found. */
+ 	LONG_OPT = 2
+ #endif
+@@ -53,7 +53,7 @@ enum {
+ 	OPT_s	= 0x10,	// -s
+ 	OPT_T	= 0x20,	// -T
+ 	OPT_u	= 0x40,	// -u
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_FEATURE_GETOPT_LONG
+ 	OPT_a	= 0x80,	// -a
+ 	OPT_l	= 0x100, // -l
+ #endif
+@@ -141,7 +141,7 @@ static const char *normalize(const char *arg)
+  * optstr must contain the short options, and longopts the long options.
+  * Other settings are found in global variables.
+  */
+-#if !ENABLE_GETOPT_LONG
++#if !ENABLE_FEATURE_GETOPT_LONG
+ #define generate_output(argv,argc,optstr,longopts) \
+ 	generate_output(argv,argc,optstr)
+ #endif
+@@ -149,7 +149,7 @@ static int generate_output(char **argv, int argc, const char *optstr, const stru
+ {
+ 	int exit_code = 0; /* We assume everything will be OK */
+ 	int opt;
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_FEATURE_GETOPT_LONG
+ 	int longindex;
+ #endif
+ 	const char *charptr;
+@@ -168,7 +168,7 @@ static int generate_output(char **argv, int argc, const char *optstr, const stru
+ 
+ 	while (1) {
+ 		opt =
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_FEATURE_GETOPT_LONG
+ 			alternative ?
+ 			getopt_long_only(argc, argv, optstr, longopts, &longindex) :
+ 			getopt_long(argc, argv, optstr, longopts, &longindex);
+@@ -180,7 +180,7 @@ static int generate_output(char **argv, int argc, const char *optstr, const stru
+ 		if (opt == '?' || opt == ':' )
+ 			exit_code = 1;
+ 		else if (!quiet_output) {
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_FEATURE_GETOPT_LONG
+ 			if (opt == LONG_OPT) {
+ 				printf(" --%s", longopts[longindex].name);
+ 				if (longopts[longindex].has_arg)
+@@ -209,7 +209,7 @@ static int generate_output(char **argv, int argc, const char *optstr, const stru
+ 	return exit_code;
+ }
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_FEATURE_GETOPT_LONG
+ /*
+  * Register several long options. options is a string of long options,
+  * separated by commas or whitespace.
+@@ -273,7 +273,7 @@ static void set_shell(const char *new_shell)
+  *   4) Returned for -T
+  */
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_FEATURE_GETOPT_LONG
+ static const char getopt_longopts[] ALIGN1 =
+ 	"options\0"      Required_argument "o"
+ 	"longoptions\0"  Required_argument "l"
+@@ -295,7 +295,7 @@ int getopt_main(int argc, char **argv)
+ 	unsigned opt;
+ 	const char *compatible;
+ 	char *s_arg;
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_FEATURE_GETOPT_LONG
+ 	struct option *long_options = NULL;
+ 	llist_t *l_arg = NULL;
+ #endif
+@@ -321,7 +321,7 @@ int getopt_main(int argc, char **argv)
+ 		return generate_output(argv+1, argc-1, s, long_options);
+ 	}
+ 
+-#if !ENABLE_GETOPT_LONG
++#if !ENABLE_FEATURE_GETOPT_LONG
+ 	opt = getopt32(argv, "+o:n:qQs:Tu", &optstr, &name, &s_arg);
+ #else
+ 	applet_long_options = getopt_longopts;
+diff --git a/util-linux/rtcwake.c b/util-linux/rtcwake.c
+index 9a73ba2..278acf3 100644
+--- a/util-linux/rtcwake.c
++++ b/util-linux/rtcwake.c
+@@ -114,7 +114,7 @@ int rtcwake_main(int argc UNUSED_PARAM, char **argv)
+ 	int utc = -1;
+ 	int fd;
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	static const char rtcwake_longopts[] ALIGN1 =
+ 		"auto\0"    No_argument "a"
+ 		"local\0"   No_argument "l"
+diff --git a/util-linux/script.c b/util-linux/script.c
+index 2e2be33..d9a62fb 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -36,7 +36,7 @@ int script_main(int argc UNUSED_PARAM, char **argv)
+ 		OPT_t = (1 << 4),
+ 	};
+ 
+-#if ENABLE_GETOPT_LONG
++#if ENABLE_LONG_OPTS
+ 	static const char getopt_longopts[] ALIGN1 =
+ 		"append\0"  No_argument       "a"
+ 		"command\0" Required_argument "c"

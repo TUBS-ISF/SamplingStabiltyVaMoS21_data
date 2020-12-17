@@ -1,0 +1,14 @@
+2010-01-02 18:57:45 +0100
+diff --git a/docs/contributing.txt b/docs/contributing.txt
+index cc16574..d06e4a2 100644
+--- a/docs/contributing.txt
++++ b/docs/contributing.txt
+@@ -216,7 +216,7 @@ These are dirty jobs, but somebody's gotta do 'em.
+ 
+ Other useful links:
+ 
+- - the comp.lang.c FAQ: http://web.onetelnet.ch/~twolf/tw/c/index.html#Sources
++ - the comp.lang.c FAQ: http://home.datacomm.ch/t_wolf/tw/c/index.html#Sources
+ 
+ 
+ 

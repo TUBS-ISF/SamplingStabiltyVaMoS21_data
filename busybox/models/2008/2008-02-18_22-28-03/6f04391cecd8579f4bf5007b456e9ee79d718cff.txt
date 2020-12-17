@@ -1,0 +1,22 @@
+2008-02-18 22:28:03 +0000
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 18cf7cc..529344f 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -246,7 +246,15 @@ static void input_backward(unsigned num)
+ 	if (cmdedit_x >= num) {
+ 		cmdedit_x -= num;
+ 		if (num <= 4) {
+-			printf("\b\b\b\b" + (4-num));
++			/* This is longer by 5 bytes on x86.
++			 * Also gets mysteriously
++			 * miscompiled for some ARM users.
++			 * printf(("\b\b\b\b" + 4) - num);
++			 * return;
++			 */
++			do {
++				bb_putchar('\b');
++			} while (--num);
+ 			return;
+ 		}
+ 		printf("\033[%uD", num);

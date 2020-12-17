@@ -1,0 +1,79 @@
+2009-07-05 12:49:29 +0200
+diff --git a/libbb/Config.in b/libbb/Config.in
+index a572775..9b616d1 100644
+--- a/libbb/Config.in
++++ b/libbb/Config.in
+@@ -114,6 +114,16 @@ config FEATURE_EDITING_ASK_TERMINAL
+ 	  correctly, or want to save on code size (about 300 bytes),
+ 	  then do not turn this option on.
+ 
++config FEATURE_NON_POSIX_CP
++	bool "Non-POSIX, but safer, copying to special nodes"
++	default y
++	help
++	  With this option, "cp file symlink" will delete symlink
++	  and create a regular file. This does not conform to POSIX,
++	  but prevents a symlink attack.
++	  Similarly, "cp file device" will not send file's data
++	  to the device.
++
+ config FEATURE_VERBOSE_CP_MESSAGE
+ 	bool "Give more precise messages when copy fails (cp, mv etc)"
+ 	default n
+diff --git a/libbb/copy_file.c b/libbb/copy_file.c
+index d804ecc..4d2f17a 100644
+--- a/libbb/copy_file.c
++++ b/libbb/copy_file.c
+@@ -8,9 +8,10 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  *
+  */
+-
+ #include "libbb.h"
+ 
++// FEATURE_NON_POSIX_CP:
++//
+ // POSIX: if exists and -i, ask (w/o -i assume yes).
+ // Then open w/o EXCL (yes, not unlink!).
+ // If open still fails and -f, try unlink, then try open again.
+@@ -23,22 +24,21 @@
+ // NB: we have special code which still allows for "cp file /dev/node"
+ // to work POSIX-ly (the only realistic case where it makes sense)
+ 
+-#define DO_POSIX_CP 0  /* 1 - POSIX behavior, 0 - safe behavior */
+-
+ // errno must be set to relevant value ("why we cannot create dest?")
+ // for POSIX mode to give reasonable error message
+ static int ask_and_unlink(const char *dest, int flags)
+ {
+ 	int e = errno;
+-#if DO_POSIX_CP
++#if !ENABLE_FEATURE_NON_POSIX_CP
+ 	if (!(flags & (FILEUTILS_FORCE|FILEUTILS_INTERACTIVE))) {
+ 		// Either it exists, or the *path* doesnt exist
+ 		bb_perror_msg("cannot create '%s'", dest);
+ 		return -1;
+ 	}
+ #endif
+-	// If !DO_POSIX_CP, act as if -f is always in effect - we don't want
+-	// "cannot create" msg, we want unlink to be done (silently unless -i).
++	// If ENABLE_FEATURE_NON_POSIX_CP, act as if -f is always in effect
++	// - we don't want "cannot create" msg, we want unlink to be done
++	// (silently unless -i).
+ 
+ 	// TODO: maybe we should do it only if ctty is present?
+ 	if (flags & FILEUTILS_INTERACTIVE) {
+@@ -279,10 +279,10 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 		 * non-interactive cp. NB: it is still racy
+ 		 * for "cp file /home/bad_user/file" case
+ 		 * (user can rm file and create a link to /etc/passwd) */
+-		if (DO_POSIX_CP
++		if (!ENABLE_FEATURE_NON_POSIX_CP
+ 		 || (dest_exists
+-		     && !(flags & (FILEUTILS_RECUR|FILEUTILS_INTERACTIVE))
+-		     && !S_ISLNK(dest_stat.st_mode))
++		    && !(flags & (FILEUTILS_RECUR|FILEUTILS_INTERACTIVE))
++		    && !S_ISLNK(dest_stat.st_mode))
+ 		) {
+ 			dst_fd = open(dest, O_WRONLY|O_CREAT|O_TRUNC, new_mode);
+ 		} else  /* safe way: */

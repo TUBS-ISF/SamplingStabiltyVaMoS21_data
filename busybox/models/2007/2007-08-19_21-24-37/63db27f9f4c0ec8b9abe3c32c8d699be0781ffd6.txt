@@ -1,0 +1,16 @@
+2007-08-19 21:24:37 +0000
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 0b4e305..070e2a9 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -289,10 +289,6 @@ static ALWAYS_INLINE void free_Htaccess_IP_list(Htaccess_IP **pptr)
+ 	free_llist((has_next_ptr**)pptr);
+ }
+ 
+-//#undef isdigit
+-//#define isdigit(a) ((unsigned)((a) - '0') <= 9)
+-//#define notdigit(a) ((unsigned)((a) - '0') > 9)
+-
+ /* Returns presumed mask width in bits or < 0 on error.
+  * Updates strp, stores IP at provided pointer */
+ static int scan_ip(const char **strp, unsigned *ipp, unsigned char endc)

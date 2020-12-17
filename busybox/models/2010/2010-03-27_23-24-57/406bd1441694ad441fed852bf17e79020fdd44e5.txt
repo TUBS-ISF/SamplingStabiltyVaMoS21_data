@@ -1,0 +1,14 @@
+2010-03-27 23:24:57 +0100
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 9e726fb..2d1d5de 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -303,7 +303,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 		logmode |= LOGMODE_SYSLOG;
+ 	}
+ #if ENABLE_FEATURE_UDHCP_PORT
+-	if (opt & 4) { /* -P */
++	if (opt & 8) { /* -P */
+ 		SERVER_PORT = xatou16(str_P);
+ 		CLIENT_PORT = SERVER_PORT + 1;
+ 	}

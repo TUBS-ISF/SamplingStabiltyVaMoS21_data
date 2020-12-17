@@ -1,0 +1,14 @@
+2007-06-21 13:44:53 +0000
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index c8f1356..0ed16bc 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -467,7 +467,7 @@ static void split_escape_and_log(char *tmpbuf, int len)
+ 		while ((c = *p++)) {
+ 			if (c == '\n')
+ 				c = ' ';
+-			if (!(c & ~0x1f)) {
++			if (!(c & ~0x1f) && c != '\t') {
+ 				*q++ = '^';
+ 				c += '@'; /* ^@, ^A, ^B... */
+ 			}

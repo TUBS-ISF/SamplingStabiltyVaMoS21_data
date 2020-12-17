@@ -1,0 +1,290 @@
+2010-01-29 09:11:47 +0100
+diff --git a/Config.in b/Config.in
+index 8e75153..6844483 100644
+--- a/Config.in
++++ b/Config.in
+@@ -141,6 +141,57 @@ config FEATURE_CHECK_UNICODE_IN_ENV
+ 
+ 	  Otherwise, Unicode support will be always enabled and active.
+ 
++config SUBST_WCHAR
++	int "Character code to substitute unprintable characters with"
++	range 1 4294967295
++	depends on FEATURE_ASSUME_UNICODE
++	default 63
++	help
++	  Typical values are 63 for '?' (works with any output device),
++	  30 for ASCII substitute control code,
++	  65533 (0xfffd) for Unicode replacement character.
++
++config LAST_SUPPORTED_WCHAR
++	int "Range of supported Unicode characters"
++	range 0 4294967295
++	depends on FEATURE_ASSUME_UNICODE
++	default 767
++	help
++	  Any character with Unicode value bigger than this is assumed
++	  to be non-printable on output device. Many applets replace
++	  such chars with substitution character.
++
++	  The idea is that many valid printable Unicode chars are
++	  nevertheless are not displayed correctly. Think about
++	  combining charachers, double-wide hieroglyphs and such.
++	  Many terminals, xterms and such will fail to handle them
++	  correctly.
++
++	  Typical values are:
++	  126 - ASCII only
++	  767 (0x2ff) - there are no combining chars in [0..767] range
++			(the range includes Latin 1, Latin Ext. A and B),
++			code is ~700 bytes smaller for this case.
++	  4351 (0x10ff) - there are no double-wide chars in [0..4351] range,
++			code is ~300 bytes smaller for this case.
++	  0 - off, any valid printable Unicode character will be printed.
++
++config UNICODE_COMBINING_WCHARS
++	bool "Allow zero-width Unicode characters on output"
++	default n
++	depends on FEATURE_ASSUME_UNICODE
++	help
++	  With this option off, any Unicode char with width of 0
++	  is substituted on output.
++
++config UNICODE_WIDE_WCHARS
++	bool "Allow wide Unicode characters on output"
++	default n
++	depends on FEATURE_ASSUME_UNICODE
++	help
++	  With this option off, any Unicode char with width > 1
++	  is substituted on output.
++
+ config LONG_OPTS
+ 	bool "Support for --long-options"
+ 	default y
+diff --git a/libbb/unicode.c b/libbb/unicode.c
+index 39b173e..878af84 100644
+--- a/libbb/unicode.c
++++ b/libbb/unicode.c
+@@ -216,8 +216,6 @@ size_t FAST_FUNC mbstowcs(wchar_t *dest, const char *src, size_t n)
+ 	return org_n - n;
+ }
+ 
+-#include "unicode_wcwidth.c"
+-
+ int FAST_FUNC iswspace(wint_t wc)
+ {
+ 	return (unsigned)wc <= 0x7f && isspace(wc);
+@@ -233,6 +231,8 @@ int FAST_FUNC iswpunct(wint_t wc)
+ 	return (unsigned)wc <= 0x7f && ispunct(wc);
+ }
+ 
++#include "unicode_wcwidth.c"
++
+ #endif /* Homegrown Unicode support */
+ 
+ 
+@@ -251,8 +251,22 @@ char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src)
+ 	char *dst;
+ 	unsigned dst_len;
+ 
+-	if (unicode_status != UNICODE_ON)
+-		return xasprintf("%-*.*s", width, width, src);
++	if (unicode_status != UNICODE_ON) {
++		char *d = dst = xmalloc(width + 1);
++		while ((int)--width >= 0) {
++			unsigned char c = *src;
++			if (c == '\0') {
++				do
++					*d++ = ' ';
++				while ((int)--width >= 0);
++				break;
++			}
++			*d++ = (c >= ' ' && c < 0x7f) ? c : '?';
++			src++;
++		}
++		*d = '\0';
++		return dst;
++	}
+ 
+ 	dst = NULL;
+ 	dst_len = 0;
+@@ -260,31 +274,64 @@ char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src)
+ 		int w;
+ 		wchar_t wc;
+ 
+-		dst = xrealloc(dst, dst_len + 2 * MB_CUR_MAX);
+ #if ENABLE_LOCALE_SUPPORT
+ 		{
+ 			mbstate_t mbst = { 0 };
+ 			ssize_t rc = mbsrtowcs(&wc, &src, 1, &mbst);
+-			if (rc <= 0) /* error, or end-of-string */
++			/* If invalid sequence is seen: -1 is returned,
++			 * src points to the invalid sequence, errno = EILSEQ.
++			 * Else number of wchars (excluding terminating L'\0')
++			 * written to dest is returned.
++			 * If len (here: 1) non-L'\0' wchars stored at dest,
++			 * src points to the next char to be converted.
++			 * If string is completely converted: src = NULL.
++			 */
++			if (rc == 0) /* end-of-string */
+ 				break;
++			if (rc < 0) { /* error */
++				src++;
++				goto subst;
++			}
++			if (!iswprint(wc))
++				goto subst;
+ 		}
+ #else
+-		src = mbstowc_internal(&wc, src);
+-		if (!src || wc == 0) /* error, or end-of-string */
+-			break;
++		{
++			const char *src1 = mbstowc_internal(&wc, src);
++			/* src = NULL: invalid sequence is seen,
++			 * else: wc is set, src is advanced to next mb char
++			 */
++			if (src1) {/* no error */
++				if (wc == 0) /* end-of-string */
++					break;
++				src = src1;
++			} else { /* error */
++				src++;
++				goto subst;
++			}
++		}
+ #endif
++		if (CONFIG_LAST_SUPPORTED_WCHAR && wc > CONFIG_LAST_SUPPORTED_WCHAR)
++			goto subst;
+ 		w = wcwidth(wc);
+-		if (w < 0) /* non-printable wchar */
+-			break;
++		if ((ENABLE_UNICODE_COMBINING_WCHARS && w < 0) /* non-printable wchar */
++		 || (!ENABLE_UNICODE_COMBINING_WCHARS && wc <= 0)
++		 || (!ENABLE_UNICODE_WIDE_WCHARS && wc > 1)
++		) {
++ subst:
++			wc = CONFIG_SUBST_WCHAR;
++			w = 1;
++		}
+ 		width -= w;
+-		if ((int)width < 0) { /* string is longer than width */
++		/* Note: if width == 0, we still may add more chars,
++		 * they may be zero-width or combining ones */
++		if ((int)width < 0) {
++			/* can't add this wc, string would become longer than width */
+ 			width += w;
+-			while (width) {
+-				dst[dst_len++] = ' ';
+-				width--;
+-			}
+ 			break;
+ 		}
++
++		dst = xrealloc(dst, dst_len + MB_CUR_MAX);
+ #if ENABLE_LOCALE_SUPPORT
+ 		{
+ 			mbstate_t mbst = { 0 };
+@@ -294,7 +341,14 @@ char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src)
+ 		dst_len += wcrtomb_internal(&dst[dst_len], wc);
+ #endif
+ 	}
++
++	/* Pad to remaining width */
++	dst = xrealloc(dst, dst_len + width + 1);
++	while ((int)--width >= 0) {
++		dst[dst_len++] = ' ';
++	}
+ 	dst[dst_len] = '\0';
++
+ 	return dst;
+ }
+ 
+diff --git a/libbb/unicode_wcwidth.c b/libbb/unicode_wcwidth.c
+index 8d301f7..ab62b18 100644
+--- a/libbb/unicode_wcwidth.c
++++ b/libbb/unicode_wcwidth.c
+@@ -59,6 +59,13 @@
+  * Latest version: http://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c
+  */
+ 
++#if CONFIG_LAST_SUPPORTED_WCHAR == 0
++# define LAST_SUPPORTED_WCHAR ((1 << 31) - 1)
++#else
++# define LAST_SUPPORTED_WCHAR CONFIG_LAST_SUPPORTED_WCHAR
++#endif
++
++#if LAST_SUPPORTED_WCHAR >= 0x0300
+ struct interval {
+ 	uint16_t first;
+ 	uint16_t last;
+@@ -111,6 +118,7 @@ static int in_uint16_table(unsigned ucs, const uint16_t *table, unsigned max)
+ 	}
+ 	return 0;
+ }
++#endif
+ 
+ 
+ /* The following two functions define the column width of an ISO 10646
+@@ -146,6 +154,7 @@ static int in_uint16_table(unsigned ucs, const uint16_t *table, unsigned max)
+  */
+ static int wcwidth(unsigned ucs)
+ {
++#if LAST_SUPPORTED_WCHAR >= 0x0300
+ 	/* sorted list of non-overlapping intervals of non-spacing characters */
+ 	/* generated by "uniset +cat=Me +cat=Mn +cat=Cf -00AD +1160-11FF +200B c" */
+ 	static const struct interval combining[] = {
+@@ -420,12 +429,15 @@ static int wcwidth(unsigned ucs)
+ #undef BIG_
+ #undef PAIR
+ 	};
++# if LAST_SUPPORTED_WCHAR >= 0x1100
+ 	static const struct interval combining0x10000[] = {
+ 		{ 0x0A01, 0x0A03 }, { 0x0A05, 0x0A06 }, { 0x0A0C, 0x0A0F },
+ 		{ 0x0A38, 0x0A3A }, { 0x0A3F, 0x0A3F }, { 0xD167, 0xD169 },
+ 		{ 0xD173, 0xD182 }, { 0xD185, 0xD18B }, { 0xD1AA, 0xD1AD },
+ 		{ 0xD242, 0xD244 }
+ 	};
++# endif
++#endif
+ 
+ 	if (ucs == 0)
+ 		return 0;
+@@ -435,6 +447,9 @@ static int wcwidth(unsigned ucs)
+ 	if (ucs < 0x0300) /* optimization */
+ 		return 1;
+ 
++#if LAST_SUPPORTED_WCHAR < 0x0300
++	return -1;
++#else
+ 	/* binary search in table of non-spacing characters */
+ 	if (in_interval_table(ucs, combining, ARRAY_SIZE(combining) - 1))
+ 		return 0;
+@@ -444,6 +459,9 @@ static int wcwidth(unsigned ucs)
+ 	if (ucs < 0x1100) /* optimization */
+ 		return 1;
+ 
++# if LAST_SUPPORTED_WCHAR < 0x1100
++	return -1;
++# else
+ 	/* binary search in table of non-spacing characters, cont. */
+ 	if (in_interval_table(ucs ^ 0x10000, combining0x10000, ARRAY_SIZE(combining0x10000) - 1))
+ 		return 0;
+@@ -458,8 +476,8 @@ static int wcwidth(unsigned ucs)
+ 
+ 	return 1 +
+ 		(  (/*ucs >= 0x1100 &&*/ ucs <= 0x115f) /* Hangul Jamo init. consonants */
+-		|| ucs == 0x2329
+-		|| ucs == 0x232a
++		|| ucs == 0x2329 /* left-pointing angle bracket; also CJK punct. char */
++		|| ucs == 0x232a /* right-pointing angle bracket; also CJK punct. char */
+ 		|| (ucs >= 0x2e80 && ucs <= 0xa4cf && ucs != 0x303f) /* CJK ... Yi */
+ 		|| (ucs >= 0xac00 && ucs <= 0xd7a3) /* Hangul Syllables */
+ 		|| (ucs >= 0xf900 && ucs <= 0xfaff) /* CJK Compatibility Ideographs */
+@@ -470,4 +488,6 @@ static int wcwidth(unsigned ucs)
+ 		|| (ucs >= 0x20000 && ucs <= 0x2fffd)
+ 		|| (ucs >= 0x30000 && ucs <= 0x3fffd)
+ 		);
++# endif
++#endif
+ }

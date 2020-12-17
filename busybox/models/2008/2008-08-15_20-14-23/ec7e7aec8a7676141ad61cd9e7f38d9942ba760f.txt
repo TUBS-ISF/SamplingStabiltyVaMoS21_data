@@ -1,0 +1,16 @@
+2008-08-15 20:14:23 +0000
+diff --git a/networking/arp.c b/networking/arp.c
+index 620f7c0..e2c5bbb 100644
+--- a/networking/arp.c
++++ b/networking/arp.c
+@@ -443,8 +443,8 @@ static int arp_show(char *name)
+ int arp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int arp_main(int argc UNUSED_PARAM, char **argv)
+ {
+-	char *hw_type;
+-	char *protocol;
++	const char *hw_type = "ether";
++	const char *protocol;
+ 
+ 	/* Initialize variables... */
+ 	ap = get_aftype(DFLT_AF);

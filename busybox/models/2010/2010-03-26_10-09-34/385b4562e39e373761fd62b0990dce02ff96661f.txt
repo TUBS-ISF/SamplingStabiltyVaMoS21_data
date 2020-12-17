@@ -1,0 +1,493 @@
+2010-03-26 10:09:34 +0100
+diff --git a/networking/udhcp/arpping.c b/networking/udhcp/arpping.c
+index cf18153..7c8c244 100644
+--- a/networking/udhcp/arpping.c
++++ b/networking/udhcp/arpping.c
+@@ -1,7 +1,5 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * arpping.c
+- *
+  * Mostly stolen from: dhcpcd - DHCP client daemon
+  * by Yoichi Hariguchi <yoichi@fore.com>
+  *
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index bb7541f..b4e8b5d 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -1,6 +1,5 @@
+ /* vi: set sw=4 ts=4: */
+-/* common.h
+- *
++/*
+  * Russ Dill <Russ.Dill@asu.edu> September 2001
+  * Rewritten by Vladimir Oleynik <dzo@simtreas.ru> (C) 2003
+  *
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 717c92c..478ca5c 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * udhcp DHCP client
++ * udhcp client
+  *
+  * Russ Dill <Russ.Dill@asu.edu> July 2001
+  *
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index fba747f..6bef562 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -1,4 +1,7 @@
+ /* vi: set sw=4 ts=4: */
++/*
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
+ #ifndef UDHCP_DHCPC_H
+ #define UDHCP_DHCPC_H 1
+ 
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 4ab32de..9e726fb 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * udhcp Server
++ * udhcp server
+  * Copyright (C) 1999 Matthew Ramsay <matthewr@moreton.com.au>
+  *			Chris Trew <ctrew@moreton.com.au>
+  *
+@@ -20,7 +20,6 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
+-
+ #include <syslog.h>
+ #include "common.h"
+ #include "dhcpc.h"
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index f618767..149300b 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -1,5 +1,7 @@
+ /* vi: set sw=4 ts=4: */
+-/* dhcpd.h */
++/*
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
+ #ifndef UDHCP_DHCPD_H
+ #define UDHCP_DHCPD_H 1
+ 
+@@ -65,8 +67,6 @@ struct server_config_t {
+ #endif
+ 
+ 
+-/*** leases.h ***/
+-
+ typedef uint32_t leasetime_t;
+ typedef int32_t signed_leasetime_t;
+ 
+@@ -101,8 +101,6 @@ struct dyn_lease *find_lease_by_nip(uint32_t nip) FAST_FUNC;
+ uint32_t find_free_or_expired_nip(const uint8_t *safe_mac) FAST_FUNC;
+ 
+ 
+-/*** static_leases.h ***/
+-
+ /* Config file parser will pass static lease info to this function
+  * which will add it to a data structure that can be searched later */
+ void add_static_lease(struct static_lease **st_lease_pp, uint8_t *mac, uint32_t nip) FAST_FUNC;
+@@ -118,8 +116,6 @@ void log_static_leases(struct static_lease **st_lease_pp) FAST_FUNC;
+ #endif
+ 
+ 
+-/*** files.h ***/
+-
+ void read_config(const char *file) FAST_FUNC;
+ void write_leases(void) FAST_FUNC;
+ void read_leases(const char *file) FAST_FUNC;
+diff --git a/networking/udhcp/dhcprelay.c b/networking/udhcp/dhcprelay.c
+index 9f6ac69..e14325d 100644
+--- a/networking/udhcp/dhcprelay.c
++++ b/networking/udhcp/dhcprelay.c
+@@ -9,7 +9,6 @@
+  *                   Netbeat AG
+  * Upstream has GPL v2 or later
+  */
+-
+ #include "common.h"
+ 
+ #define SERVER_PORT      67
+@@ -146,7 +145,6 @@ static char **get_client_devices(char *dev_list, int *client_number)
+ 	return client_dev;
+ }
+ 
+-
+ /* Creates listen sockets (in fds) bound to client and server ifaces,
+  * and returns numerically max fd.
+  */
+@@ -168,7 +166,6 @@ static int init_sockets(char **client_ifaces, int num_clients,
+ 	return n;
+ }
+ 
+-
+ /**
+  * pass_to_server() - forwards dhcp packets from client to server
+  * p - packet to send
+diff --git a/networking/udhcp/domain_codec.c b/networking/udhcp/domain_codec.c
+index f116964..2dd5347 100644
+--- a/networking/udhcp/domain_codec.c
++++ b/networking/udhcp/domain_codec.c
+@@ -24,7 +24,7 @@
+ #define NS_CMPRSFLGS 0xc0	/* name compression pointer flag */
+ 
+ 
+-/* expand a RFC1035-compressed list of domain names "cstr", of length "clen";
++/* Expand a RFC1035-compressed list of domain names "cstr", of length "clen";
+  * returns a newly allocated string containing the space-separated domains,
+  * prefixed with the contents of string pre, or NULL if an error occurs.
+  */
+@@ -149,8 +149,7 @@ static uint8_t *convert_dname(const char *src)
+ 	return res;
+ }
+ 
+-/* returns the offset within cstr at which dname can be found, or -1
+- */
++/* Returns the offset within cstr at which dname can be found, or -1 */
+ static int find_offset(const uint8_t *cstr, int clen, const uint8_t *dname)
+ {
+ 	const uint8_t *c, *d;
+@@ -188,7 +187,7 @@ static int find_offset(const uint8_t *cstr, int clen, const uint8_t *dname)
+ 	return -1;
+ }
+ 
+-/* computes string to be appended to cstr so that src would be added to
++/* Computes string to be appended to cstr so that src would be added to
+  * the compression (best case, it's a 2-byte pointer to some offset within
+  * cstr; worst case, it's all of src, converted to <4>host<3>com<0> format).
+  * The computed string is returned directly; its length is returned via retlen;
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index eab9713..6ebda94 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -2,7 +2,6 @@
+ /*
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+-
+ #include "common.h"
+ #include "dhcpd.h"
+ #include "unicode.h"
+@@ -54,8 +53,7 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 	/*     "00:00:00:00:00:00 255.255.255.255 ABCDEFGHIJKLMNOPQRS Wed Jun 30 21:49:08 1993" */
+ 	/*     "123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 */
+ 
+-	if (full_read(fd, &written_at, sizeof(written_at)) != sizeof(written_at))
+-		return 0;
++	xread(fd, &written_at, sizeof(written_at));
+ 	written_at = ntoh64(written_at);
+ 	curr = time(NULL);
+ 	if (curr < written_at)
+@@ -68,15 +66,15 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 			fmt = ":%02x";
+ 		}
+ 		addr.s_addr = lease.lease_nip;
+-		/* actually, 15+1 and 19+1, +1 is a space between columns */
+-		/* lease.hostname is char[20] and is always NUL terminated */
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+ 		{
+-			char *uni_name = unicode_conv_to_printable_fixedwidth(NULL, lease.hostname, 20);
+-			printf(" %-16s%s", inet_ntoa(addr), uni_name);
++			char *uni_name = unicode_conv_to_printable_fixedwidth(NULL, lease.hostname, 19);
++			printf(" %-16s%s ", inet_ntoa(addr), uni_name);
+ 			free(uni_name);
+ 		}
+ #else
++		/* actually, 15+1 and 19+1, +1 is a space between columns */
++		/* lease.hostname is char[20] and is always NUL terminated */
+ 		printf(" %-16s%-20s", inet_ntoa(addr), lease.hostname);
+ #endif
+ 		expires_abs = ntohl(lease.expires) + written_at;
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index cf55a6b..ff63111 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -1,11 +1,11 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * files.c -- DHCP server file manipulation *
++ * DHCP server config and lease file manipulation
++ *
+  * Rewrite by Russ Dill <Russ.Dill@asu.edu> July 2001
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+-
+ #include <netinet/ether.h>
+ 
+ #include "common.h"
+@@ -72,28 +72,28 @@ struct config_keyword {
+ };
+ 
+ static const struct config_keyword keywords[] = {
+-	/* keyword       handler   variable address               default */
+-	{"start",        udhcp_str2nip, &(server_config.start_ip),     "192.168.0.20"},
+-	{"end",          udhcp_str2nip, &(server_config.end_ip),       "192.168.0.254"},
+-	{"interface",    read_str, &(server_config.interface),    "eth0"},
++	/* keyword        handler           variable address               default */
++	{"start"        , udhcp_str2nip   , &server_config.start_ip     , "192.168.0.20"},
++	{"end"          , udhcp_str2nip   , &server_config.end_ip       , "192.168.0.254"},
++	{"interface"    , read_str        , &server_config.interface    , "eth0"},
+ 	/* Avoid "max_leases value not sane" warning by setting default
+ 	 * to default_end_ip - default_start_ip + 1: */
+-	{"max_leases",   read_u32, &(server_config.max_leases),   "235"},
+-	{"auto_time",    read_u32, &(server_config.auto_time),    "7200"},
+-	{"decline_time", read_u32, &(server_config.decline_time), "3600"},
+-	{"conflict_time",read_u32, &(server_config.conflict_time),"3600"},
+-	{"offer_time",   read_u32, &(server_config.offer_time),   "60"},
+-	{"min_lease",    read_u32, &(server_config.min_lease_sec),"60"},
+-	{"lease_file",   read_str, &(server_config.lease_file),   LEASES_FILE},
+-	{"pidfile",      read_str, &(server_config.pidfile),      "/var/run/udhcpd.pid"},
+-	{"siaddr",       udhcp_str2nip, &(server_config.siaddr_nip),   "0.0.0.0"},
++	{"max_leases"   , read_u32        , &server_config.max_leases   , "235"},
++	{"auto_time"    , read_u32        , &server_config.auto_time    , "7200"},
++	{"decline_time" , read_u32        , &server_config.decline_time , "3600"},
++	{"conflict_time", read_u32        , &server_config.conflict_time, "3600"},
++	{"offer_time"   , read_u32        , &server_config.offer_time   , "60"},
++	{"min_lease"    , read_u32        , &server_config.min_lease_sec, "60"},
++	{"lease_file"   , read_str        , &server_config.lease_file   , LEASES_FILE},
++	{"pidfile"      , read_str        , &server_config.pidfile      , "/var/run/udhcpd.pid"},
++	{"siaddr"       , udhcp_str2nip   , &server_config.siaddr_nip   , "0.0.0.0"},
+ 	/* keywords with no defaults must be last! */
+-	{"option",       udhcp_str2optset, &(server_config.options), ""},
+-	{"opt",          udhcp_str2optset, &(server_config.options), ""},
+-	{"notify_file",  read_str, &(server_config.notify_file),  ""},
+-	{"sname",        read_str, &(server_config.sname),        ""},
+-	{"boot_file",    read_str, &(server_config.boot_file),    ""},
+-	{"static_lease", read_staticlease, &(server_config.static_leases), ""},
++	{"option"       , udhcp_str2optset, &server_config.options      , ""},
++	{"opt"          , udhcp_str2optset, &server_config.options      , ""},
++	{"notify_file"  , read_str        , &server_config.notify_file  , ""},
++	{"sname"        , read_str        , &server_config.sname        , ""},
++	{"boot_file"    , read_str        , &server_config.boot_file    , ""},
++	{"static_lease" , read_staticlease, &server_config.static_leases, ""},
+ };
+ enum { KWS_WITH_DEFAULTS = ARRAY_SIZE(keywords) - 6 };
+ 
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index 81acb99..4999d80 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -1,15 +1,12 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * leases.c -- tools to manage DHCP leases
+  * Russ Dill <Russ.Dill@asu.edu> July 2001
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+-
+ #include "common.h"
+ #include "dhcpd.h"
+ 
+-
+ /* Find the oldest expired lease, NULL if there are no expired leases */
+ static struct dyn_lease *oldest_expired_lease(void)
+ {
+@@ -28,7 +25,6 @@ static struct dyn_lease *oldest_expired_lease(void)
+ 	return oldest_lease;
+ }
+ 
+-
+ /* Clear out all leases with matching nonzero chaddr OR yiaddr.
+  * If chaddr == NULL, this is a conflict lease.
+  */
+@@ -45,8 +41,7 @@ static void clear_leases(const uint8_t *chaddr, uint32_t yiaddr)
+ 	}
+ }
+ 
+-
+-/* Add a lease into the table, clearing out any old ones
++/* Add a lease into the table, clearing out any old ones.
+  * If chaddr == NULL, this is a conflict lease.
+  */
+ struct dyn_lease* FAST_FUNC add_lease(
+@@ -84,14 +79,12 @@ struct dyn_lease* FAST_FUNC add_lease(
+ 	return oldest;
+ }
+ 
+-
+ /* True if a lease has expired */
+ int FAST_FUNC is_expired_lease(struct dyn_lease *lease)
+ {
+ 	return (lease->expires < (leasetime_t) time(NULL));
+ }
+ 
+-
+ /* Find the first lease that matches MAC, NULL if no match */
+ struct dyn_lease* FAST_FUNC find_lease_by_mac(const uint8_t *mac)
+ {
+@@ -104,7 +97,6 @@ struct dyn_lease* FAST_FUNC find_lease_by_mac(const uint8_t *mac)
+ 	return NULL;
+ }
+ 
+-
+ /* Find the first lease that matches IP, NULL is no match */
+ struct dyn_lease* FAST_FUNC find_lease_by_nip(uint32_t nip)
+ {
+@@ -117,7 +109,6 @@ struct dyn_lease* FAST_FUNC find_lease_by_nip(uint32_t nip)
+ 	return NULL;
+ }
+ 
+-
+ /* Check if the IP is taken; if it is, add it to the lease table */
+ static int nobody_responds_to_arp(uint32_t nip, const uint8_t *safe_mac)
+ {
+@@ -138,7 +129,6 @@ static int nobody_responds_to_arp(uint32_t nip, const uint8_t *safe_mac)
+ 	return 0;
+ }
+ 
+-
+ /* Find a new usable (we think) address */
+ uint32_t FAST_FUNC find_free_or_expired_nip(const uint8_t *safe_mac)
+ {
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index ecdbec7..1bfe120 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -1,18 +1,19 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * packet.c -- packet ops
++ * Packet ops
++ *
+  * Rewrite by Russ Dill <Russ.Dill@asu.edu> July 2001
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ #include <netinet/in.h>
+ #if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined _NEWLIB_VERSION
+-#include <netpacket/packet.h>
+-#include <net/ethernet.h>
++# include <netpacket/packet.h>
++# include <net/ethernet.h>
+ #else
+-#include <asm/types.h>
+-#include <linux/if_packet.h>
+-#include <linux/if_ether.h>
++# include <asm/types.h>
++# include <linux/if_packet.h>
++# include <linux/if_ether.h>
+ #endif
+ 
+ #include "common.h"
+diff --git a/networking/udhcp/signalpipe.c b/networking/udhcp/signalpipe.c
+index c181e0e..6355c5e 100644
+--- a/networking/udhcp/signalpipe.c
++++ b/networking/udhcp/signalpipe.c
+@@ -1,6 +1,5 @@
+ /* vi: set sw=4 ts=4: */
+-/* signalpipe.c
+- *
++/*
+  * Signal pipe infrastructure. A reliable way of delivering signals.
+  *
+  * Russ Dill <Russ.Dill@asu.edu> December 2003
+@@ -19,10 +18,9 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
+-
+ #include "common.h"
+ 
+-
++/* Global variable: we access it from signal handler */
+ static struct fd_pair signal_pipe;
+ 
+ static void signal_handler(int sig)
+@@ -32,7 +30,6 @@ static void signal_handler(int sig)
+ 		bb_perror_msg("can't send signal");
+ }
+ 
+-
+ /* Call this before doing anything else. Sets up the socket pair
+  * and installs the signal handler */
+ void FAST_FUNC udhcp_sp_setup(void)
+@@ -49,7 +46,6 @@ void FAST_FUNC udhcp_sp_setup(void)
+ 		, signal_handler);
+ }
+ 
+-
+ /* Quick little function to setup the rfds. Will return the
+  * max_fd for use with select. Limited in that you can only pass
+  * one extra fd */
+@@ -64,7 +60,6 @@ int FAST_FUNC udhcp_sp_fd_set(fd_set *rfds, int extra_fd)
+ 	return signal_pipe.rd > extra_fd ? signal_pipe.rd : extra_fd;
+ }
+ 
+-
+ /* Read a signal from the signal pipe. Returns 0 if there is
+  * no signal, -1 on error (and sets errno appropriately), and
+  * your signal on success */
+diff --git a/networking/udhcp/socket.c b/networking/udhcp/socket.c
+index 469b362..0ed7ad1 100644
+--- a/networking/udhcp/socket.c
++++ b/networking/udhcp/socket.c
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * socket.c -- DHCP server client/server socket creation
++ * DHCP server client/server socket creation
+  *
+  * udhcp client/server
+  * Copyright (C) 1999 Matthew Ramsay <matthewr@moreton.com.au>
+@@ -22,20 +22,18 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
+-
+ #include <net/if.h>
+ #if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined _NEWLIB_VERSION
+-#include <netpacket/packet.h>
+-#include <net/ethernet.h>
++# include <netpacket/packet.h>
++# include <net/ethernet.h>
+ #else
+-#include <asm/types.h>
+-#include <linux/if_packet.h>
+-#include <linux/if_ether.h>
++# include <asm/types.h>
++# include <linux/if_packet.h>
++# include <linux/if_ether.h>
+ #endif
+ 
+ #include "common.h"
+ 
+-
+ int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t *nip, uint8_t *mac)
+ {
+ 	int fd;
+diff --git a/networking/udhcp/static_leases.c b/networking/udhcp/static_leases.c
+index 1887a8a..b334a58 100644
+--- a/networking/udhcp/static_leases.c
++++ b/networking/udhcp/static_leases.c
+@@ -1,17 +1,14 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * static_leases.c -- Couple of functions to assist with storing and
+- * retrieving data for static leases
++ * Storing and retrieving data for static leases
+  *
+  * Wade Berrier <wberrier@myrealbox.com> September 2004
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+-
+ #include "common.h"
+ #include "dhcpd.h"
+ 
+-
+ /* Takes the address of the pointer to the static_leases linked list,
+  * address to a 6 byte mac address,
+  * 4 byte IP address */

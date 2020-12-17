@@ -1,0 +1,89 @@
+2009-02-26 12:29:59 +0000
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index b2fedb1..767aa12 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -775,7 +775,7 @@ ForkJob(const char *user, CronLine *line, int mailFd,
+ 		}
+ 		/* crond 3.0pl1-100 puts tasks in separate process groups */
+ 		bb_setpgrp();
+-		execlp(prog, prog, cmd, arg, NULL);
++		execlp(prog, prog, cmd, arg, (char *) NULL);
+ 		crondlog(ERR20 "can't exec, user %s cmd %s %s %s", user, prog, cmd, arg);
+ 		if (mail_filename) {
+ 			fdprintf(1, "Exec failed: %s -c %s\n", prog, arg);
+@@ -912,7 +912,7 @@ static void RunJob(const char *user, CronLine *line)
+ 		}
+ 		/* crond 3.0pl1-100 puts tasks in separate process groups */
+ 		bb_setpgrp();
+-		execl(DEFAULT_SHELL, DEFAULT_SHELL, "-c", line->cl_Shell, NULL);
++		execl(DEFAULT_SHELL, DEFAULT_SHELL, "-c", line->cl_Shell, (char *) NULL);
+ 		crondlog(ERR20 "can't exec, user %s cmd %s %s %s", user,
+ 				 DEFAULT_SHELL, "-c", line->cl_Shell);
+ 		_exit(EXIT_SUCCESS);
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 07855f0..c9371cc 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -982,7 +982,7 @@ static int doit(char *str)
+ 		case -1: /* failure */
+ 			return 0;
+ 		case 0: /* child */
+-			execle(DEFAULT_SHELL, DEFAULT_SHELL, "-c", str, NULL, my_environ);
++			execle(DEFAULT_SHELL, DEFAULT_SHELL, "-c", str, (char *) NULL, my_environ);
+ 			_exit(127);
+ 		}
+ 		safe_waitpid(child, &status, 0);
+diff --git a/runit/runsv.c b/runit/runsv.c
+index f83d582..4155b8f 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -251,7 +251,6 @@ static unsigned custom(struct svdir *s, char c)
+ 	int w;
+ 	char a[10];
+ 	struct stat st;
+-	char *prog[2];
+ 
+ 	if (s->islog) return 0;
+ 	strcpy(a, "control/?");
+@@ -267,13 +266,11 @@ static unsigned custom(struct svdir *s, char c)
+ 				/* child */
+ 				if (haslog && dup2(logpipe.wr, 1) == -1)
+ 					warn_cannot("setup stdout for control/?");
+-				prog[0] = a;
+-				prog[1] = NULL;
+-				execv(a, prog);
++				execl(a, a, (char *) NULL);
+ 				fatal_cannot("run control/?");
+ 			}
+ 			/* parent */
+-			while (safe_waitpid(pid, &w, 0) == -1) {
++			if (safe_waitpid(pid, &w, 0) == -1) {
+ 				warn_cannot("wait for child control/?");
+ 				return 0;
+ 			}
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 7b054e4..a77bc3f 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -119,7 +119,7 @@ static NOINLINE pid_t runsv(const char *name)
+ 			| (1 << SIGTERM)
+ 			, SIG_DFL);
+ #endif
+-		execlp("runsv", "runsv", name, NULL);
++		execlp("runsv", "runsv", name, (char *) NULL);
+ 		fatal2_cannot("start runsv ", name);
+ 	}
+ 	return pid;
+diff --git a/util-linux/script.c b/util-linux/script.c
+index 2e103fd..a9f24b1 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -181,6 +181,6 @@ int script_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* Non-ignored signals revert to SIG_DFL on exec anyway */
+ 	/*signal(SIGCHLD, SIG_DFL);*/
+-	execl(shell, shell, shell_opt, shell_arg, NULL);
++	execl(shell, shell, shell_opt, shell_arg, (char *) NULL);
+ 	bb_simple_perror_msg_and_die(shell);
+ }

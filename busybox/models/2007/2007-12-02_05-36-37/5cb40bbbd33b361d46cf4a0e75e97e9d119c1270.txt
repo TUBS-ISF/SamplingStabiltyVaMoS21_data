@@ -1,0 +1,18 @@
+2007-12-02 05:36:37 +0000
+diff --git a/Makefile.help b/Makefile.help
+index e2e13de..513c10c 100644
+--- a/Makefile.help
++++ b/Makefile.help
+@@ -24,10 +24,10 @@ help:
+ 	@echo '  hosttools  		- build sed for the host.'
+ 	@echo '  			  You can use these commands if the commands on the host'
+ 	@echo '  			  is unusable. Afterwards use it like:'
+-	@echo '			  make SED="$(objtree)/sed"'
++	@echo '  			  make SED="$(objtree)/sed"'
+ 	@echo
+ 	@echo 'Installation:'
+-	@echo '  install		- install busybox into $(CONFIG_PREFIX)'
++	@echo '  install		- install busybox into CONFIG_PREFIX'
+ 	@echo '  uninstall'
+ 	@echo
+ 	@echo 'Development:'

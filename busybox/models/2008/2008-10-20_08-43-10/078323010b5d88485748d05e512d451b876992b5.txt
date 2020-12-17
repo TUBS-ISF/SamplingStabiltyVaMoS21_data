@@ -1,0 +1,83 @@
+2008-10-20 08:43:10 +0000
+diff --git a/editors/Config.in b/editors/Config.in
+index 27426bc..0388737 100644
+--- a/editors/Config.in
++++ b/editors/Config.in
+@@ -14,7 +14,7 @@ config AWK
+ 
+ config FEATURE_AWK_MATH
+ 	bool "Enable math functions (requires libm)"
+-	default y
++	default n
+ 	depends on AWK
+ 	help
+ 	  Enable math functions of the Awk programming language.
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 0c80ae6..15f677a 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -138,6 +138,14 @@ config DC
+ 	  Dc is a reverse-polish desk calculator which supports unlimited
+ 	  precision arithmetic.
+ 
++config FEATURE_DC_LIBM
++	bool "Enable power and exp functions (requires libm)"
++	default n
++	depends on DC
++	help
++	  Enable power and exp functions.
++	  NOTE: This will require libm to be present for linking.
++
+ config DEVFSD
+ 	bool "devfsd (obsolete)"
+ 	default n
+diff --git a/miscutils/dc.c b/miscutils/dc.c
+index 47ec060..7d5886e 100644
+--- a/miscutils/dc.c
++++ b/miscutils/dc.c
+@@ -53,12 +53,14 @@ static void mul(void)
+ 	push(pop() * pop());
+ }
+ 
++#if ENABLE_FEATURE_DC_LIBM
+ static void power(void)
+ {
+ 	double topower = pop();
+ 
+ 	push(pow(pop(), topower));
+ }
++#endif
+ 
+ static void divide(void)
+ {
+@@ -137,9 +139,11 @@ static const struct op operators[] = {
+ 	{"mul", mul},
+ 	{"/",   divide},
+ 	{"div", divide},
++#if ENABLE_FEATURE_DC_LIBM
+ 	{"**",  power},
+ 	{"exp", power},
+ 	{"pow", power},
++#endif
+ 	{"%",   mod},
+ 	{"mod", mod},
+ 	{"and", and},
+diff --git a/shell/ash_test/ash-standalone/noexec_gets_no_env.right b/shell/ash_test/ash-standalone/noexec_gets_no_env.right
+index 3d55d73..8522dff 100644
+--- a/shell/ash_test/ash-standalone/noexec_gets_no_env.right
++++ b/shell/ash_test/ash-standalone/noexec_gets_no_env.right
+@@ -1,2 +1,4 @@
+ VAR7=VAL
+ 0
++VAR8=VAL
++0
+diff --git a/shell/ash_test/ash-standalone/noexec_gets_no_env.tests b/shell/ash_test/ash-standalone/noexec_gets_no_env.tests
+index 5e12e5a..0d347bd 100755
+--- a/shell/ash_test/ash-standalone/noexec_gets_no_env.tests
++++ b/shell/ash_test/ash-standalone/noexec_gets_no_env.tests
+@@ -1,3 +1,5 @@
+ export VAR7=VAL
+ env | grep ^VAR7=
+ echo $?
++VAR8=VAL env | grep ^VAR8=
++echo $?

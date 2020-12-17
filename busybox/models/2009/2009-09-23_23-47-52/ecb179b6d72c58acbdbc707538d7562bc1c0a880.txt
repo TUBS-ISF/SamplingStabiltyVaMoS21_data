@@ -1,0 +1,23 @@
+2009-09-23 23:47:52 +0200
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index 2180007..28f0c0b 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -101,13 +101,15 @@
+ #include "libbb.h"
+ 
+ /* #include <net/if.h> - no. linux/if_bonding.h pulls in linux/if.h */
++#include <linux/if.h>
+ #include <net/if_arp.h>
+ #include <linux/if_bonding.h>
+ #include <linux/sockios.h>
+-
+ #include "fix_u32.h" /* hack, so we may include kernel's ethtool.h */
+ #include <linux/ethtool.h>
+-
++#ifndef BOND_ABI_VERSION
++# define BOND_ABI_VERSION 2
++#endif
+ #ifndef IFNAMSIZ
+ # define IFNAMSIZ 16
+ #endif

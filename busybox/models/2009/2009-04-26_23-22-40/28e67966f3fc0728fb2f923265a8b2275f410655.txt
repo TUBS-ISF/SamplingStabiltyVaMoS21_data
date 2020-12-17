@@ -1,0 +1,157 @@
+2009-04-26 23:22:40 +0000
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 5190fa6..1eb868c 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -72,6 +72,9 @@ getopt32(char **argv, const char *applet_opts, ...)
+         env -i ls -d /
+         Here we want env to process just the '-i', not the '-d'.
+ 
++ "!"    Report bad option, missing required options,
++        inconsistent options with all-ones return value (instead of abort).
++
+ const char *applet_long_options
+ 
+         This struct allows you to define long options:
+@@ -327,6 +330,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 	unsigned flags = 0;
+ 	unsigned requires = 0;
+ 	t_complementary complementary[33]; /* last stays zero-filled */
++	char first_char;
+ 	int c;
+ 	const unsigned char *s;
+ 	t_complementary *on_off;
+@@ -357,6 +361,11 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 	on_off = complementary;
+ 	memset(on_off, 0, sizeof(complementary));
+ 
++	/* skip bbox extension */
++	first_char = applet_opts[0];
++	if (first_char == '!')
++		applet_opts++;
++
+ 	/* skip GNU extension */
+ 	s = (const unsigned char *)applet_opts;
+ 	if (*s == '+' || *s == '-')
+@@ -549,11 +558,11 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 			 * is always NULL (see above) */
+ 			if (on_off->opt_char == '\0' /* && c != '\0' */) {
+ 				/* c is probably '?' - "bad option" */
+-				bb_show_usage();
++				goto error;
+ 			}
+ 		}
+ 		if (flags & on_off->incongruously)
+-			bb_show_usage();
++			goto error;
+ 		trigger = on_off->switch_on & on_off->switch_off;
+ 		flags &= ~(on_off->switch_off ^ trigger);
+ 		flags |= on_off->switch_on ^ trigger;
+@@ -577,16 +586,24 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 
+ 	/* check depending requires for given options */
+ 	for (on_off = complementary; on_off->opt_char; on_off++) {
+-		if (on_off->requires && (flags & on_off->switch_on) &&
+-					(flags & on_off->requires) == 0)
+-			bb_show_usage();
++		if (on_off->requires
++		 && (flags & on_off->switch_on)
++		 && (flags & on_off->requires) == 0
++		) {
++			goto error;
++		}
+ 	}
+ 	if (requires && (flags & requires) == 0)
+-		bb_show_usage();
++		goto error;
+ 	argc -= optind;
+ 	if (argc < min_arg || (max_arg >= 0 && argc > max_arg))
+-		bb_show_usage();
++		goto error;
+ 
+ 	option_mask32 = flags;
+ 	return flags;
++
++ error:
++	if (first_char != '!')
++		bb_show_usage();
++	return (int32_t)-1;
+ }
+diff --git a/shell/hush.c b/shell/hush.c
+index 292b8b2..d0819f6 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -6451,7 +6451,11 @@ static int builtin_export(char **argv)
+ 	}
+ 
+ #if ENABLE_HUSH_EXPORT_N
+-	opt_unexport = getopt32(argv, "+n"); /* "+": stop at 1st non-option */
++	/* "!": do not abort on errors */
++	/* "+": stop at 1st non-option */
++	opt_unexport = getopt32(argv, "!+n");
++	if (opt_unexport == (unsigned)-1)
++		return EXIT_FAILURE;
+ 	argv += optind;
+ #else
+ 	opt_unexport = 0;
+@@ -6918,36 +6922,22 @@ static int builtin_umask(char **argv)
+ static int builtin_unset(char **argv)
+ {
+ 	int ret;
+-	char var;
+-	char *arg;
+-
+-	if (!*++argv)
+-		return EXIT_SUCCESS;
++	unsigned opts;
+ 
+-	var = 0;
+-	while ((arg = *argv) != NULL && arg[0] == '-') {
+-		arg++;
+-		do {
+-			switch (*arg) {
+-			case 'v':
+-			case 'f':
+-				if (var == 0 || var == *arg) {
+-					var = *arg;
+-					break;
+-				}
+-				/* else: unset -vf, which is illegal.
+-				 * fall through */
+-			default:
+-				bb_error_msg("unset: %s: invalid option", *argv);
+-				return EXIT_FAILURE;
+-			}
+-		} while (*++arg);
+-		argv++;
++	/* "!": do not abort on errors */
++	/* "+": stop at 1st non-option */
++	opts = getopt32(argv, "!+vf");
++	if (opts == (unsigned)-1)
++		return EXIT_FAILURE;
++	if (opts == 3) {
++		bb_error_msg("unset: -v and -f are exclusive");
++		return EXIT_FAILURE;
+ 	}
++	argv += optind;
+ 
+ 	ret = EXIT_SUCCESS;
+ 	while (*argv) {
+-		if (var != 'f') {
++		if (!(opts & 2)) { /* not -f */
+ 			if (unset_local_var(*argv)) {
+ 				/* unset <nonexistent_var> doesn't fail.
+ 				 * Error is when one tries to unset RO var.
+diff --git a/shell/hush_test/hush-vars/unset.right b/shell/hush_test/hush-vars/unset.right
+index 8dea7c4..1fbe76a 100644
+--- a/shell/hush_test/hush-vars/unset.right
++++ b/shell/hush_test/hush-vars/unset.right
+@@ -1,6 +1,5 @@
+-hush: unset: -: invalid option
+-1
+-hush: unset: -m: invalid option
++0
++unset: invalid option -- m
+ 1
+ 0
+ ___

@@ -1,0 +1,14 @@
+2008-11-05 08:18:16 +0000
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 3a12011..a75c226 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -133,7 +133,7 @@ int id_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 	/* JUST_ALL_GROUPS ignores -r PRINT_REAL flag even if man page for */
+ 	/* id says: print the real ID instead of the effective ID, with -ugG */
+-	/* in fact in ths case egid is always printed if egid != rgid */
++	/* in fact in this case egid is always printed if egid != rgid */
+ 	if (!opt || (opt & JUST_ALL_GROUPS)) {
+ 		gid_t *groups;
+ 		int n;

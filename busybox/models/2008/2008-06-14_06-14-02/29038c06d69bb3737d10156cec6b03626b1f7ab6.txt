@@ -1,0 +1,14 @@
+2008-06-14 06:14:02 +0000
+diff --git a/shell/ash.c b/shell/ash.c
+index 0913a2f..b490b69 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -5835,7 +5835,7 @@ parse_sub_pattern(char *arg, int inquotes)
+ 			arg++; /* skip both \\, not just first one */
+ 		arg++;
+ 	}
+-	*idx++ = c;
++	*idx = c; /* NUL */
+ 
+ 	return repl;
+ }

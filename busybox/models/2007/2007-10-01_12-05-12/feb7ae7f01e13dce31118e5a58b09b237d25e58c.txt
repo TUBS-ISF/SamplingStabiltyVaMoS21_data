@@ -1,0 +1,115 @@
+2007-10-01 12:05:12 +0000
+diff --git a/archival/unzip.c b/archival/unzip.c
+index 97c743c..21d4c25 100644
+--- a/archival/unzip.c
++++ b/archival/unzip.c
+@@ -263,9 +263,9 @@ int unzip_main(int argc, char **argv)
+ 			total_size += zip_header.formatted.ucmpsize;
+ 
+ 			if (listing) { /* List entry */
+-			    if (verbose) {
+-				unsigned int dostime = zip_header.formatted.modtime | (zip_header.formatted.moddate << 16);
+-				printf("%9u  %02u-%02u-%02u %02u:%02u   %s\n",
++				if (verbose) {
++					unsigned int dostime = zip_header.formatted.modtime | (zip_header.formatted.moddate << 16);
++					printf("%9u  %02u-%02u-%02u %02u:%02u   %s\n",
+ 					   zip_header.formatted.ucmpsize,
+ 					   (dostime & 0x01e00000) >> 21,
+ 					   (dostime & 0x001f0000) >> 16,
+@@ -273,12 +273,12 @@ int unzip_main(int argc, char **argv)
+ 					   (dostime & 0x0000f800) >> 11,
+ 					   (dostime & 0x000007e0) >> 5,
+ 					   dst_fn);
+-				total_entries++;
+-			    } else {
+-				/* short listing -- filenames only */
+-				printf("%s\n", dst_fn);
+-			    }
+-			    i = 'n';
++					total_entries++;
++				} else {
++					/* short listing -- filenames only */
++					puts(dst_fn);
++				}
++				i = 'n';
+ 			} else if (dst_fd == STDOUT_FILENO) { /* Extracting to STDOUT */
+ 				i = -1;
+ 			} else if (last_char_is(dst_fn, '/')) { /* Extract directory */
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 536e946..f72a027 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -92,7 +92,7 @@ int id_main(int argc, char **argv)
+ 			if (getcon(&scontext)) {
+ 				bb_error_msg_and_die("can't get process context");
+ 			}
+-			printf("%s\n", scontext);
++			puts(scontext);
+ 		}
+ #endif
+ 		/* exit */
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 26a49a1..ccf8ac5 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -700,7 +700,7 @@ static void showfiles(void)
+ 			printf("%s%-*s", matches[n],
+ 				(int)(column_width - strlen(matches[n])), "");
+ 		}
+-		printf("%s\n", matches[n]);
++		puts(matches[n]);
+ 	}
+ }
+ 
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index cb6db78..365e24c 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -849,7 +849,7 @@ static void identify(uint16_t *val)
+ 				jj >>= 1;
+ 			}
+ 		}
+-		printf("%s\n", kk ? "" : "\n\tLikely used CD-ROM ATAPI-1");
++		puts(kk ? "" : "\n\tLikely used CD-ROM ATAPI-1");
+ 		/* the cdrom stuff is more like ATA-2 than anything else, so: */
+ 		like_std = 2;
+ 	}
+diff --git a/networking/nslookup.c b/networking/nslookup.c
+index e5bb56f..fab7e3e 100644
+--- a/networking/nslookup.c
++++ b/networking/nslookup.c
+@@ -69,7 +69,7 @@ static int print_host(const char *hostname, const char *header)
+ 		unsigned cnt = 0;
+ 
+ 		printf("%-10s %s\n", header, hostname);
+-		// printf("%s\n", cur->ai_canonname); ?
++		// puts(cur->ai_canonname); ?
+ 		while (cur) {
+ 			char *dotted, *revhost;
+ 			dotted = xmalloc_sockaddr2dotted_noport(cur->ai_addr);
+diff --git a/selinux/matchpathcon.c b/selinux/matchpathcon.c
+index 2bc0a33..bb7099e 100644
+--- a/selinux/matchpathcon.c
++++ b/selinux/matchpathcon.c
+@@ -17,7 +17,7 @@ static int print_matchpathcon(char *path, int noprint)
+ 	if (!noprint)
+ 		printf("%s\t%s\n", path, buf);
+ 	else
+-		printf("%s\n", buf);
++		puts(buf);
+ 
+ 	freecon(buf);
+ 	return 0;
+diff --git a/util-linux/losetup.c b/util-linux/losetup.c
+index 57e8569..c61af3d 100644
+--- a/util-linux/losetup.c
++++ b/util-linux/losetup.c
+@@ -64,7 +64,7 @@ int losetup_main(int argc, char **argv)
+ 		s = query_loop(dev);
+ 		if (!s) {
+ 			if (opt == 0x4) {
+-				printf("%s\n", dev);
++				puts(dev);
+ 				return EXIT_SUCCESS;
+ 			}
+ 		} else {

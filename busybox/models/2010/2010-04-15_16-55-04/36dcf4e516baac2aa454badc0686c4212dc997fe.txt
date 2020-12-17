@@ -1,0 +1,15 @@
+2010-04-15 16:55:04 -0700
+diff --git a/archival/ar.c b/archival/ar.c
+index 9039747..1b7b66a 100644
+--- a/archival/ar.c
++++ b/archival/ar.c
+@@ -235,7 +235,8 @@ int ar_main(int argc UNUSED_PARAM, char **argv)
+ 				: O_RDONLY
+ 	);
+ 
+-	archive_handle->filter = filter_accept_list;
++	if (*argv)
++		archive_handle->filter = filter_accept_list;
+ 	while (*argv) {
+ 		llist_add_to_end(&archive_handle->accept, *argv++);
+ 	}

@@ -1,0 +1,13 @@
+2008-02-11 08:35:03 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 02ec0ea..2560d6e 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3918,6 +3918,7 @@ int hush_main(int argc, char **argv)
+ 		global_argv = argv + optind;
+ 		global_argc = argc - optind;
+ 		input = xfopen(argv[optind], "r");
++		fcntl(fileno(input), F_SETFD, FD_CLOEXEC);
+ 		opt = parse_and_run_file(input);
+ 	}
+ 

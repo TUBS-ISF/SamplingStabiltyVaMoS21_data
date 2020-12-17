@@ -1,0 +1,18 @@
+2008-10-30 23:42:37 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 97f4f27..9e18ff6 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4220,6 +4220,12 @@
+        "[-cr] [-u USER] [DIR]"
+ #define tftpd_full_usage "\n\n" \
+        "Transfer a file on tftp client's request.\n" \
++       "\n" \
++       "tftpd should be used as an inetd service.\n" \
++       "tftpd's line for inetd.conf:\n" \
++       "	69 dgram udp nowait root tftpd tftpd /files/to/serve\n" \
++       "It also can be ran from udpsvd:\n" \
++       "	udpsvd -vE 0.0.0.0 69 tftpd /files/to/serve\n" \
+      "\nOptions:" \
+      "\n	-r	Prohibit upload" \
+      "\n	-c	Allow file creation via upload" \

@@ -1,0 +1,122 @@
+2007-10-20 02:00:49 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index af385e2..71f439f 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -44,6 +44,8 @@
+ #if ENABLE_SELINUX
+ #include <selinux/selinux.h>
+ #include <selinux/context.h>
++#include <selinux/flask.h>
++#include <selinux/av_permissions.h>
+ #endif
+ 
+ #if ENABLE_LOCALE_SUPPORT
+@@ -818,6 +820,9 @@ extern void set_current_security_context(security_context_t sid);
+ extern context_t set_security_context_component(security_context_t cur_context,
+ 						char *user, char *role, char *type, char *range);
+ extern void setfscreatecon_or_die(security_context_t scontext);
++extern void selinux_preserve_fcontext(int fdesc);
++#else
++#define selinux_preserve_fcontext(fdesc) ((void)0)
+ #endif
+ extern void selinux_or_die(void);
+ extern int restricted_shell(const char *shell);
+diff --git a/libbb/selinux_common.c b/libbb/selinux_common.c
+index ff076f6..7478cc7 100644
+--- a/libbb/selinux_common.c
++++ b/libbb/selinux_common.c
+@@ -38,3 +38,17 @@ void setfscreatecon_or_die(security_context_t scontext)
+ 				"file creation context to %s", scontext);
+ 	}
+ }
++
++void selinux_preserve_fcontext(int fdesc)
++{
++	security_context_t context;
++
++	if (fgetfilecon(fdesc, &context) < 0) {
++		if (errno == ENODATA || errno == ENOTSUP)
++			return;
++		bb_perror_msg_and_die("fgetfilecon failed");
++	}
++	setfscreatecon_or_die(context);
++	freecon(context);
++}
++
+diff --git a/libbb/update_passwd.c b/libbb/update_passwd.c
+index 8914b8b..388adf8 100644
+--- a/libbb/update_passwd.c
++++ b/libbb/update_passwd.c
+@@ -11,6 +11,31 @@
+ 
+ #include "libbb.h"
+ 
++#if ENABLE_SELINUX
++static void check_selinux_update_passwd(const char *username)
++{
++	security_context_t context;
++	char *seuser;
++
++	if (getuid() != (uid_t)0 || is_selinux_enabled() == 0)
++		return;		/* No need to check */
++
++	if (getprevcon_raw(&context) < 0)
++		bb_perror_msg_and_die("getprevcon failed");
++	seuser = strtok(context, ":");
++	if (!seuser)
++		bb_error_msg_and_die("invalid context '%s'", context);
++	if (strcmp(seuser, username) != 0) {
++		if (checkPasswdAccess(PASSWD__PASSWD) != 0)
++			bb_error_msg_and_die("SELinux: access denied");
++	}
++	if (ENABLE_FEATURE_CLEAN_UP)
++		freecon(context);
++}
++#else
++#define check_selinux_update_passwd(username) ((void)0)
++#endif
++
+ int update_passwd(const char *filename, const char *username,
+ 			const char *new_pw)
+ {
+@@ -27,6 +52,8 @@ int update_passwd(const char *filename, const char *username,
+ 	int cnt = 0;
+ 	int ret = -1; /* failure */
+ 
++	check_selinux_update_passwd(username);
++
+ 	/* New passwd file, "/etc/passwd+" for now */
+ 	fnamesfx = xasprintf("%s+", filename);
+ 	sfx_char = &fnamesfx[strlen(fnamesfx)-1];
+@@ -38,6 +65,8 @@ int update_passwd(const char *filename, const char *username,
+ 		goto free_mem;
+ 	old_fd = fileno(old_fp);
+ 
++	selinux_preserve_fcontext(old_fd);
++
+ 	/* Try to create "/etc/passwd+". Wait if it exists. */
+ 	i = 30;
+ 	do {
+diff --git a/networking/ping.c b/networking/ping.c
+index bd98a21..0de1b33 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -540,7 +540,7 @@ static void ping4(len_and_sockaddr *lsa)
+ 		xbind(pingsock, &source_lsa->sa, source_lsa->len);
+ 	}
+ 	if (opt_I)
+-		setsockopt(pingsock, SOL_SOCKET, SO_BINDTODEVICE, device, strlen(opt_I) + 1);
++		setsockopt(pingsock, SOL_SOCKET, SO_BINDTODEVICE, opt_I, strlen(opt_I) + 1);
+ 
+ 	/* enable broadcast pings */
+ 	setsockopt_broadcast(pingsock);
+@@ -589,7 +589,7 @@ static void ping6(len_and_sockaddr *lsa)
+ 	if (source_lsa)
+ 		xbind(pingsock, &source_lsa->sa, source_lsa->len);
+ 	if (opt_I)
+-		setsockopt(pingsock, SOL_SOCKET, SO_BINDTODEVICE, device, strlen(opt_I) + 1);
++		setsockopt(pingsock, SOL_SOCKET, SO_BINDTODEVICE, opt_I, strlen(opt_I) + 1);
+ 
+ #ifdef ICMP6_FILTER
+ 	{

@@ -1,0 +1,15 @@
+2010-04-06 16:56:33 +0200
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 06fb7f9..8e13317 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -2598,8 +2598,7 @@ move_begin(unsigned i)
+ 		printf("Partition %u has no data area\n", i + 1);
+ 		return;
+ 	}
+-	first = get_partition_start_from_dev_start(pe);
+-	/* == pe->offset_from_dev_start + get_start_sect(p) */
++	first = get_partition_start_from_dev_start(pe); /* == pe->offset_from_dev_start + get_start_sect(p) */
+ 	new = read_int(0 /*was:first*/, first, first + nr_sects - 1, first, "New beginning of data");
+ 	if (new != first) {
+ 		sector_t new_relative = new - pe->offset_from_dev_start;

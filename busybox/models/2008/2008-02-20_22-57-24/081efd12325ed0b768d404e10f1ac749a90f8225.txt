@@ -1,0 +1,14 @@
+2008-02-20 22:57:24 +0000
+diff --git a/libbb/read.c b/libbb/read.c
+index 2cd86b8..640293b 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -54,7 +54,7 @@ ssize_t safe_read(int fd, void *buf, size_t count)
+  * So far I don't see any good solution, I can only propose
+  * that affected readers should be careful and use this routine,
+  * which detects EAGAIN and uses poll() to wait on the fd.
+- * Thanksfully, poll() doesn't give rat's ass about O_NONBLOCK flag.
++ * Thankfully, poll() doesn't care about O_NONBLOCK flag.
+  */
+ ssize_t nonblock_safe_read(int fd, void *buf, size_t count)
+ {

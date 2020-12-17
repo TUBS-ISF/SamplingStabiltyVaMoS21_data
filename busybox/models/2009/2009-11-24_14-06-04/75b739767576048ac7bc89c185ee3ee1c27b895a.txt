@@ -1,0 +1,23 @@
+2009-11-24 14:06:04 +0100
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index 81a2b04..b6848ea 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -223,7 +223,7 @@ IF_NOT_FEATURE_IPV6(sa_family_t af = AF_INET;)
+ 	}
+ 
+ 	/* Next two if blocks allow to skip getaddrinfo()
+-	 * in case host is a numeric IP(v6) address,
++	 * in case host name is a numeric IP(v6) address.
+ 	 * getaddrinfo() initializes DNS resolution machinery,
+ 	 * scans network config and such - tens of syscalls.
+ 	 */
+@@ -283,7 +283,7 @@ IF_NOT_FEATURE_IPV6(sa_family_t af = AF_INET;)
+ 	r->len = used_res->ai_addrlen;
+ 	memcpy(&r->u.sa, used_res->ai_addr, used_res->ai_addrlen);
+ 
+- IF_FEATURE_IPV6(set_port:)
++ set_port:
+ 	set_nport(r, htons(port));
+  ret:
+ 	freeaddrinfo(result);

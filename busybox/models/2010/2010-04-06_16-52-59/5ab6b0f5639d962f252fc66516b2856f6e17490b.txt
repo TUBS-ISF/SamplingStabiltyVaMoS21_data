@@ -1,0 +1,14 @@
+2010-04-06 16:52:59 +0200
+diff --git a/networking/udhcp/common.c b/networking/udhcp/common.c
+index 50e2c84..7cda34a 100644
+--- a/networking/udhcp/common.c
++++ b/networking/udhcp/common.c
+@@ -109,7 +109,7 @@ const char dhcp_option_strings[] ALIGN1 =
+ 	"search" "\0"      /* DHCP_DOMAIN_SEARCH  */
+ // doesn't work in udhcpd.conf since OPTION_SIP_SERVERS
+ // is not handled yet by "string->option" conversion code:
+-	"sipservers" "\0"  /* DHCP_SIP_SERVERS    */
++	"sipsrv" "\0"      /* DHCP_SIP_SERVERS    */
+ #endif
+ // doesn't work in udhcpd.conf since OPTION_STATIC_ROUTES
+ // is not handled yet by "string->option" conversion code:

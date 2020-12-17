@@ -1,0 +1,13 @@
+2009-08-30 19:34:09 +0200
+diff --git a/coreutils/uniq.c b/coreutils/uniq.c
+index eceff6d..be53b31 100644
+--- a/coreutils/uniq.c
++++ b/coreutils/uniq.c
+@@ -89,6 +89,7 @@ int uniq_main(int argc UNUSED_PARAM, char **argv)
+ 				break;
+ 			}
+ 
++			free(cur_line);
+ 			++dups;	 /* testing for overflow seems excessive */
+ 		}
+ 

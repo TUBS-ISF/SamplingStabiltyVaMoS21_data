@@ -1,0 +1,60 @@
+2008-07-15 21:29:44 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 0db1658..3a7c2ee 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -618,7 +618,7 @@ extern char *xmalloc_fgets(FILE *file) FAST_FUNC;
+ /* Chops off '\n' from the end, unlike fgets: */
+ extern char *xmalloc_fgetline(FILE *file) FAST_FUNC;
+ /* Same, but doesn't try to conserve space (may have some slack after the end) */
+-extern char *xmalloc_fgetline_fast(FILE *file) FAST_FUNC;
++/* extern char *xmalloc_fgetline_fast(FILE *file) FAST_FUNC; */
+ 
+ extern void die_if_ferror(FILE *file, const char *msg) FAST_FUNC;
+ extern void die_if_ferror_stdout(void) FAST_FUNC;
+@@ -1006,6 +1006,7 @@ typedef struct parser_t {
+ } parser_t;
+ extern FILE* config_open(parser_t *parser, const char *filename) FAST_FUNC;
+ #endif
++/* TODO: add define magic to collapse ntokens/mintokens/comment into one int param */
+ extern char* config_read(parser_t *parser, char **tokens, int ntokens, int mintokens, const char *delims, char comment) FAST_FUNC;
+ extern void config_close(parser_t *parser) FAST_FUNC;
+ 
+diff --git a/libbb/get_line_from_file.c b/libbb/get_line_from_file.c
+index 7b65ced..56761f9 100644
+--- a/libbb/get_line_from_file.c
++++ b/libbb/get_line_from_file.c
+@@ -68,12 +68,24 @@ char* FAST_FUNC xmalloc_fgetline(FILE *file)
+ 	return c;
+ }
+ 
++#if 0
+ /* Faster routines (~twice as fast). +170 bytes. Unused as of 2008-07.
+  *
+  * NB: they stop at NUL byte too.
+  * Performance is important here. Think "grep 50gigabyte_file"...
+- * Iironically, grep can't use it because of NUL issue.
++ * Ironically, grep can't use it because of NUL issue.
+  * We sorely need C lib to provide fgets which reports size!
++ *
++ * Update:
++ * Actually, uclibc and glibc have it. man getline. It's GNUism,
++ *   but very useful one (if it's as fast as this code).
++ * TODO:
++ * - currently, sed and sort use bb_get_chunk_from_file and heavily
++ *   depend on its "stop on \n or \0" behavior, and STILL they fail
++ *   to handle all cases with embedded NULs correctly. So:
++ * - audit sed and sort; convert them to getline FIRST.
++ * - THEN ditch bb_get_chunk_from_file, replace it with getline.
++ * - provide getline implementation for non-GNU systems.
+  */
+ 
+ static char* xmalloc_fgets_internal(FILE *file, int *sizep)
+@@ -118,7 +130,6 @@ char* FAST_FUNC xmalloc_fgetline_fast(FILE *file)
+ 	return r; /* not xrealloc(r, sz + 1)! */
+ }
+ 
+-#if 0
+ char* FAST_FUNC xmalloc_fgets(FILE *file)
+ {
+ 	int sz;

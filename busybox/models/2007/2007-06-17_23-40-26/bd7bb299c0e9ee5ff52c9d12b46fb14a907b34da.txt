@@ -1,0 +1,763 @@
+2007-06-17 23:40:26 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 2a50bce..3c9f9fe 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -201,6 +201,7 @@ struct sysinfo {
+ int sysinfo(struct sysinfo* info);
+ 
+ unsigned long long monotonic_us(void);
++unsigned monotonic_sec(void);
+ 
+ extern void chomp(char *s);
+ extern void trim(char *s);
+diff --git a/libbb/time.c b/libbb/time.c
+index f2a7415..3e35542 100644
+--- a/libbb/time.c
++++ b/libbb/time.c
+@@ -21,12 +21,23 @@ unsigned long long monotonic_us(void)
+ 		bb_error_msg_and_die("clock_gettime(MONOTONIC) failed");
+ 	return ts.tv_sec * 1000000ULL + ts.tv_nsec/1000;
+ }
++unsigned monotonic_sec(void)
++{
++	struct timespec ts;
++	if (syscall(__NR_clock_gettime, CLOCK_MONOTONIC, &ts))
++		bb_error_msg_and_die("clock_gettime(MONOTONIC) failed");
++	return ts.tv_sec;
++}
+ #else
+ unsigned long long monotonic_us(void)
+ {
+ 	struct timeval tv;
+-	if (gettimeofday(&tv, NULL))
+-		bb_error_msg_and_die("gettimeofday failed");
++	gettimeofday(&tv, NULL);
+ 	return tv.tv_sec * 1000000ULL + tv_usec;
+ }
++
++unsigned monotonic_sec(void)
++{
++	return time(NULL);
++}
+ #endif
+diff --git a/miscutils/time.c b/miscutils/time.c
+index 578cb35..9b7db66 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -180,7 +180,12 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 	vv_ms = (resp->ru.ru_utime.tv_sec + resp->ru.ru_stime.tv_sec) * 1000
+ 	      + (resp->ru.ru_utime.tv_usec + resp->ru.ru_stime.tv_usec) / 1000;
+ 
+-	cpu_ticks = vv_ms * TICKS_PER_SEC / 1000;
++#if (1000 / TICKS_PER_SEC) * TICKS_PER_SEC == 1000
++	/* 1000 is exactly divisible by TICKS_PER_SEC */
++	cpu_ticks = vv_ms / (1000 / TICKS_PER_SEC);
++#else
++	cpu_ticks = vv_ms * (unsigned long long)TICKS_PER_SEC / 1000;
++#endif
+ 	if (!cpu_ticks) cpu_ticks = 1; /* we divide by it, must be nonzero */
+ 
+ 	/* putchar() != putc(stdout) in glibc! */
+diff --git a/networking/arping.c b/networking/arping.c
+index a022e70..7a9fbc2 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -33,18 +33,17 @@ enum {
+ 	BCAST_ONLY = 32,
+ 	UNICASTING = 64
+ };
+-static int cfg;
+ 
+-static int s;
++static int sock;
+ static unsigned count = UINT_MAX;
+ static unsigned timeout_us;
+-static int sent;
+-static int brd_sent;
+-static int received;
+-static int brd_recv;
+-static int req_recv;
++static unsigned sent;
++static unsigned brd_sent;
++static unsigned received;
++static unsigned brd_recv;
++static unsigned req_recv;
+ 
+-static int send_pack(int sock, struct in_addr *src_addr,
++static int send_pack(struct in_addr *src_addr,
+ 			struct in_addr *dst_addr, struct sockaddr_ll *ME,
+ 			struct sockaddr_ll *HE)
+ {
+@@ -59,7 +58,7 @@ static int send_pack(int sock, struct in_addr *src_addr,
+ 	ah->ar_pro = htons(ETH_P_IP);
+ 	ah->ar_hln = ME->sll_halen;
+ 	ah->ar_pln = 4;
+-	ah->ar_op = cfg & ADVERT ? htons(ARPOP_REPLY) : htons(ARPOP_REQUEST);
++	ah->ar_op = option_mask32 & ADVERT ? htons(ARPOP_REPLY) : htons(ARPOP_REQUEST);
+ 
+ 	memcpy(p, &ME->sll_addr, ah->ar_hln);
+ 	p += ME->sll_halen;
+@@ -67,7 +66,7 @@ static int send_pack(int sock, struct in_addr *src_addr,
+ 	memcpy(p, src_addr, 4);
+ 	p += 4;
+ 
+-	if (cfg & ADVERT)
++	if (option_mask32 & ADVERT)
+ 		memcpy(p, &ME->sll_addr, ah->ar_hln);
+ 	else
+ 		memcpy(p, &HE->sll_addr, ah->ar_hln);
+@@ -81,7 +80,7 @@ static int send_pack(int sock, struct in_addr *src_addr,
+ 	if (err == p - buf) {
+ 		last = now;
+ 		sent++;
+-		if (!(cfg & UNICASTING))
++		if (!(option_mask32 & UNICASTING))
+ 			brd_sent++;
+ 	}
+ 	return err;
+@@ -90,17 +89,17 @@ static int send_pack(int sock, struct in_addr *src_addr,
+ static void finish(void) ATTRIBUTE_NORETURN;
+ static void finish(void)
+ {
+-	if (!(cfg & QUIET)) {
+-		printf("Sent %d probe(s) (%d broadcast(s))\n"
+-			"Received %d repl%s"
+-			" (%d request(s), %d broadcast(s))\n",
++	if (!(option_mask32 & QUIET)) {
++		printf("Sent %u probe(s) (%u broadcast(s))\n"
++			"Received %u repl%s"
++			" (%u request(s), %u broadcast(s))\n",
+ 			sent, brd_sent,
+ 			received, (received == 1) ? "ies" : "y",
+ 			req_recv, brd_recv);
+ 	}
+-	if (cfg & DAD)
++	if (option_mask32 & DAD)
+ 		exit(!!received);
+-	if (cfg & UNSOLICITED)
++	if (option_mask32 & UNSOLICITED)
+ 		exit(0);
+ 	exit(!received);
+ }
+@@ -121,8 +120,8 @@ static void catcher(void)
+ 	count--;
+ 
+ 	if (last == 0 || (now - last) > 500000) {
+-		send_pack(s, &src, &dst, &me, &he);
+-		if (count == 0 && (cfg & UNSOLICITED))
++		send_pack(&src, &dst, &me, &he);
++		if (count == 0 && (option_mask32 & UNSOLICITED))
+ 			finish();
+ 	}
+ 	alarm(1);
+@@ -160,7 +159,7 @@ static int recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 		return 0;
+ 	memcpy(&src_ip, p + ah->ar_hln, 4);
+ 	memcpy(&dst_ip, p + ah->ar_hln + 4 + ah->ar_hln, 4);
+-	if (!(cfg & DAD)) {
++	if (!(option_mask32 & DAD)) {
+ 		if (src_ip.s_addr != dst.s_addr)
+ 			return 0;
+ 		if (src.s_addr != dst_ip.s_addr)
+@@ -188,7 +187,7 @@ static int recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 		if (src.s_addr && src.s_addr != dst_ip.s_addr)
+ 			return 0;
+ 	}
+-	if (!(cfg & QUIET)) {
++	if (!(option_mask32 & QUIET)) {
+ 		int s_printed = 0;
+ 
+ 		printf("%scast re%s from %s [%s]",
+@@ -219,11 +218,11 @@ static int recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 		brd_recv++;
+ 	if (ah->ar_op == htons(ARPOP_REQUEST))
+ 		req_recv++;
+-	if (cfg & QUIT_ON_REPLY)
++	if (option_mask32 & QUIT_ON_REPLY)
+ 		finish();
+-	if (!(cfg & BCAST_ONLY)) {
++	if (!(option_mask32 & BCAST_ONLY)) {
+ 		memcpy(he.sll_addr, p, me.sll_halen);
+-		cfg |= UNICASTING;
++		option_mask32 |= UNICASTING;
+ 	}
+ 	return 1;
+ }
+@@ -237,32 +236,32 @@ int arping_main(int argc, char **argv)
+ 	char *target;
+ 	unsigned char *packet;
+ 
+-	s = xsocket(PF_PACKET, SOCK_DGRAM, 0);
++	sock = xsocket(PF_PACKET, SOCK_DGRAM, 0);
+ 
+ 	// Drop suid root privileges
+ 	xsetuid(getuid());
+ 
+ 	{
+ 		unsigned opt;
+-		char *_count, *_timeout;
++		char *str_count, *str_timeout;
+ 
+ 		/* Dad also sets quit_on_reply.
+ 		 * Advert also sets unsolicited.
+ 		 */
+ 		opt_complementary = "=1:Df:AU";
+ 		opt = getopt32(argc, argv, "DUAqfbc:w:I:s:",
+-					&_count, &_timeout, &device, &source);
+-		cfg |= opt & 0x3f; /* set respective flags */
++				&str_count, &str_timeout, &device, &source);
+ 		if (opt & 0x40) /* -c: count */
+-			count = xatou(_count);
++			count = xatou(str_count);
+ 		if (opt & 0x80) /* -w: timeout */
+-			timeout_us = xatou_range(_timeout, 0, INT_MAX/2000000) * 1000000;
++			timeout_us = xatou_range(str_timeout, 0, INT_MAX/2000000) * 1000000;
+ 		//if (opt & 0x100) /* -I: interface */
+ 		if (strlen(device) >= IF_NAMESIZE) {
+ 			bb_error_msg_and_die("interface name '%s' is too long",
+ 							device);
+ 		}
+ 		//if (opt & 0x200) /* -s: source */
++		option_mask32 &= 0x3f; /* set respective flags */
+ 	}
+ 
+ 	target = argv[optind];
+@@ -274,12 +273,12 @@ int arping_main(int argc, char **argv)
+ 
+ 		memset(&ifr, 0, sizeof(ifr));
+ 		strncpy(ifr.ifr_name, device, IFNAMSIZ - 1);
+-		if (ioctl(s, SIOCGIFINDEX, &ifr) < 0) {
++		if (ioctl(sock, SIOCGIFINDEX, &ifr) < 0) {
+ 			bb_error_msg_and_die("interface %s not found", device);
+ 		}
+ 		ifindex = ifr.ifr_ifindex;
+ 
+-		if (ioctl(s, SIOCGIFFLAGS, (char *) &ifr)) {
++		if (ioctl(sock, SIOCGIFFLAGS, (char *) &ifr)) {
+ 			bb_error_msg_and_die("SIOCGIFFLAGS");
+ 		}
+ 		if (!(ifr.ifr_flags & IFF_UP)) {
+@@ -287,7 +286,7 @@ int arping_main(int argc, char **argv)
+ 		}
+ 		if (ifr.ifr_flags & (IFF_NOARP | IFF_LOOPBACK)) {
+ 			bb_error_msg("interface %s is not ARPable", device);
+-			return (cfg & DAD ? 0 : 2);
++			return (option_mask32 & DAD ? 0 : 2);
+ 		}
+ 	}
+ 
+@@ -303,10 +302,10 @@ int arping_main(int argc, char **argv)
+ 		bb_error_msg_and_die("invalid source address %s", source);
+ 	}
+ 
+-	if (!(cfg & DAD) && (cfg & UNSOLICITED) && src.s_addr == 0)
++	if (!(option_mask32 & DAD) && (option_mask32 & UNSOLICITED) && src.s_addr == 0)
+ 		src = dst;
+ 
+-	if (!(cfg & DAD) || src.s_addr) {
++	if (!(option_mask32 & DAD) || src.s_addr) {
+ 		struct sockaddr_in saddr;
+ 		int probe_fd = xsocket(AF_INET, SOCK_DGRAM, 0);
+ 
+@@ -319,7 +318,7 @@ int arping_main(int argc, char **argv)
+ 		if (src.s_addr) {
+ 			saddr.sin_addr = src;
+ 			xbind(probe_fd, (struct sockaddr *) &saddr, sizeof(saddr));
+-		} else if (!(cfg & DAD)) {
++		} else if (!(option_mask32 & DAD)) {
+ 			socklen_t alen = sizeof(saddr);
+ 
+ 			saddr.sin_port = htons(1025);
+@@ -339,29 +338,29 @@ int arping_main(int argc, char **argv)
+ 	me.sll_family = AF_PACKET;
+ 	me.sll_ifindex = ifindex;
+ 	me.sll_protocol = htons(ETH_P_ARP);
+-	xbind(s, (struct sockaddr *) &me, sizeof(me));
++	xbind(sock, (struct sockaddr *) &me, sizeof(me));
+ 
+ 	{
+ 		socklen_t alen = sizeof(me);
+ 
+-		if (getsockname(s, (struct sockaddr *) &me, &alen) == -1) {
++		if (getsockname(sock, (struct sockaddr *) &me, &alen) == -1) {
+ 			bb_error_msg_and_die("getsockname");
+ 		}
+ 	}
+ 	if (me.sll_halen == 0) {
+ 		bb_error_msg("interface \"%s\" is not ARPable (no ll address)", device);
+-		return (cfg & DAD ? 0 : 2);
++		return (option_mask32 & DAD ? 0 : 2);
+ 	}
+ 	he = me;
+ 	memset(he.sll_addr, -1, he.sll_halen);
+ 
+-	if (!(cfg & QUIET)) {
++	if (!(option_mask32 & QUIET)) {
+ 		printf("ARPING to %s from %s via %s\n",
+ 			inet_ntoa(dst), inet_ntoa(src),
+ 			device ? device : "unknown");
+ 	}
+ 
+-	if (!src.s_addr && !(cfg & DAD)) {
++	if (!src.s_addr && !(option_mask32 & DAD)) {
+ 		bb_error_msg_and_die("no src address in the non-DAD mode");
+ 	}
+ 
+@@ -387,7 +386,7 @@ int arping_main(int argc, char **argv)
+ 		socklen_t alen = sizeof(from);
+ 		int cc;
+ 
+-		cc = recvfrom(s, packet, 4096, 0, (struct sockaddr *) &from, &alen);
++		cc = recvfrom(sock, packet, 4096, 0, (struct sockaddr *) &from, &alen);
+ 		if (cc < 0) {
+ 			bb_perror_msg("recvfrom");
+ 			continue;
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 69d7f2d..af97962 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -25,19 +25,13 @@
+ 
+ 
+ /* Create a random xid */
+-unsigned long random_xid(void)
++unsigned random_xid(void)
+ {
+-	static int initialized;
++	static smallint initialized;
++
+ 	if (!initialized) {
+-		unsigned long seed;
+-
+-		if (open_read_close("/dev/urandom", &seed, sizeof(seed)) < 0) {
+-			bb_info_msg("Cannot load seed "
+-				"from /dev/urandom: %s", strerror(errno));
+-			seed = time(0);
+-		}
+-		srand(seed);
+-		initialized++;
++		srand(monotonic_us());
++		initialized = 1;
+ 	}
+ 	return rand();
+ }
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index 4ddd121..fa091bf 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -38,7 +38,7 @@ extern struct client_config_t client_config;
+ 
+ /*** clientpacket.h ***/
+ 
+-unsigned long random_xid(void);
++unsigned random_xid(void);
+ int send_discover(unsigned long xid, unsigned long requested);
+ int send_selecting(unsigned long xid, unsigned long server, unsigned long requested);
+ int send_renew(unsigned long xid, unsigned long server, unsigned long ciaddr);
+diff --git a/networking/wget.c b/networking/wget.c
+index fc7f7c3..8be37a7 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -38,7 +38,6 @@ static bool chunked;                     /* chunked transfer encoding */
+ #if ENABLE_FEATURE_WGET_STATUSBAR
+ static void progressmeter(int flag);
+ static const char *curfile;             /* Name of current file being transferred */
+-static struct timeval start;            /* Time a transfer started */
+ enum {
+ 	STALLTIME = 5                   /* Seconds when xfer considered "stalled" */
+ };
+@@ -683,30 +682,30 @@ static void alarmtimer(int iwait)
+ 	setitimer(ITIMER_REAL, &itv, NULL);
+ }
+ 
+-
+ static void
+ progressmeter(int flag)
+ {
+-	static struct timeval lastupdate;
++	static unsigned lastupdate_sec;
++	static unsigned start_sec;
+ 	static off_t lastsize, totalsize;
+ 
+-	struct timeval now, td, tvwait;
+ 	off_t abbrevsize;
+-	int elapsed, ratio, barlength, i;
++	unsigned since_last_update, elapsed;
++	unsigned ratio;
++	int barlength, i;
+ 
+ 	if (flag == -1) { /* first call to progressmeter */
+-		gettimeofday(&start, NULL);
+-		lastupdate = start;
++		start_sec = monotonic_sec();
++		lastupdate_sec = start_sec;
+ 		lastsize = 0;
+ 		totalsize = content_len + beg_range; /* as content_len changes.. */
+ 	}
+ 
+-	gettimeofday(&now, NULL);
+ 	ratio = 100;
+ 	if (totalsize != 0 && !chunked) {
+-		/* long long helps to have working ETA even if !LFS */
+-		ratio = (int) (100ULL * (transferred+beg_range) / totalsize);
+-		ratio = MIN(ratio, 100);
++		/* long long helps to have it working even if !LFS */
++		ratio = (unsigned) (100ULL * (transferred+beg_range) / totalsize);
++		if (ratio > 100) ratio = 100;
+ 	}
+ 
+ 	fprintf(stderr, "\r%-20.20s%4d%% ", curfile, ratio);
+@@ -714,12 +713,13 @@ progressmeter(int flag)
+ 	barlength = getttywidth() - 51;
+ 	if (barlength > 0) {
+ 		/* god bless gcc for variable arrays :) */
+-		char buf[barlength+1];
+ 		i = barlength * ratio / 100;
+-		memset(buf, '*', i);
+-		memset(buf + i, ' ', barlength - i);
+-		buf[barlength] = '\0';
+-		fprintf(stderr, "|%s|", buf);
++		{
++			char buf[i+1];
++			memset(buf, '*', i);
++			buf[i] = '\0';
++			fprintf(stderr, "|%s%*s|", buf, barlength - i, "");
++		}
+ 	}
+ 	i = 0;
+ 	abbrevsize = transferred + beg_range;
+@@ -730,22 +730,28 @@ progressmeter(int flag)
+ 	/* see http://en.wikipedia.org/wiki/Tera */
+ 	fprintf(stderr, "%6d %c%c ", (int)abbrevsize, " KMGTPEZY"[i], i?'B':' ');
+ 
+-	timersub(&now, &lastupdate, &tvwait);
++// Nuts! Ain't it easier to update progress meter ONLY when we transferred++?
++// FIXME: get rid of alarmtimer + updateprogressmeter mess
++
++	elapsed = monotonic_sec();
++	since_last_update = elapsed - lastupdate_sec;
+ 	if (transferred > lastsize) {
+-		lastupdate = now;
++		lastupdate_sec = elapsed;
+ 		lastsize = transferred;
+-		if (tvwait.tv_sec >= STALLTIME)
+-			timeradd(&start, &tvwait, &start);
+-		tvwait.tv_sec = 0;
++		if (since_last_update >= STALLTIME) {
++			/* We "cut off" these seconds from elapsed time
++			 * by adjusting start time */
++			start_sec += since_last_update;
++		}
++		since_last_update = 0; /* we are un-stalled now */
+ 	}
+-	timersub(&now, &start, &td);
+-	elapsed = td.tv_sec;
++	elapsed -= start_sec; /* now it's "elapsed since start" */
+ 
+-	if (tvwait.tv_sec >= STALLTIME) {
++	if (since_last_update >= STALLTIME) {
+ 		fprintf(stderr, " - stalled -");
+ 	} else {
+ 		off_t to_download = totalsize - beg_range;
+-		if (transferred <= 0 || elapsed <= 0 || transferred > to_download || chunked) {
++		if (transferred <= 0 || (int)elapsed <= 0 || transferred > to_download || chunked) {
+ 			fprintf(stderr, "--:--:-- ETA");
+ 		} else {
+ 			/* to_download / (transferred/elapsed) - elapsed: */
+diff --git a/networking/zcip.c b/networking/zcip.c
+index eb0a7ba..de4ee0b 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -23,7 +23,6 @@
+ // - avoid silent script failures, especially under load...
+ // - link status monitoring (restart on link-up; stop on link-down)
+ 
+-#include "libbb.h"
+ #include <syslog.h>
+ #include <poll.h>
+ #include <sys/wait.h>
+@@ -31,10 +30,13 @@
+ #include <net/ethernet.h>
+ #include <net/if.h>
+ #include <net/if_arp.h>
+-
+ #include <linux/if_packet.h>
+ #include <linux/sockios.h>
+ 
++#include "libbb.h"
++
++/* We don't need more than 32 bits of the counter */
++#define MONOTONIC_US() ((unsigned)monotonic_us())
+ 
+ struct arp_packet {
+ 	struct ether_header hdr;
+@@ -78,15 +80,12 @@ static void pick(struct in_addr *ip)
+ {
+ 	unsigned tmp;
+ 
+-	/* use cheaper math than lrand48() mod N */
+ 	do {
+-		tmp = (lrand48() >> 16) & IN_CLASSB_HOST;
++		tmp = rand() & IN_CLASSB_HOST;
+ 	} while (tmp > (IN_CLASSB_HOST - 0x0200));
+ 	ip->s_addr = htonl((LINKLOCAL_ADDR + 0x0100) + tmp);
+ }
+ 
+-/* TODO: we need a flag to direct bb_[p]error_msg output to stderr. */
+-
+ /**
+  * Broadcast an ARP packet.
+  */
+@@ -151,7 +150,7 @@ static int run(char *argv[3], const char *intf, struct in_addr *ip)
+  */
+ static unsigned ALWAYS_INLINE ms_rdelay(unsigned secs)
+ {
+-	return lrand48() % (secs * 1000);
++	return rand() % (secs * 1000);
+ }
+ 
+ /**
+@@ -176,29 +175,31 @@ int zcip_main(int argc, char **argv)
+ 		struct ifreq ifr;
+ 		char *intf;
+ 		char *script_av[3];
+-		suseconds_t timeout; // milliseconds
++		int timeout_ms; /* must be signed */
+ 		unsigned conflicts;
+ 		unsigned nprobes;
+ 		unsigned nclaims;
+ 		int ready;
+ 		int verbose;
+ 	} L;
+-#define null_ip   (L.null_ip  )
+-#define null_addr (L.null_addr)
+-#define saddr     (L.saddr    )
+-#define ip        (L.ip       )
+-#define ifr       (L.ifr      )
+-#define intf      (L.intf     )
+-#define script_av (L.script_av)
+-#define timeout   (L.timeout  )
+-#define conflicts (L.conflicts)
+-#define nprobes   (L.nprobes  )
+-#define nclaims   (L.nclaims  )
+-#define ready     (L.ready    )
+-#define verbose   (L.verbose  )
++#define null_ip    (L.null_ip   )
++#define null_addr  (L.null_addr )
++#define saddr      (L.saddr     )
++#define ip         (L.ip        )
++#define ifr        (L.ifr       )
++#define intf       (L.intf      )
++#define script_av  (L.script_av )
++#define timeout_ms (L.timeout_ms)
++#define conflicts  (L.conflicts )
++#define nprobes    (L.nprobes   )
++#define nclaims    (L.nclaims   )
++#define ready      (L.ready     )
++#define verbose    (L.verbose   )
+ 
+ 	memset(&L, 0, sizeof(L));
+ 
++	srand(MONOTONIC_US());
++
+ #define FOREGROUND (opts & 1)
+ #define QUIT       (opts & 2)
+ 	// parse commandline: prog [options] ifname script
+@@ -282,7 +283,7 @@ int zcip_main(int argc, char **argv)
+ 	//  - defend it, within limits
+ 	while (1) {
+ 		struct pollfd fds[1];
+-		struct timeval tv1;
++		unsigned deadline_us;
+ 		struct arp_packet p;
+ 
+ 		int source_ip_conflict = 0;
+@@ -293,24 +294,18 @@ int zcip_main(int argc, char **argv)
+ 		fds[0].revents = 0;
+ 
+ 		// poll, being ready to adjust current timeout
+-		if (!timeout) {
+-			timeout = ms_rdelay(PROBE_WAIT);
++		if (!timeout_ms) {
++			timeout_ms = ms_rdelay(PROBE_WAIT);
+ 			// FIXME setsockopt(fd, SO_ATTACH_FILTER, ...) to
+ 			// make the kernel filter out all packets except
+ 			// ones we'd care about.
+ 		}
+-		// set tv1 to the point in time when we timeout
+-		gettimeofday(&tv1, NULL);
+-		tv1.tv_usec += (timeout % 1000) * 1000;
+-		while (tv1.tv_usec > 1000000) {
+-			tv1.tv_usec -= 1000000;
+-			tv1.tv_sec++;
+-		}
+-		tv1.tv_sec += timeout / 1000;
++		// set deadline_us to the point in time when we timeout
++		deadline_us = MONOTONIC_US() + timeout_ms * 1000;
+ 
+-		VDBG("...wait %ld %s nprobes=%d, nclaims=%d\n",
+-				timeout, intf, nprobes, nclaims);
+-		switch (poll(fds, 1, timeout)) {
++		VDBG("...wait %d %s nprobes=%u, nclaims=%u\n",
++				timeout_ms, intf, nprobes, nclaims);
++		switch (poll(fds, 1, timeout_ms)) {
+ 
+ 		// timeout
+ 		case 0:
+@@ -321,25 +316,24 @@ int zcip_main(int argc, char **argv)
+ 				// have been received, so we can progress through the states
+ 				if (nprobes < PROBE_NUM) {
+ 					nprobes++;
+-					VDBG("probe/%d %s@%s\n",
++					VDBG("probe/%u %s@%s\n",
+ 							nprobes, intf, inet_ntoa(ip));
+ 					arp(fd, &saddr, ARPOP_REQUEST,
+ 							&eth_addr, null_ip,
+ 							&null_addr, ip);
+-					timeout = PROBE_MIN * 1000;
+-					timeout += ms_rdelay(PROBE_MAX
+-							- PROBE_MIN);
++					timeout_ms = PROBE_MIN * 1000;
++					timeout_ms += ms_rdelay(PROBE_MAX - PROBE_MIN);
+ 				}
+ 				else {
+ 					// Switch to announce state.
+ 					state = ANNOUNCE;
+ 					nclaims = 0;
+-					VDBG("announce/%d %s@%s\n",
++					VDBG("announce/%u %s@%s\n",
+ 							nclaims, intf, inet_ntoa(ip));
+ 					arp(fd, &saddr, ARPOP_REQUEST,
+ 							&eth_addr, ip,
+ 							&eth_addr, ip);
+-					timeout = ANNOUNCE_INTERVAL * 1000;
++					timeout_ms = ANNOUNCE_INTERVAL * 1000;
+ 				}
+ 				break;
+ 			case RATE_LIMIT_PROBE:
+@@ -347,24 +341,24 @@ int zcip_main(int argc, char **argv)
+ 				// have been received, so we can move immediately to the announce state
+ 				state = ANNOUNCE;
+ 				nclaims = 0;
+-				VDBG("announce/%d %s@%s\n",
++				VDBG("announce/%u %s@%s\n",
+ 						nclaims, intf, inet_ntoa(ip));
+ 				arp(fd, &saddr, ARPOP_REQUEST,
+ 						&eth_addr, ip,
+ 						&eth_addr, ip);
+-				timeout = ANNOUNCE_INTERVAL * 1000;
++				timeout_ms = ANNOUNCE_INTERVAL * 1000;
+ 				break;
+ 			case ANNOUNCE:
+ 				// timeouts in the ANNOUNCE state mean no conflicting ARP packets
+ 				// have been received, so we can progress through the states
+ 				if (nclaims < ANNOUNCE_NUM) {
+ 					nclaims++;
+-					VDBG("announce/%d %s@%s\n",
++					VDBG("announce/%u %s@%s\n",
+ 							nclaims, intf, inet_ntoa(ip));
+ 					arp(fd, &saddr, ARPOP_REQUEST,
+ 							&eth_addr, ip,
+ 							&eth_addr, ip);
+-					timeout = ANNOUNCE_INTERVAL * 1000;
++					timeout_ms = ANNOUNCE_INTERVAL * 1000;
+ 				}
+ 				else {
+ 					// Switch to monitor state.
+@@ -375,7 +369,7 @@ int zcip_main(int argc, char **argv)
+ 					run(script_av, intf, &ip);
+ 					ready = 1;
+ 					conflicts = 0;
+-					timeout = -1; // Never timeout in the monitor state.
++					timeout_ms = -1; // Never timeout in the monitor state.
+ 
+ 					// NOTE: all other exit paths
+ 					// should deconfig ...
+@@ -386,14 +380,14 @@ int zcip_main(int argc, char **argv)
+ 			case DEFEND:
+ 				// We won!  No ARP replies, so just go back to monitor.
+ 				state = MONITOR;
+-				timeout = -1;
++				timeout_ms = -1;
+ 				conflicts = 0;
+ 				break;
+ 			default:
+ 				// Invalid, should never happen.  Restart the whole protocol.
+ 				state = PROBE;
+ 				pick(&ip);
+-				timeout = 0;
++				timeout_ms = 0;
+ 				nprobes = 0;
+ 				nclaims = 0;
+ 				break;
+@@ -403,20 +397,17 @@ int zcip_main(int argc, char **argv)
+ 		case 1:
+ 			// We need to adjust the timeout in case we didn't receive
+ 			// a conflicting packet.
+-			if (timeout > 0) {
+-				struct timeval tv2;
+-
+-				gettimeofday(&tv2, NULL);
+-				if (timercmp(&tv1, &tv2, <)) {
++			if (timeout_ms > 0) {
++				unsigned diff = deadline_us - MONOTONIC_US();
++				if ((int)(diff) < 0) {
+ 					// Current time is greater than the expected timeout time.
+ 					// Should never happen.
+ 					VDBG("missed an expected timeout\n");
+-					timeout = 0;
++					timeout_ms = 0;
+ 				} else {
+ 					VDBG("adjusting timeout\n");
+-					timersub(&tv1, &tv2, &tv1);
+-					timeout = 1000 * tv1.tv_sec
+-							+ tv1.tv_usec / 1000;
++					timeout_ms = diff / 1000;
++					if (!timeout_ms) timeout_ms = 1;
+ 				}
+ 			}
+ 
+@@ -484,13 +475,13 @@ int zcip_main(int argc, char **argv)
+ 					conflicts++;
+ 					if (conflicts >= MAX_CONFLICTS) {
+ 						VDBG("%s ratelimit\n", intf);
+-						timeout = RATE_LIMIT_INTERVAL * 1000;
++						timeout_ms = RATE_LIMIT_INTERVAL * 1000;
+ 						state = RATE_LIMIT_PROBE;
+ 					}
+ 
+ 					// restart the whole protocol
+ 					pick(&ip);
+-					timeout = 0;
++					timeout_ms = 0;
+ 					nprobes = 0;
+ 					nclaims = 0;
+ 				}
+@@ -500,7 +491,7 @@ int zcip_main(int argc, char **argv)
+ 				if (source_ip_conflict) {
+ 					VDBG("monitor conflict -- defending\n");
+ 					state = DEFEND;
+-					timeout = DEFEND_INTERVAL * 1000;
++					timeout_ms = DEFEND_INTERVAL * 1000;
+ 					arp(fd, &saddr,
+ 							ARPOP_REQUEST,
+ 							&eth_addr, ip,
+@@ -518,7 +509,7 @@ int zcip_main(int argc, char **argv)
+ 
+ 					// restart the whole protocol
+ 					pick(&ip);
+-					timeout = 0;
++					timeout_ms = 0;
+ 					nprobes = 0;
+ 					nclaims = 0;
+ 				}
+@@ -528,7 +519,7 @@ int zcip_main(int argc, char **argv)
+ 				VDBG("invalid state -- starting over\n");
+ 				state = PROBE;
+ 				pick(&ip);
+-				timeout = 0;
++				timeout_ms = 0;
+ 				nprobes = 0;
+ 				nclaims = 0;
+ 				break;

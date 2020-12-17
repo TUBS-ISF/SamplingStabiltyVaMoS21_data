@@ -1,0 +1,90 @@
+2009-05-14 00:23:34 +0200
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index 9430bfa..e115036 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -152,6 +152,22 @@ config FEATURE_ADDUSER_LONG_OPTIONS
+ 	help
+ 	  Support long options for the adduser applet.
+ 
++config FIRST_SYSTEM_ID
++	int "First valid system uid or gid for adduser and addgroup"
++	depends on ADDUSER || ADDGROUP
++	range 0 64900
++	default 100
++	help
++	  First valid system uid or gid for adduser and addgroup
++
++config LAST_SYSTEM_ID
++	int "Last valid system uid or gid for adduser and addgroup"
++	depends on ADDUSER || ADDGROUP
++	range 0 64900
++	default 999
++	help
++	  Last valid system uid or gid for adduser and addgroup
++
+ config DELUSER
+ 	bool "deluser"
+ 	default n
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index cb83929..dc60788 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -11,6 +11,10 @@
+  */
+ #include "libbb.h"
+ 
++#if CONFIG_LAST_SYSTEM_ID < CONFIG_FIRST_SYSTEM_ID
++#error Bad LAST_SYSTEM_ID or FIRST_SYSTEM_ID in .config
++#endif
++
+ #define OPT_GID                       (1 << 0)
+ #define OPT_SYSTEM_ACCOUNT            (1 << 1)
+ 
+@@ -30,11 +34,11 @@ static void xgroup_study(struct group *g)
+ 	/* gid values is set to [0, INT_MAX] */
+ 	if (!(option_mask32 & OPT_GID)) {
+ 		if (option_mask32 & OPT_SYSTEM_ACCOUNT) {
+-			g->gr_gid = 100; /* FIRST_SYSTEM_GID */
+-			max = 999;       /* LAST_SYSTEM_GID */
++			g->gr_gid = CONFIG_FIRST_SYSTEM_ID;
++			max = CONFIG_LAST_SYSTEM_ID;
+ 		} else {
+-			g->gr_gid = 1000; /* FIRST_GID */
+-			max = 64999;      /* LAST_GID */
++			g->gr_gid = CONFIG_LAST_SYSTEM_ID + 1;
++			max = 64999;
+ 		}
+ 	}
+ 	/* Check if the desired gid is free
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index a399d9e..0023237 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -9,6 +9,10 @@
+  */
+ #include "libbb.h"
+ 
++#if CONFIG_LAST_SYSTEM_ID < CONFIG_FIRST_SYSTEM_ID
++#error Bad LAST_SYSTEM_ID or FIRST_SYSTEM_ID in .config
++#endif
++
+ /* #define OPT_HOME           (1 << 0) */ /* unused */
+ /* #define OPT_GECOS          (1 << 1) */ /* unused */
+ #define OPT_SHELL          (1 << 2)
+@@ -32,11 +36,11 @@ static void passwd_study(struct passwd *p)
+ 
+ 	if (!(option_mask32 & OPT_UID)) {
+ 		if (option_mask32 & OPT_SYSTEM_ACCOUNT) {
+-			p->pw_uid = 100; /* FIRST_SYSTEM_UID */
+-			max = 999;       /* LAST_SYSTEM_UID */
++			p->pw_uid = CONFIG_FIRST_SYSTEM_ID;
++			max = CONFIG_LAST_SYSTEM_ID;
+ 		} else {
+-			p->pw_uid = 1000; /* FIRST_UID */
+-			max = 64999;      /* LAST_UID */
++			p->pw_uid = CONFIG_LAST_SYSTEM_ID + 1;
++			max = 64999;
+ 		}
+ 	}
+ 	/* check for a free uid (and maybe gid) */

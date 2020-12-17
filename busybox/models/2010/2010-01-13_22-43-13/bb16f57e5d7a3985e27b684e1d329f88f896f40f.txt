@@ -1,0 +1,52 @@
+2010-01-13 22:43:13 +0100
+diff --git a/INSTALL b/INSTALL
+index a7902ab..2d645cd 100644
+--- a/INSTALL
++++ b/INSTALL
+@@ -19,11 +19,24 @@ it, is to enable all features and then use "standalone shell" mode with a
+ blank command $PATH.
+ 
+ To enable all features, use "make defconfig", which produces the largest
+-general-purpose configuration.  (It's allyesconfig minus debugging options,
++general-purpose configuration.  It's allyesconfig minus debugging options,
+ optional packaging choices, and a few special-purpose features requiring
+-extra configuration to use.)
++extra configuration to use.  Then enable "standalone shell" feature:
+ 
+   make defconfig
++  make menuconfig
++  # select Busybox Settings
++  #   then General Configuration
++  #     then exec prefers applets
++  #   exit back to top level menu
++  #   select Shells
++  #     then Standalone shell
++  #   exit back to top level menu
++  # exit and save new configuration
++  #   OR
++  # use these commands to modify .config directly:
++  sed -e 's/.*FEATURE_PREFER_APPLETS.*/CONFIG_FEATURE_PREFER_APPLETS=y/' -i .config
++  sed -e 's/.*FEATURE_SH_STANDALONE.*/CONFIG_FEATURE_SH_STANDALONE=y/' -i .config
+   make
+   PATH= ./busybox ash
+ 
+@@ -121,5 +134,4 @@ More Information:
+ 
+ Se also the busybox FAQ, under the questions "How can I get started using
+ BusyBox" and "How do I build a BusyBox-based system?"  The BusyBox FAQ is
+-available from http://www.busybox.net/FAQ.html or as the file
+-docs/busybox.net/FAQ.html in this tarball.
++available from http://www.busybox.net/FAQ.html
+diff --git a/coreutils/sync.c b/coreutils/sync.c
+index 9016655..59305c6 100644
+--- a/coreutils/sync.c
++++ b/coreutils/sync.c
+@@ -14,7 +14,7 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ int sync_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sync_main(int argc UNUSED_PARAM, char **argv)
++int sync_main(int argc UNUSED_PARAM, char **argv IF_NOT_DESKTOP(UNUSED_PARAM))
+ {
+ 	/* coreutils-6.9 compat */
+ 	bb_warn_ignoring_args(argv[1]);

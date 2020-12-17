@@ -1,0 +1,13 @@
+2007-06-12 20:55:38 +0000
+diff --git a/applets/Kbuild b/applets/Kbuild
+index 1d4a96c..4afab88 100644
+--- a/applets/Kbuild
++++ b/applets/Kbuild
+@@ -9,6 +9,7 @@ obj-y	+= applets.o
+ 
+ # Generated file needs additional love
+ 
++applets/usage:     .config
+ applets/applets.o: .config include/usage_compressed.h
+ 
+ hostprogs-y += usage

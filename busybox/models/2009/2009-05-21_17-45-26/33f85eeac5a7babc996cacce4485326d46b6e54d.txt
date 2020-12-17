@@ -1,0 +1,11 @@
+2009-05-21 17:45:26 -0400
+diff --git a/shell/hush_test/.gitignore b/shell/hush_test/.gitignore
+new file mode 100644
+index 0000000..104b9d1
+--- /dev/null
++++ b/shell/hush_test/.gitignore
+@@ -0,0 +1,4 @@
++*.fail
++*.xx
++
++/hush

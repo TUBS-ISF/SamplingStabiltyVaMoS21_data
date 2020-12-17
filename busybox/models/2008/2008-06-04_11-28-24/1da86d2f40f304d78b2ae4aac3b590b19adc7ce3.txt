@@ -1,0 +1,128 @@
+2008-06-04 11:28:24 +0000
+diff --git a/Config.in b/Config.in
+index a991b8a..3b37496 100644
+--- a/Config.in
++++ b/Config.in
+@@ -262,6 +262,14 @@ config STATIC
+ 
+ 	  Most people will leave this set to 'N'.
+ 
++config PIE
++	bool "Build BusyBox as a position independent executable"
++	default n
++	depends on !STATIC
++	help
++	  (TODO: what is it and why/when is it useful?)
++	  Most people will leave this set to 'N'.
++
+ config NOMMU
+ 	bool "Force NOMMU build"
+ 	default n
+diff --git a/Makefile b/Makefile
+index aad67a1..308ea42 100644
+--- a/Makefile
++++ b/Makefile
+@@ -315,6 +315,8 @@ AFLAGS_KERNEL	=
+ # Use LINUXINCLUDE when you must reference the include/ directory.
+ # Needed to be compatible with the O= option
+ CFLAGS		:= $(CFLAGS)
++# Added only to final link stage of busybox binary
++CFLAGS_busybox	:= $(CFLAGS_busybox)
+ CPPFLAGS	:= $(CPPFLAGS)
+ AFLAGS		:= $(AFLAGS)
+ LDFLAGS		:= $(LDFLAGS)
+@@ -580,7 +582,7 @@ quiet_cmd_busybox__ ?= LINK    $@
+       cmd_busybox__ ?= $(srctree)/scripts/trylink \
+       "$@" \
+       "$(CC)" \
+-      "$(CFLAGS)" \
++      "$(CFLAGS) $(CFLAGS_busybox)" \
+       "$(LDFLAGS) $(EXTRA_LDFLAGS)" \
+       "$(core-y)" \
+       "$(libs-y)" \
+diff --git a/Makefile.flags b/Makefile.flags
+index 9525889..1cfda26 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -50,17 +50,31 @@ ifeq ($(CONFIG_DEBUG),y)
+ CFLAGS += $(call cc-option,-g)
+ endif
+ 
++# If arch/$(ARCH)/Makefile did not override it (with, say, -fPIC)...
++ARCH_FPIC ?= -fpic
++ARCH_FPIE ?= -fpie
++ARCH_PIE ?= -pie
++
+ ifeq ($(CONFIG_BUILD_LIBBUSYBOX),y)
+ # on i386: 14% smaller libbusybox.so
+ # (code itself is 9% bigger, we save on relocs/PLT/GOT)
+-CFLAGS += -fpic
++CFLAGS += $(ARCH_FPIC)
+ # and another 4% reduction of libbusybox.so:
+ # (external entry points must be marked EXTERNALLY_VISIBLE)
+ CFLAGS += $(call cc-option,-fvisibility=hidden)
+ endif
+ 
+ ifeq ($(CONFIG_STATIC),y)
+-LDFLAGS += -static
++CFLAGS_busybox += -static
++endif
++
++ifeq ($(CONFIG_PIE),y)
++CFLAGS_busybox += $(ARCH_PIE)
++CFLAGS += $(ARCH_FPIE)
++# No switch() jump tables. Code growth +1k, binary size down -12k
++# due to reduced number of code pointers.
++# (TODO: make overridable: some arches may want to not do this)
++CFLAGS += $(call cc-option,-fno-jump-tables)
+ endif
+ 
+ LDLIBS += m crypt
+@@ -81,8 +95,6 @@ ifeq ($(CONFIG_DMALLOC),y)
+ LDLIBS += dmalloc
+ endif
+ 
+-#LDFLAGS += -nostdlib
+-
+ LDFLAGS_ELF2FLT = -Wl,-elf2flt
+ ifneq (,$(findstring $(LDFLAGS_ELF2FLT),$(LDFLAGS)))
+ SKIP_STRIP = y
+diff --git a/scripts/Makefile.IMA b/scripts/Makefile.IMA
+index 988c6a6..a34db50 100644
+--- a/scripts/Makefile.IMA
++++ b/scripts/Makefile.IMA
+@@ -45,8 +45,8 @@ STRIP           = $(CROSS_COMPILE)strip
+ OBJCOPY         = $(CROSS_COMPILE)objcopy
+ OBJDUMP         = $(CROSS_COMPILE)objdump
+ 
+-CFLAGS := $(CFLAGS)
+-CPPFLAGS+= -D"KBUILD_STR(s)=\#s" #-Q
++CFLAGS   := $(CFLAGS)
++CPPFLAGS += -D"KBUILD_STR(s)=\#s" #-Q
+ 
+ # We need some generic definitions
+ include $(srctree)/scripts/Kbuild.include
+@@ -180,7 +180,7 @@ busybox_unstripped.o: $(usage_stuff) include/applet_tables.h include/autoconf.h
+ busybox: busybox_unstripped.o
+ 	$(srctree)/scripts/trylink \
+ 		busybox_unstripped \
+-		"$(CC)" \
++		"$(CC) $(CFLAGS_busybox)" \
+ 		"$(CFLAGS)" \
+ 		"$(LDFLAGS)" \
+ 		"busybox_unstripped.o" \
+diff --git a/scripts/Makefile.build b/scripts/Makefile.build
+index ddefea5..f343818 100644
+--- a/scripts/Makefile.build
++++ b/scripts/Makefile.build
+@@ -251,8 +251,8 @@ ifdef builtin-target
+ quiet_cmd_link_o_target = LD      $@
+ # If the list of objects to link is empty, just create an empty built-in.o
+ cmd_link_o_target = $(if $(strip $(obj-y)),\
+-		      $(LD) $(ld_flags) -r -o $@ $(filter $(obj-y), $^),\
+-		      rm -f $@; $(AR) rcs $@)
++		$(LD) $(ld_flags) -r -o $@ $(filter $(obj-y), $^),\
++		rm -f $@; $(AR) rcs $@)
+ 
+ $(builtin-target): $(obj-y) FORCE
+ 	$(call if_changed,link_o_target)

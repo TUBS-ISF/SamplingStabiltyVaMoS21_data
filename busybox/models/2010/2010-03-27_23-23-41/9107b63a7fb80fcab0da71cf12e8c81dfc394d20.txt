@@ -1,0 +1,94 @@
+2010-03-27 23:23:41 +0100
+diff --git a/networking/udhcp/common.c b/networking/udhcp/common.c
+index 9316774..6e8ec3e 100644
+--- a/networking/udhcp/common.c
++++ b/networking/udhcp/common.c
+@@ -146,6 +146,25 @@ static void log_option(const char *pfx, const uint8_t *opt)
+ # define log_option(pfx, opt) ((void)0)
+ #endif
+ 
++unsigned FAST_FUNC udhcp_option_idx(const char *name)
++{
++	int n = index_in_strings(dhcp_option_strings, name);
++	if (n >= 0)
++		return n;
++
++	{
++		char buf[sizeof(dhcp_option_strings)];
++		char *d = buf;
++		const char *s = dhcp_option_strings;
++		while (s < dhcp_option_strings + sizeof(dhcp_option_strings) - 2) {
++			*d++ = (*s == '\0' ? ' ' : *s);
++			s++;
++		}
++		*d = '\0';
++		bb_error_msg_and_die("unknown option '%s', known options: %s", name, buf);
++	}
++}
++
+ /* get an option with bounds checking (warning, result is not aligned). */
+ uint8_t* FAST_FUNC udhcp_get_option(struct dhcp_packet *packet, int code)
+ {
+@@ -372,7 +391,7 @@ int FAST_FUNC udhcp_str2optset(const char *const_str, void *arg)
+ 	char *opt, *val, *endptr;
+ 	char *str;
+ 	const struct dhcp_option *option;
+-	int retval, length, idx;
++	int retval, length;
+ 	char buffer[8] ALIGNED(4);
+ 	uint16_t *result_u16 = (uint16_t *) buffer;
+ 	uint32_t *result_u32 = (uint32_t *) buffer;
+@@ -383,10 +402,7 @@ int FAST_FUNC udhcp_str2optset(const char *const_str, void *arg)
+ 	if (!opt)
+ 		return 0;
+ 
+-	idx = index_in_strings(dhcp_option_strings, opt); /* NB: was strcasecmp! */
+-	if (idx < 0)
+-		return 0;
+-	option = &dhcp_options[idx];
++	option = &dhcp_options[udhcp_option_idx(opt)];
+ 
+ 	retval = 0;
+ 	do {
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index b4e8b5d..1c5afa6 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -169,6 +169,8 @@ extern const struct dhcp_option dhcp_options[];
+ extern const char dhcp_option_strings[];
+ extern const uint8_t dhcp_option_lengths[];
+ 
++unsigned FAST_FUNC udhcp_option_idx(const char *name);
++
+ uint8_t *udhcp_get_option(struct dhcp_packet *packet, int code) FAST_FUNC;
+ int udhcp_end_option(uint8_t *optionptr) FAST_FUNC;
+ void udhcp_add_binary_option(struct dhcp_packet *packet, uint8_t *addopt) FAST_FUNC;
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 478ca5c..c36d418 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -879,21 +879,17 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		client_config.no_default_options = 1;
+ 	while (list_O) {
+ 		char *optstr = llist_pop(&list_O);
+-		int n = index_in_strings(dhcp_option_strings, optstr);
+-		if (n < 0)
+-			bb_error_msg_and_die("unknown option '%s'", optstr);
++		unsigned n = udhcp_option_idx(optstr);
+ 		n = dhcp_options[n].code;
+ 		client_config.opt_mask[n >> 3] |= 1 << (n & 7);
+ 	}
+ 	while (list_x) {
+-		int n;
++		unsigned n;
+ 		char *optstr = llist_pop(&list_x);
+ 		char *colon = strchr(optstr, ':');
+ 		if (colon)
+ 			*colon = '\0';
+-		n = index_in_strings(dhcp_option_strings, optstr);
+-		if (n < 0)
+-			bb_error_msg_and_die("unknown option '%s'", optstr);
++		n = udhcp_option_idx(optstr);
+ 		if (colon)
+ 			*colon = ' ';
+ 		udhcp_str2optset(optstr, &client_config.options);

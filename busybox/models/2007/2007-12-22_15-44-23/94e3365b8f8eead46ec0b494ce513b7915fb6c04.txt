@@ -1,0 +1,61 @@
+2007-12-22 15:44:23 +0000
+diff --git a/libbb/verror_msg.c b/libbb/verror_msg.c
+index e510031..dbd8323 100644
+--- a/libbb/verror_msg.c
++++ b/libbb/verror_msg.c
+@@ -45,8 +45,10 @@ void bb_verror_msg(const char *s, va_list p, const char* strerr)
+ 	msg[applet_len - 2] = ':';
+ 	msg[applet_len - 1] = ' ';
+ 	if (strerr) {
+-		msg[used++] = ':';
+-		msg[used++] = ' ';
++		if (s[0]) { /* not perror_nomsg? */
++			msg[used++] = ':';
++			msg[used++] = ' ';
++		}
+ 		strcpy(&msg[used], strerr);
+ 		used += strerr_len;
+ 	}
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 0550e43..3aacaac 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -305,7 +305,7 @@ CONFIG_ED=y
+ CONFIG_PATCH=y
+ CONFIG_SED=y
+ CONFIG_VI=y
+-CONFIG_FEATURE_VI_MAX_LEN=1024
++CONFIG_FEATURE_VI_MAX_LEN=4096
+ CONFIG_FEATURE_VI_COLON=y
+ CONFIG_FEATURE_VI_YANKMARK=y
+ CONFIG_FEATURE_VI_SEARCH=y
+diff --git a/util-linux/losetup.c b/util-linux/losetup.c
+index a9ecfd5..d521b7b 100644
+--- a/util-linux/losetup.c
++++ b/util-linux/losetup.c
+@@ -37,14 +37,14 @@ int losetup_main(int argc, char **argv)
+ 		if (argc != 1)
+ 			bb_show_usage();
+ 		if (del_loop(argv[0]))
+-			bb_perror_nomsg_and_die();
++			bb_simple_perror_msg_and_die(argv[0]);
+ 		return EXIT_SUCCESS;
+ 	}
+ 
+ 	if (argc == 2) {
+ 		/* -o or no option */
+ 		if (set_loop(&argv[0], argv[1], offset) < 0)
+-			bb_perror_nomsg_and_die();
++			bb_simple_perror_msg_and_die(argv[0]);
+ 		return EXIT_SUCCESS;
+ 	}
+ 
+@@ -52,7 +52,7 @@ int losetup_main(int argc, char **argv)
+ 		/* -o or no option */
+ 		s = query_loop(argv[0]);
+ 		if (!s)
+-			bb_perror_nomsg_and_die();
++			bb_simple_perror_msg_and_die(argv[0]);
+ 		printf("%s: %s\n", argv[0], s);
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			free(s);

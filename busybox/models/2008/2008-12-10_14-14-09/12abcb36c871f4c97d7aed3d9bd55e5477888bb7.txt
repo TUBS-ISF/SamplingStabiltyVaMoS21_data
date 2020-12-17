@@ -1,0 +1,29 @@
+2008-12-10 14:14:09 +0000
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 36d4512..27855bb 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -774,9 +774,7 @@ static void buffer_line(int linenum)
+ static void open_file_and_read_lines(void)
+ {
+ 	if (filename) {
+-		int fd = xopen(filename, O_RDONLY);
+-		dup2(fd, 0);
+-		if (fd) close(fd);
++		xmove_fd(xopen(filename, O_RDONLY), STDIN_FILENO);
+ 	} else {
+ 		/* "less" with no arguments in argv[] */
+ 		/* For status line only */
+diff --git a/networking/libiproute/ll_map.c b/networking/libiproute/ll_map.c
+index 3412dc7..2ed7fbb 100644
+--- a/networking/libiproute/ll_map.c
++++ b/networking/libiproute/ll_map.c
+@@ -172,7 +172,7 @@ int xll_name_to_index(const char *const name)
+ #endif
+ 
+ 	sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+-	if (sock_fd) {
++	if (sock_fd >= 0) {
+ 		struct ifreq ifr;
+ 		int tmp;
+ 

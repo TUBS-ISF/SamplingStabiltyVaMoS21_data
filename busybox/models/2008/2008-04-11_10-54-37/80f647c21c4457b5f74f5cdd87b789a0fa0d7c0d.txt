@@ -1,0 +1,40 @@
+2008-04-11 10:54:37 +0000
+diff --git a/Makefile.custom b/Makefile.custom
+index e4a616f..3334b31 100644
+--- a/Makefile.custom
++++ b/Makefile.custom
+@@ -47,10 +47,11 @@ ifneq ($(strip $(DO_INSTALL_LIBS)),n)
+ endif
+ 
+ # Not very elegant: copies testsuite to objdir...
++# (cp -pPR is POSIX-compliant (cp -dpR or cp -a would not be))
+ .PHONY: check
+ .PHONY: test
+ check test: busybox busybox.links
+-	test -d $(objtree)/testsuite || cp -a $(srctree)/testsuite $(objtree)
++	test -d $(objtree)/testsuite || cp -pPR $(srctree)/testsuite $(objtree)
+ 	bindir=$(objtree) srcdir=$(srctree)/testsuite \
+ 	$(SHELL) -c "cd $(objtree)/testsuite && $(srctree)/testsuite/runtest $(if $(KBUILD_VERBOSE:0=),-v)"
+ 
+@@ -58,7 +59,7 @@ check test: busybox busybox.links
+ release: distclean
+ 	cd ..; \
+ 	rm -r -f busybox-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION); \
+-	cp -a busybox busybox-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) && { \
++	cp -pPR busybox busybox-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) && { \
+ 	find busybox-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)/ -type d \
+ 		-name .svn \
+ 		-print \
+diff --git a/coreutils/cp.c b/coreutils/cp.c
+index 6cf1e21..a4eea94 100644
+--- a/coreutils/cp.c
++++ b/coreutils/cp.c
+@@ -44,7 +44,7 @@ int cp_main(int argc, char **argv)
+ 	// Soft- and hardlinking don't mix
+ 	// -P and -d are the same (-P is POSIX, -d is GNU)
+ 	// -r and -R are the same
+-	// -R (and therefore -r) switches on -d (coreutils does this)
++	// -R (and therefore -r) turns on -d (coreutils does this)
+ 	// -a = -pdR
+ 	opt_complementary = "-2:l--s:s--l:Pd:rRd:Rd:apdR";
+ 	flags = getopt32(argv, FILEUTILS_CP_OPTSTR "arPHL");

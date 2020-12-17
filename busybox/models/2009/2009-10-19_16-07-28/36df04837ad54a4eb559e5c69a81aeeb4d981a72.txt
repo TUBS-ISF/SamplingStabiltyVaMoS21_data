@@ -1,0 +1,61 @@
+2009-10-19 16:07:28 +0200
+diff --git a/include/libbb.h b/include/libbb.h
+index 6e629d1..97dbe86 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1271,6 +1271,7 @@ line_input_t *new_line_input_t(int flags) FAST_FUNC;
+  */
+ int read_line_input(const char* prompt, char* command, int maxsize, line_input_t *state) FAST_FUNC;
+ #else
++#define MAX_HISTORY 0
+ int read_line_input(const char* prompt, char* command, int maxsize) FAST_FUNC;
+ #define read_line_input(prompt, command, maxsize, state) \
+ 	read_line_input(prompt, command, maxsize)
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 2a0ace5..163efaa 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -562,13 +562,15 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	{
+-		struct timeval tv;
+ 		struct timeval *tv_ptr = NULL;
++#if ENABLE_FEATURE_TELNETD_INETD_WAIT
++		struct timeval tv;
+ 		if ((opt & OPT_WAIT) && !G.sessions) {
+ 			tv.tv_sec = sec_linger;
+ 			tv.tv_usec = 0;
+ 			tv_ptr = &tv;
+ 		}
++#endif
+ 		count = select(G.maxfd + 1, &rdfdset, &wrfdset, NULL, tv_ptr);
+ 	}
+ 	if (count == 0) /* "telnetd -w SEC" timed out */
+diff --git a/procps/top.c b/procps/top.c
+index 9e8ad1d..252f6f7 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -513,8 +513,8 @@ static NOINLINE void display_process_list(int lines_rem, int scr_width)
+ 	/* xxx_shift and xxx_scale variables allow us to replace
+ 	 * expensive divides with multiply and shift */
+ 	unsigned pmem_shift, pmem_scale, pmem_half;
+-	unsigned tmp_unsigned;
+ #if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
++	unsigned tmp_unsigned;
+ 	unsigned pcpu_shift, pcpu_scale, pcpu_half;
+ 	unsigned busy_jifs;
+ #endif
+diff --git a/shell/ash.c b/shell/ash.c
+index d81dbd3..481b841 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -53,6 +53,8 @@
+ #include "math.h"
+ #if ENABLE_ASH_RANDOM_SUPPORT
+ # include "random.h"
++#else
++# define CLEAR_RANDOM_T(rnd) ((void)0)
+ #endif
+ 
+ #if defined SINGLE_APPLET_MAIN

@@ -1,0 +1,62 @@
+2007-10-11 10:06:26 +0000
+diff --git a/include/busybox.h b/include/busybox.h
+index 5c01eca..7ef3690 100644
+--- a/include/busybox.h
++++ b/include/busybox.h
+@@ -56,7 +56,7 @@ extern const unsigned short NUM_APPLETS;
+ /* Length of these names has effect on size of libbusybox
+  * and "individual" binaries. Keep them short.
+  */
+-void lbb_prepare(char **argv) MAIN_EXTERNALLY_VISIBLE;
++void lbb_prepare(const char *applet, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ #if ENABLE_BUILD_LIBBUSYBOX
+ #if ENABLE_FEATURE_SHARED_BUSYBOX
+ int lbb_main(int argc, char **argv) EXTERNALLY_VISIBLE;
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 953f1e7..8b1ed80 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -127,11 +127,12 @@ const struct bb_applet *find_applet_by_name(const char *name)
+ int *const bb_errno __attribute__ ((section (".data")));
+ #endif
+ 
+-void lbb_prepare(char **argv)
++void lbb_prepare(const char *applet, char **argv)
+ {
+ #ifdef __GLIBC__
+ 	(*(int **)&bb_errno) = __errno_location();
+ #endif
++	applet_name = applet;
+ 
+ 	/* Set locale for everybody except 'init' */
+ 	if (ENABLE_LOCALE_SUPPORT && getpid() != 1)
+@@ -666,7 +667,7 @@ int lbb_main(int argc, char **argv)
+ int main(int argc, char **argv)
+ #endif
+ {
+-	lbb_prepare(argv);
++	lbb_prepare("busybox", argv);
+ 
+ #if !BB_MMU
+ 	/* NOMMU re-exec trick sets high-order bit in first byte of name */
+diff --git a/scripts/trylink b/scripts/trylink
+index 25629aa..7fe262b 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -220,14 +220,12 @@ if test "$CONFIG_FEATURE_INDIVIDUAL" = y; then
+     while read name main junk; do
+ 
+ 	echo "\
+-void lbb_prepare(char **argv);
++void lbb_prepare(const char *applet, char **argv);
+ int $main(int argc, char **argv);
+ 
+-const char *applet_name = \"$name\";
+-
+ int main(int argc, char **argv)
+ {
+-	lbb_prepare(argv);
++	lbb_prepare(\"$name\", argv);
+ 	return $main(argc, argv);
+ }
+ " >"$sharedlib_dir/applet.c"

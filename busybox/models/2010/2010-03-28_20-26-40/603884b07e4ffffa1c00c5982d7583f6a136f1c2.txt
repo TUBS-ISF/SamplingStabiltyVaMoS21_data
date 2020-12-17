@@ -1,0 +1,16 @@
+2010-03-28 20:26:40 +0200
+diff --git a/Makefile.custom b/Makefile.custom
+index fb9ec67..ecba6bd 100644
+--- a/Makefile.custom
++++ b/Makefile.custom
+@@ -64,6 +64,10 @@ release: distclean
+ 		-name .svn \
+ 		-print \
+ 		-exec rm -r -f {} \; ; \
++	find busybox-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)/ -type d \
++		-name .git \
++		-print \
++		-exec rm -r -f {} \; ; \
+ 	find busybox-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)/ -type f \
+ 		-name .\#* \
+ 		-print \

@@ -1,0 +1,61 @@
+2008-12-05 16:23:06 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 80311db..16e8f48 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -703,6 +703,7 @@ void xget_uidgid(struct bb_uidgid_t*, const char*) FAST_FUNC;
+ /* chown-like handling of "user[:[group]" */
+ void parse_chown_usergroup_or_die(struct bb_uidgid_t *u, char *user_group) FAST_FUNC;
+ struct passwd* xgetpwnam(const char *name) FAST_FUNC;
++struct group* xgetgrnam(const char *name) FAST_FUNC;
+ struct passwd* xgetpwuid(uid_t uid) FAST_FUNC;
+ struct group* xgetgrgid(gid_t gid) FAST_FUNC;
+ char* xuid2uname(uid_t uid) FAST_FUNC;
+diff --git a/libbb/bb_pwd.c b/libbb/bb_pwd.c
+index 5dbc58d..d728577 100644
+--- a/libbb/bb_pwd.c
++++ b/libbb/bb_pwd.c
+@@ -23,7 +23,14 @@ struct passwd* FAST_FUNC xgetpwnam(const char *name)
+ 	return pw;
+ }
+ 
+-/* xgetgrnam too? */
++struct group* FAST_FUNC xgetgrnam(const char *name)
++{
++	struct group *gr = getgrnam(name);
++	if (!gr)
++		bb_error_msg_and_die("unknown group %s", name);
++	return gr;
++}
++
+ 
+ struct passwd* FAST_FUNC xgetpwuid(uid_t uid)
+ {
+@@ -89,10 +96,7 @@ long FAST_FUNC xgroup2gid(const char *name)
+ {
+ 	struct group *mygroup;
+ 
+-	mygroup = getgrnam(name);
+-	if (mygroup == NULL)
+-		bb_error_msg_and_die("unknown group %s", name);
+-
++	mygroup = xgetgrnam(name);
+ 	return mygroup->gr_gid;
+ }
+ 
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index 2a840d7..5032d7b 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -158,10 +158,8 @@ int addgroup_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 		/* check if group and user exist */
+ 		xuname2uid(argv[0]); /* unknown user: exit */
+-		xgroup2gid(argv[1]); /* unknown group: exit */
+-// race here!
++		gr = xgetgrnam(argv[1]); /* unknown group: exit */
+ 		/* check if user is already in this group */
+-		gr = getgrnam(argv[1]);
+ 		for (; *(gr->gr_mem) != NULL; (gr->gr_mem)++) {
+ 			if (!strcmp(argv[0], *(gr->gr_mem))) {
+ 				/* user is already in group: do nothing */

@@ -1,0 +1,323 @@
+2008-11-05 13:20:58 +0000
+diff --git a/e2fsprogs/old_e2fsprogs/e2fsck.c b/e2fsprogs/old_e2fsprogs/e2fsck.c
+index 61a30f4..741536c 100644
+--- a/e2fsprogs/old_e2fsprogs/e2fsck.c
++++ b/e2fsprogs/old_e2fsprogs/e2fsck.c
+@@ -12281,7 +12281,7 @@ static int ask_yn(const char * string, int def)
+ 	tmp.c_lflag &= ~(ICANON | ECHO);
+ 	tmp.c_cc[VMIN] = 1;
+ 	tmp.c_cc[VTIME] = 0;
+-	tcsetattr (0, TCSANOW, &tmp);
++	tcsetattr_stdin_TCSANOW(&tmp);
+ #endif
+ 
+ 	if (def == 1)
+@@ -12297,7 +12297,7 @@ static int ask_yn(const char * string, int def)
+ 			break;
+ 		if (c == 3) {
+ #ifdef HAVE_TERMIOS_H
+-			tcsetattr (0, TCSANOW, &termios);
++			tcsetattr_stdin_TCSANOW(&termios);
+ #endif
+ 			if (e2fsck_global_ctx &&
+ 			    e2fsck_global_ctx->flags & E2F_FLAG_SETJMP_OK) {
+@@ -12323,7 +12323,7 @@ static int ask_yn(const char * string, int def)
+ 	else
+ 		puts ("no\n");
+ #ifdef HAVE_TERMIOS_H
+-	tcsetattr (0, TCSANOW, &termios);
++	tcsetattr_stdin_TCSANOW(&termios);
+ #endif
+ 	return def;
+ }
+diff --git a/editors/vi.c b/editors/vi.c
+index 93e5647..92c069d 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -2106,13 +2106,13 @@ static void rawmode(void)
+ 	term_vi.c_cc[VMIN] = 1;
+ 	term_vi.c_cc[VTIME] = 0;
+ 	erase_char = term_vi.c_cc[VERASE];
+-	tcsetattr(0, TCSANOW, &term_vi);
++	tcsetattr_stdin_TCSANOW(&term_vi);
+ }
+ 
+ static void cookmode(void)
+ {
+ 	fflush(stdout);
+-	tcsetattr(0, TCSANOW, &term_orig);
++	tcsetattr_stdin_TCSANOW(&term_orig);
+ }
+ 
+ //----- Come here when we get a window resize signal ---------
+diff --git a/include/libbb.h b/include/libbb.h
+index 5b6a2da..086a59f 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1142,6 +1142,8 @@ extern void print_login_prompt(void) FAST_FUNC;
+ /* NB: typically you want to pass fd 0, not 1. Think 'applet | grep something' */
+ int get_terminal_width_height(int fd, unsigned *width, unsigned *height) FAST_FUNC;
+ 
++int tcsetattr_stdin_TCSANOW(const struct termios *tp) FAST_FUNC;
++
+ /* NB: "unsigned request" is crucial! "int request" will break some arches! */
+ int ioctl_or_perror(int fd, unsigned request, void *argp, const char *fmt,...) __attribute__ ((format (printf, 4, 5))) FAST_FUNC;
+ int ioctl_or_perror_and_die(int fd, unsigned request, void *argp, const char *fmt,...) __attribute__ ((format (printf, 4, 5))) FAST_FUNC;
+diff --git a/init/init.c b/init/init.c
+index ae2dd6a..3d171d7 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -261,7 +261,7 @@ static void set_sane_term(void)
+ 	tty.c_lflag =
+ 		ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | IEXTEN;
+ 
+-	tcsetattr(STDIN_FILENO, TCSANOW, &tty);
++	tcsetattr_stdin_TCSANOW(&tty);
+ }
+ 
+ /* Open the new terminal device.
+diff --git a/libbb/bb_askpass.c b/libbb/bb_askpass.c
+index fba82a0..c60ef37 100644
+--- a/libbb/bb_askpass.c
++++ b/libbb/bb_askpass.c
+@@ -37,7 +37,7 @@ char* FAST_FUNC bb_askpass(int timeout, const char *prompt)
+ 	tio = oldtio;
+ 	tio.c_iflag &= ~(IUCLC|IXON|IXOFF|IXANY);
+ 	tio.c_lflag &= ~(ECHO|ECHOE|ECHOK|ECHONL|TOSTOP);
+-	tcsetattr(STDIN_FILENO, TCSANOW, &tio);
++	tcsetattr_stdin_TCSANOW(&tio);
+ 
+ 	memset(&sa, 0, sizeof(sa));
+ 	/* sa.sa_flags = 0; - no SA_RESTART! */
+@@ -70,7 +70,7 @@ char* FAST_FUNC bb_askpass(int timeout, const char *prompt)
+ 	}
+ 	sigaction_set(SIGINT, &oldsa);
+ 
+-	tcsetattr(STDIN_FILENO, TCSANOW, &oldtio);
++	tcsetattr_stdin_TCSANOW(&oldtio);
+ 	bb_putchar('\n');
+ 	fflush(stdout);
+ 	return ret;
+diff --git a/libbb/get_console.c b/libbb/get_console.c
+index ad56e74..74022b5 100644
+--- a/libbb/get_console.c
++++ b/libbb/get_console.c
+@@ -13,7 +13,6 @@
+ /* From <linux/kd.h> */
+ enum { KDGKBTYPE = 0x4B33 };  /* get keyboard type */
+ 
+-
+ static int open_a_console(const char *fnam)
+ {
+ 	int fd;
+@@ -37,7 +36,6 @@ static int open_a_console(const char *fnam)
+  * We try several things because opening /dev/console will fail
+  * if someone else used X (which does a chown on /dev/console).
+  */
+-
+ int FAST_FUNC get_console_fd_or_die(void)
+ {
+ 	static const char *const console_names[] = {
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 1f21866..3953cc9 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1436,7 +1436,7 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ #define _POSIX_VDISABLE '\0'
+ #endif
+ 	new_settings.c_cc[VINTR] = _POSIX_VDISABLE;
+-	tcsetattr(STDIN_FILENO, TCSANOW, &new_settings);
++	tcsetattr_stdin_TCSANOW(&new_settings);
+ 
+ 	/* Now initialize things */
+ 	previous_SIGWINCH_handler = signal(SIGWINCH, win_changed);
+@@ -1860,7 +1860,7 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ #endif
+ 
+ 	/* restore initial_settings */
+-	tcsetattr(STDIN_FILENO, TCSANOW, &initial_settings);
++	tcsetattr_stdin_TCSANOW(&initial_settings);
+ 	/* restore SIGWINCH handler */
+ 	signal(SIGWINCH, previous_SIGWINCH_handler);
+ 	fflush(stdout);
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 8ef305b..e2aee13 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -289,3 +289,8 @@ int FAST_FUNC get_terminal_width_height(int fd, unsigned *width, unsigned *heigh
+ 
+ 	return ret;
+ }
++
++int FAST_FUNC tcsetattr_stdin_TCSANOW(const struct termios *tp)
++{
++	return tcsetattr(STDIN_FILENO, TCSANOW, tp);
++}
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 8b0e729..0f53688 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -279,7 +279,7 @@ static void termios_init(struct termios *tp, int speed, struct options *op)
+ 	 */
+ #ifdef __linux__
+ 	/* flush input and output queues, important for modems! */
+-	ioctl(0, TCFLSH, TCIOFLUSH);
++	ioctl(0, TCFLSH, TCIOFLUSH); /* tcflush(0, TCIOFLUSH)? - same */
+ #endif
+ 
+ 	tp->c_cflag = CS8 | HUPCL | CREAD | speed;
+@@ -297,7 +297,7 @@ static void termios_init(struct termios *tp, int speed, struct options *op)
+ 		tp->c_cflag |= CRTSCTS;
+ #endif
+ 
+-	ioctl(0, TCSETS, tp);
++	tcsetattr_stdin_TCSANOW(tp);
+ 
+ 	debug("term_io 2\n");
+ }
+@@ -334,7 +334,7 @@ static void auto_baud(char *buf, unsigned size_buf, struct termios *tp)
+ 	tp->c_iflag |= ISTRIP;          /* enable 8th-bit stripping */
+ 	vmin = tp->c_cc[VMIN];
+ 	tp->c_cc[VMIN] = 0;             /* don't block if queue empty */
+-	ioctl(0, TCSETS, tp);
++	tcsetattr_stdin_TCSANOW(tp);
+ 
+ 	/*
+ 	 * Wait for a while, then read everything the modem has said so far and
+@@ -359,7 +359,7 @@ static void auto_baud(char *buf, unsigned size_buf, struct termios *tp)
+ 	/* Restore terminal settings. Errors will be dealt with later on. */
+ 	tp->c_iflag = iflag;
+ 	tp->c_cc[VMIN] = vmin;
+-	ioctl(0, TCSETS, tp);
++	tcsetattr_stdin_TCSANOW(tp);
+ }
+ 
+ /* do_prompt - show login prompt, optionally preceded by /etc/issue contents */
+@@ -404,7 +404,7 @@ static char *get_logname(char *logname, unsigned size_logname,
+ 
+ 	/* Flush pending input (esp. after parsing or switching the baud rate). */
+ 	sleep(1);
+-	ioctl(0, TCFLSH, TCIFLUSH);
++	ioctl(0, TCFLSH, TCIFLUSH); /* tcflush(0, TCIOFLUSH)? - same */
+ 
+ 	/* Prompt for and read a login name. */
+ 	logname[0] = '\0';
+@@ -552,12 +552,13 @@ static void termios_final(struct options *op, struct termios *tp, struct chardat
+ 	}
+ #endif
+ 	/* Optionally enable hardware flow control */
+-#ifdef  CRTSCTS
++#ifdef CRTSCTS
+ 	if (op->flags & F_RTSCTS)
+ 		tp->c_cflag |= CRTSCTS;
+ #endif
+ 
+ 	/* Finally, make the new settings effective */
++	/* It's tcsetattr_stdin_TCSANOW() + error check */
+ 	ioctl_or_perror_and_die(0, TCSETS, tp, "%s: TCSETS", op->tty);
+ }
+ 
+@@ -689,6 +690,7 @@ int getty_main(int argc UNUSED_PARAM, char **argv)
+ 	 * by patching the SunOS kernel variable "zsadtrlow" to a larger value;
+ 	 * 5 seconds seems to be a good value.
+ 	 */
++	/* tcgetattr() + error check */
+ 	ioctl_or_perror_and_die(0, TCGETS, &termios, "%s: TCGETS", options.tty);
+ 
+ #ifdef __linux__
+@@ -753,7 +755,7 @@ int getty_main(int argc UNUSED_PARAM, char **argv)
+ 			baud_index = (baud_index + 1) % options.numspeed;
+ 			termios.c_cflag &= ~CBAUD;
+ 			termios.c_cflag |= options.speeds[baud_index];
+-			ioctl(0, TCSETS, &termios);
++			tcsetattr_stdin_TCSANOW(&termios);
+ 		}
+ 	}
+ 
+diff --git a/loginutils/vlock.c b/loginutils/vlock.c
+index 42ef447..0262da5 100644
+--- a/loginutils/vlock.c
++++ b/loginutils/vlock.c
+@@ -87,7 +87,7 @@ int vlock_main(int argc UNUSED_PARAM, char **argv)
+ 	term.c_iflag |= IGNBRK;
+ 	term.c_lflag &= ~ISIG;
+ 	term.c_lflag &= ~(ECHO | ECHOCTL);
+-	tcsetattr(STDIN_FILENO, TCSANOW, &term);
++	tcsetattr_stdin_TCSANOW(&term);
+ 
+ 	do {
+ 		printf("Virtual console%s locked by %s.\n",
+@@ -101,6 +101,6 @@ int vlock_main(int argc UNUSED_PARAM, char **argv)
+ 	} while (1);
+ 
+ 	ioctl(STDIN_FILENO, VT_SETMODE, &ovtm);
+-	tcsetattr(STDIN_FILENO, TCSANOW, &oterm);
++	tcsetattr_stdin_TCSANOW(&oterm);
+ 	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 7f74864..efc2bf6 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -243,7 +243,7 @@ make_new_session(
+ 	termbuf.c_iflag |= ICRNL;
+ 	termbuf.c_iflag &= ~IXOFF;
+ 	/*termbuf.c_lflag &= ~ICANON;*/
+-	tcsetattr(0, TCSANOW, &termbuf);
++	tcsetattr_stdin_TCSANOW(&termbuf);
+ 
+ 	/* Uses FILE-based I/O to stdout, but does fflush(stdout),
+ 	 * so should be safe with vfork.
+diff --git a/procps/top.c b/procps/top.c
+index 908ae81..1d22871 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -649,7 +649,7 @@ static void clearmems(void)
+ 
+ static void reset_term(void)
+ {
+-	tcsetattr(0, TCSANOW, &initial_settings);
++	tcsetattr_stdin_TCSANOW(&initial_settings);
+ 	if (ENABLE_FEATURE_CLEAN_UP) {
+ 		clearmems();
+ #if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
+@@ -941,7 +941,7 @@ int top_main(int argc UNUSED_PARAM, char **argv)
+ 	new_settings.c_lflag &= ~(ISIG | ICANON | ECHO | ECHONL);
+ 
+ 	bb_signals(BB_FATAL_SIGS, sig_catcher);
+-	tcsetattr(0, TCSANOW, (void *) &new_settings);
++	tcsetattr_stdin_TCSANOW(&new_settings);
+ #endif /* FEATURE_USE_TERMIOS */
+ 
+ #if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index 2dbd437..78a7c82 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -293,7 +293,7 @@ static void die(const char *str) NORETURN;
+ static void die(const char *str)
+ {
+ 	if (termios_set)
+-		tcsetattr(0, TCSANOW, &sv_termios);
++		tcsetattr_stdin_TCSANOW(&sv_termios);
+ 	bb_error_msg_and_die("%s", str);
+ }
+ 
+@@ -1254,7 +1254,7 @@ int fsck_minix_main(int argc UNUSED_PARAM, char **argv)
+ 		tcgetattr(0, &sv_termios);
+ 		tmp = sv_termios;
+ 		tmp.c_lflag &= ~(ICANON | ECHO);
+-		tcsetattr(0, TCSANOW, &tmp);
++		tcsetattr_stdin_TCSANOW(&tmp);
+ 		termios_set = 1;
+ 	}
+ 
+@@ -1299,7 +1299,7 @@ int fsck_minix_main(int argc UNUSED_PARAM, char **argv)
+ 		write_superblock();
+ 
+ 	if (OPT_manual)
+-		tcsetattr(0, TCSANOW, &sv_termios);
++		tcsetattr_stdin_TCSANOW(&sv_termios);
+ 
+ 	if (changed)
+ 		retcode += 3;

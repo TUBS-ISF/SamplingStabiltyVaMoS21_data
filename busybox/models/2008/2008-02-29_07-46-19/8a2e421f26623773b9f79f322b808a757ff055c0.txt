@@ -1,0 +1,14 @@
+2008-02-29 07:46:19 +0000
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index 5730529..7ab2865 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -625,7 +625,7 @@ static void collect_mem(mem_stat *s)
+ 		put_question_marks(4);
+ 		return;
+ 	}
+-	if (s->opt == 'f') {
++	if (s->opt == 't') {
+ 		scale(m_total << 10);
+ 		return;
+ 	}

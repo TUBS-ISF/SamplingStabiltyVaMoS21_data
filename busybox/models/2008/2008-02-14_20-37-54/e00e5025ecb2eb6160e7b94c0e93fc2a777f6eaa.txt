@@ -1,0 +1,136 @@
+2008-02-14 20:37:54 +0000
+diff --git a/archival/Config.in b/archival/Config.in
+index 8d31ec7..160c54d 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -237,7 +237,15 @@ config FEATURE_TAR_LONG_OPTIONS
+ 	default n
+ 	depends on TAR && GETOPT_LONG
+ 	help
+-		Enable use of long options, increases size by about 400 Bytes
++	  Enable use of long options, increases size by about 400 Bytes
++
++config FEATURE_TAR_UNAME_GNAME
++	bool "Enable use of user and group names"
++	default n
++	help
++	  Enables use of user and group names in tar. This affects contents
++	  listings (-t) and preserving permissions when unpacking (-p).
++	  +200 bytes.
+ 
+ config UNCOMPRESS
+ 	bool "uncompress"
+diff --git a/archival/libunarchive/data_extract_all.c b/archival/libunarchive/data_extract_all.c
+index 76e7edf..4df9c09 100644
+--- a/archival/libunarchive/data_extract_all.c
++++ b/archival/libunarchive/data_extract_all.c
+@@ -112,7 +112,22 @@ void data_extract_all(archive_handle_t *archive_handle)
+ 	}
+ 
+ 	if (!(archive_handle->flags & ARCHIVE_NOPRESERVE_OWN)) {
++#if ENABLE_FEATURE_TAR_UNAME_GNAME
++		uid_t uid = file_header->uid;
++		gid_t gid = file_header->gid;
++
++		if (file_header->uname) {
++			struct passwd *pwd = getpwnam(file_header->uname);
++			if (pwd) uid = pwd->pw_uid;
++		}
++		if (file_header->gname) {
++			struct group *grp = getgrnam(file_header->gname);
++			if (grp) gid = grp->gr_gid;
++		}
++		lchown(file_header->name, uid, gid);
++#else
+ 		lchown(file_header->name, file_header->uid, file_header->gid);
++#endif
+ 	}
+ 	if ((file_header->mode & S_IFMT) != S_IFLNK) {
+ 		/* uclibc has no lchmod, glibc is even stranger -
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index 5a1f594..893cd5b 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -187,6 +187,10 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 		/* FIXME: what if we have non-link object with link_target? */
+ 		/* Will link_target be free()ed? */
+ 	}
++#if ENABLE_FEATURE_TAR_UNAME_GNAME
++	file_header->uname = tar.uname[0] ? xstrndup(tar.uname, sizeof(tar.uname)) : NULL;
++	file_header->gname = tar.gname[0] ? xstrndup(tar.gname, sizeof(tar.gname)) : NULL;
++#endif
+ 	file_header->mtime = GET_OCTAL(tar.mtime);
+ 	file_header->size = GET_OCTAL(tar.size);
+ 	file_header->gid = GET_OCTAL(tar.gid);
+@@ -317,6 +321,9 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 
+ 	free(file_header->link_target);
+ 	/* Do not free(file_header->name)! */
+-
++#if ENABLE_FEATURE_TAR_UNAME_GNAME
++	free(file_header->uname);
++	free(file_header->gname);
++#endif
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/archival/libunarchive/header_verbose_list.c b/archival/libunarchive/header_verbose_list.c
+index b9ac3c4..ea623ed 100644
+--- a/archival/libunarchive/header_verbose_list.c
++++ b/archival/libunarchive/header_verbose_list.c
+@@ -10,6 +10,33 @@ void header_verbose_list(const file_header_t *file_header)
+ {
+ 	struct tm *mtime = localtime(&(file_header->mtime));
+ 
++#if ENABLE_FEATURE_TAR_UNAME_GNAME
++	char uid[8];
++	char gid[8];
++	char *user = file_header->uname;
++	char *group = file_header->gname;
++
++	if (user == NULL) {
++		snprintf(uid, sizeof(uid), "%u", (unsigned)file_header->uid);
++		user = uid;
++	}
++	if (group == NULL) {
++		snprintf(gid, sizeof(gid), "%u", (unsigned)file_header->gid);
++		group = gid;
++	}
++	printf("%s %s/%s %9u %4u-%02u-%02u %02u:%02u:%02u %s",
++		bb_mode_string(file_header->mode),
++		user,
++		group,
++		(unsigned int) file_header->size,
++		1900 + mtime->tm_year,
++		1 + mtime->tm_mon,
++		mtime->tm_mday,
++		mtime->tm_hour,
++		mtime->tm_min,
++		mtime->tm_sec,
++		file_header->name);
++#else /* !FEATURE_TAR_UNAME_GNAME */
+ 	printf("%s %d/%d %9"OFF_FMT"u %4u-%02u-%02u %02u:%02u:%02u %s",
+ 		bb_mode_string(file_header->mode),
+ 		file_header->uid,
+@@ -22,6 +49,7 @@ void header_verbose_list(const file_header_t *file_header)
+ 		mtime->tm_min,
+ 		mtime->tm_sec,
+ 		file_header->name);
++#endif /* FEATURE_TAR_UNAME_GNAME */
+ 
+ 	if (file_header->link_target) {
+ 		printf(" -> %s", file_header->link_target);
+diff --git a/include/unarchive.h b/include/unarchive.h
+index e8beebb..4ed2ccd 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -13,6 +13,10 @@
+ typedef struct file_header_t {
+ 	char *name;
+ 	char *link_target;
++#if ENABLE_FEATURE_TAR_UNAME_GNAME
++	char *uname; 
++	char *gname;
++#endif
+ 	off_t size;
+ 	uid_t uid;
+ 	gid_t gid;

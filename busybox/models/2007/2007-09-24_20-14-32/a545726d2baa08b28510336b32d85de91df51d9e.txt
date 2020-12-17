@@ -1,0 +1,44 @@
+2007-09-24 20:14:32 +0000
+diff --git a/include/usage.h b/include/usage.h
+index eb1a641..09c8fa7 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1584,9 +1584,10 @@
+ "	::shutdown:/sbin/swapoff -a\n"
+ 
+ #define insmod_trivial_usage \
+-       "[OPTION]... MODULE [symbol=value]..."
++	USE_FEATURE_2_4_MODULES("[OPTION]... ") "MODULE [symbol=value]..."
+ #define insmod_full_usage \
+        "Load the specified kernel modules into the kernel" \
++	USE_FEATURE_2_4_MODULES( \
+        "\n\nOptions:\n" \
+        "	-f	Force module to load into the wrong kernel version\n" \
+        "	-k	Make module autoclean-able\n" \
+@@ -1594,9 +1595,11 @@
+        "	-q	Quiet\n" \
+        "	-L	Lock to prevent simultaneous loads of a module\n" \
+ 	USE_FEATURE_INSMOD_LOAD_MAP( \
+-       "	-m	Output load map to stdout\n") \
++       "	-m	Output load map to stdout\n" \
++	) \
+        "	-o NAME	Set internal module name to NAME\n" \
+-       "	-x	Do not export externs"
++       "	-x	Do not export externs" \
++	)
+ 
+ #define install_trivial_usage \
+        "[-cgmops] [sources] dest|directory"
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 3c8bb41..d7e4bef 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -72,7 +72,7 @@
+ #endif
+ 
+ #if ENABLE_FEATURE_2_6_MODULES
+-extern int insmod_ng_main( int argc, char **argv);
++extern int insmod_ng_main(int argc, char **argv);
+ #endif
+ 
+ 

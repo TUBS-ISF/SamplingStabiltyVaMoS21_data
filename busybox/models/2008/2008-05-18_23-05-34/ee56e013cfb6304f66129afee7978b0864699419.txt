@@ -1,0 +1,105 @@
+2008-05-18 23:05:34 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 56198cf..d5c53a2 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3809,11 +3809,14 @@
+      "\n	-a	Stop swapping on all swap devices" \
+ 
+ #define swapon_trivial_usage \
+-       "[-a] [DEVICE]"
++       "[-a]" USE_FEATURE_SWAPON_PRI(" [-p pri]") " [DEVICE]"
+ #define swapon_full_usage "\n\n" \
+        "Start swapping on DEVICE\n" \
+      "\nOptions:" \
+      "\n	-a	Start swapping on all swap devices" \
++	USE_FEATURE_SWAPON_PRI( \
++     "\n	-p pri	Set swap device priority" \
++	) \
+ 
+ #define switch_root_trivial_usage \
+        "[-c /dev/console] NEW_ROOT NEW_INIT [ARGUMENTS_TO_INIT]"
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index c30091a..3b7630e 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -743,6 +743,13 @@ config SWAPONOFF
+ 	  space.  If you are not using any swap space, you can leave this
+ 	  option disabled.
+ 
++config FEATURE_SWAPON_PRI
++	bool "Support option -p in swapon"
++	default n
++	depends on SWAPONOFF
++	help
++	  Enable support for setting swap device priority in swapon.
++
+ config SWITCH_ROOT
+ 	bool "switch_root"
+ 	default n
+diff --git a/util-linux/swaponoff.c b/util-linux/swaponoff.c
+index beefac0..6eafa3e 100644
+--- a/util-linux/swaponoff.c
++++ b/util-linux/swaponoff.c
+@@ -11,6 +11,16 @@
+ #include <mntent.h>
+ #include <sys/swap.h>
+ 
++#if ENABLE_FEATURE_SWAPON_PRI
++struct globals {
++	int flags;
++};
++#define G (*(struct globals*)&bb_common_bufsiz1)
++#define g_flags (G.flags)
++#else
++#define g_flags 0
++#endif
++
+ static int swap_enable_disable(char *device)
+ {
+ 	int status;
+@@ -26,7 +36,7 @@ static int swap_enable_disable(char *device)
+ #endif
+ 
+ 	if (applet_name[5] == 'n')
+-		status = swapon(device, 0);
++		status = swapon(device, g_flags);
+ 	else
+ 		status = swapoff(device);
+ 
+@@ -63,15 +73,30 @@ int swap_on_off_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int ret;
+ 
+-	if (!argv[1])
+-		bb_show_usage();
+-
++#if !ENABLE_FEATURE_SWAPON_PRI
+ 	ret = getopt32(argv, "a");
+-	if (ret)
++#else
++	opt_complementary = "p+";
++	ret = getopt32(argv, (applet_name[5] == 'n') ? "ap:" : "a", &g_flags);
++
++	if (ret & 2) { // -p
++		g_flags = SWAP_FLAG_PREFER |
++			((g_flags & SWAP_FLAG_PRIO_MASK) << SWAP_FLAG_PRIO_SHIFT);
++		ret &= 1;
++	}
++#endif
++
++	if (ret /* & 1: not needed */) // -a
+ 		return do_em_all();
+ 
++	argv += optind;
++	if (!*argv)
++		bb_show_usage();
++
+ 	/* ret = 0; redundant */
+-	while (*++argv)
++	do {
+ 		ret += swap_enable_disable(*argv);
++	} while (*++argv);
++
+ 	return ret;
+ }

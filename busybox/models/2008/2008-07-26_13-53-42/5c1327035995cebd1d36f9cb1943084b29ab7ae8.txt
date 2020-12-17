@@ -1,0 +1,65 @@
+2008-07-26 13:53:42 +0000
+diff --git a/shell/ash_test/ash-signals/signal1.right b/shell/ash_test/ash-signals/signal1.right
+index 66c30a5..cf403ac 100644
+--- a/shell/ash_test/ash-signals/signal1.right
++++ b/shell/ash_test/ash-signals/signal1.right
+@@ -2,19 +2,19 @@ got signal
+ trap -- 'echo got signal' USR1
+ sent 1 signal
+ got signal
+-sleep interrupted
++wait interrupted
+ trap -- 'echo got signal' USR1
+ sent 2 signal
+ got signal
+-sleep interrupted
++wait interrupted
+ trap -- 'echo got signal' USR1
+ sent 3 signal
+ got signal
+-sleep interrupted
++wait interrupted
+ trap -- 'echo got signal' USR1
+ sent 4 signal
+ got signal
+-sleep interrupted
++wait interrupted
+ trap -- 'echo got signal' USR1
+ sent 5 signal
+ sleep completed
+diff --git a/shell/ash_test/ash-signals/signal1.tests b/shell/ash_test/ash-signals/signal1.tests
+index 49a395b..098d21f 100755
+--- a/shell/ash_test/ash-signals/signal1.tests
++++ b/shell/ash_test/ash-signals/signal1.tests
+@@ -1,24 +1,23 @@
+-sleeping=true
+-
+ trap "echo got signal" USR1
+ 
+ for try in 1 2 3 4 5; do
+     kill -USR1 $$
+-    sleep 1
+-    echo sent $try signal
++    sleep 0.2
++    echo "sent $try signal"
+ done &
+ 
+-sleep 10 &
++sleep 2 &
+ 
++sleeping=true
+ while $sleeping; do
+     trap
+     if wait %%; then
+-        echo sleep completed
++        echo "sleep completed"
+         sleeping=false
+     elif [ $? == 127 ]; then
+-        echo no sleep tonite
++        echo "BUG: no processes to wait for?!"
+         sleeping=false
+     else
+-        echo sleep interrupted;
++        echo "wait interrupted"
+     fi
+ done

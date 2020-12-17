@@ -1,0 +1,377 @@
+2008-01-02 19:55:04 +0000
+diff --git a/archival/tar.c b/archival/tar.c
+index 5b19093..64975c4 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -610,7 +610,7 @@ static int writeTarFile(const int tar_fd, const int verboseFlag,
+ 
+ 	if (gzipPid) {
+ 		int status;
+-		if (waitpid(gzipPid, &status, 0) == -1)
++		if (safe_waitpid(gzipPid, &status, 0) == -1)
+ 			bb_perror_msg("waitpid");
+ 		else if (!WIFEXITED(status) || WEXITSTATUS(status))
+ 			/* gzip was killed or has exited with nonzero! */
+@@ -688,7 +688,7 @@ static void handle_SIGCHLD(int status)
+ 	/* Actually, 'status' is a signo. We reuse it for other needs */
+ 
+ 	/* Wait for any child without blocking */
+-	if (waitpid(-1, &status, WNOHANG) < 0)
++	if (wait_any_nohang(&status) < 0)
+ 		/* wait failed?! I'm confused... */
+ 		return;
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index f35f85c..fef8fe2 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -587,9 +587,9 @@ pid_t xspawn(char **argv);
+  *      if (rc < 0) bb_perror_msg("%s", argv[0]);
+  *      if (rc > 0) bb_error_msg("exit code: %d", rc);
+  */
++int safe_waitpid(int pid, int *wstat, int options);
+ int wait4pid(int pid);
+-int wait_pid(int *wstat, int pid);
+-int wait_nohang(int *wstat);
++int wait_any_nohang(int *wstat);
+ #define wait_crashed(w) ((w) & 127)
+ #define wait_exitcode(w) ((w) >> 8)
+ #define wait_stopsig(w) ((w) >> 8)
+diff --git a/init/init.c b/init/init.c
+index 51125f3..68a59d8 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -95,9 +95,14 @@ static const char *const environment[] = {
+ 
+ /* Function prototypes */
+ static void delete_init_action(struct init_action *a);
+-static int waitfor(pid_t pid);
+ static void halt_reboot_pwoff(int sig) ATTRIBUTE_NORETURN;
+ 
++/* TODO: move to libbb? */
++static int waitfor(pid_t runpid)
++{
++	return safe_waitpid(runpid, NULL, 0);
++}
++
+ static void loop_forever(void) ATTRIBUTE_NORETURN;
+ static void loop_forever(void)
+ {
+@@ -465,19 +470,6 @@ static pid_t run(const struct init_action *a)
+ 	_exit(-1);
+ }
+ 
+-static int waitfor(pid_t runpid)
+-{
+-	int status, wpid;
+-
+-	while (1) {
+-		wpid = waitpid(runpid, &status, 0);
+-		if (wpid == -1 && errno == EINTR)
+-			continue;
+-		break;
+-	}
+-	return wpid;
+-}
+-
+ /* Run all commands of a particular type */
+ static void run_actions(int action)
+ {
+@@ -520,7 +512,7 @@ static void init_reboot(unsigned long magic)
+ 		reboot(magic);
+ 		_exit(0);
+ 	}
+-	waitpid(pid, NULL, 0);
++	waitfor(pid);
+ }
+ 
+ static void kill_all_processes(void)
+@@ -980,7 +972,7 @@ int init_main(int argc, char **argv)
+ 		/* Don't consume all CPU time -- sleep a bit */
+ 		sleep(1);
+ 
+-		/* Wait for a child process to exit */
++		/* Wait for any child process to exit */
+ 		wpid = wait(NULL);
+ 		while (wpid > 0) {
+ 			/* Find out who died and clean up their corpse */
+@@ -995,7 +987,7 @@ int init_main(int argc, char **argv)
+ 				}
+ 			}
+ 			/* see if anyone else is waiting to be reaped */
+-			wpid = waitpid(-1, NULL, WNOHANG);
++			wpid = wait_any_nohang(NULL);
+ 		}
+ 	}
+ }
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index fc29274..6187eb9 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -121,7 +121,7 @@ static void sig_child_handler(int sig)
+ 	int wstat;
+ 	int pid;
+ 
+-	while ((pid = wait_nohang(&wstat)) > 0) {
++	while ((pid = wait_any_nohang(&wstat)) > 0) {
+ 		if (max_per_host)
+ 			ipsvd_perhost_remove(pid);
+ 		if (cnum)
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index d6e233a..4e6ecde 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -66,6 +66,21 @@ pid_t xspawn(char **argv)
+ 	return pid;
+ }
+ 
++int safe_waitpid(int pid, int *wstat, int options)
++{
++	int r;
++
++	do
++		r = waitpid(pid, wstat, options);
++	while ((r == -1) && (errno == EINTR));
++	return r;
++}
++
++int wait_any_nohang(int *wstat)
++{
++	return safe_waitpid(-1, wstat, WNOHANG);
++}
++
+ // Wait for the specified child PID to exit, returning child's error return.
+ int wait4pid(int pid)
+ {
+@@ -76,28 +91,18 @@ int wait4pid(int pid)
+ 		/* we expect errno to be already set from failed [v]fork/exec */
+ 		return -1;
+ 	}
+-	if (waitpid(pid, &status, 0) == -1)
++	if (safe_waitpid(pid, &status, 0) == -1)
+ 		return -1;
+ 	if (WIFEXITED(status))
+ 		return WEXITSTATUS(status);
+ 	if (WIFSIGNALED(status))
+ 		return WTERMSIG(status) + 1000;
+ 	return 0;
+-}
+-
+-int wait_nohang(int *wstat)
+-{
+-	return waitpid(-1, wstat, WNOHANG);
+-}
+-
+-int wait_pid(int *wstat, int pid)
+-{
+-	int r;
+-
+-	do
+-		r = waitpid(pid, wstat, 0);
+-	while ((r == -1) && (errno == EINTR));
+-	return r;
++	if (WIFEXITED(status))
++		return WEXITSTATUS(status);
++	if (WIFSIGNALED(status))
++		return WTERMSIG(status) + 1000;
++	return 0;
+ }
+ 
+ #if ENABLE_FEATURE_PREFER_APPLETS
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 8ee7e58..6056cb0 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -756,7 +756,7 @@ static int CheckJobs(void)
+ 			for (line = file->cf_LineBase; line; line = line->cl_Next) {
+ 				if (line->cl_Pid > 0) {
+ 					int status;
+-					int r = wait4(line->cl_Pid, &status, WNOHANG, NULL);
++					int r = waitpid(line->cl_Pid, &status, WNOHANG);
+ 
+ 					if (r < 0 || r == line->cl_Pid) {
+ 						EndJob(file->cf_User, line);
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 87dc4b7..7294975 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1152,7 +1152,7 @@ static NOINLINE void cgi_io_loop_and_exit(int fromCgi_rd, int toCgi_wr, int post
+ 		count = safe_poll(pfd, 3, -1);
+ 		if (count <= 0) {
+ #if 0
+-			if (waitpid(pid, &status, WNOHANG) <= 0) {
++			if (safe_waitpid(pid, &status, WNOHANG) <= 0) {
+ 				/* Weird. CGI didn't exit and no fd's
+ 				 * are ready, yet poll returned?! */
+ 				continue;
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 31911cd..68ea01a 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -944,7 +944,7 @@ static int doit(char *str)
+ 			execle(DEFAULT_SHELL, DEFAULT_SHELL, "-c", str, NULL, my_environ);
+ 			exit(127);
+ 		}
+-		waitpid(child, &status, 0);
++		safe_waitpid(child, &status, 0);
+ 		if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+ 			return 0;
+ 		}
+@@ -1068,7 +1068,7 @@ static char *run_mapping(char *physical, struct mapping_defn_t * map)
+ 		fprintf(in, "%s\n", map->mapping[i]);
+ 	}
+ 	fclose(in);
+-	waitpid(pid, &status, 0);
++	safe_waitpid(pid, &status, 0);
+ 
+ 	if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+ 		/* If the mapping script exited successfully, try to
+diff --git a/networking/inetd.c b/networking/inetd.c
+index a9c9397..d643dc6 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1161,7 +1161,7 @@ static void reapchild(int sig ATTRIBUTE_UNUSED)
+ 	servtab_t *sep;
+ 
+ 	for (;;) {
+-		pid = wait3(&status, WNOHANG, NULL);
++		pid = wait_any_nohang(&status);
+ 		if (pid <= 0)
+ 			break;
+ 		for (sep = servtab; sep; sep = sep->se_next)
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 108bbf4..0201d26 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -394,7 +394,7 @@ static void handle_sigchld(int sig)
+ 
+ 	/* Looping: more than one child may have exited */
+ 	while (1) {
+-		pid = waitpid(-1, NULL, WNOHANG);
++		pid = wait_any_nohang(NULL);
+ 		if (pid <= 0)
+ 			break;
+ 		ts = sessions;
+diff --git a/networking/udhcp/script.c b/networking/udhcp/script.c
+index 8a18898..71f0333 100644
+--- a/networking/udhcp/script.c
++++ b/networking/udhcp/script.c
+@@ -232,7 +232,7 @@ void udhcp_run_script(struct dhcpMessage *packet, const char *name)
+ 		       name, NULL, envp);
+ 		bb_perror_msg_and_die("script %s failed", client_config.script);
+ 	}
+-	waitpid(pid, NULL, 0);
++	safe_waitpid(pid, NULL, 0);
+ 	for (curr = envp; *curr; curr++)
+ 		free(*curr);
+ 	free(envp);
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 8c5a4d4..84f5193 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -282,8 +282,7 @@ static unsigned custom(struct svdir *s, char c)
+ 				execve(a, prog, environ);
+ 				fatal_cannot("run control/?");
+ 			}
+-			while (wait_pid(&w, pid) == -1) {
+-				if (errno == EINTR) continue;
++			while (safe_waitpid(pid, &w, 0) == -1) {
+ 				warn_cannot("wait for child control/?");
+ 				return 0;
+ 			}
+@@ -593,7 +592,7 @@ int runsv_main(int argc, char **argv)
+ 			int child;
+ 			int wstat;
+ 
+-			child = wait_nohang(&wstat);
++			child = wait_any_nohang(&wstat);
+ 			if (!child)
+ 				break;
+ 			if ((child == -1) && (errno != EINTR))
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 9e98ca6..8384903 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -252,7 +252,7 @@ int runsvdir_main(int argc, char **argv)
+ 	for (;;) {
+ 		/* collect children */
+ 		for (;;) {
+-			pid = wait_nohang(&wstat);
++			pid = wait_any_nohang(&wstat);
+ 			if (pid <= 0)
+ 				break;
+ 			for (i = 0; i < svnum; i++) {
+diff --git a/runit/sv.c b/runit/sv.c
+index e31adff..a89e244 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -333,8 +333,7 @@ static int checkscript(void)
+ 		bb_perror_msg(WARN"cannot %s child %s/check", "run", *service);
+ 		return 0;
+ 	}
+-	while (wait_pid(&w, pid) == -1) {
+-		if (errno == EINTR) continue;
++	while (safe_waitpid(pid, &w, 0) == -1) {
+ 		bb_perror_msg(WARN"cannot %s child %s/check", "wait for", *service);
+ 		return 0;
+ 	}
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 2dc8cb9..1d679c9 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -265,7 +265,7 @@ static unsigned processorstop(struct logdir *ld)
+ 
+ 	if (ld->ppid) {
+ 		sig_unblock(SIGHUP);
+-		while (wait_pid(&wstat, ld->ppid) == -1)
++		while (safe_waitpid(ld->ppid, &wstat, 0) == -1)
+ 			pause2cannot("wait for processor", ld->name);
+ 		sig_block(SIGHUP);
+ 		ld->ppid = 0;
+@@ -794,7 +794,7 @@ static void sig_child_handler(int sig_no)
+ 
+ 	if (verbose)
+ 		bb_error_msg(INFO"sig%s received", "child");
+-	while ((pid = wait_nohang(&wstat)) > 0) {
++	while ((pid = wait_any_nohang(&wstat)) > 0) {
+ 		for (l = 0; l < dirn; ++l) {
+ 			if (dir[l].ppid == pid) {
+ 				dir[l].ppid = 0;
+diff --git a/shell/ash.c b/shell/ash.c
+index a5b19c8..96563bf 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -3768,7 +3768,7 @@ waitproc(int block, int *status)
+ #endif
+ 	if (block == 0)
+ 		flags |= WNOHANG;
+-	return wait3(status, flags, (struct rusage *)NULL);
++	return waitpid(-1, status, flags); // safe_waitpid?
+ }
+ 
+ /*
+diff --git a/shell/hush.c b/shell/hush.c
+index cb2c3e9..b08fe10 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1649,6 +1649,7 @@ static int checkjobs(struct pipe* fg_pipe)
+ // + killall -STOP cat
+ 
+  wait_more:
++// TODO: safe_waitpid?
+ 	while ((childpid = waitpid(-1, &status, attributes)) > 0) {
+ 		const int dead = WIFEXITED(status) || WIFSIGNALED(status);
+ 
+diff --git a/shell/msh.c b/shell/msh.c
+index 9edf793..9e9b798 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -4162,7 +4162,7 @@ static int grave(int quoted)
+ 		return 0;
+ 	}
+ 	if (i != 0) {
+-		waitpid(i, NULL, 0);
++		waitpid(i, NULL, 0); // safe_waitpid?
+ 		global_env.iop->argp->aword = ++cp;
+ 		close(pf[1]);
+ 		PUSHIO(afile, remap(pf[0]),

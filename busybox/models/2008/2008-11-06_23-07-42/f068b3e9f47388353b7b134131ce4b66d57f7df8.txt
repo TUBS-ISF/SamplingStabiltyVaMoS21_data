@@ -1,0 +1,33 @@
+2008-11-06 23:07:42 +0000
+diff --git a/runit/Config.in b/runit/Config.in
+index beff1e7..422ca75 100644
+--- a/runit/Config.in
++++ b/runit/Config.in
+@@ -36,6 +36,14 @@ config SV
+ 	  sv reports the current status and controls the state of services
+ 	  monitored by the runsv supervisor.
+ 
++config SV_DEFAULT_SERVICE_DIR
++	string "Default directory for services"
++	default "/var/service"
++	depends on SV
++	help
++	  Default directory for services.
++	  Defaults to "/var/service"
++
+ config SVLOGD
+ 	bool "svlogd"
+ 	default n
+diff --git a/runit/sv.c b/runit/sv.c
+index 532bdb8..7e5efde 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -417,7 +417,7 @@ int sv_main(int argc, char **argv)
+ 	unsigned i, want_exit;
+ 	char *x;
+ 	char *action;
+-	const char *varservice = "/var/service/";
++	const char *varservice = CONFIG_SV_DEFAULT_SERVICE_DIR;
+ 	unsigned services;
+ 	char **servicex;
+ 	unsigned waitsec = 7;

@@ -1,0 +1,109 @@
+2010-01-12 12:52:30 +0100
+diff --git a/include/libbb.h b/include/libbb.h
+index e07bb52..1159634 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -249,6 +249,7 @@ extern int *const bb_errno;
+ 
+ unsigned long long monotonic_ns(void) FAST_FUNC;
+ unsigned long long monotonic_us(void) FAST_FUNC;
++unsigned long long monotonic_ms(void) FAST_FUNC;
+ unsigned monotonic_sec(void) FAST_FUNC;
+ 
+ extern void chomp(char *s) FAST_FUNC;
+diff --git a/libbb/time.c b/libbb/time.c
+index 82a0fa1..45ae6f3 100644
+--- a/libbb/time.c
++++ b/libbb/time.c
+@@ -175,6 +175,12 @@ unsigned long long FAST_FUNC monotonic_us(void)
+ 	get_mono(&ts);
+ 	return ts.tv_sec * 1000000ULL + ts.tv_nsec/1000;
+ }
++unsigned long long FAST_FUNC monotonic_ms(void)
++{
++	struct timespec ts;
++	get_mono(&ts);
++	return ts.tv_sec * 1000ULL + ts.tv_nsec/1000000;
++}
+ unsigned FAST_FUNC monotonic_sec(void)
+ {
+ 	struct timespec ts;
+@@ -196,6 +202,12 @@ unsigned long long FAST_FUNC monotonic_us(void)
+ 	gettimeofday(&tv, NULL);
+ 	return tv.tv_sec * 1000000ULL + tv.tv_usec;
+ }
++unsigned long long FAST_FUNC monotonic_ms(void)
++{
++	struct timeval tv;
++	gettimeofday(&tv, NULL);
++	return tv.tv_sec * 1000ULL + tv.tv_usec / 1000;
++}
+ unsigned FAST_FUNC monotonic_sec(void)
+ {
+ 	return time(NULL);
+diff --git a/miscutils/time.c b/miscutils/time.c
+index 3421736..5ea0f06 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -70,7 +70,7 @@ static void resuse_end(pid_t pid, resource_t *resp)
+ 			return;
+ 		}
+ 	}
+-	resp->elapsed_ms = (monotonic_us() / 1000) - resp->elapsed_ms;
++	resp->elapsed_ms = monotonic_ms() - resp->elapsed_ms;
+ }
+ 
+ static void printargv(char *const *argv)
+@@ -371,7 +371,7 @@ static void run_command(char *const *cmd, resource_t *resp)
+ 	void (*interrupt_signal)(int);
+ 	void (*quit_signal)(int);
+ 
+-	resp->elapsed_ms = monotonic_us() / 1000;
++	resp->elapsed_ms = monotonic_ms();
+ 	pid = vfork();		/* Run CMD as child process.  */
+ 	if (pid < 0)
+ 		bb_perror_msg_and_die("fork");
+diff --git a/networking/udhcp/arpping.c b/networking/udhcp/arpping.c
+index 4af8534..548796e 100644
+--- a/networking/udhcp/arpping.c
++++ b/networking/udhcp/arpping.c
+@@ -88,7 +88,7 @@ int FAST_FUNC arpping(uint32_t test_nip,
+ 	timeout_ms = 2000;
+ 	do {
+ 		int r;
+-		unsigned prevTime = monotonic_us();
++		unsigned prevTime = monotonic_ms();
+ 
+ 		pfd[0].events = POLLIN;
+ 		r = safe_poll(pfd, 1, timeout_ms);
+@@ -119,7 +119,7 @@ int FAST_FUNC arpping(uint32_t test_nip,
+ 				break;
+ 			}
+ 		}
+-		timeout_ms -= ((unsigned)monotonic_us() - prevTime) / 1000;
++		timeout_ms -= (unsigned)monotonic_ms() - prevTime;
+ 	} while (timeout_ms > 0);
+ 
+  ret:
+diff --git a/shell/ash.c b/shell/ash.c
+index b47f0e8..e668f41 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -12619,7 +12619,7 @@ readcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	backslash = 0;
+ #if ENABLE_ASH_READ_TIMEOUT
+ 	if (timeout) /* NB: ensuring end_ms is nonzero */
+-		end_ms = ((unsigned)(monotonic_us() / 1000) + timeout) | 1;
++		end_ms = ((unsigned)monotonic_ms() + timeout) | 1;
+ #endif
+ 	STARTSTACKSTR(p);
+ 	do {
+@@ -12630,7 +12630,7 @@ readcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 			struct pollfd pfd[1];
+ 			pfd[0].fd = fd;
+ 			pfd[0].events = POLLIN;
+-			timeout = end_ms - (unsigned)(monotonic_us() / 1000);
++			timeout = end_ms - (unsigned)monotonic_ms();
+ 			if ((int)timeout <= 0 /* already late? */
+ 			 || safe_poll(pfd, 1, timeout) != 1 /* no? wait... */
+ 			) { /* timed out! */

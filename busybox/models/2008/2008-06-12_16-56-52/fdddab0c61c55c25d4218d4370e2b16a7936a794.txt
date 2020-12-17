@@ -1,0 +1,178 @@
+2008-06-12 16:56:52 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index bd2dbe5..655ca01 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1031,7 +1031,7 @@ extern int restricted_shell(const char *shell);
+  */
+ extern void setup_environment(const char *shell, int clear_env, int change_env, const struct passwd *pw);
+ extern int correct_password(const struct passwd *pw);
+-/* Returns a ptr to static storage */
++/* Returns a malloced string */
+ extern char *pw_encrypt(const char *clear, const char *salt, int cleanup);
+ extern int obscure(const char *old, const char *newval, const struct passwd *pwdp);
+ /* rnd is additional random input. New one is returned.
+diff --git a/libbb/correct_password.c b/libbb/correct_password.c
+index a4ded8b..f0b9384 100644
+--- a/libbb/correct_password.c
++++ b/libbb/correct_password.c
+@@ -40,6 +40,7 @@ int correct_password(const struct passwd *pw)
+ {
+ 	char *unencrypted, *encrypted;
+ 	const char *correct;
++	int r;
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+ 	/* Using _r function to avoid pulling in static buffers */
+ 	struct spwd spw;
+@@ -72,6 +73,8 @@ int correct_password(const struct passwd *pw)
+ 		return 0;
+ 	}
+ 	encrypted = pw_encrypt(unencrypted, correct, 1);
++	r = (strcmp(encrypted, correct) == 0);
++	free(encrypted);
+ 	memset(unencrypted, 0, strlen(unencrypted));
+-	return strcmp(encrypted, correct) == 0;
++	return r;
+ }
+diff --git a/libbb/pw_encrypt.c b/libbb/pw_encrypt.c
+index d439fc3..762cbab 100644
+--- a/libbb/pw_encrypt.c
++++ b/libbb/pw_encrypt.c
+@@ -54,7 +54,7 @@ static void my_crypt_cleanup(void)
+ 
+ char *pw_encrypt(const char *clear, const char *salt, int cleanup)
+ {
+-	static char *cipher;
++	char *encrypted;
+ 
+ #if 0 /* was CONFIG_FEATURE_SHA1_PASSWORDS, but there is no such thing??? */
+ 	if (strncmp(salt, "$2$", 3) == 0) {
+@@ -62,11 +62,10 @@ char *pw_encrypt(const char *clear, const char *salt, int cleanup)
+ 	}
+ #endif
+ 
+-	free(cipher);
+-	cipher = my_crypt(clear, salt);
++	encrypted = my_crypt(clear, salt);
+ 
+ 	if (cleanup)
+ 		my_crypt_cleanup();
+ 
+-	return cipher;
++	return encrypted;
+ }
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index 230ab0f..7308596 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -65,6 +65,7 @@ int chpasswd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			bb_info_msg("Password for '%s' changed", name);
+ 		logmode = LOGMODE_STDIO;
+ 		free(name);
++		free(pass);
+ 	}
+ 
+ 	return 0;
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index fad226c..0a31137 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -16,22 +16,24 @@ static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
+ 	char salt[sizeof("$N$XXXXXXXX")]; /* "$N$XXXXXXXX" or "XX" */
+ 	char *orig = (char*)"";
+ 	char *newp = NULL;
+-	char *cipher = NULL;
+ 	char *cp = NULL;
+ 	char *ret = NULL; /* failure so far */
+ 
+ 	if (myuid && pw->pw_passwd[0]) {
++		char *encrypted;
++
+ 		orig = bb_askpass(0, "Old password:"); /* returns ptr to static */
+ 		if (!orig)
+ 			goto err_ret;
+-		cipher = pw_encrypt(orig, pw->pw_passwd, 1); /* returns ptr to static */
+-		if (strcmp(cipher, pw->pw_passwd) != 0) {
++		encrypted = pw_encrypt(orig, pw->pw_passwd, 1); /* returns malloced str */
++		if (strcmp(encrypted, pw->pw_passwd) != 0) {
+ 			syslog(LOG_WARNING, "incorrect password for '%s'",
+ 				pw->pw_name);
+ 			bb_do_delay(FAIL_DELAY);
+ 			puts("Incorrect password");
+ 			goto err_ret;
+ 		}
++		if (ENABLE_FEATURE_CLEAN_UP) free(encrypted);
+ 	}
+ 	orig = xstrdup(orig); /* or else bb_askpass() will destroy it */
+ 	newp = bb_askpass(0, "New password:"); /* returns ptr to static */
+@@ -55,8 +57,8 @@ static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
+ 		strcpy(salt, "$1$");
+ 		crypt_make_salt(salt + 3, 4, 0);
+ 	}
+-	/* pw_encrypt returns ptr to static */
+-	ret = xstrdup(pw_encrypt(newp, salt, 1));
++	/* pw_encrypt returns malloced str */
++	ret = pw_encrypt(newp, salt, 1);
+ 	/* whee, success! */
+ 
+  err_ret:
+@@ -64,7 +66,6 @@ static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
+ 	if (ENABLE_FEATURE_CLEAN_UP) free(orig);
+ 	nuke_str(newp);
+ 	if (ENABLE_FEATURE_CLEAN_UP) free(newp);
+-	nuke_str(cipher);
+ 	nuke_str(cp);
+ 	return ret;
+ }
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index f52ce8a..38812a6 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -72,6 +72,9 @@ int sulogin_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #endif
+ 
+ 	while (1) {
++		char *encrypted;
++		int r;
++
+ 		/* cp points to a static buffer that is zeroed every time */
+ 		cp = bb_askpass(timeout,
+ 				"Give root password for system maintenance\n"
+@@ -81,7 +84,10 @@ int sulogin_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			bb_info_msg("Normal startup");
+ 			return 0;
+ 		}
+-		if (strcmp(pw_encrypt(cp, pwd->pw_passwd, 1), pwd->pw_passwd) == 0) {
++		encrypted = pw_encrypt(cp, pwd->pw_passwd, 1);
++		r = strcmp(encrypted, pwd->pw_passwd);
++		free(encrypted);
++		if (r == 0) {
+ 			break;
+ 		}
+ 		bb_do_delay(FAIL_DELAY);
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 78c6f4d..352a97d 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1721,7 +1721,6 @@ static int checkPerm(const char *path, const char *request)
+ 			}
+ 
+ 			if (ENABLE_FEATURE_HTTPD_AUTH_MD5) {
+-				char *cipher;
+ 				char *pp;
+ 
+ 				if (strncmp(p, request, u - request) != 0) {
+@@ -1732,9 +1731,10 @@ static int checkPerm(const char *path, const char *request)
+ 				if (pp && pp[1] == '$' && pp[2] == '1'
+ 				 && pp[3] == '$' && pp[4]
+ 				) {
+-					pp++;
+-					cipher = pw_encrypt(u+1, pp, 1);
+-					if (strcmp(cipher, pp) == 0)
++					char *encrypted = pw_encrypt(u+1, ++pp, 1);
++					int r = strcmp(encrypted, pp);
++					free(encrypted);
++					if (r == 0)
+ 						goto set_remoteuser_var;   /* Ok */
+ 					/* unauthorized */
+ 					continue;

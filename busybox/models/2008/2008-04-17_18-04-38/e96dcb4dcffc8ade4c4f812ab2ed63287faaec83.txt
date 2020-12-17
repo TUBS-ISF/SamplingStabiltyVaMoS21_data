@@ -1,0 +1,45 @@
+2008-04-17 18:04:38 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 09695ef..01acda1 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -97,11 +97,6 @@
+      "\n	-s sender	Sender IP address" \
+      "\n	target		Target IP address" \
+ 
+-//#define ash_trivial_usage \
+-//       "[FILE]...\n" \
+-//       "or: ash -c command [args]..."
+-//#define ash_full_usage "\n\n" \
+-//       "The ash shell"
+ #define sh_trivial_usage NOUSAGE_STR
+ #define sh_full_usage ""
+ #define ash_trivial_usage NOUSAGE_STR
+diff --git a/procps/top.c b/procps/top.c
+index e3f91c8..206f9e8 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -861,17 +861,22 @@ int top_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #else
+ 			qsort(top, ntop, sizeof(top_status_t), (void*)(sort_function[0]));
+ #endif /* FEATURE_TOP_CPU_USAGE_PERCENTAGE */
+-		} else { /* TOPMEM */
++		}
++#if ENABLE_FEATURE_TOPMEM
++		else { /* TOPMEM */
+ 			qsort(topmem, ntop, sizeof(topmem_status_t), (void*)topmem_sort);
+ 		}
++#endif
+ 		count = lines;
+ 		if (OPT_BATCH_MODE || count > ntop) {
+ 			count = ntop;
+ 		}
+ 		if (scan_mask == TOP_MASK)
+ 			display_process_list(count, col);
++#if ENABLE_FEATURE_TOPMEM
+ 		else
+ 			display_topmem_process_list(count, col);
++#endif
+ 		clearmems();
+ 		if (iterations >= 0 && !--iterations)
+ 			break;

@@ -1,0 +1,148 @@
+2010-04-04 15:29:32 +0200
+diff --git a/include/libbb.h b/include/libbb.h
+index 794e438..e674e4a 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -734,6 +734,8 @@ const char *make_human_readable_str(unsigned long long size,
+ 		unsigned long block_size, unsigned long display_unit) FAST_FUNC;
+ /* Put a string of hex bytes ("1b2e66fe"...), return advanced pointer */
+ char *bin2hex(char *buf, const char *cp, int count) FAST_FUNC;
++/* Reverse */
++char* hex2bin(char *dst, const char *str, int count) FAST_FUNC;
+ 
+ /* Generate a UUID */
+ void generate_uuid(uint8_t *buf) FAST_FUNC;
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index aac46f4..aec165f 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -122,6 +122,41 @@ char* FAST_FUNC bin2hex(char *p, const char *cp, int count)
+ 	return p;
+ }
+ 
++/* Convert "[x]x[:][x]x[:][x]x[:][x]x" hex string to binary, no more than COUNT bytes */
++char* FAST_FUNC hex2bin(char *dst, const char *str, int count)
++{
++	errno = EINVAL;
++	while (*str && count) {
++		uint8_t val;
++		uint8_t c = *str++;
++		if (isdigit(c))
++			val = c - '0';
++		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
++			val = (c|0x20) - ('a' - 10);
++		else
++			return NULL;
++		val <<= 4;
++		c = *str;
++		if (isdigit(c))
++			val |= c - '0';
++		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
++			val |= (c|0x20) - ('a' - 10);
++		else if (c == ':' || c == '\0')
++			val >>= 4;
++		else
++			return NULL;
++
++		*dst++ = val;
++		if (c != '\0')
++			str++;
++		if (*str == ':')
++			str++;
++		count--;
++	}
++	errno = (*str ? ERANGE : 0);
++	return dst;
++}
++
+ /* Return how long the file at fd is, if there's any way to determine it. */
+ #ifdef UNUSED
+ off_t FAST_FUNC fdlength(int fd)
+diff --git a/networking/interface.c b/networking/interface.c
+index b59a61d..a59f310 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -30,7 +30,6 @@
+  *	    20001008 - Bernd Eckenfels, Patch from RH for setting mtu
+  *			(default AF was wrong)
+  */
+-
+ #include <net/if.h>
+ #include <net/if_arp.h>
+ #if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined(_NEWLIB_VERSION)
+@@ -1215,53 +1214,12 @@ static int if_print(char *ifname)
+ /* Input an Infiniband address and convert to binary. */
+ int FAST_FUNC in_ib(const char *bufp, struct sockaddr *sap)
+ {
+-	unsigned char *ptr;
+-	char c;
+-	const char *orig;
+-	int i;
+-	unsigned val;
+-
+ 	sap->sa_family = ib_hwtype.type;
+-	ptr = (unsigned char *) sap->sa_data;
+-
+-	i = 0;
+-	orig = bufp;
+-	while ((*bufp != '\0') && (i < INFINIBAND_ALEN)) {
+-		val = 0;
+-		c = *bufp++;
+-		if (isdigit(c))
+-			val = c - '0';
+-		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
+-			val = (c|0x20) - ('a' - 10);
+-		else {
+-			errno = EINVAL;
+-			return -1;
+-		}
+-		val <<= 4;
+-		c = *bufp;
+-		if (isdigit(c))
+-			val |= c - '0';
+-		else if ((c|0x20) >= 'a' && (c|0x20) <= 'f')
+-			val |= (c|0x20) - ('a' - 10);
+-		else if (c == ':' || c == '\0')
+-			val >>= 4;
+-		else {
+-			errno = EINVAL;
+-			return -1;
+-		}
+-		if (c != '\0')
+-			bufp++;
+-		*ptr++ = (unsigned char) (val & 0377);
+-		i++;
+-
+-		/* We might get a semicolon here - not required. */
+-		if (*bufp == ':') {
+-			bufp++;
+-		}
+-	}
+-#ifdef DEBUG
+-	fprintf(stderr, "in_ib(%s): %s\n", orig, UNSPEC_print(sap->sa_data));
+-#endif
++//TODO: error check?
++	hex2bin((char*)sap->sa_data, bufp, INFINIBAND_ALEN);
++# ifdef HWIB_DEBUG
++	fprintf(stderr, "in_ib(%s): %s\n", bufp, UNSPEC_print(sap->sa_data));
++# endif
+ 	return 0;
+ }
+ #endif
+diff --git a/networking/wget.c b/networking/wget.c
+index 5b73b93..97f4a8f 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -282,8 +282,10 @@ static char *gethdr(char *buf, size_t bufsiz, FILE *fp /*, int *istrunc*/)
+ 		return NULL;
+ 
+ 	/* convert the header name to lower case */
+-	for (s = buf; isalnum(*s) || *s == '-' || *s == '.'; ++s)
+-		*s = tolower(*s);
++	for (s = buf; isalnum(*s) || *s == '-' || *s == '.'; ++s) {
++		/* tolower for "A-Z", no-op for "0-9a-z-." */
++		*s = (*s | 0x20);
++	}
+ 
+ 	/* verify we are at the end of the header name */
+ 	if (*s != ':')

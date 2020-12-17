@@ -1,0 +1,30 @@
+2009-04-07 06:06:05 +0000
+diff --git a/shell/hush_test/hush-misc/heredoc2.right b/shell/hush_test/hush-misc/heredoc2.right
+new file mode 100644
+index 0000000..72c839c
+--- /dev/null
++++ b/shell/hush_test/hush-misc/heredoc2.right
+@@ -0,0 +1,7 @@
++exit EOF-f
++"
++echo 1
++moo	 
++ EOF-f
++EOF-f   f
++EOF-f 
+diff --git a/shell/hush_test/hush-misc/heredoc2.tests b/shell/hush_test/hush-misc/heredoc2.tests
+new file mode 100755
+index 0000000..71ab0e8
+--- /dev/null
++++ b/shell/hush_test/hush-misc/heredoc2.tests
+@@ -0,0 +1,10 @@
++f=1
++  cat <<- EOF-f
++		exit EOF-f
++"
++echo $f
++		moo	 
++ EOF-f
++EOF-f   f
++EOF-f 
++EOF-f

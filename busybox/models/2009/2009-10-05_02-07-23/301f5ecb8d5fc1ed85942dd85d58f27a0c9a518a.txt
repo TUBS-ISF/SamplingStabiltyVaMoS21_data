@@ -1,0 +1,14 @@
+2009-10-05 02:07:23 +0200
+diff --git a/shell/ash.c b/shell/ash.c
+index 9f1f8a4..44d3a99 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -11291,6 +11291,8 @@ parsesub: {
+  badsub:
+ 			raise_error_syntax("bad substitution");
+ 		}
++		if (c != '}' && subtype == VSLENGTH)
++			goto badsub;
+ 
+ 		STPUTC('=', out);
+ 		flags = 0;

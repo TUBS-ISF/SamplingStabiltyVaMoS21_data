@@ -1,0 +1,18 @@
+2009-09-04 03:48:40 +0200
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 4b9d012..391bb9b 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1361,9 +1361,9 @@ int inetd_main(int argc UNUSED_PARAM, char **argv)
+ 				if (setrlimit(RLIMIT_NOFILE, &rlim_ofile) < 0)
+ 					bb_perror_msg("setrlimit");
+ 
+-			/*closelog(); - BAD, we are after vfork,
+-			 * this may confuse syslog() state.
+-			 * Let's hope libc set syslog fd to CLOEXEC...
++			/* closelog(); - WRONG. we are after vfork,
++			 * this may confuse syslog() internal state.
++			 * Let's hope libc sets syslog fd to CLOEXEC...
+ 			 */
+ 			xmove_fd(ctrl, STDIN_FILENO);
+ 			xdup2(STDIN_FILENO, STDOUT_FILENO);

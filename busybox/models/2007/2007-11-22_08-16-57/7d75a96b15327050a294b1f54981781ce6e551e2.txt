@@ -1,0 +1,308 @@
+2007-11-22 08:16:57 +0000
+diff --git a/coreutils/echo.c b/coreutils/echo.c
+index 860853f..4c7a917 100644
+--- a/coreutils/echo.c
++++ b/coreutils/echo.c
+@@ -25,7 +25,9 @@
+ 
+ #include "libbb.h"
+ 
+-int bb_echo(char **argv)
++/* argc is unused, but removing it precludes compiler from
++ * using call -> jump optimization */
++int bb_echo(int argc, char **argv)
+ {
+ 	const char *arg;
+ #if !ENABLE_FEATURE_FANCY_ECHO
+@@ -33,6 +35,18 @@ int bb_echo(char **argv)
+ 		eflag = '\\',
+ 		nflag = 1,  /* 1 -- print '\n' */
+ 	};
++
++	/* We must check that stdout is not closed.
++	 * The reason for this is highly non-obvious.
++	 * bb_echo is used from shell. Shell must correctly handle "echo foo"
++	 * if stdout is closed. With stdio, output gets shoveled into
++	 * stdout buffer, and even fflush cannot clear it out. It seems that
++	 * even if libc receives EBADF on write attempts, it feels determined
++	 * to output data no matter what. So it will try later,
++	 * and possibly will clobber future output. Not good. */
++	if (dup2(1, 1) != 1)
++		return -1;
++
+ 	arg = *++argv;
+ 	if (!arg)
+ 		goto newline_ret;
+@@ -41,6 +55,10 @@ int bb_echo(char **argv)
+ 	char nflag = 1;
+ 	char eflag = 0;
+ 
++	/* We must check that stdout is not closed. */
++	if (dup2(1, 1) != 1)
++		return -1;
++
+ 	while (1) {
+ 		arg = *++argv;
+ 		if (!arg)
+@@ -122,7 +140,7 @@ int bb_echo(char **argv)
+ int echo_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int echo_main(int argc, char **argv)
+ {
+-	return bb_echo(argv);
++	return bb_echo(argc, argv);
+ }
+ 
+ /*-
+@@ -163,3 +181,122 @@ int echo_main(int argc, char **argv)
+  *
+  *	@(#)echo.c	8.1 (Berkeley) 5/31/93
+  */
++
++#ifdef VERSION_WITH_WRITEV
++/* We can't use stdio.
++ * The reason for this is highly non-obvious.
++ * bb_echo is used from shell. Shell must correctly handle "echo foo"
++ * if stdout is closed. With stdio, output gets shoveled into
++ * stdout buffer, and even fflush cannot clear it out. It seems that
++ * even if libc receives EBADF on write attempts, it feels determined
++ * to output data no matter what. So it will try later,
++ * and possibly will clobber future output. Not good.
++ *
++ * Using writev instead, with 'direct' conversion of argv vector.
++ */
++
++int bb_echo(int argc, char **argv)
++{
++	struct iovec io[argc];
++	struct iovec *cur_io = io;
++	char *arg;
++	char *p;
++#if !ENABLE_FEATURE_FANCY_ECHO
++	enum {
++		eflag = '\\',
++		nflag = 1,  /* 1 -- print '\n' */
++	};
++	arg = *++argv;
++	if (!arg)
++		goto newline_ret;
++#else
++	char nflag = 1;
++	char eflag = 0;
++
++	while (1) {
++		arg = *++argv;
++		if (!arg)
++			goto newline_ret;
++		if (*arg != '-')
++			break;
++
++		/* If it appears that we are handling options, then make sure
++		 * that all of the options specified are actually valid.
++		 * Otherwise, the string should just be echoed.
++		 */
++		p = arg + 1;
++		if (!*p)	/* A single '-', so echo it. */
++			goto just_echo;
++
++		do {
++			if (!strrchr("neE", *p))
++				goto just_echo;
++		} while (*++p);
++
++		/* All of the options in this arg are valid, so handle them. */
++		p = arg + 1;
++		do {
++			if (*p == 'n')
++				nflag = 0;
++			if (*p == 'e')
++				eflag = '\\';
++		} while (*++p);
++	}
++ just_echo:
++#endif
++
++	while (1) {
++		/* arg is already == *argv and isn't NULL */
++		int c;
++
++		cur_io->iov_base = p = arg;
++
++		if (!eflag) {
++			/* optimization for very common case */
++			p += strlen(arg);
++		} else while ((c = *arg++)) {
++			if (c == eflag) {	/* Check for escape seq. */
++				if (*arg == 'c') {
++					/* '\c' means cancel newline and
++					 * ignore all subsequent chars. */
++					cur_io->iov_len = p - (char*)cur_io->iov_base;
++					cur_io++;
++					goto ret;
++				}
++#if !ENABLE_FEATURE_FANCY_ECHO
++				/* SUSv3 specifies that octal escapes must begin with '0'. */
++				if ( (((unsigned char)*arg) - '1') >= 7)
++#endif
++				{
++					/* Since SUSv3 mandates a first digit of 0, 4-digit octals
++					* of the form \0### are accepted. */
++					if (*arg == '0' && ((unsigned char)(arg[1]) - '0') < 8) {
++						arg++;
++					}
++					/* bb_process_escape_sequence can handle nul correctly */
++					c = bb_process_escape_sequence( (void*) &arg);
++				}
++			}
++			*p++ = c;
++		}
++
++		arg = *++argv;
++		if (arg)
++			*p++ = ' ';
++		cur_io->iov_len = p - (char*)cur_io->iov_base;
++		cur_io++;
++		if (!arg)
++			break;
++	}
++
++ newline_ret:
++	if (nflag) {
++		cur_io->iov_base = (char*)"\n";
++		cur_io->iov_len = 1;
++		cur_io++;
++	}
++ ret:
++	/* TODO: implement and use full_writev? */
++	return writev(1, io, (cur_io - io)) >= 0; 
++}
++#endif
+diff --git a/include/libbb.h b/include/libbb.h
+index 3bec432..77392d0 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -728,7 +728,7 @@ extern void bb_verror_msg(const char *s, va_list p, const char *strerr);
+ 
+ /* applets which are useful from another applets */
+ int bb_cat(char** argv);
+-int bb_echo(char** argv);
++int bb_echo(int argc, char** argv);
+ int test_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int kill_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ #if ENABLE_ROUTE
+diff --git a/shell/ash.c b/shell/ash.c
+index bb930f5..4113ce8 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -4567,6 +4567,7 @@ stoppedjobs(void)
+  */
+ 
+ #define EMPTY -2                /* marks an unused slot in redirtab */
++#define CLOSED -3               /* marks a slot of previously-closed fd */
+ #ifndef PIPE_BUF
+ # define PIPESIZE 4096          /* amount of buffering in a pipe */
+ #else
+@@ -4791,7 +4792,7 @@ redirect(union node *redir, int flags)
+ 	int i;
+ 	int fd;
+ 	int newfd;
+-	int *p;
++
+ 	nullredirs++;
+ 	if (!redir) {
+ 		return;
+@@ -4799,15 +4800,13 @@ redirect(union node *redir, int flags)
+ 	sv = NULL;
+ 	INT_OFF;
+ 	if (flags & REDIR_PUSH) {
+-		struct redirtab *q;
+-		q = ckmalloc(sizeof(struct redirtab));
+-		q->next = redirlist;
+-		redirlist = q;
+-		q->nullredirs = nullredirs - 1;
++		sv = ckmalloc(sizeof(*sv));
++		sv->next = redirlist;
++		redirlist = sv;
++		sv->nullredirs = nullredirs - 1;
+ 		for (i = 0; i < 10; i++)
+-			q->renamed[i] = EMPTY;
++			sv->renamed[i] = EMPTY;
+ 		nullredirs = 0;
+-		sv = q;
+ 	}
+ 	n = redir;
+ 	do {
+@@ -4817,9 +4816,14 @@ redirect(union node *redir, int flags)
+ 			continue; /* redirect from/to same file descriptor */
+ 
+ 		newfd = openredirect(n);
+-		if (fd == newfd)
++		if (fd == newfd) {
++			/* Descriptor wasn't open before redirect.
++			 * Mark it for close in the future */
++			if (sv && sv->renamed[fd] == EMPTY)
++				sv->renamed[fd] = CLOSED;
+ 			continue;
+-		if (sv && *(p = &sv->renamed[fd]) == EMPTY) {
++		}
++		if (sv && sv->renamed[fd] == EMPTY) {
+ 			i = fcntl(fd, F_DUPFD, 10);
+ 
+ 			if (i == -1) {
+@@ -4831,7 +4835,7 @@ redirect(union node *redir, int flags)
+ 					/* NOTREACHED */
+ 				}
+ 			} else {
+-				*p = i;
++				sv->renamed[fd] = i;
+ 				close(fd);
+ 			}
+ 		} else {
+@@ -4840,7 +4844,7 @@ redirect(union node *redir, int flags)
+ 		dupredirect(n, newfd);
+ 	} while ((n = n->nfile.next));
+ 	INT_ON;
+-	if (flags & REDIR_SAVEFD2 && sv && sv->renamed[2] >= 0)
++	if ((flags & REDIR_SAVEFD2) && sv && sv->renamed[2] >= 0)
+ 		preverrout_fd = sv->renamed[2];
+ }
+ 
+@@ -4858,6 +4862,11 @@ popredir(int drop)
+ 	INT_OFF;
+ 	rp = redirlist;
+ 	for (i = 0; i < 10; i++) {
++		if (rp->renamed[i] == CLOSED) {
++			if (!drop)
++				close(i);
++			continue;
++		}
+ 		if (rp->renamed[i] != EMPTY) {
+ 			if (!drop) {
+ 				close(i);
+@@ -10994,7 +11003,7 @@ exitcmd(int argc, char **argv)
+ static int
+ echocmd(int argc, char **argv)
+ {
+-	return bb_echo(argv);
++	return bb_echo(argc, argv);
+ }
+ #endif
+ 
+diff --git a/shell/ash_test/ash-redir/redir.right b/shell/ash_test/ash-redir/redir.right
+new file mode 100644
+index 0000000..2a02d41
+--- /dev/null
++++ b/shell/ash_test/ash-redir/redir.right
+@@ -0,0 +1 @@
++TEST
+diff --git a/shell/ash_test/ash-redir/redir.tests b/shell/ash_test/ash-redir/redir.tests
+new file mode 100644
+index 0000000..7a1a668
+--- /dev/null
++++ b/shell/ash_test/ash-redir/redir.tests
+@@ -0,0 +1,6 @@
++# test: closed fds should stay closed
++exec 1>&-
++echo TEST >TEST
++echo JUNK # lost: stdout is closed
++cat TEST >&2
++rm TEST

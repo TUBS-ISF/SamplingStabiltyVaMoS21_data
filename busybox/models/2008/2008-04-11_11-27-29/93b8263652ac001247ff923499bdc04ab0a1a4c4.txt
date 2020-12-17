@@ -1,0 +1,91 @@
+2008-04-11 11:27:29 +0000
+diff --git a/libbb/ptr_to_globals.c b/libbb/ptr_to_globals.c
+index f8ccbf1..48cf8d8 100644
+--- a/libbb/ptr_to_globals.c
++++ b/libbb/ptr_to_globals.c
+@@ -5,7 +5,20 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
++struct globals;
++
++#ifndef GCC_COMBINE
++
+ /* We cheat here. It is declared as const ptr in libbb.h,
+  * but here we make it live in R/W memory */
+-struct globals;
+ struct globals *ptr_to_globals;
++
++#else
++
++/* gcc -combine will see through and complain */
++/* Using alternative method which is more likely to break
++ * on weird architectures, compilers, linkers and so on */
++struct globals *const ptr_to_globals __attribute__ ((section (".data")));
++
++#endif
++
+diff --git a/scripts/Makefile.IMA b/scripts/Makefile.IMA
+index 762e252..d246517 100644
+--- a/scripts/Makefile.IMA
++++ b/scripts/Makefile.IMA
+@@ -145,8 +145,10 @@ include libbb/Kbuild
+ lib-all-y += $(patsubst %,libbb/%,$(sort $(lib-y)))
+ lib-y:=
+ 
+-busybox: $(usage_stuff)
+-	$(CC) $(CPPFLAGS) $(CFLAGS) $(EXTRA_CFLAGS) --combine $(WHOLE_PROGRAM) \
++busybox: $(usage_stuff) include/applet_tables.h
++	$(CC) $(CPPFLAGS) $(CFLAGS) $(EXTRA_CFLAGS) \
++		-DGCC_COMBINE=1 \
++		--combine $(WHOLE_PROGRAM) \
+ 		-funit-at-a-time -Wno-error -std=gnu99  \
+ 		-o $(@)_unstripped $(lib-all-y:.o=.c) \
+ 		-Wl,--start-group -lcrypt -lm -Wl,--end-group
+@@ -154,7 +156,13 @@ busybox: $(usage_stuff)
+ 	-$(STRIP) -s -R .note -R .comment -R .version $@
+ 
+ applets/usage:
+-	$(HOSTCC) -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer      -I$(srctree)/include -o applets/usage applets/usage.c
++	$(HOSTCC) -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -I$(srctree)/include -o applets/usage applets/usage.c
++
++applets/applet_tables:
++	$(HOSTCC) -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -I$(srctree)/include -o applets/applet_tables applets/applet_tables.c
++
+ include/usage_compressed.h: $(srctree)/include/usage.h applets/usage
+ 	$(srctree)/applets/usage_compressed include/usage_compressed.h applets
+ 
++include/applet_tables.h: $(srctree)/include/applets.h
++	applets/applet_tables include/applet_tables.h
+diff --git a/shell/ash_ptr_hack.c b/shell/ash_ptr_hack.c
+index 490b73b..68d9072 100644
+--- a/shell/ash_ptr_hack.c
++++ b/shell/ash_ptr_hack.c
+@@ -5,12 +5,25 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+-/* We cheat here. They are declared as const ptr in ash.c,
+- * but here we make them live in R/W memory */
+ struct globals_misc;
+ struct globals_memstack;
+ struct globals_var;
+ 
++#ifndef GCC_COMBINE
++
++/* We cheat here. They are declared as const ptr in ash.c,
++ * but here we make them live in R/W memory */
+ struct globals_misc     *ash_ptr_to_globals_misc;
+ struct globals_memstack *ash_ptr_to_globals_memstack;
+ struct globals_var      *ash_ptr_to_globals_var;
++
++#else
++
++/* gcc -combine will see through and complain */
++/* Using alternative method which is more likely to break
++ * on weird architectures, compilers, linkers and so on */
++struct globals_misc     *const ash_ptr_to_globals_misc __attribute__ ((section (".data")));
++struct globals_memstack *const ash_ptr_to_globals_memstack __attribute__ ((section (".data")));
++struct globals_var      *const ash_ptr_to_globals_var __attribute__ ((section (".data")));
++
++#endif

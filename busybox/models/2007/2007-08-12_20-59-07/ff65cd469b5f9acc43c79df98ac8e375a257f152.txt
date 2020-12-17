@@ -1,0 +1,29 @@
+2007-08-12 20:59:07 +0000
+diff --git a/Makefile b/Makefile
+index f6991ac..e97330a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -760,7 +760,7 @@ PHONY += prepare-all
+ # 2) Create the include2 directory, used for the second asm symlink
+ prepare3: .kernelrelease
+ ifneq ($(KBUILD_SRC),)
+-	@echo '  Using $(srctree) as source for kernel'
++	@echo '  Using $(srctree) as source for busybox'
+ 	$(Q)if [ -f $(srctree)/.config ]; then \
+ 		echo "  $(srctree) is not clean, please run 'make mrproper'";\
+ 		echo "  in the '$(srctree)' directory.";\
+diff --git a/applets/usage.c b/applets/usage.c
+index c128b52..4955839 100644
+--- a/applets/usage.c
++++ b/applets/usage.c
+@@ -1,7 +1,9 @@
+ /* vi: set sw=4 ts=4: */
+ #include <unistd.h>
+ 
+-#include "autoconf.h"
++/* Just #include "autoconf.h" doesn't work for builds in separate
++ * object directory */
++#include "../include/autoconf.h"
+ 
+ static const char usage_messages[] = ""
+ #define MAKE_USAGE

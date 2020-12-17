@@ -1,0 +1,135 @@
+2009-03-19 23:09:58 +0000
+diff --git a/shell/ash.c b/shell/ash.c
+index a8383d8..d969b20 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -39,7 +39,7 @@
+  * When debugging is on, debugging info will be written to ./trace and
+  * a quit signal will generate a core dump.
+  */
+-#define DEBUG 0
++#define DEBUG 2
+ /* Tweak debug output verbosity here */
+ #define DEBUG_TIME 0
+ #define DEBUG_PID 1
+@@ -3834,7 +3834,8 @@ dowait(int wait_flags, struct job *job)
+ 	 * NB: _not_ safe_waitpid, we need to detect EINTR */
+ 	pid = waitpid(-1, &status,
+ 			(doing_jobctl ? (wait_flags | WUNTRACED) : wait_flags));
+-	TRACE(("wait returns pid=%d, status=0x%x\n", pid, status));
++	TRACE(("wait returns pid=%d, status=0x%x, errno=%d(%s)\n",
++				pid, status, errno, strerror(errno)));
+ 	if (pid <= 0)
+ 		return pid;
+ 
+@@ -8003,7 +8004,7 @@ dotrap(void)
+ 		want_exexit = evalstring(t, SKIPEVAL);
+ 		exitstatus = savestatus;
+ 		if (want_exexit) {
+-			TRACE(("dotrap returns %d\n", skip));
++			TRACE(("dotrap returns %d\n", want_exexit));
+ 			return want_exexit;
+ 		}
+ 	}
+@@ -8051,11 +8052,13 @@ evaltree(union node *n, int flags)
+ 		if (err) {
+ 			/* if it was a signal, check for trap handlers */
+ 			if (exception_type == EXSIG) {
+-				TRACE(("exception %d (EXSIG) in evaltree, err=%d\n", exception, err));
++				TRACE(("exception %d (EXSIG) in evaltree, err=%d\n",
++						exception_type, err));
+ 				goto out;
+ 			}
+ 			/* continue on the way out */
+-			TRACE(("exception %d in evaltree, propagating err=%d\n", exception, err));
++			TRACE(("exception %d in evaltree, propagating err=%d\n",
++					exception_type, err));
+ 			exception_handler = savehandler;
+ 			longjmp(exception_handler->loc, err);
+ 		}
+diff --git a/shell/ash_doc.txt b/shell/ash_doc.txt
+index d8a48c1..2aa4443 100644
+--- a/shell/ash_doc.txt
++++ b/shell/ash_doc.txt
+@@ -46,8 +46,77 @@ done
+ of exiting. (true) in subshell does not seem to matter, as another user
+ reports the same with:
+ 
+-while true
+-do
+-  echo Kill me
+-  sleep 1
++trap "echo USR1" USR1
++while true; do
++    echo Sleeping
++    sleep 5
+ done
++
++Compat note.
++Bash version 3.2.0(1) exits this script at the receipt of SIGINT
++_only_ if it had two last children die from it.
++The following trace was obtained while periodically running
++"killall -SIGINT sleep; sleep 0.1; kill -SIGINT <bash_PID>":
++
++23:48:32.376707 clone(...) = 13528
++23:48:32.388706 waitpid(-1, 0xffc832ec, 0) = ? ERESTARTSYS (To be restarted)
++23:48:32.459761 --- SIGINT (Interrupt) @ 0 (0) ---
++    kill -SIGINT <bash_PID> is ignored, back to waiting:
++23:48:32.463706 waitpid(-1, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0) = 13528
++    sleep exited with 0
++23:48:37.377557 --- SIGCHLD (Child exited) @ 0 (0) ---
++23:48:37.378451 clone(...) = 13538
++23:48:37.390708 waitpid(-1, [{WIFSIGNALED(s) && WTERMSIG(s) == SIGINT}], 0) = 13538
++    sleep was killed by "killall -SIGINT sleep"
++23:48:38.523944 --- SIGCHLD (Child exited) @ 0 (0) ---
++23:48:38.524861 clone(...) = 13542
++23:48:38.538706 waitpid(-1, 0xffc832ec, 0) = ? ERESTARTSYS (To be restarted)
++23:48:38.624761 --- SIGINT (Interrupt) @ 0 (0) ---
++    kill -SIGINT <bash_PID> is ignored, back to waiting:
++23:48:38.628706 waitpid(-1, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0) = 13542
++    sleep exited with 0
++23:48:43.525674 --- SIGCHLD (Child exited) @ 0 (0) ---
++23:48:43.526563 clone(...) = 13545
++23:48:43.538709 waitpid(-1, [{WIFSIGNALED(s) && WTERMSIG(s) == SIGINT}], 0) = 13545
++    sleep was killed by "killall -SIGINT sleep"
++23:48:44.466848 --- SIGCHLD (Child exited) @ 0 (0) ---
++23:48:44.467735 clone(...) = 13549
++23:48:44.481706 waitpid(-1, 0xffc832ec, 0) = ? ERESTARTSYS (To be restarted)
++23:48:44.567757 --- SIGINT (Interrupt) @ 0 (0) ---
++    kill -SIGINT <bash_PID> is ignored, back to waiting:
++23:48:44.571706 waitpid(-1, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0) = 13549
++    sleep exited with 0
++23:48:49.468553 --- SIGCHLD (Child exited) @ 0 (0) ---
++23:48:49.469445 clone(...) = 13551
++23:48:49.481708 waitpid(-1, [{WIFSIGNALED(s) && WTERMSIG(s) == SIGINT}], 0) = 13551
++    sleep was killed by "killall -SIGINT sleep"
++23:48:50.515837 --- SIGCHLD (Child exited) @ 0 (0) ---
++23:48:50.516718 clone(...) = 13555
++23:48:50.530706 waitpid(-1, 0xffc832ec, 0) = ? ERESTARTSYS (To be restarted)
++23:48:50.615761 --- SIGINT (Interrupt) @ 0 (0) ---
++    kill -SIGINT <bash_PID> is ignored, back to waiting:
++23:48:50.619705 waitpid(-1, [{WIFSIGNALED(s) && WTERMSIG(s) == SIGINT}], 0) = 13555
++    sleep was killed by "killall -SIGINT sleep".
++    This is the second one in a row. Kill ourself:
++23:48:51.504604 kill(13515, SIGINT)     = 0
++23:48:51.504689 --- SIGINT (Interrupt) @ 0 (0) ---
++23:48:51.504915 +++ killed by SIGINT +++
++
++As long as there is at least one "sleep 5" which exited successfully
++(not killed by SIGINT), bash continues. This is not documented anywhere
++AFAIKS.
++
++Why keyboard ^C acts differently?
++
++00:08:07.655985 clone(...) = 14270
++00:08:07.669707 waitpid(-1, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0) = 14270
++00:08:12.656872 --- SIGCHLD (Child exited) @ 0 (0) ---
++00:08:12.657743 clone(...) = 14273
++00:08:12.671708 waitpid(-1, [{WIFSIGNALED(s) && WTERMSIG(s) == SIGINT}], 0) = 14273
++00:08:13.810778 --- SIGINT (Interrupt) @ 0 (0) ---
++00:08:13.818705 kill(14269, SIGINT)     = 0
++00:08:13.820103 --- SIGINT (Interrupt) @ 0 (0) ---
++00:08:13.820925 +++ killed by SIGINT +++
++
++Perhaps because at the moment bash got SIGINT it had no children?
++(it did not manage to spawn new sleep yet, see the trace)

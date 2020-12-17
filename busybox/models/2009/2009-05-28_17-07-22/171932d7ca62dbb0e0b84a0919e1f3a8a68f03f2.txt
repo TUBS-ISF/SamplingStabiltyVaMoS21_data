@@ -1,0 +1,17 @@
+2009-05-28 17:07:22 +0200
+diff --git a/shell/hush.c b/shell/hush.c
+index 1d4470e..add40eb 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -6762,10 +6762,8 @@ static int builtin_type(char **argv)
+ 	int ret = EXIT_SUCCESS;
+ 
+ 	while (*++argv) {
+-		char *path;
+ 		const char *type;
+-
+-		type = path = NULL;
++		char *path = NULL;
+ 
+ 		if (0) {} /* make conditional compile easier below */
+ 		/*else if (find_alias(*argv))

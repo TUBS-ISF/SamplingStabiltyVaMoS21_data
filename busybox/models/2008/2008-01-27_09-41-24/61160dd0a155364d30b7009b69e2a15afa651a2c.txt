@@ -1,0 +1,14 @@
+2008-01-27 09:41:24 +0000
+diff --git a/Makefile b/Makefile
+index eabc21b..411e0dc 100644
+--- a/Makefile
++++ b/Makefile
+@@ -842,7 +842,7 @@ depend dep:
+ # ---------------------------------------------------------------------------
+ # Modules
+ 
+-ifdef CONFIG_MODULES
++ifdef _BB_DISABLED_CONFIG_MODULES
+ 
+ # 	By default, build modules as well
+ 

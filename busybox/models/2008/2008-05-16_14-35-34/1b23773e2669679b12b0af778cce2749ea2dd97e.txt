@@ -1,0 +1,14 @@
+2008-05-16 14:35:34 +0000
+diff --git a/TODO b/TODO
+index fa9a207..71768f5 100644
+--- a/TODO
++++ b/TODO
+@@ -294,6 +294,8 @@ Minor stuff:
+   See grep -r strtod
+   Alot of duplication that wants cleanup.
+ ---
++  in_ether duplicated in network/{interface,ifconfig}.c
++---
+ 
+ 
+ Code cleanup:

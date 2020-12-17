@@ -1,0 +1,26 @@
+2009-11-26 15:26:14 +0100
+diff --git a/miscutils/runlevel.c b/miscutils/runlevel.c
+index 6e10d9c..83b5a77 100644
+--- a/miscutils/runlevel.c
++++ b/miscutils/runlevel.c
+@@ -11,17 +11,16 @@
+  *
+  * initially busyboxified by Bernhard Reutner-Fischer
+  */
+-
+-#include <utmp.h>
+ #include "libbb.h"
++#include <utmp.h>
+ 
+ int runlevel_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int runlevel_main(int argc, char **argv)
++int runlevel_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct utmp *ut;
+ 	char prev;
+ 
+-	if (argc > 1) utmpname(argv[1]);
++	if (argv[1]) utmpname(argv[1]);
+ 
+ 	setutent();
+ 	while ((ut = getutent()) != NULL) {

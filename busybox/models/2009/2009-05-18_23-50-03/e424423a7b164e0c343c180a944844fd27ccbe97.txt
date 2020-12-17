@@ -1,0 +1,24 @@
+2009-05-18 23:50:03 +0200
+diff --git a/editors/awk.c b/editors/awk.c
+index 924cfcf..cef7334 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -1571,13 +1571,14 @@ static int awk_split(const char *s, node *spl, char **slist)
+ 				n++; /* we saw yet another delimiter */
+ 			} else {
+ 				pmatch[0].rm_eo = l;
+-				if (s[l]) pmatch[0].rm_eo++;
++				if (s[l])
++					pmatch[0].rm_eo++;
+ 			}
+ 			memcpy(s1, s, l);
+ 			/* make sure we remove *all* of the separator chars */
+-			while (l < pmatch[0].rm_eo) {
+-				s1[l++] = '\0';
+-			}
++			do {
++				s1[l] = '\0';
++			} while (++l < pmatch[0].rm_eo);
+ 			nextword(&s1);
+ 			s += pmatch[0].rm_eo;
+ 		} while (*s);

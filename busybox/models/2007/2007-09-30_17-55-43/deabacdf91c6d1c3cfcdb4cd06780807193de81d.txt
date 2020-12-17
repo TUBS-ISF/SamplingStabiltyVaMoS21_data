@@ -1,0 +1,69 @@
+2007-09-30 17:55:43 +0000
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 33417af..4864c85 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -73,10 +73,6 @@ void udhcp_run_script(struct dhcpMessage *packet, const char *name);
+ /* from socket.h */
+ #define listen_socket		udhcp_listen_socket
+ #define read_interface		udhcp_read_interface
+-/* from dhcpc.h */
+-#define client_config		udhcp_client_config
+-/* from dhcpd.h */
+-#define server_config		udhcp_server_config
+ 
+ void udhcp_sp_setup(void);
+ int udhcp_sp_fd_set(fd_set *rfds, int extra_fd);
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 961a171..ca478b3 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -37,7 +37,7 @@ static smallint listen_mode;
+ 
+ static smallint state;
+ 
+-struct client_config_t client_config;
++/* struct client_config_t client_config is in bb_common_bufsiz1 */
+ 
+ 
+ /* just a little helper */
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index 20f4e52..8da1dd8 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -33,7 +33,7 @@ struct client_config_t {
+ 	uint8_t arp[6];                 /* Our arp address */
+ };
+ 
+-extern struct client_config_t client_config;
++#define client_config (*(struct client_config_t*)&bb_common_bufsiz1)
+ 
+ 
+ /*** clientpacket.h ***/
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index e722833..3466312 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -18,7 +18,7 @@
+ 
+ /* globals */
+ struct dhcpOfferedAddr *leases;
+-struct server_config_t server_config;
++/* struct server_config_t server_config is in bb_common_bufsiz1 */
+ 
+ 
+ int udhcpd_main(int argc, char **argv);
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index fc6b1d6..28106d3 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -54,7 +54,8 @@ struct server_config_t {
+ 	struct static_lease *static_leases; /* List of ip/mac pairs to assign static leases */
+ };
+ 
+-extern struct server_config_t server_config;
++#define server_config (*(struct server_config_t*)&bb_common_bufsiz1)
++
+ extern struct dhcpOfferedAddr *leases;
+ 
+ 

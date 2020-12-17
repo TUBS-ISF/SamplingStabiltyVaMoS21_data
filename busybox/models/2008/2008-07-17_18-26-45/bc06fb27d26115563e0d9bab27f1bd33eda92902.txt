@@ -1,0 +1,38 @@
+2008-07-17 18:26:45 +0000
+diff --git a/archival/Config.in b/archival/Config.in
+index 02daae1..5d5087b 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -167,6 +167,8 @@ config TAR
+ 	  create compressed archives. It's probably the most widely used
+ 	  UNIX archive program.
+ 
++if TAR
++
+ config FEATURE_TAR_CREATE
+ 	bool "Enable archive creation"
+ 	default y
+@@ -208,12 +210,12 @@ config FEATURE_TAR_COMPRESS
+ 	  when extracting .tar.Z archives.
+ 
+ config FEATURE_TAR_AUTODETECT
+-	bool "Let tar autodetect gz/bz2 compresses tarballs"
++	bool "Autodetect gz/bz2 compresses tarballs"
+ 	default n
+ 	depends on FEATURE_TAR_GZIP || FEATURE_TAR_BZIP2
+ 	help
+ 	  With this option tar can automatically detect gzip/bzip2 compressed
+-	  tarballs. Currently it works only on seekable streams.
++	  tarballs. Currently it works only on files (not pipes etc).
+ 
+ config FEATURE_TAR_FROM
+ 	bool "Enable -X (exclude from) and -T (include from) options)"
+@@ -265,6 +267,8 @@ config FEATURE_TAR_UNAME_GNAME
+ 	  listings (-t) and preserving permissions when unpacking (-p).
+ 	  +200 bytes.
+ 
++endif #tar
++
+ config UNCOMPRESS
+ 	bool "uncompress"
+ 	default n

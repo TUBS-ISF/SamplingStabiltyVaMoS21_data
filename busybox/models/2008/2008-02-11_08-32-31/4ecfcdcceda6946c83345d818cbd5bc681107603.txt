@@ -1,0 +1,14 @@
+2008-02-11 08:32:31 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index e9d0355..02ec0ea 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3882,7 +3882,7 @@ int hush_main(int argc, char **argv)
+ 	if (interactive_fd) {
+ 		/* Looks like they want an interactive shell */
+ 		setup_job_control();
+-		/* -1 is special - makes xfuncs longjmp on exit
++		/* -1 is special - makes xfuncs longjmp, not exit
+ 		 * (we reset die_sleep = 0 whereever we [v]fork) */
+ 		die_sleep = -1;
+ 		if (setjmp(die_jmp)) {

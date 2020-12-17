@@ -1,0 +1,14 @@
+2008-02-24 22:08:57 +0000
+diff --git a/printutils/lpr.c b/printutils/lpr.c
+index e8da28b..86fcd9b 100644
+--- a/printutils/lpr.c
++++ b/printutils/lpr.c
+@@ -9,7 +9,7 @@
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  *
+- * See RFC 1179 for propocol description.
++ * See RFC 1179 for protocol description.
+  */
+ #include "libbb.h"
+ 

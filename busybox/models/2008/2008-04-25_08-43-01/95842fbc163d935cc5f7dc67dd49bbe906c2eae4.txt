@@ -1,0 +1,67 @@
+2008-04-25 08:43:01 +0000
+diff --git a/testsuite/runtest b/testsuite/runtest
+index c668240..4787648 100755
+--- a/testsuite/runtest
++++ b/testsuite/runtest
+@@ -9,12 +9,12 @@
+ # Option -e will make testcase stop on the first failed command.
+ run_applet_testcase()
+ {
+-	local applet=$1
++	local applet="$1"
+ 	local testcase="$2"
+ 
+ 	local status
+ 	local uc_applet=$(echo $applet | tr a-z A-Z)
+-	local testname=`basename "$testcase"`
++	local testname=$(basename "$testcase")
+ 
+ 	if grep -q "^# CONFIG_${uc_applet} is not set$" $bindir/.config; then
+ 		echo "UNTESTED: $testname"
+@@ -22,7 +22,7 @@ run_applet_testcase()
+ 	fi
+ 
+ 	if grep -q "^# FEATURE: " "$testcase"; then
+-		local feature=`sed -ne 's/^# FEATURE: //p' "$testcase"`
++		local feature=$(sed -ne 's/^# FEATURE: //p' "$testcase")
+ 
+ 		if grep -q "^# ${feature} is not set$" $bindir/.config; then
+ 			echo "UNTESTED: $testname"
+@@ -58,7 +58,7 @@ run_applet_tests()
+ 	local applet=$1
+ 	local status=0
+ 	for testcase in $tsdir/$applet/*; do
+-		case `basename "$testcase"` in
++		case $(basename "$testcase") in
+ 			\#*)
+ 				continue
+ 				;;
+@@ -130,9 +130,12 @@ for applet in $applets; do
+ 
+ 	# Is this a new-style test?
+ 	if [ -f "${applet}.tests" ]; then
+-		if [ ! -h "$LINKSDIR/$applet" ] && [ "${applet:0:4}" != "all_" ]; then
+-			echo "SKIPPED: $applet (not built)"
+-			continue
++		if [ ! -h "$LINKSDIR/$applet" ]; then
++			# (avoiding bash'ism "${applet:0:4}")
++			if ! echo "$applet" | grep "^all_" >/dev/null; then
++				echo "SKIPPED: $applet (not built)"
++				continue
++			fi
+ 		fi
+ #		echo "Running test ${tsdir:-.}/${applet}.tests"
+ 		PATH="$LINKSDIR:$tsdir:$bindir:$PATH" "${tsdir:-.}/${applet}.tests"
+diff --git a/util-linux/mkswap.c b/util-linux/mkswap.c
+index 1c364ef..11c411b 100644
+--- a/util-linux/mkswap.c
++++ b/util-linux/mkswap.c
+@@ -23,7 +23,7 @@ static void mkswap_selinux_setcontext(int fd, const char *path)
+ 		security_context_t oldcon = NULL;
+ 		context_t context;
+ 
+-		if (fgetfilecon_raw(fd, &oldcon) < 0) {
++		if (fgetfilecon(fd, &oldcon) < 0) {
+ 			if (errno != ENODATA)
+ 				goto error;
+ 			if (matchpathcon(path, stbuf.st_mode, &oldcon) < 0)

@@ -1,0 +1,55 @@
+2007-09-27 10:17:53 +0000
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 69f2e31..1b827d7 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -324,7 +324,7 @@ static int ChangeUser(const char *user, short dochdir)
+ 
+ 	pas = getpwnam(user);
+ 	if (pas == NULL) {
+-		bb_perror_msg_and_die("failed to get uid for %s", user);
++		bb_perror_msg_and_die("cannot get uid for %s", user);
+ 	}
+ 	setenv("USER", pas->pw_name, 1);
+ 	setenv("HOME", pas->pw_dir, 1);
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index e11c2de..0b4dbf6 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -99,23 +99,19 @@ static void print_perms(int id, struct ipc_perm *ipcp)
+ 
+ 	printf("%-10d %-10o", id, ipcp->mode & 0777);
+ 
+-	if ((pw = getpwuid(ipcp->cuid)))
+-		printf(" %-10s", pw->pw_name);
+-	else
+-		printf(" %-10d", ipcp->cuid);
+-	if ((gr = getgrgid(ipcp->cgid)))
+-		printf(" %-10s", gr->gr_name);
+-	else
+-		printf(" %-10d", ipcp->cgid);
+-
+-	if ((pw = getpwuid(ipcp->uid)))
+-		printf(" %-10s", pw->pw_name);
+-	else
+-		printf(" %-10d", ipcp->uid);
+-	if ((gr = getgrgid(ipcp->gid)))
+-		printf(" %-10s\n", gr->gr_name);
+-	else
+-		printf(" %-10d\n", ipcp->gid);
++	pw = getpwuid(ipcp->cuid);
++	if (pw)	printf(" %-10s", pw->pw_name);
++	else	printf(" %-10d", ipcp->cuid);
++	gr = getgrgid(ipcp->cgid);
++	if (gr)	printf(" %-10s", gr->gr_name);
++	else	printf(" %-10d", ipcp->cgid);
++
++	pw = getpwuid(ipcp->uid);
++	if (pw)	printf(" %-10s", pw->pw_name);
++	else	printf(" %-10d", ipcp->uid);
++	gr = getgrgid(ipcp->gid);
++	if (gr)	printf(" %-10s\n", gr->gr_name);
++	else	printf(" %-10d\n", ipcp->gid);
+ }
+ 
+ 

@@ -1,0 +1,166 @@
+2008-06-14 06:04:59 +0000
+diff --git a/shell/ash.c b/shell/ash.c
+index a8428b9..0913a2f 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -5818,73 +5818,26 @@ parse_sub_pattern(char *arg, int inquotes)
+ 	char *idx, *repl = NULL;
+ 	unsigned char c;
+ 
+-	for (idx = arg; *arg; arg++) {
+-		if (*arg == '/') {
+-			/* Only the first '/' seen is our seperator */
++	idx = arg;
++	while (1) {
++		c = *arg;
++		if (!c)
++			break;
++		if (c == '/') {
++			/* Only the first '/' seen is our separator */
+ 			if (!repl) {
+-				*idx++ = '\0';
+-				repl = idx;
+-			} else
+-				*idx++ = *arg;
+-			} else if (*arg != '\\') {
+-				*idx++ = *arg;
+-			} else {
+-				if (inquotes)
+-					arg++;
+-				else {
+-					if (*(arg + 1) != '\\')
+-						goto single_backslash;
+-					arg += 2;
+-				}
+-
+-			switch (*arg) {
+-			case 'n':	c = '\n'; break;
+-			case 'r':	c = '\r'; break;
+-			case 't':	c = '\t'; break;
+-			case 'v':	c = '\v'; break;
+-			case 'f':	c = '\f'; break;
+-			case 'b':	c = '\b'; break;
+-			case 'a':	c = '\a'; break;
+-			case '\\':
+-				if (*(arg + 1) != '\\' && !inquotes)
+-					goto single_backslash;
+-				arg++;
+-				/* FALLTHROUGH */
+-			case '\0':
+-				/* Trailing backslash, just stuff one in the buffer
+-				 * and backup arg so the loop will exit.
+-				 */
+-				c = '\\';
+-				if (!*arg)
+-					arg--;
+-				break;
+-			default:
+-				c = *arg;
+-				if (isdigit(c)) {
+-					/* It's an octal number, parse it. */
+-					int i;
+-					c = 0;
+-
+-					for (i = 0; *arg && i < 3; arg++, i++) {
+-						if (*arg >= '8' || *arg < '0')
+-							ash_msg_and_raise_error("Invalid octal char in pattern");
+-// TODO: number() instead? It does error checking...
+-						c = (c << 3) + atoi(arg);
+-					}
+-					/* back off one (so outer loop can do it) */
+-					arg--;
+-				}
++				repl = idx + 1;
++				c = '\0';
+ 			}
+-			*idx++ = c;
+ 		}
++		*idx++ = c;
++		if (!inquotes && c == '\\' && arg[1] == '\\')
++			arg++; /* skip both \\, not just first one */
++		arg++;
+ 	}
+-	*idx = *arg;
++	*idx++ = c;
+ 
+ 	return repl;
+-
+- single_backslash:
+-	ash_msg_and_raise_error("single backslash unexpected");
+-	/* NOTREACHED */
+ }
+ #endif /* ENABLE_ASH_BASH_COMPAT */
+ 
+diff --git a/shell/ash_test/ash-vars/var_bash3.right b/shell/ash_test/ash-vars/var_bash3.right
+new file mode 100644
+index 0000000..f7f1479
+--- /dev/null
++++ b/shell/ash_test/ash-vars/var_bash3.right
+@@ -0,0 +1,20 @@
++a041#c
++a041#c
++a\041#c
++a\041#c
++a\041#c
++a\041#c
++a\041#c
++a\041#c
++a\041#c
++a\c
++a\c
++a\c
++a\\c
++a\\c
++a\\c
++a\tc
++a\tc
++a\tc
++atc
++a\tc
+diff --git a/shell/ash_test/ash-vars/var_bash3.tests b/shell/ash_test/ash-vars/var_bash3.tests
+new file mode 100755
+index 0000000..b905027
+--- /dev/null
++++ b/shell/ash_test/ash-vars/var_bash3.tests
+@@ -0,0 +1,41 @@
++a='abc'
++r=${a//b/\041#}
++echo $r
++echo ${a//b/\041#}
++echo "${a//b/\041#}"
++
++a='abc'
++r=${a//b/\\041#}
++echo $r
++echo ${a//b/\\041#}
++echo "${a//b/\\041#}"
++
++a='abc'
++b='\041#'
++r=${a//b/$b}
++echo $r
++echo ${a//b/$b}
++echo "${a//b/$b}"
++
++a='abc'
++b='\'
++r="${a//b/$b}"
++echo $r
++echo ${a//b/$b}
++echo "${a//b/$b}"
++
++a='abc'
++b='\\'
++r="${a//b/$b}"
++echo $r
++echo ${a//b/$b}
++echo "${a//b/$b}"
++
++a='abc'
++b='\t'
++r="${a//b/$b}"
++echo $r
++echo ${a//b/$b}
++echo "${a//b/$b}"
++echo ${a//b/\t}
++echo "${a//b/\t}"

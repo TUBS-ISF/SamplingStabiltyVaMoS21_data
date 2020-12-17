@@ -1,0 +1,14 @@
+2009-10-24 17:20:29 +0200
+diff --git a/util-linux/mkfs_ext2.c b/util-linux/mkfs_ext2.c
+index d89f946..8b435c1 100644
+--- a/util-linux/mkfs_ext2.c
++++ b/util-linux/mkfs_ext2.c
+@@ -414,7 +414,7 @@ int mkfs_ext2_main(int argc UNUSED_PARAM, char **argv)
+ 		, inodes_per_group * ngroups, nblocks
+ 		, nreserved, reserved_percent
+ 		, first_block
+-		, group_desc_blocks * (blocksize / sizeof(*gd)) * blocks_per_group
++		, group_desc_blocks * (blocksize / (unsigned)sizeof(*gd)) * blocks_per_group
+ 		, ngroups
+ 		, blocks_per_group, blocks_per_group
+ 		, inodes_per_group

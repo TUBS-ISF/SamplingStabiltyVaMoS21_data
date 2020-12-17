@@ -1,0 +1,69 @@
+2008-06-18 09:22:31 +0000
+diff --git a/shell/hush_test/hush-bugs/quote3.right b/shell/hush_test/hush-bugs/quote3.right
+deleted file mode 100644
+index 069a46e..0000000
+--- a/shell/hush_test/hush-bugs/quote3.right
++++ /dev/null
+@@ -1,3 +0,0 @@
+-Testing: in $empty""
+-..
+-Finished
+diff --git a/shell/hush_test/hush-bugs/quote3.tests b/shell/hush_test/hush-bugs/quote3.tests
+deleted file mode 100755
+index 075e785..0000000
+--- a/shell/hush_test/hush-bugs/quote3.tests
++++ /dev/null
+@@ -1,8 +0,0 @@
+-if test $# = 0; then
+-    exec "$THIS_SH" quote3.tests abc "d e"
+-fi
+-
+-echo 'Testing: in $empty""'
+-empty=''
+-for a in $empty""; do echo ".$a."; done
+-echo Finished
+diff --git a/shell/hush_test/hush-parsing/quote3.right b/shell/hush_test/hush-parsing/quote3.right
+new file mode 100644
+index 0000000..bbe46df
+--- /dev/null
++++ b/shell/hush_test/hush-parsing/quote3.right
+@@ -0,0 +1,12 @@
++Testing: in ""
++..
++Testing: in ''
++..
++Testing: in $empty
++Testing: in $empty""
++..
++Testing: in $empty''
++..
++Testing: in "$empty"
++..
++Finished
+diff --git a/shell/hush_test/hush-parsing/quote3.tests b/shell/hush_test/hush-parsing/quote3.tests
+new file mode 100755
+index 0000000..b5fd597
+--- /dev/null
++++ b/shell/hush_test/hush-parsing/quote3.tests
+@@ -0,0 +1,21 @@
++empty=''
++
++echo 'Testing: in ""'
++for a in ""; do echo ".$a."; done
++
++echo 'Testing: in '"''"
++for a in ''; do echo ".$a."; done
++
++echo 'Testing: in $empty'
++for a in $empty; do echo ".$a."; done
++
++echo 'Testing: in $empty""'
++for a in $empty""; do echo ".$a."; done
++
++echo 'Testing: in $empty'"''"
++for a in $empty''; do echo ".$a."; done
++
++echo 'Testing: in "$empty"'
++for a in "$empty"; do echo ".$a."; done
++
++echo Finished

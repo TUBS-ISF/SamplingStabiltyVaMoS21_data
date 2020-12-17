@@ -1,0 +1,1559 @@
+2008-07-22 18:27:53 +0000
+diff --git a/Config.in b/Config.in
+index 8e55edb..5ad35ce 100644
+--- a/Config.in
++++ b/Config.in
+@@ -40,7 +40,7 @@ choice
+ 	  There are 3 ways BusyBox can handle buffer allocations:
+ 	  - Use malloc. This costs code size for the call to xmalloc.
+ 	  - Put them on stack. For some very small machines with limited stack
+-	    space, this can be deadly.  For most folks, this works just fine.
++	    space, this can be deadly. For most folks, this works just fine.
+ 	  - Put them in BSS. This works beautifully for computers with a real
+ 	    MMU (and OS support), but wastes runtime RAM for uCLinux. This
+ 	    behavior was the only one available for BusyBox versions 0.48 and
+@@ -72,8 +72,8 @@ config FEATURE_VERBOSE_USAGE
+ 	select SHOW_USAGE
+ 	help
+ 	  All BusyBox applets will show more verbose help messages when
+-	  busybox is invoked with --help.  This will add a lot of text to the
+-	  busybox binary.  In the default configuration, this will add about
++	  busybox is invoked with --help. This will add a lot of text to the
++	  busybox binary. In the default configuration, this will add about
+ 	  13k, but it can add much more depending on your configuration.
+ 
+ config FEATURE_COMPRESS_USAGE
+@@ -86,15 +86,15 @@ config FEATURE_COMPRESS_USAGE
+ 
+ 	  If you have a really tiny busybox with few applets enabled (and
+ 	  bunzip2 isn't one of them), the overhead of the decompressor might
+-	  be noticeable.  Also, if you run executables directly from ROM
+-	  and have very little memory, this might not be a win.  Otherwise,
++	  be noticeable. Also, if you run executables directly from ROM
++	  and have very little memory, this might not be a win. Otherwise,
+ 	  you probably want this.
+ 
+ config FEATURE_INSTALLER
+ 	bool "Support --install [-s] to install applet links at runtime"
+ 	default n
+ 	help
+-	  Enable 'busybox --install [-s]' support.  This will allow you to use
++	  Enable 'busybox --install [-s]' support. This will allow you to use
+ 	  busybox at runtime to create hard links or symlinks for all the
+ 	  applets that are compiled into busybox.
+ 
+@@ -118,7 +118,7 @@ config FEATURE_DEVPTS
+ 	help
+ 	  Enable if you want BusyBox to use Unix98 PTY support. If enabled,
+ 	  busybox will use /dev/ptmx for the master side of the pseudoterminal
+-	  and /dev/pts/<number> for the slave side.  Otherwise, BSD style
++	  and /dev/pts/<number> for the slave side. Otherwise, BSD style
+ 	  /dev/ttyp<number> will be used. To use this option, you should have
+ 	  devpts mounted.
+ 
+@@ -127,7 +127,7 @@ config FEATURE_CLEAN_UP
+ 	default n
+ 	help
+ 	  As a size optimization, busybox normally exits without explicitly
+-	  freeing dynamically allocated memory or closing files.  This saves
++	  freeing dynamically allocated memory or closing files. This saves
+ 	  space since the OS will clean up for us, but it can confuse debuggers
+ 	  like valgrind, which report tons of memory and resource leaks.
+ 
+@@ -152,7 +152,7 @@ config FEATURE_SUID
+ 	  If you're really paranoid and don't want to do this, build two
+ 	  busybox binaries with different applets in them (and the appropriate
+ 	  symlinks pointing to each binary), and only set the suid bit on the
+-	  one that needs it.  The applets currently marked to need the suid bit
++	  one that needs it. The applets currently marked to need the suid bit
+ 	  are login, passwd, su, ping, traceroute, crontab, dnsd, ipcrm, ipcs,
+ 	  and vlock.
+ 
+@@ -162,7 +162,7 @@ config FEATURE_SUID_CONFIG
+ 	depends on FEATURE_SUID
+ 	help
+ 	  Allow the SUID / SGID state of an applet to be determined at runtime
+-	  by checking /etc/busybox.conf.  (This is sort of a poor man's sudo.)
++	  by checking /etc/busybox.conf. (This is sort of a poor man's sudo.)
+ 	  The format of this file is as follows:
+ 
+ 	  <applet> = [Ssx-][Ssx-][x-] (<username>|<uid>).(<groupname>|<gid>)
+@@ -170,11 +170,12 @@ config FEATURE_SUID_CONFIG
+ 	  An example might help:
+ 
+ 	  [SUID]
+-	  su = ssx root.0 # applet su can be run by anyone and runs with euid=0/egid=0
++	  su = ssx root.0 # applet su can be run by anyone and runs with
++	                  # euid=0/egid=0
+ 	  su = ssx        # exactly the same
+ 
+-	  mount = sx- root.disk # applet mount can be run by root and members of group disk
+-	                        # and runs with euid=0
++	  mount = sx- root.disk # applet mount can be run by root and members
++	                        # of group disk and runs with euid=0
+ 
+ 	  cp = --- # disable applet cp for everyone
+ 
+@@ -193,14 +194,15 @@ config FEATURE_SUID_CONFIG_QUIET
+ 	default y
+ 	depends on FEATURE_SUID_CONFIG
+ 	help
+-	  /etc/busybox.conf should be readable by the user needing the SUID, check
+-	  this option to avoid users to be notified about missing permissions.
++	  /etc/busybox.conf should be readable by the user needing the SUID,
++	  check this option to avoid users to be notified about missing
++	  permissions.
+ 
+ config SELINUX
+ 	bool "Support NSA Security Enhanced Linux"
+ 	default n
+ 	help
+-	  Enable support for SELinux in applets ls, ps, and id.  Also provide
++	  Enable support for SELinux in applets ls, ps, and id. Also provide
+ 	  the option of compiling in SELinux applets.
+ 
+ 	  If you do not have a complete SELinux userland installed, this stuff
+@@ -235,9 +237,9 @@ config BUSYBOX_EXEC_PATH
+ 	default "/proc/self/exe"
+ 	help
+ 	  When Busybox applets need to run other busybox applets, BusyBox
+-	  sometimes needs to exec() itself.  When the /proc filesystem is
++	  sometimes needs to exec() itself. When the /proc filesystem is
+ 	  mounted, /proc/self/exe always points to the currently running
+-	  executable.  If you haven't got /proc, set this to wherever you
++	  executable. If you haven't got /proc, set this to wherever you
+ 	  want to run BusyBox from.
+ 
+ # These are auto-selected by other options
+@@ -304,7 +306,7 @@ config BUILD_LIBBUSYBOX
+ 	  busybox code.
+ 
+ 	  This feature allows every applet to be built as a tiny
+-	  separate executable.  Enabling it for "one big busybox binary"
++	  separate executable. Enabling it for "one big busybox binary"
+ 	  approach serves no purpose and increases code size.
+ 	  You should almost certainly say "no" to this.
+ 
+@@ -321,7 +323,7 @@ config BUILD_LIBBUSYBOX
+ ###	  standalone application which uses libbusybox say 'Y'.
+ ###
+ ###	  Note: libbusybox is GPL, not LGPL, and exports no stable API that
+-###	  might act as a copyright barrier.  We can and will modify the
++###	  might act as a copyright barrier. We can and will modify the
+ ###	  exported function set between releases (even minor version number
+ ###	  changes), and happily break out-of-tree features.
+ ###
+@@ -379,11 +381,11 @@ config LFS
+ 	select FDISK_SUPPORT_LARGE_DISKS
+ 	help
+ 	  If you want to build BusyBox with large file support, then enable
+-	  this option.  This will have no effect if your kernel or your C
+-	  library lacks large file support for large files.  Some of the
++	  this option. This will have no effect if your kernel or your C
++	  library lacks large file support for large files. Some of the
+ 	  programs that can benefit from large file support include dd, gzip,
+-	  cp, mount, tar, and many others.  If you want to access files larger
+-	  than 2 Gigabytes, enable this option.  Otherwise, leave it set to 'N'.
++	  cp, mount, tar, and many others. If you want to access files larger
++	  than 2 Gigabytes, enable this option. Otherwise, leave it set to 'N'.
+ 
+ config CROSS_COMPILER_PREFIX
+ 	string "Cross Compiler prefix"
+@@ -404,8 +406,8 @@ config DEBUG
+ 	default n
+ 	help
+ 	  Say Y here if you wish to examine BusyBox internals while applets are
+-	  running.  This increases the size of the binary considerably, and
+-	  should only be used when doing development.  If you are doing
++	  running. This increases the size of the binary considerably, and
++	  should only be used when doing development. If you are doing
+ 	  development and want to debug BusyBox, answer Y.
+ 
+ 	  Most people should answer N.
+@@ -417,7 +419,7 @@ config DEBUG_PESSIMIZE
+ 	help
+ 	  The compiler's optimization of source code can eliminate and reorder
+ 	  code, resulting in an executable that's hard to understand when
+-	  stepping through it with a debugger.  This switches it off, resulting
++	  stepping through it with a debugger. This switches it off, resulting
+ 	  in a much bigger executable that more closely matches the source
+ 	  code.
+ 
+@@ -434,27 +436,28 @@ choice
+ 	default NO_DEBUG_LIB
+ 	help
+ 	  Using an additional debugging library will make BusyBox become
+-	  considerable larger and will cause it to run more slowly.  You
++	  considerable larger and will cause it to run more slowly. You
+ 	  should always leave this option disabled for production use.
+ 
+ 	  dmalloc support:
+ 	  ----------------
+ 	  This enables compiling with dmalloc ( http://dmalloc.com/ )
+ 	  which is an excellent public domain mem leak and malloc problem
+-	  detector.  To enable dmalloc, before running busybox you will
++	  detector. To enable dmalloc, before running busybox you will
+ 	  want to properly set your environment, for example:
+ 	    export DMALLOC_OPTIONS=debug=0x34f47d83,inter=100,log=logfile
+ 	  The 'debug=' value is generated using the following command
+-	    dmalloc -p log-stats -p log-non-free -p log-bad-space -p log-elapsed-time \
+-	       -p check-fence -p check-heap -p check-lists -p check-blank \
+-	       -p check-funcs -p realloc-copy -p allow-free-null
++	    dmalloc -p log-stats -p log-non-free -p log-bad-space \
++	       -p log-elapsed-time -p check-fence -p check-heap \
++	       -p check-lists -p check-blank -p check-funcs -p realloc-copy \
++	       -p allow-free-null
+ 
+ 	  Electric-fence support:
+ 	  -----------------------
+-	  This enables compiling with Electric-fence support.  Electric
++	  This enables compiling with Electric-fence support. Electric
+ 	  fence is another very useful malloc debugging library which uses
+ 	  your computer's virtual memory hardware to detect illegal memory
+-	  accesses.  This support will make BusyBox be considerable larger
++	  accesses. This support will make BusyBox be considerable larger
+ 	  and run slower, so you should leave this option disabled unless
+ 	  you are hunting a hard to find memory problem.
+ 
+@@ -476,7 +479,7 @@ config INCLUDE_SUSv2
+ 	help
+ 	  This option will enable backwards compatibility with SuSv2,
+ 	  specifically, old-style numeric options ('command -1 <file>')
+-	  will be supported in head, tail, and fold.  (Note: should
++	  will be supported in head, tail, and fold. (Note: should
+ 	  affect renice too.)
+ 
+ config PARSE
+@@ -509,8 +512,8 @@ config INSTALL_APPLET_SYMLINKS
+ config INSTALL_APPLET_HARDLINKS
+ 	bool "as hard-links"
+ 	help
+-	  Install applets as hard-links to the busybox binary. This might count
+-	  on a filesystem with few inodes.
++	  Install applets as hard-links to the busybox binary. This might
++	  count on a filesystem with few inodes.
+ 
+ config INSTALL_APPLET_SCRIPT_WRAPPERS
+ 	bool "as script wrappers"
+@@ -546,7 +549,8 @@ config INSTALL_SH_APPLET_HARDLINK
+ config INSTALL_SH_APPLET_SCRIPT_WRAPPER
+ 	bool "as script wrapper"
+ 	help
+-	  Install /bin/sh applet as script wrapper that call the busybox binary.
++	  Install /bin/sh applet as script wrapper that call the busybox
++	  binary.
+ 
+ endchoice
+ 
+diff --git a/archival/Config.in b/archival/Config.in
+index 5d5087b..b26be64 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -10,7 +10,7 @@ config AR
+ 	default n
+ 	help
+ 	  ar is an archival utility program used to create, modify, and
+-	  extract contents from archives.  An archive is a single file holding
++	  extract contents from archives. An archive is a single file holding
+ 	  a collection of other files in a structure that makes it possible to
+ 	  retrieve the original individual files (called archive members).
+ 	  The original files' contents, mode (permissions), timestamp, owner,
+@@ -33,8 +33,8 @@ config FEATURE_AR_LONG_FILENAMES
+ 	default n
+ 	depends on AR
+ 	help
+-	  By default the ar format can only store the first 15 characters of the
+-	  filename, this option removes that limitation.
++	  By default the ar format can only store the first 15 characters of
++	  the filename, this option removes that limitation.
+ 	  It supports the GNU ar long filename method which moves multiple long
+ 	  filenames into a the data section of a new ar entry.
+ 
+@@ -43,7 +43,7 @@ config BUNZIP2
+ 	default n
+ 	help
+ 	  bunzip2 is a compression utility using the Burrows-Wheeler block
+-	  sorting text compression algorithm, and Huffman coding.  Compression
++	  sorting text compression algorithm, and Huffman coding. Compression
+ 	  is generally considerably better than that achieved by more
+ 	  conventional LZ77/LZ78-based compressors, and approaches the
+ 	  performance of the PPM family of statistical compressors.
+@@ -56,7 +56,7 @@ config BZIP2
+ 	default n
+ 	help
+ 	  bzip2 is a compression utility using the Burrows-Wheeler block
+-	  sorting text compression algorithm, and Huffman coding.  Compression
++	  sorting text compression algorithm, and Huffman coding. Compression
+ 	  is generally considerably better than that achieved by more
+ 	  conventional LZ77/LZ78-based compressors, and approaches the
+ 	  performance of the PPM family of statistical compressors.
+@@ -68,15 +68,15 @@ config CPIO
+ 	bool "cpio"
+ 	default n
+ 	help
+-	  cpio is an archival utility program used to create, modify, and extract
+-	  contents from archives.
++	  cpio is an archival utility program used to create, modify, and
++	  extract contents from archives.
+ 	  cpio has 110 bytes of overheads for every stored file.
+ 
+ 	  This implementation of cpio can extract cpio archives created in the
+ 	  "newc" or "crc" format, it cannot create or modify them.
+ 
+-	  Unless you have a specific application which requires cpio, you should
+-	  probably say N here.
++	  Unless you have a specific application which requires cpio, you
++	  should probably say N here.
+ 
+ config FEATURE_CPIO_O
+ 	bool "Support for archive creation"
+@@ -100,7 +100,8 @@ config DPKG_DEB
+ 	bool "dpkg_deb"
+ 	default n
+ 	help
+-	  dpkg-deb packs, unpacks and provides information about Debian archives.
++	  dpkg-deb packs, unpacks and provides information about Debian
++	  archives.
+ 
+ 	  This implementation of dpkg-deb cannot pack archives.
+ 
+@@ -112,9 +113,10 @@ config FEATURE_DPKG_DEB_EXTRACT_ONLY
+ 	default n
+ 	depends on DPKG_DEB
+ 	help
+-	  This reduces dpkg-deb to the equivalent of "ar -p <deb> data.tar.gz | tar -zx".
+-	  However it saves space as none of the extra dpkg-deb, ar or tar options are
+-	  needed, they are linked to internally.
++	  This reduces dpkg-deb to the equivalent of
++	  "ar -p <deb> data.tar.gz | tar -zx". However it saves space as none
++	  of the extra dpkg-deb, ar or tar options are needed, they are linked
++	  to internally.
+ 
+ config GUNZIP
+ 	bool "gunzip"
+@@ -240,8 +242,9 @@ config FEATURE_TAR_OLDSUN_COMPATIBILITY
+ 	depends on TAR
+ 	help
+ 	  This option is required to unpack archives created by some old
+-	  version of Sun's tar (it was calculating checksum using signed arithmetic).
+-	  It is said to be fixed in newer Sun tar, but "old" tarballs still exist.
++	  version of Sun's tar (it was calculating checksum using signed
++	  arithmetic). It is said to be fixed in newer Sun tar, but "old"
++	  tarballs still exist.
+ 
+ config FEATURE_TAR_GNU_EXTENSIONS
+ 	bool "Support for GNU tar extensions (long filenames)"
+@@ -281,7 +284,7 @@ config UNLZMA
+ 	default n
+ 	help
+ 	  unlzma is a compression utility using the Lempel-Ziv-Markov chain
+-	  compression algorithm, and range coding.  Compression
++	  compression algorithm, and range coding. Compression
+ 	  is generally considerably better than that achieved by the bzip2
+ 	  compressors.
+ 
+@@ -322,18 +325,19 @@ config FEATURE_DEB_TAR_GZ
+ 	help
+ 	  This is the default compression method inside the debian ar file.
+ 
+-	  If you want compatibility with standard .deb's you should say yes here.
++	  If you want compatibility with standard .deb's you should say yes
++	  here.
+ 
+ config FEATURE_DEB_TAR_BZ2
+ 	bool "bzip2 debian packages"
+ 	default n
+ 	depends on DPKG || DPKG_DEB
+ 	help
+-	  This allows dpkg and dpkg-deb to extract deb's that are compressed internally
+-	  with bzip2 instead of gzip.
++	  This allows dpkg and dpkg-deb to extract deb's that are compressed
++	  internally with bzip2 instead of gzip.
+ 
+-	  You only want this if you are creating your own custom debian packages that
+-	  use an internal control.tar.bz2 or data.tar.bz2.
++	  You only want this if you are creating your own custom debian
++	  packages that use an internal control.tar.bz2 or data.tar.bz2.
+ 
+ config FEATURE_DEB_TAR_LZMA
+ 	bool "lzma debian packages"
+diff --git a/coreutils/Config.in b/coreutils/Config.in
+index b01980d..4138390 100644
+--- a/coreutils/Config.in
++++ b/coreutils/Config.in
+@@ -10,7 +10,7 @@ config BASENAME
+ 	default n
+ 	help
+ 	  basename is used to strip the directory and suffix from filenames,
+-	  leaving just the filename itself.  Enable this option if you wish
++	  leaving just the filename itself. Enable this option if you wish
+ 	  to enable the 'basename' utility.
+ 
+ config CAL
+@@ -24,7 +24,7 @@ config CAT
+ 	default n
+ 	help
+ 	  cat is used to concatenate files and print them to the standard
+-	  output.  Enable this option if you wish to enable the 'cat' utility.
++	  output. Enable this option if you wish to enable the 'cat' utility.
+ 
+ config CATV
+ 	bool "catv"
+@@ -117,7 +117,8 @@ config FEATURE_DD_SIGNAL_HANDLING
+ 	  print to standard error the number of records read and written
+ 	  so far, then to resume copying.
+ 
+-	  $ dd if=/dev/zero of=/dev/null& pid=$! $ kill -USR1 $pid; sleep 1; kill $pid
++	  $ dd if=/dev/zero of=/dev/null&
++	  $ pid=$! kill -USR1 $pid; sleep 1; kill $pid
+ 	  10899206+0 records in 10899206+0 records out
+ 
+ config FEATURE_DD_IBS_OBS
+@@ -232,7 +233,7 @@ config EXPR_MATH_SUPPORT_64
+ 	default n
+ 	depends on EXPR
+ 	help
+-	  Enable 64-bit math support in the expr applet.  This will make
++	  Enable 64-bit math support in the expr applet. This will make
+ 	  the applet slightly larger, but will allow computation with very
+ 	  large numbers.
+ 
+@@ -548,8 +549,8 @@ config FEATURE_SORT_BIG
+ 	depends on SORT
+ 	help
+ 	  Without this, sort only supports -r, -u, and an integer version
+-	  of -n.  Selecting this adds sort keys, floating point support, and
+-	  more.  This adds a little over 3k to a nonstatic build on x86.
++	  of -n. Selecting this adds sort keys, floating point support, and
++	  more. This adds a little over 3k to a nonstatic build on x86.
+ 
+ 	  The SuSv3 sort standard is available at:
+ 	  http://www.opengroup.org/onlinepubs/007904975/utilities/sort.html
+@@ -581,7 +582,7 @@ config FEATURE_STAT_FORMAT
+ 	depends on STAT
+ 	help
+ 	  Without this, stat will not support the '-c format' option where
+-	  users can pass a custom format string for output.  This adds about
++	  users can pass a custom format string for output. This adds about
+ 	  7k to a nonstatic build on amd64.
+ 
+ config STTY
+@@ -642,7 +643,7 @@ config TEST
+ 	default n
+ 	help
+ 	  test is used to check file types and compare values,
+-	  returning an appropriate exit code.  The bash shell
++	  returning an appropriate exit code. The bash shell
+ 	  has test built in, ash can build it in optionally.
+ 
+ config FEATURE_TEST_64
+@@ -753,7 +754,7 @@ config FEATURE_WC_LARGE
+ 	default n
+ 	depends on WC
+ 	help
+-	  Use "unsigned long long" in wc for count variables
++	  Use "unsigned long long" in wc for count variables.
+ 
+ config WHO
+ 	bool "who"
+diff --git a/debianutils/Config.in b/debianutils/Config.in
+index f1b73b6..4ed00dd 100644
+--- a/debianutils/Config.in
++++ b/debianutils/Config.in
+@@ -26,8 +26,8 @@ config RUN_PARTS
+ 	  It is useful to set up a directory like cron.daily, where you need to
+ 	  execute all the scripts in that directory.
+ 
+-	  In this implementation of run-parts some features (such as report mode)
+-	  are not implemented.
++	  In this implementation of run-parts some features (such as report
++	  mode) are not implemented.
+ 
+ 	  Unless you know that run-parts is used in some of your scripts
+ 	  you can safely say N here.
+diff --git a/e2fsprogs/Config.in b/e2fsprogs/Config.in
+index fe8d031..9a0088a 100644
+--- a/e2fsprogs/Config.in
++++ b/e2fsprogs/Config.in
+@@ -38,7 +38,7 @@ config LSATTR
+ ###	bool "mke2fs"
+ ###	default n
+ ###	help
+-###	  mke2fs is used to create an ext2/ext3 filesystem.  The normal compat
++###	  mke2fs is used to create an ext2/ext3 filesystem. The normal compat
+ ###	  symlinks 'mkfs.ext2' and 'mkfs.ext3' are also provided.
+ 
+ ### config TUNE2FS
+diff --git a/e2fsprogs/old_e2fsprogs/Config.in b/e2fsprogs/old_e2fsprogs/Config.in
+index 0062b2f..5990f55 100644
+--- a/e2fsprogs/old_e2fsprogs/Config.in
++++ b/e2fsprogs/old_e2fsprogs/Config.in
+@@ -38,7 +38,7 @@ config MKE2FS
+ 	bool "mke2fs"
+ 	default n
+ 	help
+-	  mke2fs is used to create an ext2/ext3 filesystem.  The normal compat
++	  mke2fs is used to create an ext2/ext3 filesystem. The normal compat
+ 	  symlinks 'mkfs.ext2' and 'mkfs.ext3' are also provided.
+ 
+ config TUNE2FS
+diff --git a/editors/Config.in b/editors/Config.in
+index 58959aa..27426bc 100644
+--- a/editors/Config.in
++++ b/editors/Config.in
+@@ -9,7 +9,7 @@ config AWK
+ 	bool "awk"
+ 	default n
+ 	help
+-	  Awk is used as a pattern scanning and processing language.  This is
++	  Awk is used as a pattern scanning and processing language. This is
+ 	  the BusyBox implementation of that programming language.
+ 
+ config FEATURE_AWK_MATH
+@@ -64,7 +64,7 @@ config ED
+ 	default n
+ 	help
+ 	  The original 1970's Unix text editor, from the days of teletypes.
+-	  Small, simple, evil.  Part of SUSv3.  If you're not already using
++	  Small, simple, evil. Part of SUSv3. If you're not already using
+ 	  this, you don't need it.
+ 
+ config PATCH
+@@ -84,9 +84,9 @@ config VI
+ 	bool "vi"
+ 	default n
+ 	help
+-	  'vi' is a text editor.  More specifically, it is the One True
+-	  text editor <grin>.  It does, however, have a rather steep
+-	  learning curve.  If you are not already comfortable with 'vi'
++	  'vi' is a text editor. More specifically, it is the One True
++	  text editor <grin>. It does, however, have a rather steep
++	  learning curve. If you are not already comfortable with 'vi'
+ 	  you may wish to use something else.
+ 
+ config FEATURE_VI_MAX_LEN
+@@ -113,7 +113,7 @@ config FEATURE_VI_COLON
+ 	default y
+ 	depends on VI
+ 	help
+-	  Enable a limited set of colon commands for vi.  This does not
++	  Enable a limited set of colon commands for vi. This does not
+ 	  provide an "ex" mode.
+ 
+ config FEATURE_VI_YANKMARK
+@@ -137,7 +137,7 @@ config FEATURE_VI_USE_SIGNALS
+ 	default y
+ 	depends on VI
+ 	help
+-	  Selecting this option will make busybox vi signal aware.  This will
++	  Selecting this option will make busybox vi signal aware. This will
+ 	  make busybox vi support SIGWINCH to deal with Window Changes, catch
+ 	  Ctrl-Z and Ctrl-C and alarms.
+ 
+diff --git a/findutils/Config.in b/findutils/Config.in
+index a830394..9bb73d3 100644
+--- a/findutils/Config.in
++++ b/findutils/Config.in
+@@ -17,7 +17,7 @@ config FEATURE_FIND_PRINT0
+ 	depends on FIND
+ 	help
+ 	  Causes output names to be separated by a null character
+-	  rather than a newline.  This allows names that contain
++	  rather than a newline. This allows names that contain
+ 	  newlines and other whitespace to be more easily
+ 	  interpreted by other programs.
+ 
+@@ -182,7 +182,7 @@ config FEATURE_GREP_EGREP_ALIAS
+ 	default y
+ 	depends on GREP
+ 	help
+-	  Enabled support for extended regular expressions.  Extended
++	  Enabled support for extended regular expressions. Extended
+ 	  regular expressions allow for alternation (foo|bar), grouping,
+ 	  and various repetition operators.
+ 
+diff --git a/init/Config.in b/init/Config.in
+index a1684d4..c26c4c5 100644
+--- a/init/Config.in
++++ b/init/Config.in
+@@ -80,7 +80,7 @@ config FEATURE_INIT_COREDUMPS
+ 	help
+ 	  If this option is enabled and the file /.init_enable_core
+ 	  exists, then init will call setrlimit() to allow unlimited
+-	  core file sizes.  If this option is disabled, processes
++	  core file sizes. If this option is disabled, processes
+ 	  will not generate any core files.
+ 
+ 
+@@ -90,7 +90,7 @@ config FEATURE_INITRD
+ 	default y
+ 	depends on INIT
+ 	help
+-	  Legacy support for running init under the old-style initrd.  Allows
++	  Legacy support for running init under the old-style initrd. Allows
+ 	  the name linuxrc to act as init, and it doesn't assume init is PID 1.
+ 
+ 	  This does not apply to initramfs, which runs /init as PID 1 and
+@@ -106,7 +106,7 @@ config MESG
+ 	bool "mesg"
+ 	default n
+ 	help
+-	  Mesg controls access to your terminal by others.  It is typically
++	  Mesg controls access to your terminal by others. It is typically
+ 	  used to allow or disallow other users to write to your terminal
+ 
+ endmenu
+diff --git a/libbb/Config.in b/libbb/Config.in
+index 5bf0d2e..f5b804f 100644
+--- a/libbb/Config.in
++++ b/libbb/Config.in
+@@ -62,7 +62,7 @@ config FEATURE_EDITING_VI
+ 	default n
+ 	depends on FEATURE_EDITING
+ 	help
+-	  Enable vi-style line editing.  In shells, this mode can be
++	  Enable vi-style line editing. In shells, this mode can be
+ 	  turned on and off with "set -o vi" and "set +o vi".
+ 
+ config FEATURE_EDITING_HISTORY
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index d3ad400..aca85a1 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -9,7 +9,7 @@ config FEATURE_SHADOWPASSWDS
+ 	bool "Support for shadow passwords"
+ 	default n
+ 	help
+-	  Build support for shadow password in /etc/shadow.  This file is only
++	  Build support for shadow password in /etc/shadow. This file is only
+ 	  readable by root and thus the encrypted passwords are no longer
+ 	  publicly readable.
+ 
+@@ -18,17 +18,17 @@ config USE_BB_PWD_GRP
+ 	default n
+ 	help
+ 	  If you leave this disabled, busybox will use the system's password
+-	  and group functions.  And if you are using the GNU C library
++	  and group functions. And if you are using the GNU C library
+ 	  (glibc), you will then need to install the /etc/nsswitch.conf
+ 	  configuration file and the required /lib/libnss_* libraries in
+-	  order for the password and group functions to work.  This generally
++	  order for the password and group functions to work. This generally
+ 	  makes your embedded system quite a bit larger.
+ 
+ 	  Enabling this option will cause busybox to directly access the
+ 	  system's /etc/password, /etc/group files (and your system will be
+ 	  smaller, and I will get fewer emails asking about how glibc NSS
+-	  works).  When this option is enabled, you will not be able to use
+-	  PAM to access remote LDAP password servers and whatnot.  And if you
++	  works). When this option is enabled, you will not be able to use
++	  PAM to access remote LDAP password servers and whatnot. And if you
+ 	  want hostname resolution to work with glibc, you still need the
+ 	  /lib/libnss_* libraries.
+ 
+@@ -44,16 +44,16 @@ config USE_BB_SHADOW
+ 	depends on USE_BB_PWD_GRP && FEATURE_SHADOWPASSWDS
+ 	help
+ 	  If you leave this disabled, busybox will use the system's shadow
+-	  password handling functions.  And if you are using the GNU C library
++	  password handling functions. And if you are using the GNU C library
+ 	  (glibc), you will then need to install the /etc/nsswitch.conf
+ 	  configuration file and the required /lib/libnss_* libraries in
+-	  order for the shadow password functions to work.  This generally
++	  order for the shadow password functions to work. This generally
+ 	  makes your embedded system quite a bit larger.
+ 
+ 	  Enabling this option will cause busybox to directly access the
+-	  system's /etc/shadow file when handling shadow passwords.  This
++	  system's /etc/shadow file when handling shadow passwords. This
+ 	  makes your system smaller (and I will get fewer emails asking about
+-	  how glibc NSS works).  When this option is enabled, you will not be
++	  how glibc NSS works). When this option is enabled, you will not be
+ 	  able to use PAM to access shadow passwords from remote LDAP
+ 	  password servers and whatnot.
+ 
+@@ -66,7 +66,7 @@ config USE_BB_CRYPT
+ 	  standard C library functions.
+ 
+ 	  If you leave this disabled, busybox will use the system's
+-	  crypt functions.  Most C libraries use large (~70k)
++	  crypt functions. Most C libraries use large (~70k)
+ 	  static buffers there, and also combine them with more general
+ 	  DES encryption/decryption.
+ 
+@@ -211,9 +211,9 @@ config PASSWD
+ 	select FEATURE_SUID
+ 	select FEATURE_SYSLOG
+ 	help
+-	  passwd changes passwords for user and group accounts.  A normal user
++	  passwd changes passwords for user and group accounts. A normal user
+ 	  may only change the password for his/her own account, the super user
+-	  may change the password for any account.  The administrator of a group
++	  may change the password for any account. The administrator of a group
+ 	  may change the password for the group.
+ 
+ 	  Note that Busybox binary must be setuid root for this applet to
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 2a80e61..0c80ae6 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -101,7 +101,7 @@ config CROND
+ 	help
+ 	  Crond is a background daemon that parses individual crontab
+ 	  files and executes commands on behalf of the users in question.
+-	  This is a port of dcron from slackware.  It uses files of the
++	  This is a port of dcron from slackware. It uses files of the
+ 	  format /var/spool/cron/crontabs/<username> files, for example:
+ 	      $ cat /var/spool/cron/crontabs/root
+ 	      # Run daily cron jobs at 4:40 every day:
+@@ -126,7 +126,7 @@ config CRONTAB
+ 	default n
+ 	select FEATURE_SUID
+ 	help
+-	  Crontab manipulates the crontab for a particular user.  Only
++	  Crontab manipulates the crontab for a particular user. Only
+ 	  the superuser may specify a different user and/or crontab directory.
+ 	  Note that Busybox binary must be setuid root for this applet to
+ 	  work properly.
+@@ -185,14 +185,14 @@ config FEATURE_DEVFS
+ 	  This is obsolete and will be going away at the end of 2008..
+ 
+ 	  This tells busybox to look for names like /dev/loop/0 instead of
+-	  /dev/loop0.  If your /dev directory has normal names instead of
++	  /dev/loop0. If your /dev directory has normal names instead of
+ 	  devfs names, you don't want this.
+ 
+ config EJECT
+ 	bool "eject"
+ 	default n
+ 	help
+-	  Used to eject cdroms.  (defaults to /dev/cdrom)
++	  Used to eject cdroms. (defaults to /dev/cdrom)
+ 
+ config FEATURE_EJECT_SCSI
+ 	bool "SCSI support"
+@@ -311,8 +311,8 @@ config HDPARM
+ 	bool "hdparm"
+ 	default n
+ 	help
+-	  Get/Set hard drive parameters.  Primarily intended for ATA
+-	  drives.  Adds about 13k (or around 30k if you enable the
++	  Get/Set hard drive parameters. Primarily intended for ATA
++	  drives. Adds about 13k (or around 30k if you enable the
+ 	  FEATURE_HDPARM_GET_IDENTITY option)....
+ 
+ config FEATURE_HDPARM_GET_IDENTITY
+@@ -355,7 +355,7 @@ config FEATURE_HDPARM_HDIO_TRISTATE_HWIF
+ 	depends on HDPARM
+ 	help
+ 	  Enables the 'hdparm -x' option to tristate device for hotswap,
+-	  and the '-b' option to get/set bus state.  This is dangerous
++	  and the '-b' option to get/set bus state. This is dangerous
+ 	  stuff, so you should probably say N.
+ 
+ config FEATURE_HDPARM_HDIO_GETSET_DMA
+@@ -420,7 +420,7 @@ config MT
+ 	bool "mt"
+ 	default n
+ 	help
+-	  mt is used to control tape devices.  You can use the mt utility
++	  mt is used to control tape devices. You can use the mt utility
+ 	  to advance or rewind a tape past a specified number of archive
+ 	  files on the tape.
+ 
+@@ -441,7 +441,7 @@ config READAHEAD
+ 
+ 	  This applet just calls the readahead(2) system call on each file.
+ 	  It is mainly useful in system startup scripts to preload files
+-	  or executables before they are used.  When used at the right time
++	  or executables before they are used. When used at the right time
+ 	  (in particular when a CPU bound process is running) it can
+ 	  significantly speed up system startup.
+ 
+@@ -514,8 +514,8 @@ config WATCHDOG
+ 	default n
+ 	help
+ 	  The watchdog utility is used with hardware or software watchdog
+-	  device drivers.  It opens the specified watchdog device special file
+-	  and periodically writes a magic character to the device.  If the
++	  device drivers. It opens the specified watchdog device special file
++	  and periodically writes a magic character to the device. If the
+ 	  watchdog applet ever fails to write the magic character within a
+ 	  certain amount of time, the watchdog device assumes the system has
+ 	  hung, and will cause the hardware to reboot.
+diff --git a/modutils/Config.in b/modutils/Config.in
+index 453b195..f76a082 100644
+--- a/modutils/Config.in
++++ b/modutils/Config.in
+@@ -104,7 +104,7 @@ config FEATURE_INSMOD_VERSION_CHECKING
+ 	default n
+ 	depends on INSMOD && FEATURE_2_4_MODULES
+ 	help
+-	  Support checking of versions for modules.  This is used to
++	  Support checking of versions for modules. This is used to
+ 	  ensure that the kernel and module are made for each other.
+ 
+ config FEATURE_INSMOD_KSYMOOPS_SYMBOLS
+@@ -113,9 +113,9 @@ config FEATURE_INSMOD_KSYMOOPS_SYMBOLS
+ 	depends on INSMOD && FEATURE_2_4_MODULES
+ 	help
+ 	  By adding module symbols to the kernel symbol table, Oops messages
+-	  occuring within kernel modules can be properly debugged.  By enabling
++	  occuring within kernel modules can be properly debugged. By enabling
+ 	  this feature, module symbols will always be added to the kernel symbol
+-	  table for properly debugging support.  If you are not interested in
++	  table for properly debugging support. If you are not interested in
+ 	  Oops messages from kernel modules, say N.
+ 
+ config FEATURE_INSMOD_LOADINKMEM
+@@ -145,7 +145,7 @@ config FEATURE_INSMOD_LOAD_MAP_FULL
+ 	depends on FEATURE_INSMOD_LOAD_MAP
+ 	help
+ 	  Without this option, -m will only output section
+-	  load map.  With this option, -m will also output
++	  load map. With this option, -m will also output
+ 	  symbols load map.
+ 
+ config RMMOD
+@@ -229,7 +229,7 @@ config FEATURE_CHECK_TAINTED_MODULE
+ 	default y
+ 	depends on INSMOD || LSMOD
+ 	help
+-	  Support checking for tainted modules.  These are usually binary
++	  Support checking for tainted modules. These are usually binary
+ 	  only modules that will make the linux-kernel list ignore your
+ 	  support request.
+ 	  This option is required to support GPLONLY modules.
+diff --git a/networking/Config.in b/networking/Config.in
+index fb6988b..5f38062 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -216,7 +216,7 @@ config FEATURE_HTTPD_ENCODE_URL_STR
+ 	depends on HTTPD
+ 	help
+ 	  This option allows html encoding of arbitrary strings for display
+-	  by the browser.  Output goes to stdout.
++	  by the browser. Output goes to stdout.
+ 	  For example, httpd -e "<Hello World>" produces
+ 	  "&#60Hello&#32World&#62".
+ 
+@@ -264,7 +264,7 @@ config FEATURE_IFCONFIG_SLIP
+ 	default n
+ 	depends on IFCONFIG
+ 	help
+-	  Allow "keepalive" and "outfill" support for SLIP.  If you're not
++	  Allow "keepalive" and "outfill" support for SLIP. If you're not
+ 	  planning on using serial lines, leave this unchecked.
+ 
+ config FEATURE_IFCONFIG_MEMSTART_IOADDR_IRQ
+@@ -281,7 +281,7 @@ config FEATURE_IFCONFIG_HW
+ 	depends on IFCONFIG
+ 	help
+ 	  Set the hardware address of this interface, if the device driver
+-	  supports  this  operation.  Currently, we only support the 'ether'
++	  supports  this  operation. Currently, we only support the 'ether'
+ 	  class.
+ 
+ config FEATURE_IFCONFIG_BROADCAST_PLUS
+@@ -303,15 +303,15 @@ config IFUPDOWN
+ 	bool "ifupdown"
+ 	default n
+ 	help
+-	  Activate or deactivate the specified interfaces.  This applet makes
++	  Activate or deactivate the specified interfaces. This applet makes
+ 	  use of either "ifconfig" and "route" or the "ip" command to actually
+-	  configure network interfaces.  Therefore, you will probably also want
++	  configure network interfaces. Therefore, you will probably also want
+ 	  to enable either IFCONFIG and ROUTE, or enable
+-	  FEATURE_IFUPDOWN_IP and the various IP options.  Of
++	  FEATURE_IFUPDOWN_IP and the various IP options. Of
+ 	  course you could use non-busybox versions of these programs, so
+ 	  against my better judgement (since this will surely result in plenty
+ 	  of support questions on the mailing list), I do not force you to
+-	  enable these additional options.  It is up to you to supply either
++	  enable these additional options. It is up to you to supply either
+ 	  "ifconfig", "route" and "run-parts" or the "ip" command, either
+ 	  via busybox or via standalone utilities.
+ 
+@@ -458,7 +458,7 @@ config IP
+ 	default n
+ 	help
+ 	  The "ip" applet is a TCP/IP interface configuration and routing
+-	  utility.  You generally don't need "ip" to use busybox with
++	  utility. You generally don't need "ip" to use busybox with
+ 	  TCP/IP.
+ 
+ config FEATURE_IP_ADDRESS
+@@ -558,7 +558,8 @@ config FEATURE_IPCALC_FANCY
+ 	default y
+ 	depends on IPCALC
+ 	help
+-	  Adds the options hostname, prefix and silent to the output of "ipcalc".
++	  Adds the options hostname, prefix and silent to the output of
++	  "ipcalc".
+ 
+ config FEATURE_IPCALC_LONG_OPTIONS
+ 	bool "Enable long options"
+@@ -688,7 +689,8 @@ config SLATTACH
+ 	bool "slattach"
+ 	default n
+ 	help
+-	  slattach is a small utility to attach network interfaces to serial lines.
++	  slattach is a small utility to attach network interfaces to serial
++	  lines.
+ 
+ config TELNET
+ 	bool "telnet"
+@@ -703,7 +705,7 @@ config FEATURE_TELNET_TTYPE
+ 	depends on TELNET
+ 	help
+ 	  Setting this option will forward the TERM environment variable to the
+-	  remote host you are connecting to.  This is useful to make sure that
++	  remote host you are connecting to. This is useful to make sure that
+ 	  things like ANSI colors and other control sequences behave.
+ 
+ config FEATURE_TELNET_AUTOLOGIN
+@@ -722,9 +724,9 @@ config TELNETD
+ 	select FEATURE_SYSLOG
+ 	help
+ 	  A daemon for the TELNET protocol, allowing you to log onto the host
+-	  running the daemon.  Please keep in mind that the TELNET protocol
+-	  sends passwords in plain text.  If you can't afford the space for an
+-	  SSH daemon and you trust your network, you may say 'y' here.  As a
++	  running the daemon. Please keep in mind that the TELNET protocol
++	  sends passwords in plain text. If you can't afford the space for an
++	  SSH daemon and you trust your network, you may say 'y' here. As a
+ 	  more secure alternative, you should seriously consider installing the
+ 	  very small Dropbear SSH daemon instead:
+ 		http://matt.ucc.asn.au/dropbear/dropbear.html
+@@ -750,7 +752,7 @@ config TELNETD
+ 		  mount -t devpts devpts /dev/pts
+ 
+ 	  You need to be sure that Busybox has LOGIN and
+-	  FEATURE_SUID enabled.  And finally, you should make
++	  FEATURE_SUID enabled. And finally, you should make
+ 	  certain that Busybox has been installed setuid root:
+ 
+ 		chown root.root /bin/busybox
+@@ -770,7 +772,7 @@ config TFTP
+ 	bool "tftp"
+ 	default n
+ 	help
+-	  This enables the Trivial File Transfer Protocol client program.  TFTP
++	  This enables the Trivial File Transfer Protocol client program. TFTP
+ 	  is usually used for simple, small transfers such as a root image
+ 	  for a network-enabled bootloader.
+ 
+@@ -789,7 +791,7 @@ config FEATURE_TFTP_GET
+ 	default y
+ 	depends on TFTP || TFTPD
+ 	help
+-	  Add support for the GET command within the TFTP client.  This allows
++	  Add support for the GET command within the TFTP client. This allows
+ 	  a client to retrieve a file from a TFTP server.
+ 	  Also enable upload support in tftpd, if tftpd is selected.
+ 
+@@ -798,7 +800,7 @@ config FEATURE_TFTP_PUT
+ 	default y
+ 	depends on TFTP || TFTPD
+ 	help
+-	  Add support for the PUT command within the TFTP client.  This allows
++	  Add support for the PUT command within the TFTP client. This allows
+ 	  a client to transfer a file to a TFTP server.
+ 	  Also enable download support in tftpd, if tftpd is selected.
+ 
+@@ -815,7 +817,7 @@ config DEBUG_TFTP
+ 	default n
+ 	depends on TFTP
+ 	help
+-	  Enable debug settings for tftp.  This is useful if you're running
++	  Enable debug settings for tftp. This is useful if you're running
+ 	  into problems with tftp as the protocol doesn't help you much when
+ 	  you run into problems.
+ 
+@@ -830,7 +832,7 @@ config FEATURE_TRACEROUTE_VERBOSE
+ 	default n
+ 	depends on TRACEROUTE
+ 	help
+-	  Add some verbosity to traceroute.  This includes amongst other things
++	  Add some verbosity to traceroute. This includes amongst other things
+ 	  hostnames and ICMP response types.
+ 
+ config FEATURE_TRACEROUTE_SOURCE_ROUTE
+@@ -900,12 +902,14 @@ config TCPSVD
+ 	bool "tcpsvd"
+ 	default n
+ 	help
+-	  tcpsvd listens on a TCP port and runs a program for each new connection
++	  tcpsvd listens on a TCP port and runs a program for each new
++	  connection.
+ 
+ config UDPSVD
+ 	bool "udpsvd"
+ 	default n
+ 	help
+-	  udpsvd listens on an UDP port and runs a program for each new connection
++	  udpsvd listens on an UDP port and runs a program for each new
++	  connection.
+ 
+ endmenu
+diff --git a/procps/Config.in b/procps/Config.in
+index 585893e..642ebd0 100644
+--- a/procps/Config.in
++++ b/procps/Config.in
+@@ -18,7 +18,7 @@ config FUSER
+ 	default n
+ 	help
+ 	  fuser lists all PIDs (Process IDs) that currently have a given
+-	  file open.  fuser can also list all PIDs that have a given network
++	  file open. fuser can also list all PIDs that have a given network
+ 	  (TCP or UDP) port open.
+ 
+ config KILL
+@@ -26,7 +26,7 @@ config KILL
+ 	default n
+ 	help
+ 	  The command kill sends the specified signal to the specified
+-	  process or process group.  If no signal is specified, the TERM
++	  process or process group. If no signal is specified, the TERM
+ 	  signal is sent.
+ 
+ config KILLALL
+@@ -35,7 +35,7 @@ config KILLALL
+ 	depends on KILL
+ 	help
+ 	  killall sends a signal to all processes running any of the
+-	  specified commands.  If no signal name is specified, SIGTERM is
++	  specified commands. If no signal name is specified, SIGTERM is
+ 	  sent.
+ 
+ config KILLALL5
+diff --git a/shell/Config.in b/shell/Config.in
+index 7972002..f4a9e7b 100644
+--- a/shell/Config.in
++++ b/shell/Config.in
+@@ -39,7 +39,7 @@ config ASH
+ 	help
+ 	  Tha 'ash' shell adds about 60k in the default configuration and is
+ 	  the most complete and most pedantically correct shell included with
+-	  busybox.  This shell is actually a derivative of the Debian 'dash'
++	  busybox. This shell is actually a derivative of the Debian 'dash'
+ 	  shell (by Herbert Xu), which was created by porting the 'ash' shell
+ 	  (written by Kenneth Almquist) from NetBSD.
+ 
+@@ -96,7 +96,7 @@ config ASH_MATH_SUPPORT_64
+ 	default n
+ 	depends on ASH_MATH_SUPPORT
+ 	help
+-	  Enable 64-bit math support in the ash shell.  This will make
++	  Enable 64-bit math support in the ash shell. This will make
+ 	  the shell slightly larger, but will allow computation with very
+ 	  large numbers.
+ 
+@@ -176,7 +176,7 @@ config HUSH
+ 	default n
+ 	help
+ 	  hush is a very small shell (just 18k) and it has fairly complete
+-	  Bourne shell grammar.  It even handles all the normal flow control
++	  Bourne shell grammar. It even handles all the normal flow control
+ 	  options such as if/then/elif/else/fi, for/in/do/done, while loops,
+ 	  etc.
+ 
+@@ -246,7 +246,7 @@ config MSH
+ 	help
+ 	  The minix shell (adds just 30k) is quite complete and handles things
+ 	  like for/do/done, case/esac and all the things you expect a Bourne
+-	  shell to do.  It is not always pedantically correct about Bourne
++	  shell to do. It is not always pedantically correct about Bourne
+ 	  shell grammar (try running the shell testscript "tests/sh.testcases"
+ 	  on it and compare vs bash) but for most things it works quite well.
+ 	  It also uses only vfork, so it can be used on uClinux systems.
+@@ -267,11 +267,11 @@ config FEATURE_SH_STANDALONE
+ 	depends on (MSH || LASH || HUSH || ASH) && FEATURE_PREFER_APPLETS
+ 	help
+ 	  This option causes busybox shells to use busybox applets
+-	  in preference to executables in the PATH whenever possible.  For
++	  in preference to executables in the PATH whenever possible. For
+ 	  example, entering the command 'ifconfig' into the shell would cause
+-	  busybox to use the ifconfig busybox applet.  Specifying the fully
++	  busybox to use the ifconfig busybox applet. Specifying the fully
+ 	  qualified executable name, such as '/sbin/ifconfig' will still
+-	  execute the /sbin/ifconfig executable on the filesystem.  This option
++	  execute the /sbin/ifconfig executable on the filesystem. This option
+ 	  is generally used when creating a statically linked version of busybox
+ 	  for use as a rescue shell, in the event that you screw up your system.
+ 
+@@ -285,12 +285,12 @@ config FEATURE_SH_STANDALONE
+ 	  started this way).
+ # untrue?
+ #	  Note that this will *also* cause applets to take precedence
+-#	  over shell builtins of the same name.  So turning this on will
++#	  over shell builtins of the same name. So turning this on will
+ #	  eliminate any performance gained by turning on the builtin "echo"
+ #	  and "test" commands in ash.
+ # untrue?
+ #	  Note that when using this option, the shell will attempt to directly
+-#	  run '/bin/busybox'.  If you do not have the busybox binary sitting in
++#	  run '/bin/busybox'. If you do not have the busybox binary sitting in
+ #	  that exact location with that exact name, this option will not work at
+ #	  all.
+ 
+diff --git a/sysklogd/Config.in b/sysklogd/Config.in
+index 4312a05..0664be0 100644
+--- a/sysklogd/Config.in
++++ b/sysklogd/Config.in
+@@ -10,14 +10,14 @@ config SYSLOGD
+ 	default n
+ 	help
+ 	  The syslogd utility is used to record logs of all the
+-	  significant events that occur on a system.  Every
++	  significant events that occur on a system. Every
+ 	  message that is logged records the date and time of the
+ 	  event, and will generally also record the name of the
+-	  application that generated the message.  When used in
++	  application that generated the message. When used in
+ 	  conjunction with klogd, messages from the Linux kernel
+-	  can also be recorded.  This is terribly useful,
++	  can also be recorded. This is terribly useful,
+ 	  especially for finding what happened when something goes
+-	  wrong.  And something almost always will go wrong if
++	  wrong. And something almost always will go wrong if
+ 	  you wait long enough....
+ 
+ config FEATURE_ROTATE_LOGFILE
+@@ -35,10 +35,10 @@ config FEATURE_REMOTE_LOG
+ 	help
+ 	  When you enable this feature, the syslogd utility can
+ 	  be used to send system log messages to another system
+-	  connected via a network.  This allows the remote
++	  connected via a network. This allows the remote
+ 	  machine to log all the system messages, which can be
+ 	  terribly useful for reducing the number of serial
+-	  cables you use.  It can also be a very good security
++	  cables you use. It can also be a very good security
+ 	  measure to prevent system logs from being tampered with
+ 	  by an intruder.
+ 
+@@ -58,7 +58,7 @@ config FEATURE_IPC_SYSLOG
+ 	  When you enable this feature, the syslogd utility will
+ 	  use a circular buffer to record system log messages.
+ 	  When the buffer is filled it will continue to overwrite
+-	  the oldest messages.  This can be very useful for
++	  the oldest messages. This can be very useful for
+ 	  systems with little or no permanent storage, since
+ 	  otherwise system logs can eventually fill up your
+ 	  entire filesystem, which may cause your system to
+@@ -79,7 +79,7 @@ config LOGREAD
+ 	depends on FEATURE_IPC_SYSLOG
+ 	help
+ 	  If you enabled Circular Buffer support, you almost
+-	  certainly want to enable this feature as well.  This
++	  certainly want to enable this feature as well. This
+ 	  utility will allow you to read the messages that are
+ 	  stored in the syslogd circular buffer.
+ 
+@@ -100,7 +100,7 @@ config KLOGD
+ 	help
+ 	  klogd is a utility which intercepts and logs all
+ 	  messages from the Linux kernel and sends the messages
+-	  out to the 'syslogd' utility so they can be logged.  If
++	  out to the 'syslogd' utility so they can be logged. If
+ 	  you wish to record the messages produced by the kernel,
+ 	  you should enable this option.
+ 
+@@ -111,7 +111,7 @@ config LOGGER
+ 	help
+ 	    The logger utility allows you to send arbitrary text
+ 	    messages to the system log (i.e. the 'syslogd' utility) so
+-	    they can be logged.  This is generally used to help locate
++	    they can be logged. This is generally used to help locate
+ 	    problems that occur within programs and scripts.
+ 
+ endmenu
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 833a41f..86d404a 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -9,12 +9,12 @@ config DMESG
+ 	bool "dmesg"
+ 	default n
+ 	help
+-	  dmesg is used to examine or control the kernel ring buffer.  When the
++	  dmesg is used to examine or control the kernel ring buffer. When the
+ 	  Linux kernel prints messages to the system log, they are stored in
+-	  the kernel ring buffer.  You can use dmesg to print the kernel's ring
++	  the kernel ring buffer. You can use dmesg to print the kernel's ring
+ 	  buffer, clear the kernel ring buffer, change the size of the kernel
+ 	  ring buffer, and change the priority level at which kernel messages
+-	  are also logged to the system console.  Enable this option if you
++	  are also logged to the system console. Enable this option if you
+ 	  wish to enable the 'dmesg' utility.
+ 
+ config FEATURE_DMESG_PRETTY
+@@ -23,7 +23,8 @@ config FEATURE_DMESG_PRETTY
+ 	depends on DMESG
+ 	help
+ 	  If you wish to scrub the syslog level from the output, say 'Y' here.
+-	  The syslog level is a string prefixed to every line with the form "<#>".
++	  The syslog level is a string prefixed to every line with the form
++	  "<#>".
+ 
+ 	  With this option you will see:
+ 	    # dmesg
+@@ -42,8 +43,8 @@ config FBSET
+ 	default n
+ 	help
+ 	  fbset is used to show or change the settings of a Linux frame buffer
+-	  device.  The frame buffer device provides a simple and unique
+-	  interface to access a graphics display.  Enable this option
++	  device. The frame buffer device provides a simple and unique
++	  interface to access a graphics display. Enable this option
+ 	  if you wish to enable the 'fbset' utility.
+ 
+ config FEATURE_FBSET_FANCY
+@@ -52,8 +53,8 @@ config FEATURE_FBSET_FANCY
+ 	depends on FBSET
+ 	help
+ 	  This option enables extended fbset options, allowing one to set the
+-	  framebuffer size, color depth, etc.  interface to access a graphics
+-	  display.  Enable this option if you wish to enable extended fbset
++	  framebuffer size, color depth, etc. interface to access a graphics
++	  display. Enable this option if you wish to enable extended fbset
+ 	  options.
+ 
+ config FEATURE_FBSET_READMODE
+@@ -70,11 +71,11 @@ config FDFLUSH
+ 	default n
+ 	help
+ 	  fdflush is only needed when changing media on slightly-broken
+-	  removable media drives.  It is used to make Linux believe that a
++	  removable media drives. It is used to make Linux believe that a
+ 	  hardware disk-change switch has been actuated, which causes Linux to
+-	  forget anything it has cached from the previous media.  If you have
++	  forget anything it has cached from the previous media. If you have
+ 	  such a slightly-broken drive, you will need to run fdflush every time
+-	  you change a disk.  Most people have working hardware and can safely
++	  you change a disk. Most people have working hardware and can safely
+ 	  leave this disabled.
+ 
+ config FDFORMAT
+@@ -88,7 +89,7 @@ config FDISK
+ 	default n
+ 	help
+ 	  The fdisk utility is used to divide hard disks into one or more
+-	  logical disks, which are generally called partitions.  This utility
++	  logical disks, which are generally called partitions. This utility
+ 	  can be used to list and edit the set of partitions or BSD style
+ 	  'disk slices' that are defined on a hard drive.
+ 
+@@ -105,7 +106,7 @@ config FEATURE_FDISK_WRITABLE
+ 	depends on FDISK
+ 	help
+ 	  Enabling this option allows you to create or change a partition table
+-	  and write those changes out to disk.  If you leave this option
++	  and write those changes out to disk. If you leave this option
+ 	  disabled, you will only be able to view the partition table.
+ 
+ config FEATURE_AIX_LABEL
+@@ -147,7 +148,7 @@ config FEATURE_FDISK_ADVANCED
+ 	help
+ 	  Enabling this option allows you to do terribly unsafe things like
+ 	  define arbitrary drive geometry, move the beginning of data in a
+-	  partition, and similarly evil things.  Unless you have a very good
++	  partition, and similarly evil things. Unless you have a very good
+ 	  reason you would be wise to leave this disabled.
+ 
+ config FINDFS
+@@ -156,7 +157,7 @@ config FINDFS
+ 	select VOLUMEID
+ 	help
+ 	  This is similar to the findfs program that is part of the e2fsprogs
+-	  package.  However, the e2fsprogs version only support ext2/3.  This
++	  package. However, the e2fsprogs version only support ext2/3. This
+ 	  version supports those in addition to FAT, swap, and ReiserFS.
+ 	  WARNING:
+ 	  With all submodules selected, it will add ~8k to busybox.
+@@ -165,11 +166,11 @@ config FREERAMDISK
+ 	bool "freeramdisk"
+ 	default n
+ 	help
+-	  Linux allows you to create ramdisks.  This utility allows you to
++	  Linux allows you to create ramdisks. This utility allows you to
+ 	  delete them and completely free all memory that was used for the
+-	  ramdisk.  For example, if you boot Linux into a ramdisk and later
++	  ramdisk. For example, if you boot Linux into a ramdisk and later
+ 	  pivot_root, you may want to free the memory that is allocated to the
+-	  ramdisk.  If you have no use for freeing memory from a ramdisk, leave
++	  ramdisk. If you have no use for freeing memory from a ramdisk, leave
+ 	  this disabled.
+ 
+ config FSCK_MINIX
+@@ -177,9 +178,9 @@ config FSCK_MINIX
+ 	default n
+ 	help
+ 	  The minix filesystem is a nice, small, compact, read-write filesystem
+-	  with little overhead.  It is not a journaling filesystem however and
++	  with little overhead. It is not a journaling filesystem however and
+ 	  can experience corruption if it is not properly unmounted or if the
+-	  power goes off in the middle of a write.  This utility allows you to
++	  power goes off in the middle of a write. This utility allows you to
+ 	  check for and attempt to repair any corruption that occurs to a minix
+ 	  filesystem.
+ 
+@@ -188,8 +189,8 @@ config MKFS_MINIX
+ 	default n
+ 	help
+ 	  The minix filesystem is a nice, small, compact, read-write filesystem
+-	  with little overhead.  If you wish to be able to create minix filesystems
+-	  this utility will do the job for you.
++	  with little overhead. If you wish to be able to create minix
++	  filesystems this utility will do the job for you.
+ 
+ comment "Minix filesystem support"
+ 	depends on FSCK_MINIX || MKFS_MINIX
+@@ -199,9 +200,9 @@ config FEATURE_MINIX2
+ 	default y
+ 	depends on FSCK_MINIX || MKFS_MINIX
+ 	help
+-	  If you wish to be able to create version 2 minix filesystems, enable this.
+-	  If you enabled 'mkfs_minix' then you almost certainly want to be using the
+-	  version 2 filesystem support.
++	  If you wish to be able to create version 2 minix filesystems, enable
++	  this. If you enabled 'mkfs_minix' then you almost certainly want to
++	  be using the version 2 filesystem support.
+ 
+ config GETOPT
+ 	bool "getopt"
+@@ -209,9 +210,9 @@ config GETOPT
+ 	help
+ 	  The getopt utility is used to break up (parse) options in command
+ 	  lines to make it easy to write complex shell scripts that also check
+-	  for legal (and illegal) options.  If you want to write horribly
++	  for legal (and illegal) options. If you want to write horribly
+ 	  complex shell scripts, or use some horribly complex shell script
+-	  written by others, this utility may be for you.  Most people will
++	  written by others, this utility may be for you. Most people will
+ 	  wisely leave this disabled.
+ 
+ config HEXDUMP
+@@ -243,7 +244,7 @@ config HWCLOCK
+ 	default n
+ 	help
+ 	  The hwclock utility is used to read and set the hardware clock
+-	  on a system.  This is primarily used to set the current time on
++	  on a system. This is primarily used to set the current time on
+ 	  shutdown in the hardware clock, so the hardware will keep the
+ 	  correct time when Linux is _not_ running.
+ 
+@@ -252,7 +253,7 @@ config FEATURE_HWCLOCK_LONG_OPTIONS
+ 	default n
+ 	depends on HWCLOCK && GETOPT_LONG
+ 	help
+-	  By default, the hwclock utility only uses short options.  If you
++	  By default, the hwclock utility only uses short options. If you
+ 	  are overly fond of its long options, such as --hctosys, --utc, etc)
+ 	  then enable this option.
+ 
+@@ -262,7 +263,7 @@ config FEATURE_HWCLOCK_ADJTIME_FHS
+ 	depends on HWCLOCK
+ 	help
+ 	  Starting with FHS 2.3, the adjtime state file is supposed to exist
+-	  at /var/lib/hwclock/adjtime instead of /etc/adjtime.  If you wish
++	  at /var/lib/hwclock/adjtime instead of /etc/adjtime. If you wish
+ 	  to use the FHS behavior, answer Y here, otherwise answer N for the
+ 	  classic /etc/adjtime path.
+ 
+@@ -290,7 +291,7 @@ config LOSETUP
+ 	default n
+ 	help
+ 	  losetup is used to associate or detach a loop device with a regular
+-	  file or block device, and to query the status of a loop device.  This
++	  file or block device, and to query the status of a loop device. This
+ 	  version does not currently support enabling data encryption.
+ 
+ config MDEV
+@@ -326,7 +327,8 @@ config FEATURE_MDEV_RENAME_REGEXP
+ 	default n
+ 	depends on FEATURE_MDEV_RENAME
+ 	help
+-	  Add support for regular expressions substitutions when renaming device.
++	  Add support for regular expressions substitutions when renaming
++	  device.
+ 
+ config FEATURE_MDEV_EXEC
+ 	bool "Support command execution at device addition/removal"
+@@ -354,9 +356,9 @@ config MKSWAP
+ 	default n
+ 	help
+ 	  The mkswap utility is used to configure a file or disk partition as
+-	  Linux swap space.  This allows Linux to use the entire file or
++	  Linux swap space. This allows Linux to use the entire file or
+ 	  partition as if it were additional RAM, which can greatly increase
+-	  the capability of low-memory machines.  This additional memory is
++	  the capability of low-memory machines. This additional memory is
+ 	  much slower than real RAM, but can be very helpful at preventing your
+ 	  applications being killed by the Linux out of memory (OOM) killer.
+ 	  Once you have created swap space using 'mkswap' you need to enable
+@@ -377,9 +379,9 @@ config MORE
+ 	default n
+ 	help
+ 	  more is a simple utility which allows you to read text one screen
+-	  sized page at a time.  If you want to read text that is larger than
++	  sized page at a time. If you want to read text that is larger than
+ 	  the screen, and you are using anything faster than a 300 baud modem,
+-	  you will probably find this utility very helpful.  If you don't have
++	  you will probably find this utility very helpful. If you don't have
+ 	  any need to reading text files, you can leave this disabled.
+ 
+ config FEATURE_USE_TERMIOS
+@@ -388,7 +390,7 @@ config FEATURE_USE_TERMIOS
+ 	depends on MORE || TOP
+ 	help
+ 	  This option allows utilities such as 'more' and 'top' to determine
+-	  the size of the screen.  If you leave this disabled, your utilities
++	  the size of the screen. If you leave this disabled, your utilities
+ 	  that display things on the screen will be especially primitive and
+ 	  will be unable to determine the current screen size, and will be
+ 	  unable to move the cursor.
+@@ -608,10 +610,10 @@ config MOUNT
+ 	default n
+ 	help
+ 	  All files and filesystems in Unix are arranged into one big directory
+-	  tree.  The 'mount' utility is used to graft a filesystem onto a
+-	  particular part of the tree.  A filesystem can either live on a block
++	  tree. The 'mount' utility is used to graft a filesystem onto a
++	  particular part of the tree. A filesystem can either live on a block
+ 	  device, or it can be accessible over the network, as is the case with
+-	  NFS filesystems.  Most people using BusyBox will also want to enable
++	  NFS filesystems. Most people using BusyBox will also want to enable
+ 	  the 'mount' utility.
+ 
+ config FEATURE_MOUNT_FAKE
+@@ -649,7 +651,7 @@ config FEATURE_MOUNT_LABEL
+ 	select VOLUMEID
+ 	help
+ 	  This allows for specifying a device by label or uuid, rather than by
+-	  name.  This feature utilizes the same functionality as findfs.
++	  name. This feature utilizes the same functionality as findfs.
+ 
+ config FEATURE_MOUNT_NFS
+ 	bool "Support mounting NFS file systems"
+@@ -672,7 +674,7 @@ config FEATURE_MOUNT_FLAGS
+ 	bool "Support lots of -o flags in mount"
+ 	default y
+ 	help
+-	  Without this, mount only supports ro/rw/remount.  With this, it
++	  Without this, mount only supports ro/rw/remount. With this, it
+ 	  supports nosuid, suid, dev, nodev, exec, noexec, sync, async, atime,
+ 	  noatime, diratime, nodiratime, loud, bind, move, shared, slave,
+ 	  private, unbindable, rshared, rslave, rprivate, and runbindable.
+@@ -689,11 +691,11 @@ config PIVOT_ROOT
+ 	default n
+ 	help
+ 	  The pivot_root utility swaps the mount points for the root filesystem
+-	  with some other mounted filesystem.  This allows you to do all sorts
++	  with some other mounted filesystem. This allows you to do all sorts
+ 	  of wild and crazy things with your Linux system and is far more
+ 	  powerful than 'chroot'.
+ 
+-	  Note: This is for initrd in linux 2.4.  Under initramfs (introduced
++	  Note: This is for initrd in linux 2.4. Under initramfs (introduced
+ 	  in linux 2.6) use switch_root instead.
+ 
+ config RDATE
+@@ -728,7 +730,7 @@ config SETARCH
+ 	default n
+ 	help
+ 	  The linux32 utility is used to create a 32bit environment for the
+-	  specified program (usually a shell).  It only makes sense to have
++	  specified program (usually a shell). It only makes sense to have
+ 	  this util on a system that supports both 64bit and 32bit userland
+ 	  (like amd64/x86, ppc64/ppc, sparc64/sparc, etc...).
+ 
+@@ -738,9 +740,9 @@ config SWAPONOFF
+ 	help
+ 	  This option enables both the 'swapon' and the 'swapoff' utilities.
+ 	  Once you have created some swap space using 'mkswap', you also need
+-	  to enable your swap space with the 'swapon' utility.  The 'swapoff'
++	  to enable your swap space with the 'swapon' utility. The 'swapoff'
+ 	  utility is used, typically at system shutdown, to disable any swap
+-	  space.  If you are not using any swap space, you can leave this
++	  space. If you are not using any swap space, you can leave this
+ 	  option disabled.
+ 
+ config FEATURE_SWAPON_PRI
+@@ -755,28 +757,28 @@ config SWITCH_ROOT
+ 	default n
+ 	help
+ 	  The switch_root utility is used from initramfs to select a new
+-	  root device.  Under initramfs, you have to use this instead of
+-	  pivot_root.  (Stop reading here if you don't care why.)
++	  root device. Under initramfs, you have to use this instead of
++	  pivot_root. (Stop reading here if you don't care why.)
+ 
+ 	  Booting with initramfs extracts a gzipped cpio archive into rootfs
+-	  (which is a variant of ramfs/tmpfs).  Because rootfs can't be moved
+-	  or unmounted*, pivot_root will not work from initramfs.  Instead,
++	  (which is a variant of ramfs/tmpfs). Because rootfs can't be moved
++	  or unmounted*, pivot_root will not work from initramfs. Instead,
+ 	  switch_root deletes everything out of rootfs (including itself),
+ 	  does a mount --move that overmounts rootfs with the new root, and
+ 	  then execs the specified init program.
+ 
+ 	  * Because the Linux kernel uses rootfs internally as the starting
+ 	  and ending point for searching through the kernel's doubly linked
+-	  list of active mount points.  That's why.
++	  list of active mount points. That's why.
+ 
+ config UMOUNT
+ 	bool "umount"
+ 	default n
+ 	help
+-	  When you want to remove a mounted filesystem from its current mount point,
+-	  for example when you are shutting down the system, the 'umount' utility is
+-	  the tool to use.  If you enabled the 'mount' utility, you almost certainly
+-	  also want to enable 'umount'.
++	  When you want to remove a mounted filesystem from its current mount
++	  point, for example when you are shutting down the system, the
++	  'umount' utility is the tool to use. If you enabled the 'mount'
++	  utility, you almost certainly also want to enable 'umount'.
+ 
+ config FEATURE_UMOUNT_ALL
+ 	bool "Support option -a"
+@@ -794,10 +796,11 @@ config FEATURE_MOUNT_LOOP
+ 	depends on MOUNT || UMOUNT
+ 	help
+ 	  Enabling this feature allows automatic mounting of files (containing
+-	  filesystem images) via the linux kernel's loopback devices.  The mount
+-	  command will detect you are trying to mount a file instead of a block
+-	  device, and transparently associate the file with a loopback device.
+-	  The umount command will also free that loopback device.
++	  filesystem images) via the linux kernel's loopback devices.
++	  The mount command will detect you are trying to mount a file instead
++	  of a block device, and transparently associate the file with a
++	  loopback device. The umount command will also free that loopback
++	  device.
+ 
+ 	  You can still use the 'losetup' utility (to manually associate files
+ 	  with loop devices) if you need to do something advanced, such as
+@@ -811,9 +814,9 @@ config FEATURE_MTAB_SUPPORT
+ 	select FEATURE_MOUNT_FAKE
+ 	help
+ 	  Historically, Unix systems kept track of the currently mounted
+-	  partitions in the file "/etc/mtab".  These days, the kernel exports
++	  partitions in the file "/etc/mtab". These days, the kernel exports
+ 	  the list of currently mounted partitions in "/proc/mounts", rendering
+-	  the old mtab file obsolete.  (In modern systems, /etc/mtab should be
++	  the old mtab file obsolete. (In modern systems, /etc/mtab should be
+ 	  a symlink to /proc/mounts.)
+ 
+ 	  The only reason to have mount maintain an /etc/mtab file itself is if
+@@ -823,7 +826,7 @@ config FEATURE_MTAB_SUPPORT
+ 	  features like separate per-process filesystem namespaces, requires
+ 	  that your /etc directory be writeable, tends to get easily confused
+ 	  by --bind or --move mounts, won't update if you rename a directory
+-	  that contains a mount point, and so on.  (In brief: avoid.)
++	  that contains a mount point, and so on. (In brief: avoid.)
+ 
+ 	  About the only reason to use this is if you've removed /proc from
+ 	  your kernel.

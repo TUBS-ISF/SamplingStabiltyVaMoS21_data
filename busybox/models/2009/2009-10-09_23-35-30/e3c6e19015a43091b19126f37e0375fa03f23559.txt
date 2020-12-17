@@ -1,0 +1,40 @@
+2009-10-09 23:35:30 +0200
+diff --git a/shell/ash_test/ash-signals/signal1.tests b/shell/ash_test/ash-signals/signal1.tests
+index 3c42473..28bfc6a 100755
+--- a/shell/ash_test/ash-signals/signal1.tests
++++ b/shell/ash_test/ash-signals/signal1.tests
+@@ -6,7 +6,7 @@ for try in 1 2 3 4 5; do
+     echo "sent $try signal"
+ done &
+ 
+-# Ensure "wait" have something to wait for
++# Ensure "wait" has something to wait for
+ sleep 2 &
+ 
+ # Ensure we do not execute "trap" below before "kill -USR1" above
+diff --git a/shell/random.c b/shell/random.c
+index a4dce84..cca9d12 100644
+--- a/shell/random.c
++++ b/shell/random.c
+@@ -2,7 +2,7 @@
+ /*
+  * $RANDOM support.
+  *
+- * Copyright (C) 2008 Denys Vlasenko
++ * Copyright (C) 2009 Denys Vlasenko
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+diff --git a/shell/random.h b/shell/random.h
+index 2d29a60..8667e1c 100644
+--- a/shell/random.h
++++ b/shell/random.h
+@@ -2,7 +2,7 @@
+ /*
+  * $RANDOM support.
+  *
+- * Copyright (C) 2008 Denys Vlasenko
++ * Copyright (C) 2009 Denys Vlasenko
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */

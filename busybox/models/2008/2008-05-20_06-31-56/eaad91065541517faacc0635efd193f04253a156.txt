@@ -1,0 +1,14 @@
+2008-05-20 06:31:56 +0000
+diff --git a/Makefile.custom b/Makefile.custom
+index 3334b31..58a979e 100644
+--- a/Makefile.custom
++++ b/Makefile.custom
+@@ -99,7 +99,7 @@ stksizes: busybox_unstripped
+ 
+ .PHONY: bigdata
+ bigdata: busybox_unstripped
+-	$(CROSS_COMPILE)nm --size-sort busybox_unstripped | grep -vi ' [tr] '
++	$(CROSS_COMPILE)nm --size-sort busybox_unstripped | grep -vi ' [trw] '
+ 
+ # Documentation Targets
+ .PHONY: doc

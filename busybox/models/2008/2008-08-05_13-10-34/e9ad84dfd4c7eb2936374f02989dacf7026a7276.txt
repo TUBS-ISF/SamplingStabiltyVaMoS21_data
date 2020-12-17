@@ -1,0 +1,1379 @@
+2008-08-05 13:10:34 +0000
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index 308e5d7..90bd5b2 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -1,7 +1,7 @@
+ #
+ # Automatically generated make config: don't edit
+-# Busybox version: 1.11.0.svn
+-# Mon Apr 21 23:20:35 2008
++# Busybox version: 1.12.0.svn
++# Tue Aug  5 14:43:04 2008
+ #
+ CONFIG_HAVE_DOT_CONFIG=y
+ 
+@@ -13,6 +13,7 @@ CONFIG_HAVE_DOT_CONFIG=y
+ # General Configuration
+ #
+ CONFIG_DESKTOP=y
++CONFIG_FEATURE_ASSUME_UNICODE=y
+ CONFIG_FEATURE_BUFFERS_USE_MALLOC=y
+ # CONFIG_FEATURE_BUFFERS_GO_ON_STACK is not set
+ # CONFIG_FEATURE_BUFFERS_GO_IN_BSS is not set
+@@ -38,21 +39,25 @@ CONFIG_FEATURE_HAVE_RPC=y
+ # Build Options
+ #
+ # CONFIG_STATIC is not set
++# CONFIG_PIE is not set
+ CONFIG_NOMMU=y
+ # CONFIG_BUILD_LIBBUSYBOX is not set
+ # CONFIG_FEATURE_INDIVIDUAL is not set
+ # CONFIG_FEATURE_SHARED_BUSYBOX is not set
+ CONFIG_LFS=y
++CONFIG_CROSS_COMPILER_PREFIX=""
+ 
+ #
+ # Debugging Options
+ #
+ # CONFIG_DEBUG is not set
++# CONFIG_DEBUG_PESSIMIZE is not set
+ # CONFIG_WERROR is not set
+ CONFIG_NO_DEBUG_LIB=y
+ # CONFIG_DMALLOC is not set
+ # CONFIG_EFENCE is not set
+ CONFIG_INCLUDE_SUSv2=y
++# CONFIG_PARSE is not set
+ 
+ #
+ # Installation Options
+@@ -86,6 +91,7 @@ CONFIG_FEATURE_VERBOSE_CP_MESSAGE=y
+ CONFIG_FEATURE_COPYBUF_KB=4
+ CONFIG_MONOTONIC_SYSCALL=y
+ CONFIG_IOCTL_HEX2STR_ERROR=y
++CONFIG_FEATURE_HWIB=y
+ 
+ #
+ # Applets
+@@ -94,6 +100,10 @@ CONFIG_IOCTL_HEX2STR_ERROR=y
+ #
+ # Archival Utilities
+ #
++CONFIG_FEATURE_SEAMLESS_LZMA=y
++CONFIG_FEATURE_SEAMLESS_BZ2=y
++CONFIG_FEATURE_SEAMLESS_GZ=y
++CONFIG_FEATURE_SEAMLESS_Z=y
+ CONFIG_AR=y
+ CONFIG_FEATURE_AR_LONG_FILENAMES=y
+ CONFIG_BUNZIP2=y
+@@ -104,17 +114,11 @@ CONFIG_DPKG=y
+ CONFIG_DPKG_DEB=y
+ CONFIG_FEATURE_DPKG_DEB_EXTRACT_ONLY=y
+ CONFIG_GUNZIP=y
+-CONFIG_FEATURE_GUNZIP_UNCOMPRESS=y
+ CONFIG_GZIP=y
+ CONFIG_RPM2CPIO=y
+ CONFIG_RPM=y
+-CONFIG_FEATURE_RPM_BZ2=y
+ CONFIG_TAR=y
+ CONFIG_FEATURE_TAR_CREATE=y
+-CONFIG_FEATURE_TAR_GZIP=y
+-CONFIG_FEATURE_TAR_BZIP2=y
+-CONFIG_FEATURE_TAR_LZMA=y
+-CONFIG_FEATURE_TAR_COMPRESS=y
+ CONFIG_FEATURE_TAR_AUTODETECT=y
+ CONFIG_FEATURE_TAR_FROM=y
+ CONFIG_FEATURE_TAR_OLDGNU_COMPATIBILITY=y
+@@ -128,17 +132,6 @@ CONFIG_FEATURE_LZMA_FAST=y
+ CONFIG_UNZIP=y
+ 
+ #
+-# Common options for cpio and tar
+-#
+-
+-#
+-# Common options for dpkg and dpkg_deb
+-#
+-CONFIG_FEATURE_DEB_TAR_GZ=y
+-CONFIG_FEATURE_DEB_TAR_BZ2=y
+-CONFIG_FEATURE_DEB_TAR_LZMA=y
+-
+-#
+ # Coreutils
+ #
+ CONFIG_BASENAME=y
+@@ -216,6 +209,7 @@ CONFIG_SEQ=y
+ CONFIG_SHA1SUM=y
+ CONFIG_SLEEP=y
+ CONFIG_FEATURE_FANCY_SLEEP=y
++CONFIG_FEATURE_FLOAT_SLEEP=y
+ CONFIG_SORT=y
+ CONFIG_FEATURE_SORT_BIG=y
+ CONFIG_SPLIT=y
+@@ -386,8 +380,9 @@ CONFIG_MESG=y
+ # Login/Password Management Utilities
+ #
+ CONFIG_FEATURE_SHADOWPASSWDS=y
+-CONFIG_USE_BB_SHADOW=y
+ CONFIG_USE_BB_PWD_GRP=y
++CONFIG_USE_BB_SHADOW=y
++CONFIG_USE_BB_CRYPT=y
+ CONFIG_ADDGROUP=y
+ CONFIG_FEATURE_ADDUSER_TO_GROUP=y
+ CONFIG_DELGROUP=y
+@@ -424,25 +419,30 @@ CONFIG_LSATTR=y
+ #
+ # Linux Module Utilities
+ #
+-CONFIG_INSMOD=y
+-CONFIG_FEATURE_INSMOD_VERSION_CHECKING=y
+-CONFIG_FEATURE_INSMOD_KSYMOOPS_SYMBOLS=y
+-CONFIG_FEATURE_INSMOD_LOADINKMEM=y
+-CONFIG_FEATURE_INSMOD_LOAD_MAP=y
+-CONFIG_FEATURE_INSMOD_LOAD_MAP_FULL=y
+-CONFIG_RMMOD=y
+-CONFIG_LSMOD=y
+-CONFIG_FEATURE_LSMOD_PRETTY_2_6_OUTPUT=y
+-CONFIG_MODPROBE=y
+-CONFIG_FEATURE_MODPROBE_MULTIPLE_OPTIONS=y
+-CONFIG_FEATURE_MODPROBE_FANCY_ALIAS=y
+-
+-#
+-# Options common to multiple modutils
+-#
+-CONFIG_FEATURE_CHECK_TAINTED_MODULE=y
+-CONFIG_FEATURE_2_4_MODULES=y
+-CONFIG_FEATURE_2_6_MODULES=y
++CONFIG_MODPROBE_SMALL=y
++CONFIG_FEATURE_MODPROBE_SMALL_OPTIONS_ON_CMDLINE=y
++CONFIG_FEATURE_MODPROBE_SMALL_CHECK_ALREADY_LOADED=y
++# CONFIG_DEPMOD is not set
++# CONFIG_FEATURE_DEPMOD_PRUNE_FANCY is not set
++# CONFIG_FEATURE_DEPMOD_ALIAS is not set
++# CONFIG_INSMOD is not set
++# CONFIG_FEATURE_INSMOD_VERSION_CHECKING is not set
++# CONFIG_FEATURE_INSMOD_KSYMOOPS_SYMBOLS is not set
++# CONFIG_FEATURE_INSMOD_LOADINKMEM is not set
++# CONFIG_FEATURE_INSMOD_LOAD_MAP is not set
++# CONFIG_FEATURE_INSMOD_LOAD_MAP_FULL is not set
++# CONFIG_RMMOD is not set
++# CONFIG_LSMOD is not set
++# CONFIG_FEATURE_LSMOD_PRETTY_2_6_OUTPUT is not set
++# CONFIG_MODPROBE is not set
++# CONFIG_FEATURE_MODPROBE_MULTIPLE_OPTIONS is not set
++# CONFIG_FEATURE_MODPROBE_FANCY_ALIAS is not set
++# CONFIG_FEATURE_MODPROBE_BLACKLIST is not set
++# CONFIG_FEATURE_CHECK_TAINTED_MODULE is not set
++# CONFIG_FEATURE_2_4_MODULES is not set
++# CONFIG_FEATURE_2_6_MODULES is not set
++CONFIG_DEFAULT_MODULES_DIR="/lib/modules"
++CONFIG_DEFAULT_DEPMOD_FILE="modules.dep"
+ # CONFIG_FEATURE_QUERY_MODULE_INTERFACE is not set
+ 
+ #
+@@ -525,6 +525,7 @@ CONFIG_RTCWAKE=y
+ CONFIG_SCRIPT=y
+ CONFIG_SETARCH=y
+ CONFIG_SWAPONOFF=y
++CONFIG_FEATURE_SWAPON_PRI=y
+ CONFIG_SWITCH_ROOT=y
+ CONFIG_UMOUNT=y
+ CONFIG_FEATURE_UMOUNT_ALL=y
+@@ -562,7 +563,10 @@ CONFIG_DC=y
+ CONFIG_EJECT=y
+ CONFIG_FEATURE_EJECT_SCSI=y
+ CONFIG_FBSPLASH=y
++CONFIG_INOTIFYD=y
+ CONFIG_LAST=y
++CONFIG_FEATURE_LAST_SMALL=y
++# CONFIG_FEATURE_LAST_FANCY is not set
+ CONFIG_LESS=y
+ CONFIG_FEATURE_LESS_MAXLINES=9999999
+ CONFIG_FEATURE_LESS_BRACKETS=y
+@@ -590,7 +594,6 @@ CONFIG_RUNLEVEL=y
+ CONFIG_RX=y
+ CONFIG_SETSID=y
+ CONFIG_STRINGS=y
+-CONFIG_SYMLINKS=y
+ CONFIG_TASKSET=y
+ CONFIG_FEATURE_TASKSET_FANCY=y
+ CONFIG_TIME=y
+@@ -675,6 +678,7 @@ CONFIG_NC_SERVER=y
+ CONFIG_NC_EXTRA=y
+ CONFIG_NETSTAT=y
+ CONFIG_FEATURE_NETSTAT_WIDE=y
++CONFIG_FEATURE_NETSTAT_PRG=y
+ CONFIG_NSLOOKUP=y
+ CONFIG_PING=y
+ CONFIG_PING6=y
+@@ -765,6 +769,7 @@ CONFIG_FEATURE_SH_IS_NONE=y
+ # CONFIG_ASH_MATH_SUPPORT_64 is not set
+ # CONFIG_ASH_GETOPTS is not set
+ # CONFIG_ASH_BUILTIN_ECHO is not set
++# CONFIG_ASH_BUILTIN_PRINTF is not set
+ # CONFIG_ASH_BUILTIN_TEST is not set
+ # CONFIG_ASH_CMDCMD is not set
+ # CONFIG_ASH_MAIL is not set
+@@ -778,6 +783,7 @@ CONFIG_HUSH_JOB=y
+ CONFIG_HUSH_TICK=y
+ CONFIG_HUSH_IF=y
+ CONFIG_HUSH_LOOPS=y
++CONFIG_HUSH_CASE=y
+ CONFIG_LASH=y
+ CONFIG_MSH=y
+ 
+diff --git a/archival/Config.in b/archival/Config.in
+index b26be64..d6332a2 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -5,6 +5,30 @@
+ 
+ menu "Archival Utilities"
+ 
++config FEATURE_SEAMLESS_LZMA
++	bool "Make tar, rpm, man, modprobe etc understand .lzma data"
++	default n
++	help
++	  Make tar, rpm, man, modprobe etc understand .lzma data.
++
++config FEATURE_SEAMLESS_BZ2
++	bool "Make tar, rpm, man, modprobe etc understand .bz2 data"
++	default n
++	help
++	  Make tar, rpm, man, modprobe etc understand .bz2 data.
++
++config FEATURE_SEAMLESS_GZ
++	bool "Make tar, rpm, man, modprobe etc understand .gz data"
++	default n
++	help
++	  Make tar, rpm, man, modprobe etc understand .gz data.
++
++config FEATURE_SEAMLESS_Z
++	bool "Make tar and gunzip understand .Z data"
++	default n
++	help
++	  Make tar and gunzip understand .Z data.
++
+ config AR
+ 	bool "ar"
+ 	default n
+@@ -126,15 +150,6 @@ config GUNZIP
+ 	  You can use the `-t' option to test the integrity of
+ 	  an archive, without decompressing it.
+ 
+-config FEATURE_GUNZIP_UNCOMPRESS
+-	bool "Uncompress support"
+-	default n
+-	depends on GUNZIP
+-	help
+-	  Enable if you want gunzip to have the ability to decompress
+-	  archives created by the program compress (not much
+-	  used anymore).
+-
+ config GZIP
+ 	bool "gzip"
+ 	default n
+@@ -154,13 +169,6 @@ config RPM
+ 	help
+ 	  Mini RPM applet - queries and extracts RPM packages.
+ 
+-config FEATURE_RPM_BZ2
+-	bool "Enable handling of rpms with bzip2-compressed data inside"
+-	default n
+-	depends on RPM
+-	help
+-	  Enable handling of rpms with bzip2-compressed data inside.
+-
+ config TAR
+ 	bool "tar"
+ 	default n
+@@ -179,42 +187,10 @@ config FEATURE_TAR_CREATE
+ 	  If you enable this option you'll be able to create
+ 	  tar archives using the `-c' option.
+ 
+-config FEATURE_TAR_GZIP
+-	bool "Enable -z option"
+-	default y
+-	depends on TAR
+-	help
+-	  If you enable this option tar will be able to call gzip,
+-	  when creating or extracting tar gziped archives.
+-
+-config FEATURE_TAR_BZIP2
+-	bool "Enable -j option to handle .tar.bz2 files"
+-	default n
+-	depends on TAR
+-	help
+-	  If you enable this option you'll be able to extract
+-	  archives compressed with bzip2.
+-
+-config FEATURE_TAR_LZMA
+-	bool "Enable -a option to handle .tar.lzma files"
+-	default n
+-	depends on TAR
+-	help
+-	  If you enable this option you'll be able to extract
+-	  archives compressed with lzma.
+-
+-config FEATURE_TAR_COMPRESS
+-	bool "Enable -Z option"
+-	default n
+-	depends on TAR
+-	help
+-	  If you enable this option tar will be able to call uncompress,
+-	  when extracting .tar.Z archives.
+-
+ config FEATURE_TAR_AUTODETECT
+-	bool "Autodetect gz/bz2 compresses tarballs"
++	bool "Autodetect gz/bz2 compressed tarballs"
+ 	default n
+-	depends on FEATURE_TAR_GZIP || FEATURE_TAR_BZIP2
++	depends on FEATURE_SEAMLESS_Z || FEATURE_SEAMLESS_GZ || FEATURE_SEAMLESS_BZ2 || FEATURE_SEAMLESS_LZMA
+ 	help
+ 	  With this option tar can automatically detect gzip/bzip2 compressed
+ 	  tarballs. Currently it works only on files (not pipes etc).
+@@ -312,42 +288,4 @@ config UNZIP
+ 	  current directory. Use the `-d' option to extract to a
+ 	  directory of your choice.
+ 
+-comment "Common options for cpio and tar"
+-	depends on CPIO || TAR
+-
+-comment "Common options for dpkg and dpkg_deb"
+-	depends on DPKG || DPKG_DEB
+-
+-config FEATURE_DEB_TAR_GZ
+-	bool "gzip debian packages (normal)"
+-	default y if DPKG || DPKG_DEB
+-	depends on DPKG || DPKG_DEB
+-	help
+-	  This is the default compression method inside the debian ar file.
+-
+-	  If you want compatibility with standard .deb's you should say yes
+-	  here.
+-
+-config FEATURE_DEB_TAR_BZ2
+-	bool "bzip2 debian packages"
+-	default n
+-	depends on DPKG || DPKG_DEB
+-	help
+-	  This allows dpkg and dpkg-deb to extract deb's that are compressed
+-	  internally with bzip2 instead of gzip.
+-
+-	  You only want this if you are creating your own custom debian
+-	  packages that use an internal control.tar.bz2 or data.tar.bz2.
+-
+-config FEATURE_DEB_TAR_LZMA
+-	bool "lzma debian packages"
+-	default n
+-	depends on DPKG || DPKG_DEB
+-	help
+-	  This allows dpkg and dpkg-deb to extract deb's that are compressed
+-	  internally with lzma instead of gzip.
+-
+-	  You only want this if you are creating your own custom debian
+-	  packages that use an internal control.tar.lzma or data.tar.lzma.
+-
+ endmenu
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index 65bb8b7..c796205 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -161,7 +161,7 @@ char* make_new_name_bunzip2(char *filename)
+ static
+ USE_DESKTOP(long long) int unpack_bunzip2(void)
+ {
+-	return unpack_bz2_stream(STDIN_FILENO, STDOUT_FILENO);
++	return unpack_bz2_stream_prime(STDIN_FILENO, STDOUT_FILENO);
+ }
+ 
+ int bunzip2_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+@@ -218,8 +218,8 @@ char* make_new_name_gunzip(char *filename)
+ 
+ 	extension++;
+ 	if (strcmp(extension, "tgz" + 1) == 0
+-#if ENABLE_FEATURE_GUNZIP_UNCOMPRESS
+-	 || strcmp(extension, "Z") == 0
++#if ENABLE_FEATURE_SEAMLESS_Z
++	 || (extension[0] == 'Z' && extension[1] == '\0')
+ #endif
+ 	) {
+ 		extension[-1] = '\0';
+@@ -244,8 +244,8 @@ USE_DESKTOP(long long) int unpack_gunzip(void)
+ 		unsigned char magic2;
+ 
+ 		magic2 = xread_char(STDIN_FILENO);
+-		if (ENABLE_FEATURE_GUNZIP_UNCOMPRESS && magic2 == 0x9d) {
+-			status = uncompress(STDIN_FILENO, STDOUT_FILENO);
++		if (ENABLE_FEATURE_SEAMLESS_Z && magic2 == 0x9d) {
++			status = unpack_Z_stream(STDIN_FILENO, STDOUT_FILENO);
+ 		} else if (magic2 == 0x8b) {
+ 			status = unpack_gz_stream(STDIN_FILENO, STDOUT_FILENO);
+ 		} else {
+@@ -351,7 +351,7 @@ USE_DESKTOP(long long) int unpack_uncompress(void)
+ 	if ((xread_char(STDIN_FILENO) != 0x1f) || (xread_char(STDIN_FILENO) != 0x9d)) {
+ 		bb_error_msg("invalid magic");
+ 	} else {
+-		status = uncompress(STDIN_FILENO, STDOUT_FILENO);
++		status = unpack_Z_stream(STDIN_FILENO, STDOUT_FILENO);
+ 	}
+ 	return status;
+ }
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 54e9632..f31a7f0 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -1438,10 +1438,10 @@ static void init_archive_deb_control(archive_handle_t *ar_handle)
+ 	tar_handle->src_fd = ar_handle->src_fd;
+ 
+ 	/* We don't care about data.tar.* or debian-binary, just control.tar.* */
+-#if ENABLE_FEATURE_DEB_TAR_GZ
++#if ENABLE_FEATURE_SEAMLESS_GZ
+ 	llist_add_to(&(ar_handle->accept), (char*)"control.tar.gz");
+ #endif
+-#if ENABLE_FEATURE_DEB_TAR_BZ2
++#if ENABLE_FEATURE_SEAMLESS_BZ2
+ 	llist_add_to(&(ar_handle->accept), (char*)"control.tar.bz2");
+ #endif
+ 
+@@ -1458,10 +1458,10 @@ static void init_archive_deb_data(archive_handle_t *ar_handle)
+ 	tar_handle->src_fd = ar_handle->src_fd;
+ 
+ 	/* We don't care about control.tar.* or debian-binary, just data.tar.* */
+-#if ENABLE_FEATURE_DEB_TAR_GZ
++#if ENABLE_FEATURE_SEAMLESS_GZ
+ 	llist_add_to(&(ar_handle->accept), (char*)"data.tar.gz");
+ #endif
+-#if ENABLE_FEATURE_DEB_TAR_BZ2
++#if ENABLE_FEATURE_SEAMLESS_BZ2
+ 	llist_add_to(&(ar_handle->accept), (char*)"data.tar.bz2");
+ #endif
+ 
+diff --git a/archival/dpkg_deb.c b/archival/dpkg_deb.c
+index 9e6340f..f94c90c 100644
+--- a/archival/dpkg_deb.c
++++ b/archival/dpkg_deb.c
+@@ -31,12 +31,12 @@ int dpkg_deb_main(int argc, char **argv)
+ 	ar_archive->sub_archive = tar_archive;
+ 	ar_archive->filter = filter_accept_list_reassign;
+ 
+-#if ENABLE_FEATURE_DEB_TAR_GZ
++#if ENABLE_FEATURE_SEAMLESS_GZ
+ 	llist_add_to(&(ar_archive->accept), (char*)"data.tar.gz");
+ 	llist_add_to(&control_tar_llist, (char*)"control.tar.gz");
+ #endif
+ 
+-#if ENABLE_FEATURE_DEB_TAR_BZ2
++#if ENABLE_FEATURE_SEAMLESS_BZ2
+ 	llist_add_to(&(ar_archive->accept), (char*)"data.tar.bz2");
+ 	llist_add_to(&control_tar_llist, (char*)"control.tar.bz2");
+ #endif
+diff --git a/archival/libunarchive/Kbuild b/archival/libunarchive/Kbuild
+index 468a7e8..364f917 100644
+--- a/archival/libunarchive/Kbuild
++++ b/archival/libunarchive/Kbuild
+@@ -32,36 +32,20 @@ DPKG_FILES:= \
+ 	get_header_tar.o \
+ 	filter_accept_list_reassign.o
+ 
+-lib-$(CONFIG_RPM)                       += open_transformer.o
+-lib-$(CONFIG_FEATURE_TAR_BZIP2)         += open_transformer.o
+-lib-$(CONFIG_FEATURE_TAR_LZMA)          += open_transformer.o
+-lib-$(CONFIG_FEATURE_TAR_GZIP)          += open_transformer.o
+-lib-$(CONFIG_FEATURE_TAR_COMPRESS)      += open_transformer.o
+-lib-$(CONFIG_FEATURE_DEB_TAR_GZ)        += open_transformer.o
+-lib-$(CONFIG_FEATURE_DEB_TAR_BZ2)       += open_transformer.o
+-lib-$(CONFIG_FEATURE_DEB_TAR_LZMA)      += open_transformer.o
+-
+-lib-$(CONFIG_FEATURE_MODPROBE_SMALL_ZIPPED) += open_transformer.o decompress_unzip.o decompress_bunzip2.o
+-
+ lib-$(CONFIG_AR)                        += get_header_ar.o unpack_ar_archive.o
+ lib-$(CONFIG_BUNZIP2)                   += decompress_bunzip2.o
+ lib-$(CONFIG_UNLZMA)                    += decompress_unlzma.o
+ lib-$(CONFIG_CPIO)                      += get_header_cpio.o
+ lib-$(CONFIG_DPKG)                      += $(DPKG_FILES)
+ lib-$(CONFIG_DPKG_DEB)                  += $(DPKG_FILES)
+-lib-$(CONFIG_FEATURE_DEB_TAR_GZ)        += decompress_unzip.o get_header_tar_gz.o
+-lib-$(CONFIG_FEATURE_DEB_TAR_BZ2)       += decompress_bunzip2.o get_header_tar_bz2.o
+-lib-$(CONFIG_FEATURE_DEB_TAR_LZMA)      += decompress_unlzma.o get_header_tar_lzma.o
+ lib-$(CONFIG_GUNZIP)                    += decompress_unzip.o
+-lib-$(CONFIG_FEATURE_GUNZIP_UNCOMPRESS) += decompress_uncompress.o
+ lib-$(CONFIG_RPM2CPIO)                  += decompress_unzip.o get_header_cpio.o
+-lib-$(CONFIG_RPM)                       += decompress_unzip.o get_header_cpio.o
+-lib-$(CONFIG_FEATURE_RPM_BZ2)           += decompress_bunzip2.o
++lib-$(CONFIG_RPM)                       += open_transformer.o decompress_unzip.o get_header_cpio.o
+ lib-$(CONFIG_TAR)                       += get_header_tar.o
+-lib-$(CONFIG_FEATURE_TAR_BZIP2)         += decompress_bunzip2.o get_header_tar_bz2.o
+-lib-$(CONFIG_FEATURE_TAR_LZMA)          += decompress_unlzma.o get_header_tar_lzma.o
+-lib-$(CONFIG_FEATURE_TAR_GZIP)          += decompress_unzip.o get_header_tar_gz.o
+-lib-$(CONFIG_FEATURE_TAR_COMPRESS)      += decompress_uncompress.o
+ lib-$(CONFIG_UNCOMPRESS)                += decompress_uncompress.o
+ lib-$(CONFIG_UNZIP)                     += decompress_unzip.o
++lib-$(CONFIG_FEATURE_SEAMLESS_Z)        += open_transformer.o decompress_uncompress.o
++lib-$(CONFIG_FEATURE_SEAMLESS_GZ)       += open_transformer.o decompress_unzip.o get_header_tar_gz.o
++lib-$(CONFIG_FEATURE_SEAMLESS_BZ2)      += open_transformer.o decompress_bunzip2.o get_header_tar_bz2.o
++lib-$(CONFIG_FEATURE_SEAMLESS_LZMA)     += open_transformer.o decompress_unlzma.o get_header_tar_lzma.o
+ lib-$(CONFIG_FEATURE_COMPRESS_USAGE)    += decompress_bunzip2.o
+diff --git a/archival/libunarchive/decompress_bunzip2.c b/archival/libunarchive/decompress_bunzip2.c
+index 654dc28..b53720f 100644
+--- a/archival/libunarchive/decompress_bunzip2.c
++++ b/archival/libunarchive/decompress_bunzip2.c
+@@ -590,7 +590,8 @@ int FAST_FUNC start_bunzip(bunzip_data **bdp, int in_fd, const unsigned char *in
+ 	bunzip_data *bd;
+ 	unsigned i;
+ 	enum {
+-		BZh0 = ('B' << 24) + ('Z' << 16) + ('h' << 8) + '0'
++		BZh0 = ('B' << 24) + ('Z' << 16) + ('h' << 8) + '0',
++		h0 = ('h' << 8) + '0',
+ 	};
+ 
+ 	/* Figure out how much data to allocate */
+@@ -617,12 +618,18 @@ int FAST_FUNC start_bunzip(bunzip_data **bdp, int in_fd, const unsigned char *in
+ 	if (i) return i;
+ 
+ 	/* Ensure that file starts with "BZh['1'-'9']." */
+-	i = get_bits(bd, 32);
+-	if ((unsigned)(i - BZh0 - 1) >= 9) return RETVAL_NOT_BZIP_DATA;
++	/* Update: now caller verifies 1st two bytes, makes .gz/.bz2
++	 * integration easier */
++	/* was: */
++	/* i = get_bits(bd, 32); */
++	/* if ((unsigned)(i - BZh0 - 1) >= 9) return RETVAL_NOT_BZIP_DATA; */
++	i = get_bits(bd, 16);
++	if ((unsigned)(i - h0 - 1) >= 9) return RETVAL_NOT_BZIP_DATA;
+ 
+ 	/* Fourth byte (ascii '1'-'9') indicates block size in units of 100k of
+ 	   uncompressed data.  Allocate intermediate buffer for block. */
+-	bd->dbufSize = 100000 * (i - BZh0);
++	/* bd->dbufSize = 100000 * (i - BZh0); */
++	bd->dbufSize = 100000 * (i - h0);
+ 
+ 	/* Cannot use xmalloc - may leak bd in NOFORK case! */
+ 	bd->dbuf = malloc_or_warn(bd->dbufSize * sizeof(int));
+@@ -682,6 +689,17 @@ unpack_bz2_stream(int src_fd, int dst_fd)
+ 	return i ? i : USE_DESKTOP(total_written) + 0;
+ }
+ 
++USE_DESKTOP(long long) int FAST_FUNC
++unpack_bz2_stream_prime(int src_fd, int dst_fd)
++{
++	unsigned char magic[2];
++	xread(src_fd, magic, 2);
++	if (magic[0] != 'B' || magic[1] != 'Z') {
++		bb_error_msg_and_die("invalid magic");
++	}
++	return unpack_bz2_stream(src_fd, dst_fd);
++}
++
+ #ifdef TESTING
+ 
+ static char *const bunzip_errors[] = {
+@@ -693,9 +711,10 @@ static char *const bunzip_errors[] = {
+ /* Dumb little test thing, decompress stdin to stdout */
+ int main(int argc, char **argv)
+ {
+-	int i = unpack_bz2_stream(0, 1);
++	int i;
+ 	char c;
+ 
++	int i = unpack_bz2_stream_prime(0, 1);
+ 	if (i < 0)
+ 		fprintf(stderr, "%s\n", bunzip_errors[-i]);
+ 	else if (read(STDIN_FILENO, &c, 1))
+diff --git a/archival/libunarchive/decompress_uncompress.c b/archival/libunarchive/decompress_uncompress.c
+index 1615700..fe1491e 100644
+--- a/archival/libunarchive/decompress_uncompress.c
++++ b/archival/libunarchive/decompress_uncompress.c
+@@ -1,6 +1,4 @@
+ /* vi: set sw=4 ts=4: */
+-#include "libbb.h"
+-
+ /* uncompress for busybox -- (c) 2002 Robert Griebl
+  *
+  * based on the original compress42.c source
+@@ -26,6 +24,10 @@
+  *
+  */
+ 
++#include "libbb.h"
++#include "unarchive.h"
++
++
+ /* Default input buffer size */
+ #define	IBUFSIZ	2048
+ 
+@@ -71,7 +73,7 @@
+  */
+ 
+ USE_DESKTOP(long long) int FAST_FUNC
+-uncompress(int fd_in, int fd_out)
++unpack_Z_stream(int fd_in, int fd_out)
+ {
+ 	USE_DESKTOP(long long total_written = 0;)
+ 	USE_DESKTOP(long long) int retval = -1;
+diff --git a/archival/libunarchive/filter_accept_list_reassign.c b/archival/libunarchive/filter_accept_list_reassign.c
+index 4dbc2d1..f1de4e8 100644
+--- a/archival/libunarchive/filter_accept_list_reassign.c
++++ b/archival/libunarchive/filter_accept_list_reassign.c
+@@ -23,22 +23,25 @@ char FAST_FUNC filter_accept_list_reassign(archive_handle_t *archive_handle)
+ 
+ 		/* Find extension */
+ 		name_ptr = strrchr(archive_handle->file_header->name, '.');
++		if (!name_ptr)
++			return EXIT_FAILURE;
++		name_ptr++;
+ 
+ 		/* Modify the subarchive handler based on the extension */
+-		if (ENABLE_FEATURE_DEB_TAR_GZ
+-		 && strcmp(name_ptr, ".gz") == 0
++		if (ENABLE_FEATURE_SEAMLESS_GZ
++		 && strcmp(name_ptr, "gz") == 0
+ 		) {
+ 			archive_handle->action_data_subarchive = get_header_tar_gz;
+ 			return EXIT_SUCCESS;
+ 		}
+-		if (ENABLE_FEATURE_DEB_TAR_BZ2
+-		 && strcmp(name_ptr, ".bz2") == 0
++		if (ENABLE_FEATURE_SEAMLESS_BZ2
++		 && strcmp(name_ptr, "bz2") == 0
+ 		) {
+ 			archive_handle->action_data_subarchive = get_header_tar_bz2;
+ 			return EXIT_SUCCESS;
+ 		}
+-		if (ENABLE_FEATURE_DEB_TAR_LZMA
+-		 && strcmp(name_ptr, ".lzma") == 0
++		if (ENABLE_FEATURE_SEAMLESS_LZMA
++		 && strcmp(name_ptr, "lzma") == 0
+ 		) {
+ 			archive_handle->action_data_subarchive = get_header_tar_lzma;
+ 			return EXIT_SUCCESS;
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index 5310f3f..bf0f92b 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -148,12 +148,12 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+ 		 * we can switch to get_header_tar_gz/bz2/lzma().
+ 		 * Needs seekable fd. I wish recv(MSG_PEEK) works
+ 		 * on any fd... */
+-#if ENABLE_FEATURE_TAR_GZIP
++#if ENABLE_FEATURE_SEAMLESS_GZ
+ 		if (tar.name[0] == 0x1f && tar.name[1] == (char)0x8b) { /* gzip */
+ 			get_header_ptr = get_header_tar_gz;
+ 		} else
+ #endif
+-#if ENABLE_FEATURE_TAR_BZIP2
++#if ENABLE_FEATURE_SEAMLESS_BZ2
+ 		if (tar.name[0] == 'B' && tar.name[1] == 'Z'
+ 		 && tar.name[2] == 'h' && isdigit(tar.name[3])
+ 		) { /* bzip2 */
+diff --git a/archival/libunarchive/get_header_tar_bz2.c b/archival/libunarchive/get_header_tar_bz2.c
+index 035c10b..615bbba 100644
+--- a/archival/libunarchive/get_header_tar_bz2.c
++++ b/archival/libunarchive/get_header_tar_bz2.c
+@@ -11,7 +11,7 @@ char FAST_FUNC get_header_tar_bz2(archive_handle_t *archive_handle)
+ 	/* Can't lseek over pipes */
+ 	archive_handle->seek = seek_by_read;
+ 
+-	open_transformer(archive_handle->src_fd, unpack_bz2_stream, "bunzip2");
++	open_transformer(archive_handle->src_fd, unpack_bz2_stream_prime, "bunzip2");
+ 	archive_handle->offset = 0;
+ 	while (get_header_tar(archive_handle) == EXIT_SUCCESS)
+ 		continue;
+diff --git a/archival/rpm.c b/archival/rpm.c
+index e6dd3d8..e1f3c89 100644
+--- a/archival/rpm.c
++++ b/archival/rpm.c
+@@ -206,27 +206,27 @@ static void extract_cpio_gz(int fd)
+ 	archive_handle->src_fd = fd;
+ 	/*archive_handle->offset = 0; - init_handle() did it */
+ 
++// TODO: open_zipped does the same
++
+ 	xread(archive_handle->src_fd, &magic, 2);
+ #if BB_MMU
+ 	xformer = unpack_gz_stream;
+ #else
+ 	xformer_prog = "gunzip";
+ #endif
+-	if ((magic[0] != 0x1f) || (magic[1] != 0x8b)) {
+-		if (ENABLE_FEATURE_RPM_BZ2
+-		 && (magic[0] == 0x42) && (magic[1] == 0x5a)) {
++	if (magic[0] != 0x1f || magic[1] != 0x8b) {
++		if (!ENABLE_FEATURE_SEAMLESS_BZ2
++		 || magic[0] != 'B' || magic[1] != 'Z'
++		) {
++			bb_error_msg_and_die("no gzip"
++				USE_FEATURE_SEAMLESS_BZ2("/bzip2")
++				" magic");
++		}
+ #if BB_MMU
+-			xformer = unpack_bz2_stream;
++		xformer = unpack_bz2_stream;
+ #else
+-			xformer_prog = "bunzip2";
++		xformer_prog = "bunzip2";
+ #endif
+-	/* We can do better, need modifying unpack_bz2_stream to not require
+-	 * first 2 bytes. Not very hard to do... I mean, TODO :) */
+-			xlseek(archive_handle->src_fd, -2, SEEK_CUR);
+-		} else
+-			bb_error_msg_and_die("no gzip"
+-				USE_FEATURE_RPM_BZ2("/bzip")
+-				" magic");
+ 	} else {
+ #if !BB_MMU
+ 		/* NOMMU version of open_transformer execs an external unzipper that should
+diff --git a/archival/tar.c b/archival/tar.c
+index b2481b8..45701c9 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -36,7 +36,7 @@
+ #define block_buf bb_common_bufsiz1
+ 
+ 
+-#if !ENABLE_FEATURE_TAR_GZIP && !ENABLE_FEATURE_TAR_BZIP2
++#if !ENABLE_FEATURE_SEAMLESS_GZ && !ENABLE_FEATURE_SEAMLESS_BZ2
+ /* Do not pass gzip flag to writeTarFile() */
+ #define writeTarFile(tar_fd, verboseFlag, dereferenceFlag, include, exclude, gzip) \
+ 	writeTarFile(tar_fd, verboseFlag, dereferenceFlag, include, exclude)
+@@ -503,19 +503,19 @@ static int FAST_FUNC writeFileToTarball(const char *fileName, struct stat *statb
+ 	return TRUE;
+ }
+ 
+-#if ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2
+-#if !(ENABLE_FEATURE_TAR_GZIP && ENABLE_FEATURE_TAR_BZIP2)
++#if ENABLE_FEATURE_SEAMLESS_GZ || ENABLE_FEATURE_SEAMLESS_BZ2
++#if !(ENABLE_FEATURE_SEAMLESS_GZ && ENABLE_FEATURE_SEAMLESS_BZ2)
+ #define vfork_compressor(tar_fd, gzip) vfork_compressor(tar_fd)
+ #endif
+ /* Don't inline: vfork scares gcc and pessimizes code */
+ static void NOINLINE vfork_compressor(int tar_fd, int gzip)
+ {
+ 	pid_t gzipPid;
+-#if ENABLE_FEATURE_TAR_GZIP && ENABLE_FEATURE_TAR_BZIP2
++#if ENABLE_FEATURE_SEAMLESS_GZ && ENABLE_FEATURE_SEAMLESS_BZ2
+ 	const char *zip_exec = (gzip == 1) ? "gzip" : "bzip2";
+-#elif ENABLE_FEATURE_TAR_GZIP
++#elif ENABLE_FEATURE_SEAMLESS_GZ
+ 	const char *zip_exec = "gzip";
+-#else /* only ENABLE_FEATURE_TAR_BZIP2 */
++#else /* only ENABLE_FEATURE_SEAMLESS_BZ2 */
+ 	const char *zip_exec = "bzip2";
+ #endif
+ 	// On Linux, vfork never unpauses parent early, although standard
+@@ -579,7 +579,7 @@ static void NOINLINE vfork_compressor(int tar_fd, int gzip)
+ 		bb_perror_msg_and_die("cannot exec %s", zip_exec);
+ 	}
+ }
+-#endif /* ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2 */
++#endif /* ENABLE_FEATURE_SEAMLESS_GZ || ENABLE_FEATURE_SEAMLESS_BZ2 */
+ 
+ 
+ /* gcc 4.2.1 inlines it, making code bigger */
+@@ -601,7 +601,7 @@ static NOINLINE int writeTarFile(int tar_fd, int verboseFlag,
+ 	if (fstat(tbInfo.tarFd, &tbInfo.statBuf) < 0)
+ 		bb_perror_msg_and_die("cannot stat tar file");
+ 
+-#if ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2
++#if ENABLE_FEATURE_SEAMLESS_GZ || ENABLE_FEATURE_SEAMLESS_BZ2
+ 	if (gzip)
+ 		vfork_compressor(tbInfo.tarFd, gzip);
+ #endif
+@@ -637,7 +637,7 @@ static NOINLINE int writeTarFile(int tar_fd, int verboseFlag,
+ 	if (errorFlag)
+ 		bb_error_msg("error exit delayed from previous errors");
+ 
+-#if ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2
++#if ENABLE_FEATURE_SEAMLESS_GZ || ENABLE_FEATURE_SEAMLESS_BZ2
+ 	if (gzip) {
+ 		int status;
+ 		if (safe_waitpid(-1, &status, 0) == -1)
+@@ -679,7 +679,7 @@ static llist_t *append_file_list_to_list(llist_t *list)
+ #define append_file_list_to_list(x) 0
+ #endif
+ 
+-#if ENABLE_FEATURE_TAR_COMPRESS
++#if ENABLE_FEATURE_SEAMLESS_Z
+ static char FAST_FUNC get_header_tar_Z(archive_handle_t *archive_handle)
+ {
+ 	/* Can't lseek over pipes */
+@@ -692,7 +692,7 @@ static char FAST_FUNC get_header_tar_Z(archive_handle_t *archive_handle)
+ 		bb_error_msg_and_die("invalid magic");
+ 	}
+ 
+-	open_transformer(archive_handle->src_fd, uncompress, "uncompress");
++	open_transformer(archive_handle->src_fd, unpack_Z_stream, "uncompress");
+ 	archive_handle->offset = 0;
+ 	while (get_header_tar(archive_handle) == EXIT_SUCCESS)
+ 		continue;
+@@ -729,14 +729,14 @@ static void handle_SIGCHLD(int status)
+ 
+ enum {
+ 	OPTBIT_KEEP_OLD = 7,
+-	USE_FEATURE_TAR_CREATE(  OPTBIT_CREATE      ,)
+-	USE_FEATURE_TAR_CREATE(  OPTBIT_DEREFERENCE ,)
+-	USE_FEATURE_TAR_BZIP2(   OPTBIT_BZIP2       ,)
+-	USE_FEATURE_TAR_LZMA(    OPTBIT_LZMA        ,)
+-	USE_FEATURE_TAR_FROM(    OPTBIT_INCLUDE_FROM,)
+-	USE_FEATURE_TAR_FROM(    OPTBIT_EXCLUDE_FROM,)
+-	USE_FEATURE_TAR_GZIP(    OPTBIT_GZIP        ,)
+-	USE_FEATURE_TAR_COMPRESS(OPTBIT_COMPRESS    ,)
++	USE_FEATURE_TAR_CREATE(   OPTBIT_CREATE      ,)
++	USE_FEATURE_TAR_CREATE(   OPTBIT_DEREFERENCE ,)
++	USE_FEATURE_SEAMLESS_BZ2( OPTBIT_BZIP2       ,)
++	USE_FEATURE_SEAMLESS_LZMA(OPTBIT_LZMA        ,)
++	USE_FEATURE_TAR_FROM(     OPTBIT_INCLUDE_FROM,)
++	USE_FEATURE_TAR_FROM(     OPTBIT_EXCLUDE_FROM,)
++	USE_FEATURE_SEAMLESS_GZ(  OPTBIT_GZIP        ,)
++	USE_FEATURE_SEAMLESS_Z(   OPTBIT_COMPRESS    ,)
+ 	OPTBIT_NOPRESERVE_OWN,
+ 	OPTBIT_NOPRESERVE_PERM,
+ 	OPT_TEST         = 1 << 0, // t
+@@ -747,14 +747,14 @@ enum {
+ 	OPT_P            = 1 << 5, // p
+ 	OPT_VERBOSE      = 1 << 6, // v
+ 	OPT_KEEP_OLD     = 1 << 7, // k
+-	OPT_CREATE       = USE_FEATURE_TAR_CREATE(  (1<<OPTBIT_CREATE      )) + 0, // c
+-	OPT_DEREFERENCE  = USE_FEATURE_TAR_CREATE(  (1<<OPTBIT_DEREFERENCE )) + 0, // h
+-	OPT_BZIP2        = USE_FEATURE_TAR_BZIP2(   (1<<OPTBIT_BZIP2       )) + 0, // j
+-	OPT_LZMA         = USE_FEATURE_TAR_LZMA(    (1<<OPTBIT_LZMA        )) + 0, // a
+-	OPT_INCLUDE_FROM = USE_FEATURE_TAR_FROM(    (1<<OPTBIT_INCLUDE_FROM)) + 0, // T
+-	OPT_EXCLUDE_FROM = USE_FEATURE_TAR_FROM(    (1<<OPTBIT_EXCLUDE_FROM)) + 0, // X
+-	OPT_GZIP         = USE_FEATURE_TAR_GZIP(    (1<<OPTBIT_GZIP        )) + 0, // z
+-	OPT_COMPRESS     = USE_FEATURE_TAR_COMPRESS((1<<OPTBIT_COMPRESS    )) + 0, // Z
++	OPT_CREATE       = USE_FEATURE_TAR_CREATE(   (1 << OPTBIT_CREATE      )) + 0, // c
++	OPT_DEREFERENCE  = USE_FEATURE_TAR_CREATE(   (1 << OPTBIT_DEREFERENCE )) + 0, // h
++	OPT_BZIP2        = USE_FEATURE_SEAMLESS_BZ2( (1 << OPTBIT_BZIP2       )) + 0, // j
++	OPT_LZMA         = USE_FEATURE_SEAMLESS_LZMA((1 << OPTBIT_LZMA        )) + 0, // a
++	OPT_INCLUDE_FROM = USE_FEATURE_TAR_FROM(     (1 << OPTBIT_INCLUDE_FROM)) + 0, // T
++	OPT_EXCLUDE_FROM = USE_FEATURE_TAR_FROM(     (1 << OPTBIT_EXCLUDE_FROM)) + 0, // X
++	OPT_GZIP         = USE_FEATURE_SEAMLESS_GZ(  (1 << OPTBIT_GZIP        )) + 0, // z
++	OPT_COMPRESS     = USE_FEATURE_SEAMLESS_Z(   (1 << OPTBIT_COMPRESS    )) + 0, // Z
+ 	OPT_NOPRESERVE_OWN  = 1 << OPTBIT_NOPRESERVE_OWN , // no-same-owner
+ 	OPT_NOPRESERVE_PERM = 1 << OPTBIT_NOPRESERVE_PERM, // no-same-permissions
+ };
+@@ -772,20 +772,20 @@ static const char tar_longopts[] ALIGN1 =
+ 	"create\0"              No_argument       "c"
+ 	"dereference\0"         No_argument       "h"
+ # endif
+-# if ENABLE_FEATURE_TAR_BZIP2
++# if ENABLE_FEATURE_SEAMLESS_BZ2
+ 	"bzip2\0"               No_argument       "j"
+ # endif
+-# if ENABLE_FEATURE_TAR_LZMA
++# if ENABLE_FEATURE_SEAMLESS_LZMA
+ 	"lzma\0"                No_argument       "a"
+ # endif
+ # if ENABLE_FEATURE_TAR_FROM
+ 	"files-from\0"          Required_argument "T"
+ 	"exclude-from\0"        Required_argument "X"
+ # endif
+-# if ENABLE_FEATURE_TAR_GZIP
++# if ENABLE_FEATURE_SEAMLESS_GZ
+ 	"gzip\0"                No_argument       "z"
+ # endif
+-# if ENABLE_FEATURE_TAR_COMPRESS
++# if ENABLE_FEATURE_SEAMLESS_Z
+ 	"compress\0"            No_argument       "Z"
+ # endif
+ 	"no-same-owner\0"       No_argument       "\xfd"
+@@ -834,12 +834,12 @@ int tar_main(int argc UNUSED_PARAM, char **argv)
+ #endif
+ 	opt = getopt32(argv,
+ 		"txC:f:Opvk"
+-		USE_FEATURE_TAR_CREATE(  "ch"  )
+-		USE_FEATURE_TAR_BZIP2(   "j"   )
+-		USE_FEATURE_TAR_LZMA(    "a"   )
+-		USE_FEATURE_TAR_FROM(    "T:X:")
+-		USE_FEATURE_TAR_GZIP(    "z"   )
+-		USE_FEATURE_TAR_COMPRESS("Z"   )
++		USE_FEATURE_TAR_CREATE(   "ch"  )
++		USE_FEATURE_SEAMLESS_BZ2( "j"   )
++		USE_FEATURE_SEAMLESS_LZMA("a"   )
++		USE_FEATURE_TAR_FROM(     "T:X:")
++		USE_FEATURE_SEAMLESS_GZ(  "z"   )
++		USE_FEATURE_SEAMLESS_Z(   "Z"   )
+ 		, &base_dir // -C dir
+ 		, &tar_filename // -f filename
+ 		USE_FEATURE_TAR_FROM(, &(tar_handle->accept)) // T
+@@ -922,8 +922,7 @@ int tar_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 			tar_stream = stdout;
+ 			/* Mimicking GNU tar 1.15.1: */
+-			flags = O_WRONLY|O_CREAT|O_TRUNC;
+-		/* was doing unlink; open(O_WRONLY|O_CREAT|O_EXCL); why? */
++			flags = O_WRONLY | O_CREAT | O_TRUNC;
+ 		} else {
+ 			tar_stream = stdin;
+ 			flags = O_RDONLY;
+@@ -933,7 +932,14 @@ int tar_main(int argc UNUSED_PARAM, char **argv)
+ 			tar_handle->src_fd = fileno(tar_stream);
+ 			tar_handle->seek = seek_by_read;
+ 		} else {
+-			tar_handle->src_fd = xopen(tar_filename, flags);
++			if (ENABLE_FEATURE_TAR_AUTODETECT && flags == O_RDONLY) {
++				get_header_ptr = get_header_tar;
++				tar_handle->src_fd = open_zipped(tar_filename);
++				if (tar_handle->src_fd < 0)
++					bb_perror_msg_and_die("can't open '%s'", tar_filename);
++			} else {
++				tar_handle->src_fd = xopen(tar_filename, flags);
++			}
+ 		}
+ 	}
+ 
+@@ -947,11 +953,11 @@ int tar_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* create an archive */
+ 	if (opt & OPT_CREATE) {
+-#if ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2
++#if ENABLE_FEATURE_SEAMLESS_GZ || ENABLE_FEATURE_SEAMLESS_BZ2
+ 		int zipMode = 0;
+-		if (ENABLE_FEATURE_TAR_GZIP && (opt & OPT_GZIP))
++		if (ENABLE_FEATURE_SEAMLESS_GZ && (opt & OPT_GZIP))
+ 			zipMode = 1;
+-		if (ENABLE_FEATURE_TAR_BZIP2 && (opt & OPT_BZIP2))
++		if (ENABLE_FEATURE_SEAMLESS_BZ2 && (opt & OPT_BZIP2))
+ 			zipMode = 2;
+ #endif
+ 		/* NB: writeTarFile() closes tar_handle->src_fd */
+diff --git a/include/libbb.h b/include/libbb.h
+index 9cbab4f..3996846 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -597,6 +597,7 @@ extern void *xmalloc_read(int fd, size_t *maxsz_p) FAST_FUNC;
+ /* Returns NULL if file can't be opened */
+ extern void *xmalloc_open_read_close(const char *filename, size_t *maxsz_p) FAST_FUNC;
+ /* Autodetects .gz etc */
++extern int open_zipped(const char *fname) FAST_FUNC;
+ extern void *xmalloc_open_zipped_read_close(const char *fname, size_t *maxsz_p) FAST_FUNC;
+ /* Never returns NULL */
+ extern void *xmalloc_xopen_read_close(const char *filename, size_t *maxsz_p) FAST_FUNC;
+@@ -1039,10 +1040,6 @@ const char *bb_basename(const char *name) FAST_FUNC;
+ char *last_char_is(const char *s, int c) FAST_FUNC;
+ 
+ 
+-USE_DESKTOP(long long) int uncompress(int fd_in, int fd_out) FAST_FUNC;
+-int inflate(int in, int out) FAST_FUNC;
+-
+-
+ int bb_make_directory(char *path, long mode, int flags) FAST_FUNC;
+ 
+ int get_signum(const char *name) FAST_FUNC;
+diff --git a/include/unarchive.h b/include/unarchive.h
+index cf23d98..7ff791b 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -98,9 +98,9 @@ extern void header_verbose_list(const file_header_t *file_header) FAST_FUNC;
+ extern char get_header_ar(archive_handle_t *archive_handle) FAST_FUNC;
+ extern char get_header_cpio(archive_handle_t *archive_handle) FAST_FUNC;
+ extern char get_header_tar(archive_handle_t *archive_handle) FAST_FUNC;
++extern char get_header_tar_gz(archive_handle_t *archive_handle) FAST_FUNC;
+ extern char get_header_tar_bz2(archive_handle_t *archive_handle) FAST_FUNC;
+ extern char get_header_tar_lzma(archive_handle_t *archive_handle) FAST_FUNC;
+-extern char get_header_tar_gz(archive_handle_t *archive_handle) FAST_FUNC;
+ 
+ extern void seek_by_jump(const archive_handle_t *archive_handle, unsigned amount) FAST_FUNC;
+ extern void seek_by_read(const archive_handle_t *archive_handle, unsigned amount) FAST_FUNC;
+@@ -120,17 +120,22 @@ typedef struct inflate_unzip_result {
+ 	uint32_t crc;
+ } inflate_unzip_result;
+ 
+-extern USE_DESKTOP(long long) int unpack_bz2_stream(int src_fd, int dst_fd) FAST_FUNC;
+-extern USE_DESKTOP(long long) int inflate_unzip(inflate_unzip_result *res, off_t compr_size, int src_fd, int dst_fd) FAST_FUNC;
+-extern USE_DESKTOP(long long) int unpack_gz_stream(int src_fd, int dst_fd) FAST_FUNC;
+-extern USE_DESKTOP(long long) int unpack_lzma_stream(int src_fd, int dst_fd) FAST_FUNC;
++USE_DESKTOP(long long) int inflate_unzip(inflate_unzip_result *res, off_t compr_size, int src_fd, int dst_fd) FAST_FUNC;
++/* lzma unpacker takes .lzma stream from offset 0 */
++USE_DESKTOP(long long) int unpack_lzma_stream(int src_fd, int dst_fd) FAST_FUNC;
++/* the rest wants 2 first bytes already skipped by the caller */
++USE_DESKTOP(long long) int unpack_bz2_stream(int src_fd, int dst_fd) FAST_FUNC;
++USE_DESKTOP(long long) int unpack_gz_stream(int src_fd, int dst_fd) FAST_FUNC;
++USE_DESKTOP(long long) int unpack_Z_stream(int fd_in, int fd_out) FAST_FUNC;
++/* wrapper which checks first two bytes to be "BZ" */
++USE_DESKTOP(long long) int unpack_bz2_stream_prime(int src_fd, int dst_fd) FAST_FUNC;
+ 
+ #if BB_MMU
+-extern void open_transformer(int fd,
++void open_transformer(int fd,
+ 	USE_DESKTOP(long long) int FAST_FUNC (*transformer)(int src_fd, int dst_fd)) FAST_FUNC;
+ #define open_transformer(fd, transformer, transform_prog) open_transformer(fd, transformer)
+ #else
+-extern void open_transformer(int src_fd, const char *transform_prog) FAST_FUNC;
++void open_transformer(int src_fd, const char *transform_prog) FAST_FUNC;
+ #define open_transformer(fd, transformer, transform_prog) open_transformer(fd, transform_prog)
+ #endif
+ 
+diff --git a/include/usage.h b/include/usage.h
+index ae6d2bc..78f4036 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3943,9 +3943,9 @@
+        "nameserver 10.0.0.1\n"
+ 
+ #define tar_trivial_usage \
+-       "-[" USE_FEATURE_TAR_CREATE("c") USE_FEATURE_TAR_GZIP("z") \
+-	USE_FEATURE_TAR_BZIP2("j") USE_FEATURE_TAR_LZMA("a") \
+-	USE_FEATURE_TAR_COMPRESS("Z") "xtvO] " \
++       "-[" USE_FEATURE_TAR_CREATE("c") USE_FEATURE_SEAMLESS_GZ("z") \
++	USE_FEATURE_SEAMLESS_BZ2("j") USE_FEATURE_SEAMLESS_LZMA("a") \
++	USE_FEATURE_SEAMLESS_Z("Z") "xtvO] " \
+ 	USE_FEATURE_TAR_FROM("[-X FILE] ") \
+        "[-f TARFILE] [-C DIR] [FILE(s)]..."
+ #define tar_full_usage "\n\n" \
+@@ -3956,16 +3956,16 @@
+      "\n	x	Extract" \
+      "\n	t	List" \
+      "\nArchive format selection:" \
+-	USE_FEATURE_TAR_GZIP( \
++	USE_FEATURE_SEAMLESS_GZ( \
+      "\n	z	Filter the archive through gzip" \
+ 	) \
+-	USE_FEATURE_TAR_BZIP2( \
++	USE_FEATURE_SEAMLESS_BZ2( \
+      "\n	j	Filter the archive through bzip2" \
+ 	) \
+-	USE_FEATURE_TAR_LZMA( \
++	USE_FEATURE_SEAMLESS_LZMA( \
+      "\n	a	Filter the archive through lzma" \
+ 	) \
+-	USE_FEATURE_TAR_COMPRESS( \
++	USE_FEATURE_SEAMLESS_Z( \
+      "\n	Z	Filter the archive through compress" \
+ 	) \
+      "\nFile selection:" \
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index beb1d6f..2bab0eb 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -73,7 +73,8 @@ static const char *unpack_usage_messages(void)
+ 
+ 	i = start_bunzip(&bd,
+ 			/* src_fd: */ -1,
+-			/* inbuf:  */ (void *)packed_usage,
++//FIXME: can avoid storing these 2 bytes!
++			/* inbuf:  */ (void *)packed_usage + 2,
+ 			/* len:    */ sizeof(packed_usage));
+ 	/* read_bunzip can longjmp to start_bunzip, and ultimately
+ 	 * end up here with i != 0 on read data errors! Not trivial */
+diff --git a/libbb/read.c b/libbb/read.c
+index 18f6283..9f6bfcd 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -8,7 +8,14 @@
+  */
+ 
+ #include "libbb.h"
+-#if ENABLE_FEATURE_MODPROBE_SMALL_ZIPPED
++
++#define ZIPPED (ENABLE_FEATURE_SEAMLESS_LZMA \
++	|| ENABLE_FEATURE_SEAMLESS_BZ2 \
++	|| ENABLE_FEATURE_SEAMLESS_GZ \
++	/* || ENABLE_FEATURE_SEAMLESS_Z */ \
++)
++
++#if ZIPPED
+ #include "unarchive.h"
+ #endif
+ 
+@@ -299,24 +306,81 @@ void* FAST_FUNC xmalloc_xopen_read_close(const char *filename, size_t *maxsz_p)
+ 	return buf;
+ }
+ 
+-#if ENABLE_FEATURE_MODPROBE_SMALL_ZIPPED
++int FAST_FUNC open_zipped(const char *fname)
++{
++#if !ZIPPED
++	return open(fname, O_RDONLY);
++#else
++	unsigned char magic[2];
++	char *sfx;
++	int fd;
++#if BB_MMU
++	USE_DESKTOP(long long) int FAST_FUNC (*xformer)(int src_fd, int dst_fd);
++	enum { xformer_prog = 0 };
++#else
++	enum { xformer = 0 };
++	const char *xformer_prog;
++#endif
++
++	fd = open(fname, O_RDONLY);
++	if (fd < 0)
++		return fd;
++
++	sfx = strrchr(fname, '.');
++	if (sfx) {
++		if (ENABLE_FEATURE_SEAMLESS_LZMA && strcmp(sfx, ".lzma") == 0)
++			/* .lzma has no header/signature, just trust it */
++			open_transformer(fd, unpack_lzma_stream, "unlzma");
++		else
++		if ((ENABLE_FEATURE_SEAMLESS_GZ && strcmp(sfx, ".gz") == 0)
++		 || (ENABLE_FEATURE_SEAMLESS_BZ2 && strcmp(sfx, ".bz2") == 0)
++		) {
++			/* .gz and .bz2 both have 2-byte signature, and their
++			 * unpack_XXX_stream want this header skipped. */
++			xread(fd, &magic, 2);
++#if BB_MMU
++			xformer = unpack_gz_stream;
++#else
++			xformer_prog = "gunzip";
++#endif
++			if (magic[0] != 0x1f || magic[1] != 0x8b) {
++				if (!ENABLE_FEATURE_SEAMLESS_BZ2
++				 || magic[0] != 'B' || magic[1] != 'Z'
++				) {
++					bb_error_msg_and_die("no gzip"
++						USE_FEATURE_SEAMLESS_BZ2("/bzip2")
++						" magic");
++				}
++#if BB_MMU
++				xformer = unpack_bz2_stream;
++#else
++				xformer_prog = "bunzip2";
++#endif
++			} else {
++#if !BB_MMU
++				/* NOMMU version of open_transformer execs
++				 * an external unzipper that wants
++				 * file position at the start of the file */
++				xlseek(fd, 0, SEEK_SET);
++#endif
++			}
++			open_transformer(fd, xformer, xformer_prog);
++		}
++	}
++
++	return fd;
++#endif
++}
++
+ void* FAST_FUNC xmalloc_open_zipped_read_close(const char *fname, size_t *maxsz_p)
+ {
++	int fd;
+ 	char *image;
+-	char *suffix;
+ 
+-	int fd = open(fname, O_RDONLY);
++	fd = open_zipped(fname);
+ 	if (fd < 0)
+ 		return NULL;
+ 
+-	suffix = strrchr(fname, '.');
+-	if (suffix) {
+-		if (strcmp(suffix, ".gz") == 0)
+-			open_transformer(fd, unpack_gz_stream, "gunzip");
+-		else if (strcmp(suffix, ".bz2") == 0)
+-			open_transformer(fd, unpack_bz2_stream, "bunzip2");
+-	}
+-
+ 	image = xmalloc_read(fd, maxsz_p);
+ 	if (!image)
+ 		bb_perror_msg("read error from '%s'", fname);
+@@ -324,4 +388,3 @@ void* FAST_FUNC xmalloc_open_zipped_read_close(const char *fname, size_t *maxsz_
+ 
+ 	return image;
+ }
+-#endif
+diff --git a/modutils/Config.in b/modutils/Config.in
+index f76a082..a430fca 100644
+--- a/modutils/Config.in
++++ b/modutils/Config.in
+@@ -54,13 +54,6 @@ config FEATURE_MODPROBE_SMALL_CHECK_ALREADY_LOADED
+ 	  Check if the module is already loaded.
+ 	  N.B. It's racy.
+ 
+-config FEATURE_MODPROBE_SMALL_ZIPPED
+-	bool "Handle gzipped or bzipped modules"
+-	default n
+-	depends on MODPROBE_SMALL
+-	help
+-	  Handle compressed modules. Bloaty. Sloooow.
+-
+ config DEPMOD
+ 	bool "depmod"
+ 	default n
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index ea130b8..ac08ba7 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -100,7 +100,7 @@ static char* find_keyword(char *ptr, size_t len, const char *word)
+ {
+ 	int wlen;
+ 
+-	if (!ptr) /* happens if read_module cannot read it */
++	if (!ptr) /* happens if xmalloc_open_zipped_read_close cannot read it */
+ 		return NULL;
+ 
+ 	wlen = strlen(word);
+@@ -141,12 +141,6 @@ static char* str_2_list(const char *str)
+ 	return dst;
+ }
+ 
+-#if ENABLE_FEATURE_MODPROBE_SMALL_ZIPPED
+-# define read_module xmalloc_open_zipped_read_close
+-#else
+-# define read_module xmalloc_open_read_close
+-#endif
+-
+ /* We use error numbers in a loose translation... */
+ static const char *moderror(int err)
+ {
+@@ -173,7 +167,7 @@ static int load_module(const char *fname, const char *options)
+ 	char *module_image;
+ 	dbg1_error_msg("load_module('%s','%s')", fname, options);
+ 
+-	module_image = read_module(fname, &len);
++	module_image = xmalloc_open_zipped_read_close(fname, &len);
+ 	r = (!module_image || init_module(module_image, len, options ? options : "") != 0);
+ 	free(module_image);
+ 	dbg1_error_msg("load_module:%d", r);
+@@ -195,7 +189,7 @@ static void parse_module(module_info *info, const char *pathname)
+ 
+ 	/* Read (possibly compressed) module */
+ 	len = 64 * 1024 * 1024; /* 64 Mb at most */
+-	module_image = read_module(pathname, &len);
++	module_image = xmalloc_open_zipped_read_close(pathname, &len);
+ //TODO: optimize redundant module body reads
+ 
+ 	/* "alias1 symbol:sym1 alias2 symbol:sym2" */
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 2948016..404c50d 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -1,7 +1,7 @@
+ #
+ # Automatically generated make config: don't edit
+-# Busybox version: 1.11.0.svn
+-# Wed Jun 25 12:56:32 2008
++# Busybox version: 1.12.0.svn
++# Tue Aug  5 14:44:22 2008
+ #
+ CONFIG_HAVE_DOT_CONFIG=y
+ 
+@@ -57,6 +57,7 @@ CONFIG_NO_DEBUG_LIB=y
+ # CONFIG_DMALLOC is not set
+ # CONFIG_EFENCE is not set
+ CONFIG_INCLUDE_SUSv2=y
++# CONFIG_PARSE is not set
+ 
+ #
+ # Installation Options
+@@ -99,6 +100,10 @@ CONFIG_FEATURE_HWIB=y
+ #
+ # Archival Utilities
+ #
++CONFIG_FEATURE_SEAMLESS_LZMA=y
++CONFIG_FEATURE_SEAMLESS_BZ2=y
++CONFIG_FEATURE_SEAMLESS_GZ=y
++CONFIG_FEATURE_SEAMLESS_Z=y
+ CONFIG_AR=y
+ CONFIG_FEATURE_AR_LONG_FILENAMES=y
+ CONFIG_BUNZIP2=y
+@@ -109,17 +114,11 @@ CONFIG_FEATURE_CPIO_O=y
+ # CONFIG_DPKG_DEB is not set
+ # CONFIG_FEATURE_DPKG_DEB_EXTRACT_ONLY is not set
+ CONFIG_GUNZIP=y
+-CONFIG_FEATURE_GUNZIP_UNCOMPRESS=y
+ CONFIG_GZIP=y
+ CONFIG_RPM2CPIO=y
+ CONFIG_RPM=y
+-CONFIG_FEATURE_RPM_BZ2=y
+ CONFIG_TAR=y
+ CONFIG_FEATURE_TAR_CREATE=y
+-CONFIG_FEATURE_TAR_GZIP=y
+-CONFIG_FEATURE_TAR_BZIP2=y
+-CONFIG_FEATURE_TAR_LZMA=y
+-CONFIG_FEATURE_TAR_COMPRESS=y
+ CONFIG_FEATURE_TAR_AUTODETECT=y
+ CONFIG_FEATURE_TAR_FROM=y
+ CONFIG_FEATURE_TAR_OLDGNU_COMPATIBILITY=y
+@@ -133,13 +132,6 @@ CONFIG_FEATURE_LZMA_FAST=y
+ CONFIG_UNZIP=y
+ 
+ #
+-# Common options for cpio and tar
+-#
+-# CONFIG_FEATURE_DEB_TAR_GZ is not set
+-# CONFIG_FEATURE_DEB_TAR_BZ2 is not set
+-# CONFIG_FEATURE_DEB_TAR_LZMA is not set
+-
+-#
+ # Coreutils
+ #
+ CONFIG_BASENAME=y
+@@ -217,6 +209,7 @@ CONFIG_SEQ=y
+ CONFIG_SHA1SUM=y
+ CONFIG_SLEEP=y
+ CONFIG_FEATURE_FANCY_SLEEP=y
++CONFIG_FEATURE_FLOAT_SLEEP=y
+ CONFIG_SORT=y
+ CONFIG_FEATURE_SORT_BIG=y
+ CONFIG_SPLIT=y
+@@ -426,29 +419,28 @@ CONFIG_LSATTR=y
+ #
+ # Linux Module Utilities
+ #
+-CONFIG_DEPMOD=y
+-CONFIG_FEATURE_DEPMOD_PRUNE_FANCY=y
+-CONFIG_FEATURE_DEPMOD_ALIAS=y
+-CONFIG_INSMOD=y
+-CONFIG_FEATURE_INSMOD_VERSION_CHECKING=y
+-CONFIG_FEATURE_INSMOD_KSYMOOPS_SYMBOLS=y
+-CONFIG_FEATURE_INSMOD_LOADINKMEM=y
+-CONFIG_FEATURE_INSMOD_LOAD_MAP=y
+-CONFIG_FEATURE_INSMOD_LOAD_MAP_FULL=y
+-CONFIG_RMMOD=y
+-CONFIG_LSMOD=y
+-CONFIG_FEATURE_LSMOD_PRETTY_2_6_OUTPUT=y
+-CONFIG_MODPROBE=y
+-CONFIG_FEATURE_MODPROBE_MULTIPLE_OPTIONS=y
+-CONFIG_FEATURE_MODPROBE_FANCY_ALIAS=y
+-CONFIG_FEATURE_MODPROBE_BLACKLIST=y
+-
+-#
+-# Options common to multiple modutils
+-#
+-CONFIG_FEATURE_CHECK_TAINTED_MODULE=y
+-CONFIG_FEATURE_2_4_MODULES=y
+-CONFIG_FEATURE_2_6_MODULES=y
++CONFIG_MODPROBE_SMALL=y
++CONFIG_FEATURE_MODPROBE_SMALL_OPTIONS_ON_CMDLINE=y
++CONFIG_FEATURE_MODPROBE_SMALL_CHECK_ALREADY_LOADED=y
++# CONFIG_DEPMOD is not set
++# CONFIG_FEATURE_DEPMOD_PRUNE_FANCY is not set
++# CONFIG_FEATURE_DEPMOD_ALIAS is not set
++# CONFIG_INSMOD is not set
++# CONFIG_FEATURE_INSMOD_VERSION_CHECKING is not set
++# CONFIG_FEATURE_INSMOD_KSYMOOPS_SYMBOLS is not set
++# CONFIG_FEATURE_INSMOD_LOADINKMEM is not set
++# CONFIG_FEATURE_INSMOD_LOAD_MAP is not set
++# CONFIG_FEATURE_INSMOD_LOAD_MAP_FULL is not set
++# CONFIG_RMMOD is not set
++# CONFIG_LSMOD is not set
++# CONFIG_FEATURE_LSMOD_PRETTY_2_6_OUTPUT is not set
++# CONFIG_MODPROBE is not set
++# CONFIG_FEATURE_MODPROBE_MULTIPLE_OPTIONS is not set
++# CONFIG_FEATURE_MODPROBE_FANCY_ALIAS is not set
++# CONFIG_FEATURE_MODPROBE_BLACKLIST is not set
++# CONFIG_FEATURE_CHECK_TAINTED_MODULE is not set
++# CONFIG_FEATURE_2_4_MODULES is not set
++# CONFIG_FEATURE_2_6_MODULES is not set
+ CONFIG_DEFAULT_MODULES_DIR="/lib/modules"
+ CONFIG_DEFAULT_DEPMOD_FILE="modules.dep"
+ # CONFIG_FEATURE_QUERY_MODULE_INTERFACE is not set
+@@ -686,6 +678,7 @@ CONFIG_NC_SERVER=y
+ CONFIG_NC_EXTRA=y
+ CONFIG_NETSTAT=y
+ CONFIG_FEATURE_NETSTAT_WIDE=y
++CONFIG_FEATURE_NETSTAT_PRG=y
+ CONFIG_NSLOOKUP=y
+ CONFIG_PING=y
+ CONFIG_PING6=y
+@@ -794,6 +787,7 @@ CONFIG_ASH_RANDOM_SUPPORT=y
+ # CONFIG_HUSH_TICK is not set
+ # CONFIG_HUSH_IF is not set
+ # CONFIG_HUSH_LOOPS is not set
++# CONFIG_HUSH_CASE is not set
+ # CONFIG_LASH is not set
+ # CONFIG_MSH is not set
+ 

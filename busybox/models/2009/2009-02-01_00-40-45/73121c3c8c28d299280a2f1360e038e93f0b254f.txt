@@ -1,0 +1,171 @@
+2009-02-01 00:40:45 +0000
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 2d16ec1..c0d515d 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -6,14 +6,24 @@
+ #include "common.h"
+ #include "dhcpd.h"
+ 
++#if BB_LITTLE_ENDIAN
++static inline uint64_t hton64(uint64_t v)
++{
++        return (((uint64_t)htonl(v)) << 32) | htonl(v >> 32);
++}
++#else
++#define hton64(v) (v)
++#endif
++#define ntoh64(v) hton64(v)
++
++
+ int dumpleases_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	int fd;
+ 	int i;
+ 	unsigned opt;
+-	leasetime_t expires;
+-	leasetime_t curr;
++	int64_t written_at, curr, expires_abs;
+ 	const char *file = LEASES_FILE;
+ 	struct dhcpOfferedAddr lease;
+ 	struct in_addr addr;
+@@ -40,7 +50,13 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 	printf("Mac Address       IP-Address      Expires %s\n", (opt & OPT_a) ? "at" : "in");
+ 	/*     "00:00:00:00:00:00 255.255.255.255 Wed Jun 30 21:49:08 1993" */
+ 
++	if (full_read(fd, &written_at, sizeof(written_at)) != sizeof(written_at))
++		return 0;
++	written_at = ntoh64(written_at);
+ 	curr = time(NULL);
++	if (curr < written_at)
++		written_at = curr; /* lease file from future! :) */
++
+ 	while (full_read(fd, &lease, sizeof(lease)) == sizeof(lease)) {
+ 		const char *fmt = ":%02x" + 1;
+ 		for (i = 0; i < 6; i++) {
+@@ -49,13 +65,14 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 		}
+ 		addr.s_addr = lease.yiaddr;
+ 		printf(" %-15s ", inet_ntoa(addr));
+-		if (lease.expires == 0) {
++		expires_abs = ntohl(lease.expires) + written_at;
++		if (expires_abs <= curr) {
+ 			puts("expired");
+ 			continue;
+ 		}
+-		expires = ntohl(lease.expires);
+ 		if (!(opt & OPT_a)) { /* no -a */
+ 			unsigned d, h, m;
++			unsigned expires = expires_abs - curr;
+ 			d = expires / (24*60*60); expires %= (24*60*60);
+ 			h = expires / (60*60); expires %= (60*60);
+ 			m = expires / 60; expires %= 60;
+@@ -63,7 +80,7 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 				printf("%u days ", d);
+ 			printf("%02u:%02u:%02u\n", h, m, (unsigned)expires);
+ 		} else { /* -a */
+-			time_t t = expires + curr;
++			time_t t = expires_abs;
+ 			fputs(ctime(&t), stdout);
+ 		}
+ 	}
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 76b42f0..64edcbb 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -12,6 +12,16 @@
+ #include "dhcpd.h"
+ #include "options.h"
+ 
++#if BB_LITTLE_ENDIAN
++static inline uint64_t hton64(uint64_t v)
++{
++        return (((uint64_t)htonl(v)) << 32) | htonl(v >> 32);
++}
++#else
++#define hton64(v) (v)
++#endif
++#define ntoh64(v) hton64(v)
++
+ 
+ /* on these functions, make sure your datatype matches */
+ static int read_ip(const char *line, void *arg)
+@@ -335,14 +345,16 @@ void FAST_FUNC write_leases(void)
+ 	int fd;
+ 	unsigned i;
+ 	leasetime_t curr;
++	int64_t written_at;
+ 
+ 	fd = open_or_warn(server_config.lease_file, O_WRONLY|O_CREAT|O_TRUNC);
+ 	if (fd < 0)
+ 		return;
+ 
+-	curr = time(NULL);
+-//TODO: write out current time? Readers need to adjust .expires field
+-// to account for time between file was written and when it was read back.
++	curr = written_at = time(NULL);
++
++	written_at = hton64(written_at);
++	full_write(fd, &written_at, sizeof(written_at));
+ 
+ 	for (i = 0; i < server_config.max_leases; i++) {
+ 		leasetime_t tmp_time;
+@@ -353,11 +365,9 @@ void FAST_FUNC write_leases(void)
+ 		/* screw with the time in the struct, for easier writing */
+ 		tmp_time = leases[i].expires;
+ 
+-		//if (server_config.remaining) {
+-			leases[i].expires -= curr;
+-			if ((signed_leasetime_t) leases[i].expires < 0)
+-				leases[i].expires = 0;
+-		//} /* else stick with the time we got */
++		leases[i].expires -= curr;
++		if ((signed_leasetime_t) leases[i].expires < 0)
++			leases[i].expires = 0;
+ 		leases[i].expires = htonl(leases[i].expires);
+ 
+ 		/* No error check. If the file gets truncated,
+@@ -382,14 +392,20 @@ void FAST_FUNC read_leases(const char *file)
+ {
+ 	int fd;
+ 	unsigned i;
+-//	leasetime_t curr;
+ 	struct dhcpOfferedAddr lease;
++	int64_t written_at, curr;
+ 
+ 	fd = open_or_warn(file, O_RDONLY);
+ 	if (fd < 0)
+ 		return;
+ 
+-//	curr = time(NULL);
++	if (full_read(fd, &written_at, sizeof(written_at)) != sizeof(written_at))
++		goto ret;
++	written_at = ntoh64(written_at);
++	curr = time(NULL);
++	if (curr < written_at)
++		written_at = curr; /* lease file from future! :) */
++
+ 	i = 0;
+ 	while (i < server_config.max_leases
+ 	 && full_read(fd, &lease, sizeof(lease)) == sizeof(lease)
+@@ -397,9 +413,9 @@ void FAST_FUNC read_leases(const char *file)
+ 		/* ADDME: what if it matches some static lease? */
+ 		uint32_t y = ntohl(lease.yiaddr);
+ 		if (y >= server_config.start_ip && y <= server_config.end_ip) {
+-			leasetime_t expires = ntohl(lease.expires);
+-//			if (!server_config.remaining)
+-//				expires -= curr;
++			int64_t expires = ntohl(lease.expires) + written_at - curr;
++			if (expires <= 0)
++				continue;
+ 			/* NB: add_lease takes "relative time", IOW,
+ 			 * lease duration, not lease deadline. */
+ 			if (!(add_lease(lease.chaddr, lease.yiaddr, expires))) {
+@@ -410,5 +426,6 @@ void FAST_FUNC read_leases(const char *file)
+ 		}
+ 	}
+ 	DEBUG("Read %d leases", i);
++ ret:
+ 	close(fd);
+ }

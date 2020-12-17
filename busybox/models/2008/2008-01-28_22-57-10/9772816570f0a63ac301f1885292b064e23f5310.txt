@@ -1,0 +1,111 @@
+2008-01-28 22:57:10 +0000
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 80adff5..993618e 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -638,7 +638,6 @@ void run_applet_no_and_exit(int applet_no, char **argv)
+ 		argc++;
+ 
+ 	/* Reinit some shared global data */
+-	optind = 1;
+ 	xfunc_error_retval = EXIT_FAILURE;
+ 
+ 	applet_name = APPLET_NAME(applet_no);
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 2452eb0..80d5d28 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -473,11 +473,30 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 		}
+ 	}
+ 
+-	/* In case getopt32 was already called, reinit some state */
++	/* In case getopt32 was already called:
++	 * reset the libc getopt() function, which keeps internal state.
++	 *
++	 * BSD-derived getopt() functions require that optind be set to 1 in
++	 * order to reset getopt() state.  This used to be generally accepted
++	 * way of resetting getopt().  However, glibc's getopt()
++	 * has additional getopt() state beyond optind, and requires that
++	 * optind be set to zero to reset its state.  So the unfortunate state of
++	 * affairs is that BSD-derived versions of getopt() misbehave if
++	 * optind is set to 0 in order to reset getopt(), and glibc's getopt()
++	 * will core dump if optind is set 1 in order to reset getopt().
++	 * 
++	 * More modern versions of BSD require that optreset be set to 1 in
++	 * order to reset getopt().   Sigh.  Standards, anyone?
++	 */
++#ifdef __GLIBC__
++	optind = 0;
++#else /* BSD style */
+ 	optind = 1;
+-	/* optarg = NULL; opterr = 0; optopt = 0; ?? */
++	/* optreset = 1; */
++#endif
++	/* optarg = NULL; opterr = 0; optopt = 0; - do we need this?? */
+ 
+-	/* Note: just "getopt() <= 0" will not work good for
++	/* Note: just "getopt() <= 0" will not work well for
+ 	 * "fake" short options, like this one:
+ 	 * wget $'-\203' "Test: test" http://kernel.org/
+ 	 * (supposed to act as --header, but doesn't) */
+@@ -487,7 +506,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+ #else
+ 	while ((c = getopt(argc, argv, applet_opts)) != -1) {
+ #endif
+-		c &= 0xff; /* fight libc's sign extends */
++		c &= 0xff; /* fight libc's sign extension */
+  loop_arg_is_opt:
+ 		for (on_off = complementary; on_off->opt != c; on_off++) {
+ 			/* c==0 if long opt have non NULL flag */
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 3a386c5..98339c9 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -137,26 +137,6 @@ int run_nofork_applet_prime(struct nofork_save_area *old, int applet_no, char **
+ 	 * die_sleep and longjmp here instead. */
+ 	die_sleep = -1;
+ 
+-	/* Reset the libc getopt() function, which keeps internal state.
+-	 *
+-	 * BSD-derived getopt() functions require that optind be reset to 1 in
+-	 * order to reset getopt() state.  This used to be generally accepted
+-	 * way of resetting getopt().  However, glibc's getopt()
+-	 * has additional getopt() state beyond optind, and requires that
+-	 * optind be set zero to reset its state.  So the unfortunate state of
+-	 * affairs is that BSD-derived versions of getopt() misbehave if
+-	 * optind is set to 0 in order to reset getopt(), and glibc's getopt()
+-	 * will core ump if optind is set 1 in order to reset getopt().
+-	 * 
+-	 * More modern versions of BSD require that optreset be set to 1 in
+-	 * order to reset getopt().   Sigh.  Standards, anyone?
+-	 */
+-#ifdef __GLIBC__
+-	optind = 0;
+-#else /* BSD style */
+-	optind = 1;
+-	/* optreset = 1; */
+-#endif
+ 	/* option_mask32 = 0; - not needed */
+ 
+ 	argc = 1;
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 061750e..ee6c143 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -155,7 +155,14 @@ static int generate_output(char **argv, int argc, const char *optstr, const stru
+ 
+ 	if (quiet_errors) /* No error reporting from getopt(3) */
+ 		opterr = 0;
+-	optind = 0; /* Reset getopt(3) */
++
++	/* Reset getopt(3) (see libbb/getopt32.c for long rant) */
++#ifdef __GLIBC__
++        optind = 0;
++#else /* BSD style */
++        optind = 1;
++        /* optreset = 1; */
++#endif
+ 
+ 	while (1) {
+ 		opt =

@@ -1,0 +1,342 @@
+2008-08-28 22:42:52 +0000
+diff --git a/coreutils/Config.in b/coreutils/Config.in
+index 4138390..29b55d4 100644
+--- a/coreutils/Config.in
++++ b/coreutils/Config.in
+@@ -136,12 +136,12 @@ config DF
+ 	  df reports the amount of disk space used and available
+ 	  on filesystems.
+ 
+-config FEATURE_DF_INODE
+-	bool "Enable -i (inode information)"
++config FEATURE_DF_FANCY
++	bool "Enable -a, -i, -B"
+ 	default n
+ 	depends on DF
+ 	help
+-	  This option enables support for df -i.
++	  This option enables -a, -i and -B.
+ 
+ config DIRNAME
+ 	bool "dirname"
+diff --git a/coreutils/df.c b/coreutils/df.c
+index 9cb328a..fd25023 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -8,7 +8,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-/* BB_AUDIT SUSv3 _NOT_ compliant -- options -P and -t missing.  Also blocksize. */
++/* BB_AUDIT SUSv3 _NOT_ compliant -- option -t missing. */
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/df.html */
+ 
+ /* Mar 16, 2003      Manuel Novoa III   (mjn3@codepoet.org)
+@@ -16,6 +16,10 @@
+  * Size reduction.  Removed floating point dependency.  Added error checking
+  * on output.  Output stats on 0-sized filesystems if specifically listed on
+  * the command line.  Properly round *-blocks, Used, and Available quantities.
++ *
++ * Aug 28, 2008      Bernhard Reutner-Fischer
++ *
++ * Implement -P and -B; better coreutils compat; cleanup
+  */
+ 
+ #include <mntent.h>
+@@ -34,51 +38,73 @@ int df_main(int argc, char **argv)
+ {
+ 	unsigned long blocks_used;
+ 	unsigned blocks_percent_used;
+-#if ENABLE_FEATURE_HUMAN_READABLE
+-	unsigned df_disp_hr = 1024;
+-#endif
++	unsigned long df_disp_hr = 1024;
+ 	int status = EXIT_SUCCESS;
+ 	unsigned opt;
+ 	FILE *mount_table;
+ 	struct mntent *mount_entry;
+ 	struct statfs s;
+-	/* default display is kilobytes */
+-	const char *disp_units_hdr = "1k-blocks";
++	static const char ignored_mounts[] ALIGN1 =
++	  "rootfs\0";
+ 
+ 	enum {
+-		OPT_ALL = (1 << 0),
+-		OPT_INODE = (ENABLE_FEATURE_HUMAN_READABLE ? (1 << 4) : (1 << 2))
+-		            * ENABLE_FEATURE_DF_INODE
++		OPT_KILO  = (1 << 0),
++		OPT_POSIX = (1 << 1),
++		OPT_ALL   = (1 << 2) * ENABLE_FEATURE_DF_FANCY,
++		OPT_INODE = (1 << 3) * ENABLE_FEATURE_DF_FANCY,
++		OPT_BSIZE = (1 << 4) * ENABLE_FEATURE_DF_FANCY,
++		OPT_HUMAN = (1 << 5) * ENABLE_FEATURE_HUMAN_READABLE,
++		OPT_MEGA  = (1 << 6) * ENABLE_FEATURE_HUMAN_READABLE,
+ 	};
++	const char *disp_units_hdr = NULL;
++	char *chp;
+ 
+-#if ENABLE_FEATURE_HUMAN_READABLE
+-	opt_complementary = "h-km:k-hm:m-hk";
+-	opt = getopt32(argv, "ahmk" USE_FEATURE_DF_INODE("i"));
+-	if (opt & (1 << 1)) { // -h
++#if ENABLE_FEATURE_HUMAN_READABLE && ENABLE_FEATURE_DF_FANCY
++	opt_complementary = "k-mB:m-Bk:B-km";
++#elif ENABLE_FEATURE_HUMAN_READABLE
++	opt_complementary = "k-m:m-k";
++#endif
++	opt = getopt32(argv, "kP"
++			USE_FEATURE_DF_FANCY("aiB:")
++			USE_FEATURE_HUMAN_READABLE("hm")
++			USE_FEATURE_DF_FANCY(, &chp));
++	if (opt & OPT_MEGA)
++		df_disp_hr = 1024*1024;
++
++	if (opt & OPT_BSIZE)
++		df_disp_hr = xatoul_range(chp, 1, ULONG_MAX); /* disallow 0 */
++
++	/* From the manpage of df from coreutils-6.10:
++	   Disk space is shown in 1K blocks by default, unless the environment
++	   variable POSIXLY_CORRECT is set, in which case 512-byte blocks are used.
++	*/
++	if (getenv("POSIXLY_CORRECT")) /* TODO - a new libbb function? */
++		df_disp_hr = 512;
++
++	if (opt & OPT_HUMAN) {
+ 		df_disp_hr = 0;
+ 		disp_units_hdr = "     Size";
+ 	}
+-	if (opt & (1 << 2)) { // -m
+-		df_disp_hr = 1024*1024;
+-		disp_units_hdr = "1M-blocks";
+-	}
+-	if (opt & OPT_INODE) {
++	if (opt & OPT_INODE)
+ 		disp_units_hdr = "   Inodes";
+-	}
++
++	if (disp_units_hdr == NULL) {
++#if ENABLE_FEATURE_HUMAN_READABLE
++		disp_units_hdr = xasprintf("%s-blocks",
++			make_human_readable_str(df_disp_hr, 0, !!(opt & OPT_POSIX)));
+ #else
+-	opt = getopt32(argv, "ak" USE_FEATURE_DF_INODE("i"));
++		disp_units_hdr = xasprintf("%d-blocks", df_disp_hr);
+ #endif
+-
+-	printf("Filesystem           %-15sUsed Available Use%% Mounted on\n",
+-			disp_units_hdr);
++	}
++	printf("Filesystem           %-15sUsed Available %s Mounted on\n",
++			disp_units_hdr, (opt & OPT_POSIX) ? "Capacity" : "Use%");
+ 
+ 	mount_table = NULL;
+ 	argv += optind;
+ 	if (optind >= argc) {
+ 		mount_table = setmntent(bb_path_mtab_file, "r");
+-		if (!mount_table) {
++		if (!mount_table)
+ 			bb_perror_msg_and_die(bb_path_mtab_file);
+-		}
+ 	}
+ 
+ 	while (1) {
+@@ -93,9 +119,8 @@ int df_main(int argc, char **argv)
+ 			}
+ 		} else {
+ 			mount_point = *argv++;
+-			if (!mount_point) {
++			if (!mount_point)
+ 				break;
+-			}
+ 			mount_entry = find_mount_point(mount_point, bb_path_mtab_file);
+ 			if (!mount_entry) {
+ 				bb_error_msg("%s: can't find mount point", mount_point);
+@@ -118,10 +143,9 @@ int df_main(int argc, char **argv)
+ 				s.f_blocks = s.f_files;
+ 				s.f_bavail = s.f_bfree = s.f_ffree;
+ 				s.f_bsize = 1;
+-#if ENABLE_FEATURE_HUMAN_READABLE
++
+ 				if (df_disp_hr)
+ 					df_disp_hr = 1;
+-#endif
+ 			}
+ 			blocks_used = s.f_blocks - s.f_bfree;
+ 			blocks_percent_used = 0;
+@@ -131,11 +155,10 @@ int df_main(int argc, char **argv)
+ 						) / (blocks_used + s.f_bavail);
+ 			}
+ 
+-#ifdef WHY_IT_SHOULD_BE_HIDDEN
+-			if (strcmp(device, "rootfs") == 0) {
++			/* GNU coreutils 6.10 skip certain mounts, try to be compatible.  */
++			if (index_in_strings(device, ignored_mounts) != -1)
+ 				continue;
+-			}
+-#endif
++
+ #ifdef WHY_WE_DO_IT_FOR_DEV_ROOT_ONLY
+ /* ... and also this is the only user of find_block_device */
+ 			if (strcmp(device, "/dev/root") == 0) {
+@@ -164,12 +187,12 @@ int df_main(int argc, char **argv)
+ #else
+ 			printf(" %9lu %9lu %9lu %3u%% %s\n",
+ 					kscale(s.f_blocks, s.f_bsize),
+-					kscale(s.f_blocks-s.f_bfree, s.f_bsize),
++					kscale(s.f_blocks - s.f_bfree, s.f_bsize),
+ 					kscale(s.f_bavail, s.f_bsize),
+ 					blocks_percent_used, mount_point);
+ #endif
+ 		}
+ 	}
+ 
+-	fflush_stdout_and_exit(status);
++	return status;
+ }
+diff --git a/include/usage.h b/include/usage.h
+index 41012af..a09f7ea 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -705,36 +705,40 @@
+      "\n		do not poll for events" \
+ 	)
+ 
+-/* -k is accepted but ignored for !HUMAN_READABLE,
+- * but we won't mention this (unimportant) */
+-#if ENABLE_FEATURE_HUMAN_READABLE || ENABLE_FEATURE_DF_INODE
+-#define DF_HAS_OPTIONS(x) x
+-#else
+-#define DF_HAS_OPTIONS(x)
+-#endif
+ #define df_trivial_usage \
+-	DF_HAS_OPTIONS("[-") \
+-	USE_FEATURE_HUMAN_READABLE("hmk") USE_FEATURE_DF_INODE("i") \
+-	DF_HAS_OPTIONS("] ") "[FILESYSTEM...]"
++	"[-Pk" \
++	USE_FEATURE_HUMAN_READABLE("mh") \
++	USE_FEATURE_DF_FANCY("ai] [-B SIZE") \
++	"] [FILESYSTEM...]"
+ #define df_full_usage "\n\n" \
+        "Print filesystem usage statistics\n" \
+-	DF_HAS_OPTIONS("\nOptions:") \
++     "\nOptions:" \
++     "\n	-P	POSIX output format" \
++     "\n	-k	1024-byte blocks (default)" \
+ 	USE_FEATURE_HUMAN_READABLE( \
++     "\n	-m	1M-byte blocks" \
+      "\n	-h	Human readable (e.g. 1K 243M 2G)" \
+-     "\n	-m	1024*1024 blocks" \
+-     "\n	-k	1024 blocks" \
+ 	) \
+-	USE_FEATURE_DF_INODE( \
++	USE_FEATURE_DF_FANCY( \
++     "\n	-a	Show all filesystems" \
+      "\n	-i	Inodes" \
+-	)
++     "\n	-B SIZE	Blocksize" \
++	) \
++
+ #define df_example_usage \
+        "$ df\n" \
+-       "Filesystem           1k-blocks      Used Available Use% Mounted on\n" \
++       "Filesystem           1K-blocks      Used Available Use% Mounted on\n" \
+        "/dev/sda3              8690864   8553540    137324  98% /\n" \
+        "/dev/sda1                64216     36364     27852  57% /boot\n" \
+        "$ df /dev/sda3\n" \
+-       "Filesystem           1k-blocks      Used Available Use% Mounted on\n" \
+-       "/dev/sda3              8690864   8553540    137324  98% /\n"
++       "Filesystem           1K-blocks      Used Available Use% Mounted on\n" \
++       "/dev/sda3              8690864   8553540    137324  98% /\n" \
++       "$ POSIXLY_CORRECT=sure df /dev/sda3\n" \
++       "Filesystem         512B-blocks      Used Available Use% Mounted on\n" \
++       "/dev/sda3             17381728  17107080    274648  98% /\n" \
++       "$ POSIXLY_CORRECT=yep df -P /dev/sda3\n" \
++       "Filesystem          512-blocks      Used Available Capacity Mounted on\n" \
++       "/dev/sda3             17381728  17107080    274648      98% /\n"
+ 
+ #define dhcprelay_trivial_usage \
+        "[client1,client2,...] [server_device]"
+diff --git a/libbb/human_readable.c b/libbb/human_readable.c
+index dad26ed..61c8567 100644
+--- a/libbb/human_readable.c
++++ b/libbb/human_readable.c
+@@ -32,7 +32,9 @@ const char* FAST_FUNC make_human_readable_str(unsigned long long size,
+ 	unsigned long block_size, unsigned long display_unit)
+ {
+ 	/* The code will adjust for additional (appended) units */
+-	static const char zero_and_units[] ALIGN1 = { '0', 0, 'k', 'M', 'G', 'T' };
++	static const char unit_chars[] ALIGN1 = {
++		'\0', 'K', 'M', 'G', 'T', 'P', 'E'
++	};
+ 	static const char fmt[] ALIGN1 = "%llu";
+ 	static const char fmt_tenths[] ALIGN1 = "%llu.%d%c";
+ 
+@@ -42,26 +44,33 @@ const char* FAST_FUNC make_human_readable_str(unsigned long long size,
+ 	int frac;
+ 	const char *u;
+ 	const char *f;
++	smallint no_tenths;
+ 
+-	u = zero_and_units;
+-	f = fmt;
+-	frac = 0;
++	if (size == 0)
++		return "0";
+ 
+-	val = size * block_size;
+-	if (val == 0) {
+-		return u;
++	/* If block_size is 0 then do not print tenths */
++	no_tenths = 0;
++	if (block_size == 0) {
++		no_tenths = 1;
++		block_size = 1;
+ 	}
+ 
++	u = unit_chars;
++	val = size * block_size;
++	f = fmt;
++	frac = 0;
++
+ 	if (display_unit) {
+ 		val += display_unit/2;	/* Deal with rounding */
+ 		val /= display_unit;	/* Don't combine with the line above!!! */
++		/* will just print it as ulonglong (below) */
+ 	} else {
+-		++u;
+ 		while ((val >= 1024)
+-		 && (u < zero_and_units + sizeof(zero_and_units) - 1)
++		 && (u < unit_chars + sizeof(unit_chars) - 1)
+ 		) {
+ 			f = fmt_tenths;
+-			++u;
++			u++;
+ 			frac = (((int)(val % 1024)) * 10 + 1024/2) / 1024;
+ 			val /= 1024;
+ 		}
+@@ -69,9 +78,9 @@ const char* FAST_FUNC make_human_readable_str(unsigned long long size,
+ 			++val;
+ 			frac = 0;
+ 		}
+-#if 0
++#if 1
+ 		/* Sample code to omit decimal point and tenths digit. */
+-		if (/* no_tenths */ 1) {
++		if (no_tenths) {
+ 			if (frac >= 5) {
+ 				++val;
+ 			}
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 686974b..96c1978 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -153,7 +153,7 @@ CONFIG_DD=y
+ CONFIG_FEATURE_DD_SIGNAL_HANDLING=y
+ CONFIG_FEATURE_DD_IBS_OBS=y
+ CONFIG_DF=y
+-CONFIG_FEATURE_DF_INODE=y
++CONFIG_FEATURE_DF_FANCY=y
+ CONFIG_DIRNAME=y
+ CONFIG_DOS2UNIX=y
+ CONFIG_UNIX2DOS=y

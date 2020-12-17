@@ -1,0 +1,116 @@
+2008-09-27 14:06:06 +0000
+diff --git a/e2fsprogs/old_e2fsprogs/e2fsck.c b/e2fsprogs/old_e2fsprogs/e2fsck.c
+index 7cb1227..61a30f4 100644
+--- a/e2fsprogs/old_e2fsprogs/e2fsck.c
++++ b/e2fsprogs/old_e2fsprogs/e2fsck.c
+@@ -192,10 +192,10 @@ struct buffer_head {
+ #define K_DEV_FS        1
+ #define K_DEV_JOURNAL   2
+ 
+-#define lock_buffer(bh) do {} while(0)
+-#define unlock_buffer(bh) do {} while(0)
++#define lock_buffer(bh) do {} while (0)
++#define unlock_buffer(bh) do {} while (0)
+ #define buffer_req(bh) 1
+-#define do_readahead(journal, start) do {} while(0)
++#define do_readahead(journal, start) do {} while (0)
+ 
+ static e2fsck_t e2fsck_global_ctx;  /* Try your very best not to use this! */
+ 
+@@ -10014,7 +10014,7 @@ static int do_one_pass(journal_t *journal,
+ 		 * all of the sequence number checks.  What are we going
+ 		 * to do with it?  That depends on the pass... */
+ 
+-		switch(blocktype) {
++		switch (blocktype) {
+ 		case JFS_DESCRIPTOR_BLOCK:
+ 			/* If it is a valid descriptor block, replay it
+ 			 * in pass REPLAY; otherwise, just skip over the
+@@ -11158,7 +11158,7 @@ int journal_init_revoke(journal_t *journal, int hash_size)
+ 
+ 	shift = 0;
+ 	tmp = hash_size;
+-	while((tmp >>= 1UL) != 0UL)
++	while ((tmp >>= 1UL) != 0UL)
+ 		shift++;
+ 	journal->j_revoke->hash_shift = shift;
+ 
+@@ -12251,7 +12251,7 @@ static int read_a_char(void)
+ 	int     r;
+ 	int     fail = 0;
+ 
+-	while(1) {
++	while (1) {
+ 		if (e2fsck_global_ctx &&
+ 		    (e2fsck_global_ctx->flags & E2F_FLAG_CANCEL)) {
+ 			return 3;
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/dirhash.c b/e2fsprogs/old_e2fsprogs/ext2fs/dirhash.c
+index ab3243f..09e34be 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/dirhash.c
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/dirhash.c
+@@ -42,7 +42,7 @@ static void TEA_transform(__u32 buf[4], __u32 const in[])
+ 		sum += DELTA;
+ 		b0 += ((b1 << 4)+a) ^ (b1+sum) ^ ((b1 >> 5)+b);
+ 		b1 += ((b0 << 4)+c) ^ (b0+sum) ^ ((b0 >> 5)+d);
+-	} while(--n);
++	} while (--n);
+ 
+ 	buf[0] += b0;
+ 	buf[1] += b1;
+diff --git a/e2fsprogs/old_e2fsprogs/fsck.c b/e2fsprogs/old_e2fsprogs/fsck.c
+index 9cb9f75..cc27353 100644
+--- a/e2fsprogs/old_e2fsprogs/fsck.c
++++ b/e2fsprogs/old_e2fsprogs/fsck.c
+@@ -533,21 +533,21 @@ static struct fs_info *lookup(char *filesys)
+ /* Find fsck program for a given fs type. */
+ static char *find_fsck(char *type)
+ {
+-  char *s;
+-  const char *tpl;
+-  char *p = string_copy(fsck_path);
+-  struct stat st;
++	char *s;
++	const char *tpl;
++	char *p = string_copy(fsck_path);
++	struct stat st;
+ 
+-  /* Are we looking for a program or just a type? */
+-  tpl = (strncmp(type, "fsck.", 5) ? "%s/fsck.%s" : "%s/%s");
++	/* Are we looking for a program or just a type? */
++	tpl = (strncmp(type, "fsck.", 5) ? "%s/fsck.%s" : "%s/%s");
+ 
+-  for(s = strtok(p, ":"); s; s = strtok(NULL, ":")) {
+-	s = xasprintf(tpl, s, type);
+-	if (stat(s, &st) == 0) break;
+-	free(s);
+-  }
+-  free(p);
+-  return s;
++	for (s = strtok(p, ":"); s; s = strtok(NULL, ":")) {
++		s = xasprintf(tpl, s, type);
++		if (stat(s, &st) == 0) break;
++		free(s);
++	}
++	free(p);
++	return s;
+ }
+ 
+ static int progress_active(void)
+@@ -885,7 +885,7 @@ static void compile_fs_type(char *fs_type, struct fs_type_compile *cmp)
+ 	list = string_copy(fs_type);
+ 	num = 0;
+ 	s = strtok(list, ",");
+-	while(s) {
++	while (s) {
+ 		negate = 0;
+ 		if (strncmp(s, "no", 2) == 0) {
+ 			s += 2;
+@@ -930,7 +930,7 @@ static int opt_in_list(char *opt, char *optlist)
+ 	list = string_copy(optlist);
+ 
+ 	s = strtok(list, ",");
+-	while(s) {
++	while (s) {
+ 		if (strcmp(s, opt) == 0) {
+ 			free(list);
+ 			return 1;

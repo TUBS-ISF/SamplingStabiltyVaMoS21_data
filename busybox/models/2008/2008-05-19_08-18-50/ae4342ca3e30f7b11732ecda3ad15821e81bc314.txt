@@ -1,0 +1,657 @@
+2008-05-19 08:18:50 +0000
+diff --git a/console-tools/chvt.c b/console-tools/chvt.c
+index ea96d13..ea3e7c0 100644
+--- a/console-tools/chvt.c
++++ b/console-tools/chvt.c
+@@ -9,25 +9,17 @@
+ 
+ #include "libbb.h"
+ 
+-/* From <linux/vt.h> */
+-enum {
+-	VT_ACTIVATE = 0x5606,   /* make vt active */
+-	VT_WAITACTIVE = 0x5607  /* wait for vt active */
+-};
+-
+ int chvt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chvt_main(int argc, char **argv)
+ {
+-	int fd, num;
++	int num;
+ 
+ 	if (argc != 2) {
+ 		bb_show_usage();
+ 	}
+ 
+-	fd = get_console_fd();
+ 	num = xatou_range(argv[1], 1, 63);
+ 	/* double cast suppresses "cast to ptr from int of different size" */
+-	xioctl(fd, VT_ACTIVATE, (void *)(ptrdiff_t)num);
+-	xioctl(fd, VT_WAITACTIVE, (void *)(ptrdiff_t)num);
++	console_make_active(get_console_fd(), num);
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/console-tools/dumpkmap.c b/console-tools/dumpkmap.c
+index 40b58f7..1adfdd7 100644
+--- a/console-tools/dumpkmap.c
++++ b/console-tools/dumpkmap.c
+@@ -7,6 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  *
+  */
++/* no options, no getopt */
+ 
+ #include "libbb.h"
+ 
+@@ -23,18 +24,17 @@ struct kbentry {
+ #define MAX_NR_KEYMAPS 256
+ 
+ int dumpkmap_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int dumpkmap_main(int argc, char **argv)
++int dumpkmap_main(int ATTRIBUTE_UNUSED argc, char ATTRIBUTE_UNUSED **argv)
+ {
+ 	struct kbentry ke;
+ 	int i, j, fd;
+-	char flags[MAX_NR_KEYMAPS];
++	RESERVE_CONFIG_BUFFER(flags,MAX_NR_KEYMAPS);
+ 
+-	if (argc >= 2 && argv[1][0] == '-')
+-		bb_show_usage();
++/*	bb_warn_ignoring_args(argc>=2);*/
+ 
+ 	fd = xopen(CURRENT_VC, O_RDWR);
+ 
+-	write(1, "bkeymap", 7);
++	write(STDOUT_FILENO, "bkeymap", 7);
+ 
+ 	/* Here we want to set everything to 0 except for indexes:
+ 	 * [0-2] [4-6] [8-10] [12] */
+@@ -43,7 +43,7 @@ int dumpkmap_main(int argc, char **argv)
+ 	flags[3] = flags[7] = flags[11] = 0;
+ 
+ 	/* dump flags */
+-	write(1, flags, MAX_NR_KEYMAPS);
++	write(STDOUT_FILENO, flags, MAX_NR_KEYMAPS);
+ 
+ 	for (i = 0; i < MAX_NR_KEYMAPS; i++) {
+ 		if (flags[i] == 1) {
+@@ -56,11 +56,14 @@ int dumpkmap_main(int argc, char **argv)
+ 						(char *)&ke.kb_table,
+ 						&ke.kb_value)
+ 				) {
+-					write(1, (void*)&ke.kb_value, 2);
++					write(STDOUT_FILENO, (void*)&ke.kb_value, 2);
+ 				}
+ 			}
+ 		}
+ 	}
+-	close(fd);
++	if (ENABLE_FEATURE_CLEAN_UP) {
++		close(fd);
++		RELEASE_CONFIG_BUFFER(flags);
++	}
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/console-tools/kbd_mode.c b/console-tools/kbd_mode.c
+index 46ec3fd..1614957 100644
+--- a/console-tools/kbd_mode.c
++++ b/console-tools/kbd_mode.c
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- * Mini loadkmap implementation for busybox
++ * Mini kbd_mode implementation for busybox
+  *
+  * Copyright (C) 2007 Loïc Grenié <loic.grenie@gmail.com>
+  *   written using Andries Brouwer <aeb@cwi.nl>'s kbd_mode from
+@@ -14,54 +14,39 @@
+ #include <linux/kd.h>
+ 
+ int kbd_mode_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int kbd_mode_main(int argc, char **argv)
++int kbd_mode_main(int ATTRIBUTE_UNUSED argc, char **argv)
+ {
+-	static const char opts[] = "saku";
+-
+-	const char *opt = argv[1];
+-	const char *p;
+ 	int fd;
+-
++	unsigned opt;
++	enum {
++		SCANCODE = (1<<0),
++		ASCII	 = (1<<1),
++		MEDIUMRAW= (1<<2),
++		UNICODE	 = (1<<3)
++	};
++	static const char KD_xxx[] ALIGN1 = "saku";
++	opt = getopt32(argv, KD_xxx);
+ 	fd = get_console_fd();
+-	if (fd < 0) /* get_console_fd() already complained */
++/*	if (fd < 0)
+ 		return EXIT_FAILURE;
++*/
++	if (!opt) { /* print current setting */
++		const char *mode = "unknown";
++		int m;
+ 
+-	if (opt == NULL) {
+-		/* No arg */
+-		const char *msg = "unknown";
+-		int mode;
+-
+-		ioctl(fd, KDGKBMODE, &mode);
+-		switch(mode) {
+-		case K_RAW:
+-			msg = "raw (scancode)";
+-			break;
+-		case K_XLATE:
+-			msg = "default (ASCII)";
+-			break;
+-		case K_MEDIUMRAW:
+-			msg = "mediumraw (keycode)";
+-			break;
+-		case K_UNICODE:
+-			msg = "Unicode (UTF-8)";
+-			break;
+-		}
+-		printf("The keyboard is in %s mode\n", msg);
+-	}
+-	else if (argc > 2 /* more than 1 arg */
+-	 || *opt != '-' /* not an option */
+-	 || (p = strchr(opts, opt[1])) == NULL /* not an option we expect */
+-	 || opt[2] != '\0' /* more than one option char */
+-	) {
+-		bb_show_usage();
+-		/* return EXIT_FAILURE; - not reached */
+-	}
+-	else {
+-#if K_RAW != 0 || K_XLATE != 1 || K_MEDIUMRAW != 2 || K_UNICODE != 3
+-#error kbd_mode must be changed
+-#endif
+-		/* The options are in the order of the various K_xxx */
+-		ioctl(fd, KDSKBMODE, p - opts);
++		ioctl(fd, KDGKBMODE, &m);
++		if (m == K_RAW)
++			mode = "raw (scancode)";
++		else if (m == K_XLATE)
++			mode = "default (ASCII)";
++		else if (m == K_MEDIUMRAW)
++			mode = "mediumraw (keycode)";
++		else if (m == K_UNICODE)
++			mode = "Unicode (UTF-8)";
++		printf("The keyboard is in %s mode\n", mode);
++	} else {
++		opt = opt & UNICODE ? 3 : opt >> 1;
++		xioctl(fd, KDSKBMODE, &opt);
+ 	}
+ 
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+diff --git a/console-tools/loadkmap.c b/console-tools/loadkmap.c
+index bea5a77..28e53eb 100644
+--- a/console-tools/loadkmap.c
++++ b/console-tools/loadkmap.c
+@@ -26,28 +26,26 @@ struct kbentry {
+ #define MAX_NR_KEYMAPS  256
+ 
+ int loadkmap_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int loadkmap_main(int argc, char **argv ATTRIBUTE_UNUSED)
++int loadkmap_main(int ATTRIBUTE_UNUSED argc, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	struct kbentry ke;
+ 	int i, j, fd;
+ 	uint16_t ibuff[NR_KEYS];
+-	char flags[MAX_NR_KEYMAPS];
+-	char buff[7];
++	RESERVE_CONFIG_BUFFER(flags,MAX_NR_KEYMAPS);
+ 
+-	if (argc != 1)
+-		bb_show_usage();
++/*  bb_warn_ignoring_args(argc>=2);*/
+ 
+ 	fd = xopen(CURRENT_VC, O_RDWR);
+ 
+-	xread(0, buff, 7);
+-	if (strncmp(buff, BINARY_KEYMAP_MAGIC, 7))
+-		bb_error_msg_and_die("this is not a valid binary keymap");
++	xread(STDIN_FILENO, flags, 7);
++	if (strncmp(flags, BINARY_KEYMAP_MAGIC, 7))
++		bb_error_msg_and_die("not a valid binary keymap");
+ 
+-	xread(0, flags, MAX_NR_KEYMAPS);
++	xread(STDIN_FILENO, flags, MAX_NR_KEYMAPS);
+ 
+ 	for (i = 0; i < MAX_NR_KEYMAPS; i++) {
+ 		if (flags[i] == 1) {
+-			xread(0, ibuff, NR_KEYS * sizeof(uint16_t));
++			xread(STDIN_FILENO, ibuff, NR_KEYS * sizeof(uint16_t));
+ 			for (j = 0; j < NR_KEYS; j++) {
+ 				ke.kb_index = j;
+ 				ke.kb_table = i;
+@@ -57,6 +55,9 @@ int loadkmap_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ 		}
+ 	}
+ 
+-	if (ENABLE_FEATURE_CLEAN_UP) close(fd);
+-	return 0;
++	if (ENABLE_FEATURE_CLEAN_UP) {
++		close(fd);
++		RELEASE_CONFIG_BUFFER(flags);
++	}
++	return EXIT_SUCCESS;
+ }
+diff --git a/console-tools/openvt.c b/console-tools/openvt.c
+index c4746df..2085224 100644
+--- a/console-tools/openvt.c
++++ b/console-tools/openvt.c
+@@ -61,7 +61,8 @@ static int get_vt_fd(void)
+ 	for (fd = 0; fd < 3; fd++)
+ 		if (!not_vt_fd(fd))
+ 			return fd;
+-	/* _only_ O_NONBLOCK: ask for neither read not write perms */
++	/* _only_ O_NONBLOCK: ask for neither read nor write perms */
++	/*FIXME: use? device_open(DEV_CONSOLE,0); */
+ 	fd = open(DEV_CONSOLE, O_NONBLOCK);
+ 	if (fd >= 0 && !not_vt_fd(fd))
+ 		return fd;
+@@ -93,7 +94,7 @@ static NOINLINE void vfork_child(char **argv)
+ 		/* CHILD */
+ 		/* Try to make this VT our controlling tty */
+ 		setsid(); /* lose old ctty */
+-		ioctl(0, TIOCSCTTY, 0 /* 0: don't forcibly steal */);
++		ioctl(STDIN_FILENO, TIOCSCTTY, 0 /* 0: don't forcibly steal */);
+ 		//bb_error_msg("our sid %d", getsid(0));
+ 		//bb_error_msg("our pgrp %d", getpgrp());
+ 		//bb_error_msg("VT's sid %d", tcgetsid(0));
+@@ -135,14 +136,13 @@ int openvt_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	sprintf(vtname, VC_FORMAT, vtno);
+ 	/* (Try to) clean up stray open fds above fd 2 */
+ 	bb_daemonize_or_rexec(DAEMON_CLOSE_EXTRA_FDS | DAEMON_ONLY_SANITIZE, NULL);
+-	close(0);
++	close(STDIN_FILENO);
+ 	/*setsid(); - BAD IDEA: after we exit, child is SIGHUPed... */
+ 	xopen(vtname, O_RDWR);
+-	xioctl(0, VT_GETSTATE, &vtstat);
++	xioctl(STDIN_FILENO, VT_GETSTATE, &vtstat);
+ 
+ 	if (flags & OPT_s) {
+-		xioctl(0, VT_ACTIVATE, (void*)(ptrdiff_t)vtno);
+-		xioctl(0, VT_WAITACTIVE, (void*)(ptrdiff_t)vtno);
++		console_make_active(STDIN_FILENO, vtno);
+ 	}
+ 
+ 	if (!argv[0]) {
+@@ -153,14 +153,16 @@ int openvt_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		/*argv[1] = NULL; - already is */
+ 	}
+ 
+-	xdup2(0, STDOUT_FILENO);
+-	xdup2(0, STDERR_FILENO);
++	xdup2(STDIN_FILENO, STDOUT_FILENO);
++	xdup2(STDIN_FILENO, STDERR_FILENO);
+ 
+ #ifdef BLOAT
++	{
+ 	/* Handle -l (login shell) option */
+ 	const char *prog = argv[0];
+ 	if (flags & OPT_l)
+ 		argv[0] = xasprintf("-%s", argv[0]);
++	}
+ #endif
+ 
+ 	vfork_child(argv);
+@@ -168,12 +170,11 @@ int openvt_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		/* We have only one child, wait for it */
+ 		safe_waitpid(-1, NULL, 0); /* loops on EINTR */
+ 		if (flags & OPT_s) {
+-			xioctl(0, VT_ACTIVATE, (void*)(ptrdiff_t)(vtstat.v_active));
+-			xioctl(0, VT_WAITACTIVE, (void*)(ptrdiff_t)(vtstat.v_active));
++			console_make_active(STDIN_FILENO, vtstat.v_active);
+ 			// Compat: even with -c N (try to) disallocate:
+ 			// # /usr/app/kbd-1.12/bin/openvt -f -c 9 -ws sleep 5
+ 			// openvt: could not deallocate console 9
+-			xioctl(0, VT_DISALLOCATE, (void*)(ptrdiff_t)vtno);
++			xioctl(STDIN_FILENO, VT_DISALLOCATE, (void*)(ptrdiff_t)vtno);
+ 		}
+ 	}
+ 	return EXIT_SUCCESS;
+diff --git a/console-tools/reset.c b/console-tools/reset.c
+index a2bf44d..5d5d4e2 100644
+--- a/console-tools/reset.c
++++ b/console-tools/reset.c
+@@ -26,7 +26,7 @@ int reset_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ 
+ 	/* no options, no getopt */
+ 
+-	if (isatty(0) && isatty(1)) {
++	if (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO)) {
+ 		/* See 'man 4 console_codes' for details:
+ 		 * "ESC c"			-- Reset
+ 		 * "ESC ( K"		-- Select user mapping
+diff --git a/console-tools/setconsole.c b/console-tools/setconsole.c
+index 8765a7c..82fe83f 100644
+--- a/console-tools/setconsole.c
++++ b/console-tools/setconsole.c
+@@ -3,40 +3,34 @@
+  *  setconsole.c - redirect system console output
+  *
+  *  Copyright (C) 2004,2005  Enrik Berkhan <Enrik.Berkhan@inka.de>
++ *  Copyright (C) 2008 Bernhard Fischer
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+ 
+-#if ENABLE_FEATURE_SETCONSOLE_LONG_OPTIONS
+-static const char setconsole_longopts[] ALIGN1 =
+-	"reset\0" No_argument "r"
+-	;
+-#endif
+-
+-#define OPT_SETCONS_RESET 1
+-
+ int setconsole_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int setconsole_main(int argc, char **argv)
++int setconsole_main(int ATTRIBUTE_UNUSED argc, char **argv)
+ {
+-	unsigned long flags;
+ 	const char *device = CURRENT_TTY;
++	bool reset;
+ 
+ #if ENABLE_FEATURE_SETCONSOLE_LONG_OPTIONS
++	static const char setconsole_longopts[] ALIGN1 =
++		"reset\0" No_argument "r"
++		;
+ 	applet_long_options = setconsole_longopts;
+ #endif
+-	flags = getopt32(argv, "r");
+-
+-	if (argc - optind > 1)
+-		bb_show_usage();
++	/* at most one non-option argument */
++	opt_complementary = "?1";
++	reset = getopt32(argv, "r");
+ 
+-	if (argc - optind == 1) {
+-		if (flags & OPT_SETCONS_RESET)
+-			bb_show_usage();
+-		device = argv[optind];
++	argv += 1 + reset;
++	if (*argv) {
++		device = *argv;
+ 	} else {
+-		if (flags & OPT_SETCONS_RESET)
++		if (reset)
+ 			device = DEV_CONSOLE;
+ 	}
+ 
+diff --git a/console-tools/setlogcons.c b/console-tools/setlogcons.c
+index b312fa7..aa8e080 100644
+--- a/console-tools/setlogcons.c
++++ b/console-tools/setlogcons.c
+@@ -17,15 +17,14 @@ int setlogcons_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	struct {
+ 		char fn;
+ 		char subarg;
+-	} arg;
+-
+-	arg.fn = 11;    /* redirect kernel messages */
+-	arg.subarg = 0; /* to specified console (current as default) */
++	} arg = { 11, /* redirect kernel messages */
++			  0   /* to specified console (current as default) */
++			};
+ 
+ 	if (argv[1])
+ 		arg.subarg = xatou_range(argv[1], 0, 63);
+ 
+ 	xioctl(xopen(VC_1, O_RDONLY), TIOCLINUX, &arg);
+ 
+-	return 0;
++	return EXIT_SUCCESS;
+ }
+diff --git a/include/libbb.h b/include/libbb.h
+index 4067063..f50ae36 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -281,8 +281,9 @@ extern int recursive_action(const char *fileName, unsigned flags,
+ 	void* userData, unsigned depth);
+ extern int device_open(const char *device, int mode);
+ enum { GETPTY_BUFSIZE = 16 }; /* more than enough for "/dev/ttyXXX" */
+-extern int getpty(char *line);
++extern int xgetpty(char *line);
+ extern int get_console_fd(void);
++extern void console_make_active(int fd, const int vt_num);
+ extern char *find_block_device(const char *path);
+ /* bb_copyfd_XX print read/write errors and return -1 if they occur */
+ extern off_t bb_copyfd_eof(int fd1, int fd2);
+@@ -590,6 +591,7 @@ extern ssize_t safe_write(int fd, const void *buf, size_t count);
+ // if some data was written before error occurred
+ extern ssize_t full_write(int fd, const void *buf, size_t count);
+ extern void xwrite(int fd, const void *buf, size_t count);
++extern void xopen_xwrite_close(const char* file, const char *str);
+ 
+ /* Reads and prints to stdout till eof, then closes FILE. Exits on error: */
+ extern void xprint_and_close_file(FILE *file);
+diff --git a/include/usage.h b/include/usage.h
+index d5c53a2..cffe782 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -875,7 +875,7 @@
+ #define dumpkmap_trivial_usage \
+        "> keymap"
+ #define dumpkmap_full_usage "\n\n" \
+-       "Print out a binary keyboard translation table to standard output"
++       "Print a binary keyboard translation table to standard output"
+ #define dumpkmap_example_usage \
+        "$ dumpkmap > keymap\n"
+ 
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index d943628..0c7e254 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -98,6 +98,7 @@ lib-y += vfork_daemon_rexec.o
+ lib-y += warn_ignoring_args.o
+ lib-y += wfopen.o
+ lib-y += wfopen_input.o
++lib-y += write.o
+ lib-y += xatonum.o
+ lib-y += xconnect.o
+ lib-y += xfuncs.o
+diff --git a/libbb/get_console.c b/libbb/get_console.c
+index 0da27b1..36fe204 100644
+--- a/libbb/get_console.c
++++ b/libbb/get_console.c
+@@ -8,10 +8,8 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-//#include <sys/ioctl.h>
+ #include "libbb.h"
+ 
+-
+ /* From <linux/kd.h> */
+ enum { KDGKBTYPE = 0x4B33 };  /* get keyboard type */
+ 
+@@ -70,3 +68,15 @@ int get_console_fd(void)
+ 	bb_error_msg("can't open console");
+ 	return fd;                      /* total failure */
+ }
++
++/* From <linux/vt.h> */
++enum {
++	VT_ACTIVATE = 0x5606,   /* make vt active */
++	VT_WAITACTIVE = 0x5607  /* wait for vt active */
++};
++
++void console_make_active(int fd, const int vt_num)
++{
++	xioctl(fd, VT_ACTIVATE, (void *)(ptrdiff_t)vt_num);
++	xioctl(fd, VT_WAITACTIVE, (void *)(ptrdiff_t)vt_num);
++}
+diff --git a/libbb/getpty.c b/libbb/getpty.c
+index 5ac9582..d43fb82 100644
+--- a/libbb/getpty.c
++++ b/libbb/getpty.c
+@@ -10,7 +10,7 @@
+ 
+ #define DEBUG 0
+ 
+-int getpty(char *line)
++int xgetpty(char *line)
+ {
+ 	int p;
+ #if ENABLE_FEATURE_DEVPTS
+@@ -22,7 +22,7 @@ int getpty(char *line)
+ 		name = ptsname(p);
+ 		if (!name) {
+ 			bb_perror_msg("ptsname error (is /dev/pts mounted?)");
+-			return -1;
++			goto fail;
+ 		}
+ 		safe_strncpy(line, name, GETPTY_BUFSIZE);
+ 		return p;
+@@ -52,7 +52,9 @@ int getpty(char *line)
+ 		}
+ 	}
+ #endif /* FEATURE_DEVPTS */
+-	return -1;
++USE_FEATURE_DEVPTS( fail:)
++	bb_error_msg_and_die("open pty");
++	return -1; /* never get here */
+ }
+ 
+ 
+diff --git a/libbb/write.c b/libbb/write.c
+new file mode 100644
+index 0000000..b628b49
+--- /dev/null
++++ b/libbb/write.c
+@@ -0,0 +1,20 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Utility routines.
++ *
++ * Copyright (C) 2008 Bernhard Fischer
++ *
++ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
++ */
++
++#include "libbb.h"
++
++/* Open file and write string str to it, close file.
++ * Die on any open or write-error.  */
++void xopen_xwrite_close(const char* file, const char* str)
++{
++	int fd = xopen(file, O_WRONLY);
++
++	xwrite(fd, str, strlen(str));
++	close(fd);
++}
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 5188edb..e312c0b 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -164,11 +164,7 @@ make_new_session(
+ 	/*ts->buf2 = ts->buf1 + BUFSIZE;*/
+ 
+ 	/* Got a new connection, set up a tty. */
+-	fd = getpty(tty_name);
+-	if (fd < 0) {
+-		bb_error_msg("can't create pty");
+-		return NULL;
+-	}
++	fd = xgetpty(tty_name);
+ 	if (fd > maxfd)
+ 		maxfd = fd;
+ 	ts->ptyfd = fd;
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 93b7166..a71fadd 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -516,7 +516,7 @@ CONFIG_FEATURE_MOUNT_FSTAB=y
+ CONFIG_PIVOT_ROOT=y
+ CONFIG_RDATE=y
+ CONFIG_READPROFILE=y
+-# CONFIG_RTCWAKE is not set
++CONFIG_RTCWAKE=y
+ CONFIG_SETARCH=y
+ CONFIG_SWAPONOFF=y
+ CONFIG_SWITCH_ROOT=y
+@@ -534,10 +534,10 @@ CONFIG_FEATURE_MOUNT_LOOP=y
+ #
+ CONFIG_ADJTIMEX=y
+ # CONFIG_BBCONFIG is not set
+-# CONFIG_CHAT is not set
+-# CONFIG_FEATURE_CHAT_NOFAIL is not set
++CONFIG_CHAT=y
++CONFIG_FEATURE_CHAT_NOFAIL=y
+ # CONFIG_FEATURE_CHAT_TTY_HIFI is not set
+-# CONFIG_FEATURE_CHAT_IMPLICIT_CR is not set
++CONFIG_FEATURE_CHAT_IMPLICIT_CR=y
+ # CONFIG_FEATURE_CHAT_SWALLOW_OPTS is not set
+ # CONFIG_FEATURE_CHAT_SEND_ESCAPES is not set
+ # CONFIG_FEATURE_CHAT_VAR_ABORT_LEN is not set
+diff --git a/util-linux/rtcwake.c b/util-linux/rtcwake.c
+index 6df7334..515f812 100644
+--- a/util-linux/rtcwake.c
++++ b/util-linux/rtcwake.c
+@@ -30,7 +30,7 @@
+ 
+ static time_t rtc_time;
+ 
+-static int may_wakeup(const char *rtcname)
++static bool may_wakeup(const char *rtcname)
+ {
+ 	ssize_t ret;
+ 	char buf[128];
+@@ -42,7 +42,7 @@ static int may_wakeup(const char *rtcname)
+ 	snprintf(buf, sizeof(buf), SYS_RTC_PATH, rtcname);
+ 	ret = open_read_close(buf, buf, sizeof(buf));
+ 	if (ret < 0)
+-		return 0;
++		return false;
+ 
+ 	/* wakeup events could be disabled or not supported */
+ 	return strncmp(buf, "enabled\n", 8) == 0;
+@@ -89,15 +89,6 @@ static void setup_alarm(int fd, time_t *wakeup)
+ 	}
+ }
+ 
+-static void suspend_system(const char *suspend)
+-{
+-	FILE *f = xfopen(SYS_POWER_PATH, "w");
+-	fprintf(f, "%s\n", suspend);
+-	fflush(f);
+-	/* this executes after wake from suspend */
+-	fclose(f);
+-}
+-
+ #define RTCWAKE_OPT_AUTO         0x01
+ #define RTCWAKE_OPT_LOCAL        0x02
+ #define RTCWAKE_OPT_UTC          0x04
+@@ -185,7 +176,7 @@ int rtcwake_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	usleep(10 * 1000);
+ 
+ 	if (strcmp(suspend, "on"))
+-		suspend_system(suspend);
++		xopen_xwrite_close(SYS_POWER_PATH, suspend);
+ 	else {
+ 		/* "fake" suspend ... we'll do the delay ourselves */
+ 		unsigned long data;
+diff --git a/util-linux/script.c b/util-linux/script.c
+index 63d3039..c188332 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -69,10 +69,7 @@ int script_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		shell = DEFAULT_SHELL;
+ 	}
+ 
+-	pty = getpty(pty_line);
+-	if (pty < 0) {
+-		bb_perror_msg_and_die("can't get pty");
+-	}
++	pty = xgetpty(pty_line);
+ 
+ 	/* get current stdin's tty params */
+ 	attr_ok = tcgetattr(0, &tt);

@@ -1,0 +1,14 @@
+2009-10-02 01:29:25 +0200
+diff --git a/coreutils/Config.in b/coreutils/Config.in
+index 64a9421..2d745e2 100644
+--- a/coreutils/Config.in
++++ b/coreutils/Config.in
+@@ -81,7 +81,7 @@ config CP
+ config FEATURE_CP_LONG_OPTIONS
+ 	bool "Enable long options for cp"
+ 	default n
+-	depends on CP
++	depends on CP && LONG_OPTS
+ 	help
+ 	  Enable long options for cp.
+ 	  Also add support for --parents option.

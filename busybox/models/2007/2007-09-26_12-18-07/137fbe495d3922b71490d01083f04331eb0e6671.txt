@@ -1,0 +1,17 @@
+2007-09-26 12:18:07 +0000
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 38da7f8..94397bc 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -300,10 +300,10 @@ int runsvdir_main(int argc, char **argv)
+ 				stamplog = now + 900;
+ 			}
+ 		}
+-		deadline = now + (check ? 1 : 5);
+ 
+ 		pfd[0].revents = 0;
+ 		sig_block(SIGCHLD);
++		deadline = (check ? 1 : 5);
+ 		if (rplog)
+ 			poll(pfd, 1, deadline*1000);
+ 		else

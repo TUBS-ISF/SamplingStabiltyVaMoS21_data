@@ -1,0 +1,627 @@
+2008-07-08 05:14:36 +0000
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 637afce..28913d2 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -382,9 +382,8 @@ static int search_for_provides(int needle, int start_at)
+  */
+ static void add_edge_to_node(common_node_t *node, edge_t *edge)
+ {
+-	node->num_of_edges++;
+-	node->edge = xrealloc(node->edge, sizeof(edge_t) * (node->num_of_edges + 1));
+-	node->edge[node->num_of_edges - 1] = edge;
++	node->edge = xrealloc_vector(node->edge, 2, node->num_of_edges);
++	node->edge[node->num_of_edges++] = edge;
+ }
+ 
+ /*
+@@ -972,7 +971,7 @@ static int check_deps(deb_file_t **deb_file, int deb_start /*, int dep_max_count
+ 	 * installed package for conflicts*/
+ 	while (deb_file[i] != NULL) {
+ 		const unsigned package_num = deb_file[i]->package;
+-		conflicts = xrealloc(conflicts, sizeof(int) * (conflicts_num + 1));
++		conflicts = xrealloc_vector(conflicts, 2, conflicts_num);
+ 		conflicts[conflicts_num] = package_num;
+ 		conflicts_num++;
+ 		/* add provides to conflicts list */
+@@ -989,7 +988,7 @@ static int check_deps(deb_file_t **deb_file, int deb_start /*, int dep_max_count
+ 					new_node->version = package_hashtable[package_num]->edge[j]->version;
+ 					package_hashtable[conflicts_package_num] = new_node;
+ 				}
+-				conflicts = xrealloc(conflicts, sizeof(int) * (conflicts_num + 1));
++				conflicts = xrealloc_vector(conflicts, 2, conflicts_num);
+ 				conflicts[conflicts_num] = conflicts_package_num;
+ 				conflicts_num++;
+ 			}
+@@ -1170,7 +1169,8 @@ static char **create_list(const char *filename)
+ 	file_list = NULL;
+ 	count = 0;
+ 	while ((line = xmalloc_fgetline(list_stream)) != NULL) {
+-		file_list = xrealloc(file_list, sizeof(char *) * (count + 2));
++//TODO: zeroing xrealloc_vector? 
++		file_list = xrealloc_vector(file_list, 2, count);
+ 		file_list[count++] = line;
+ 		file_list[count] = NULL;
+ 	}
+@@ -1634,7 +1634,7 @@ int dpkg_main(int argc UNUSED_PARAM, char **argv)
+ 	/* Read arguments and store relevant info in structs */
+ 	while (*argv) {
+ 		/* deb_count = nb_elem - 1 and we need nb_elem + 1 to allocate terminal node [NULL pointer] */
+-		deb_file = xrealloc(deb_file, sizeof(deb_file[0]) * (deb_count + 2));
++		deb_file = xrealloc_vector(deb_file, 2, deb_count);
+ 		deb_file[deb_count] = xzalloc(sizeof(deb_file[0][0]));
+ 		if (opt & (OPT_install | OPT_unpack)) {
+ 			/* -i/-u: require filename */
+diff --git a/archival/rpm.c b/archival/rpm.c
+index c4bcd60..b3d7cd5 100644
+--- a/archival/rpm.c
++++ b/archival/rpm.c
+@@ -279,12 +279,12 @@ static rpm_index **rpm_gettags(int fd, int *num_tags)
+ 			tmpindex->type = ntohl(tmpindex->type);
+ 			tmpindex->count = ntohl(tmpindex->count);
+ 			tmpindex->offset = storepos + ntohl(tmpindex->offset);
+-			if (pass==0)
++			if (pass == 0)
+ 				tmpindex->tag -= 743;
+ 		}
+ 		xlseek(fd, header.size, SEEK_CUR); /* Seek past store */
+ 		/* Skip padding to 8 byte boundary after reading signature headers */
+-		if (pass==0)
++		if (pass == 0)
+ 			xlseek(fd, (8 - (xlseek(fd,0,SEEK_CUR) % 8)) % 8, SEEK_CUR);
+ 	}
+ 	tags = xrealloc(tags, tagindex * sizeof(struct rpmtag *)); /* realloc tags to save space */
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index 1798549..3bac151 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -241,9 +241,10 @@ int cut_main(int argc UNUSED_PARAM, char **argv)
+ 			}
+ 
+ 			/* add the new list */
+-			cut_lists = xrealloc(cut_lists, sizeof(struct cut_list) * (++nlists));
+-			cut_lists[nlists-1].startpos = s;
+-			cut_lists[nlists-1].endpos = e;
++			cut_lists = xrealloc_vector(cut_lists, 4, nlists);
++			cut_lists[nlists].startpos = s;
++			cut_lists[nlists].endpos = e;
++			nlists++;
+ 		}
+ 
+ 		/* make sure we got some cut positions out of all that */
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index a2eaf11..eb45798 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -735,9 +735,9 @@ decode_format_string(const char *s)
+ 
+ 		assert(s != next);
+ 		s = next;
++		spec = xrealloc_vector(spec, 4, n_specs);
++		memcpy(&spec[n_specs], &tspec, sizeof(spec[0]));
+ 		n_specs++;
+-		spec = xrealloc(spec, n_specs * sizeof(*spec));
+-		memcpy(&spec[n_specs-1], &tspec, sizeof *spec);
+ 	}
+ }
+ 
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index 1fa5527..ac8fc9b 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -360,8 +360,7 @@ int sort_main(int argc UNUSED_PARAM, char **argv)
+ 		for (;;) {
+ 			line = GET_LINE(fp);
+ 			if (!line) break;
+-			if (!(linecount & 63))
+-				lines = xrealloc(lines, sizeof(char *) * (linecount + 64));
++			lines = xrealloc_vector(lines, 6, linecount);
+ 			lines[linecount++] = line;
+ 		}
+ 		fclose_if_not_stdin(fp);
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index 953ff67..cb5f48f 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -90,7 +90,7 @@ static int FAST_FUNC act(const char *file, struct stat *statbuf, void *args UNUS
+ 		return SKIP;
+ 	}
+ 
+-	names = xrealloc(names, (cur + 2) * sizeof(names[0]));
++	names = xrealloc_vector(names, 4, cur);
+ 	names[cur++] = xstrdup(file);
+ 	names[cur] = NULL;
+ 
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index c176936..86c78d8 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -1028,13 +1028,13 @@ static void parse_args(char **argv)
+ // FIXME: must check that arg is a blkdev, or resolve
+ // "/path", "UUID=xxx" or "LABEL=xxx" into block device name
+ // ("UUID=xxx"/"LABEL=xxx" can probably shifted to fsck.auto duties)
+-			devices = xrealloc(devices, (num_devices+1) * sizeof(devices[0]));
++			devices = xrealloc_vector(devices, 2, num_devices);
+ 			devices[num_devices++] = xstrdup(arg);
+ 			continue;
+ 		}
+ 
+ 		if (arg[0] != '-' || opts_for_fsck) {
+-			args = xrealloc(args, (num_args+1) * sizeof(args[0]));
++			args = xrealloc_vector(args, 2, num_args);
+ 			args[num_args++] = xstrdup(arg);
+ 			continue;
+ 		}
+@@ -1111,7 +1111,7 @@ static void parse_args(char **argv)
+ 		if (optpos) {
+ 			options[0] = '-';
+ 			options[optpos + 1] = '\0';
+-			args = xrealloc(args, (num_args+1) * sizeof(args[0]));
++			args = xrealloc_vector(args, 2, num_args);
+ 			args[num_args++] = options;
+ 		}
+ 	}
+diff --git a/editors/awk.c b/editors/awk.c
+index 2af3988..7af9e1e 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -1473,8 +1473,10 @@ static regex_t *as_regex(node *op, regex_t *preg)
+ /* gradually increasing buffer */
+ static void qrealloc(char **b, int n, int *size)
+ {
+-	if (!*b || n >= *size)
+-		*b = xrealloc(*b, *size = n + (n>>1) + 80);
++	if (!*b || n >= *size) {
++		*size = n + (n>>1) + 80;
++		*b = xrealloc(*b, *size);
++	}
+ }
+ 
+ /* resize field storage space */
+diff --git a/editors/diff.c b/editors/diff.c
+index 570c4c4..64ad651 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -1059,6 +1059,7 @@ static unsigned diffreg(char *file1, char *file2, int flags)
+ 
+ 	member = (int *) nfile[1];
+ 	equiv(sfile[0], slen[0], sfile[1], slen[1], member);
++//TODO: xrealloc_vector?
+ 	member = xrealloc(member, (slen[1] + 2) * sizeof(int));
+ 
+ 	class = (int *) nfile[0];
+@@ -1168,8 +1169,7 @@ static int FAST_FUNC add_to_dirlist(const char *filename,
+ 		void *userdata,
+ 		int depth UNUSED_PARAM)
+ {
+-	/* +2: with space for eventual trailing NULL */
+-	dl = xrealloc(dl, (dl_count+2) * sizeof(dl[0]));
++	dl = xrealloc_vector(dl, 5, dl_count);
+ 	dl[dl_count] = xstrdup(filename + (int)(ptrdiff_t)userdata);
+ 	dl_count++;
+ 	return TRUE;
+diff --git a/editors/sed.c b/editors/sed.c
+index 88bae78..67e8841 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -732,8 +732,7 @@ static void flush_append(void)
+ 
+ static void add_input_file(FILE *file)
+ {
+-	G.input_file_list = xrealloc(G.input_file_list,
+-			(G.input_file_count + 1) * sizeof(FILE *));
++	G.input_file_list = xrealloc_vector(G.input_file_list, 2, G.input_file_count);
+ 	G.input_file_list[G.input_file_count++] = file;
+ }
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index 378cb44..fc65d52 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -564,10 +564,14 @@ void fputc_printable(int ch, FILE *file) FAST_FUNC;
+ 
+ /* dmalloc will redefine these to it's own implementation. It is safe
+  * to have the prototypes here unconditionally.  */
+-extern void *malloc_or_warn(size_t size) FAST_FUNC;
+-extern void *xmalloc(size_t size) FAST_FUNC;
+-extern void *xzalloc(size_t size) FAST_FUNC;
+-extern void *xrealloc(void *old, size_t size) FAST_FUNC;
++void *malloc_or_warn(size_t size) FAST_FUNC;
++void *xmalloc(size_t size) FAST_FUNC;
++void *xzalloc(size_t size) FAST_FUNC;
++void *xrealloc(void *old, size_t size) FAST_FUNC;
++#define xrealloc_vector(vector, shift, idx) \
++	xrealloc_vector_helper((vector), (sizeof((vector)[0]) << 8) + (shift), (idx))
++void* xrealloc_vector_helper(void *vector, unsigned sizeof_and_shift, int idx) FAST_FUNC;
++
+ 
+ extern ssize_t safe_read(int fd, void *buf, size_t count) FAST_FUNC;
+ extern ssize_t nonblock_safe_read(int fd, void *buf, size_t count) FAST_FUNC;
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 5cbecd5..c49297b 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -109,6 +109,7 @@ lib-y += xfunc_die.o
+ lib-y += xgetcwd.o
+ lib-y += xgethostbyname.o
+ lib-y += xreadlink.o
++lib-y += xrealloc_vector.o
+ 
+ # conditionally compiled objects:
+ lib-$(CONFIG_FEATURE_MOUNT_LOOP) += loop.o
+diff --git a/libbb/dump.c b/libbb/dump.c
+index c455952..8a90aac 100644
+--- a/libbb/dump.c
++++ b/libbb/dump.c
+@@ -245,7 +245,7 @@ static void rewrite(FS * fs)
+ 			{
+ 				savech = *p3;
+ 				*p3 = '\0';
+-				pr->fmt = xrealloc(pr->fmt, strlen(pr->fmt)+(p3-p2)+1);
++				pr->fmt = xrealloc(pr->fmt, strlen(pr->fmt) + (p3-p2) + 1);
+ 				strcat(pr->fmt, p2);
+ 				*p3 = savech;
+ 				p2 = p3;
+diff --git a/libbb/get_line_from_file.c b/libbb/get_line_from_file.c
+index 66ea5a1..3a76f49 100644
+--- a/libbb/get_line_from_file.c
++++ b/libbb/get_line_from_file.c
+@@ -42,7 +42,7 @@ char* FAST_FUNC bb_get_chunk_from_file(FILE *file, int *end)
+ 		//	free(linebuf);
+ 		//	return NULL;
+ 		//}
+-		linebuf = xrealloc(linebuf, idx+1);
++		linebuf = xrealloc(linebuf, idx + 1);
+ 		linebuf[idx] = '\0';
+ 	}
+ 	return linebuf;
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 3ef47ba..a46b5d2 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -400,11 +400,8 @@ static void free_tab_completion_data(void)
+ 
+ static void add_match(char *matched)
+ {
+-	int nm = num_matches;
+-	int nm1 = nm + 1;
+-
+-	matches = xrealloc(matches, nm1 * sizeof(char *));
+-	matches[nm] = matched;
++	matches = xrealloc_vector(matches, 4, num_matches);
++	matches[num_matches] = matched;
+ 	num_matches++;
+ }
+ 
+diff --git a/libbb/mtab.c b/libbb/mtab.c
+index 57654a6..2c17132 100644
+--- a/libbb/mtab.c
++++ b/libbb/mtab.c
+@@ -27,14 +27,14 @@ void FAST_FUNC erase_mtab(const char *name)
+ 	}
+ 
+ 	while ((m = getmntent(mountTable)) != 0) {
++		entries = xrealloc(entries, 3, count);
++		entries[count].mnt_fsname = xstrdup(m->mnt_fsname);
++		entries[count].mnt_dir = xstrdup(m->mnt_dir);
++		entries[count].mnt_type = xstrdup(m->mnt_type);
++		entries[count].mnt_opts = xstrdup(m->mnt_opts);
++		entries[count].mnt_freq = m->mnt_freq;
++		entries[count].mnt_passno = m->mnt_passno;
+ 		i = count++;
+-		entries = xrealloc(entries, count * sizeof(entries[0]));
+-		entries[i].mnt_fsname = xstrdup(m->mnt_fsname);
+-		entries[i].mnt_dir = xstrdup(m->mnt_dir);
+-		entries[i].mnt_type = xstrdup(m->mnt_type);
+-		entries[i].mnt_opts = xstrdup(m->mnt_opts);
+-		entries[i].mnt_freq = m->mnt_freq;
+-		entries[i].mnt_passno = m->mnt_passno;
+ 	}
+ 	endmntent(mountTable);
+ 
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 7d49d83..a5168a0 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -45,8 +45,8 @@ static int get_cached(cache_t *cp, unsigned id)
+ 	for (i = 0; i < cp->size; i++)
+ 		if (cp->cache[i].id == id)
+ 			return i;
+-	i = cp->size++;
+-	cp->cache = xrealloc(cp->cache, cp->size * sizeof(*cp->cache));
++	i = cp->size;
++	cp->cache = xrealloc_vector(cp->cache, 2, cp->size++);
+ 	cp->cache[i++].id = id;
+ 	return -i;
+ }
+@@ -59,8 +59,8 @@ static char* get_cached(cache_t *cp, unsigned id, ug_func* fp)
+ 	for (i = 0; i < cp->size; i++)
+ 		if (cp->cache[i].id == id)
+ 			return cp->cache[i].name;
+-	i = cp->size++;
+-	cp->cache = xrealloc(cp->cache, cp->size * sizeof(*cp->cache));
++	i = cp->size;
++	cp->cache = xrealloc_vector(cp->cache, 2, cp->size++);
+ 	cp->cache[i].id = id;
+ 	/* Never fails. Generates numeric string if name isn't found */
+ 	fp(cp->cache[i].name, sizeof(cp->cache[i].name), id);
+diff --git a/libbb/read.c b/libbb/read.c
+index 7b80412..405e216 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -291,3 +291,52 @@ void* FAST_FUNC xmalloc_xopen_read_close(const char *filename, size_t *sizep)
+ 		bb_perror_msg_and_die("can't read '%s'", filename);
+ 	return buf;
+ }
++
++/* libbb candidate */
++#if 0
++static void *xmalloc_read(int fd, size_t *sizep)
++{
++	char *buf;
++	size_t size, rd_size, total;
++	off_t to_read;
++	struct stat st;
++
++	to_read = sizep ? *sizep : INT_MAX; /* max to read */
++
++	/* Estimate file size */
++	st.st_size = 0; /* in case fstat fails, assume 0 */
++	fstat(fd, &st);
++	/* /proc/N/stat files report st_size 0 */
++	/* In order to make such files readable, we add small const */
++	size = (st.st_size | 0x3ff) + 1;
++
++	total = 0;
++	buf = NULL;
++	while (1) {
++		if (to_read < size)
++			size = to_read;
++		buf = xrealloc(buf, total + size + 1);
++		rd_size = full_read(fd, buf + total, size);
++		if ((ssize_t)rd_size < 0) { /* error */
++			free(buf);
++			return NULL;
++		}
++		total += rd_size;
++		if (rd_size < size) /* EOF */
++			break;
++		to_read -= rd_size;
++		if (to_read <= 0)
++			break;
++		/* grow by 1/8, but in [1k..64k] bounds */
++		size = ((total / 8) | 0x3ff) + 1;
++		if (size > 64*1024)
++			size = 64*1024;
++	}
++	xrealloc(buf, total + 1);
++	buf[total] = '\0';
++
++	if (sizep)
++		*sizep = total;
++	return buf;
++}
++#endif
+diff --git a/libpwdgrp/pwd_grp.c b/libpwdgrp/pwd_grp.c
+index 3fe70f4..867caf0 100644
+--- a/libpwdgrp/pwd_grp.c
++++ b/libpwdgrp/pwd_grp.c
+@@ -643,11 +643,7 @@ int initgroups(const char *user, gid_t gid)
+ 			if (group.gr_gid != gid) {
+ 				for (m = group.gr_mem; *m; m++) {
+ 					if (!strcmp(*m, user)) {
+-						if (!(num_groups & 7)) {
+-							gid_t *tmp = xrealloc(group_list,
+-									(num_groups+8) * sizeof(gid_t *));
+-							group_list = tmp;
+-						}
++						group_list = xrealloc_vector(group_list, 3, num_groups);
+ 						group_list[num_groups++] = group.gr_gid;
+ 						break;
+ 					}
+diff --git a/miscutils/less.c b/miscutils/less.c
+index ecdb9ae..1e22d33 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -322,7 +322,7 @@ static void read_lines(void)
+ 		}
+  reached_eof:
+ 		last_terminated = terminated;
+-		flines = xrealloc(flines, (max_fline+1) * sizeof(char *));
++		flines = xrealloc_vector(flines, 8, max_fline);
+ 		if (option_mask32 & FLAG_N) {
+ 			/* Width of 7 preserves tab spacing in the text */
+ 			flines[max_fline] = xasprintf(
+@@ -332,7 +332,7 @@ static void read_lines(void)
+ 			if (terminated)
+ 				max_lineno++;
+ 		} else {
+-			flines[max_fline] = xrealloc(current_line, strlen(current_line)+1);
++			flines[max_fline] = xrealloc(current_line, strlen(current_line) + 1);
+ 		}
+ 		if (max_fline >= MAXLINES) {
+ 			eof_error = 0; /* Pretend we saw EOF */
+@@ -933,7 +933,7 @@ static void fill_match_lines(unsigned pos)
+ 		/* and we didn't match it last time */
+ 		 && !(num_matches && match_lines[num_matches-1] == pos)
+ 		) {
+-			match_lines = xrealloc(match_lines, (num_matches+1) * sizeof(int));
++			match_lines = xrealloc_vector(match_lines, 4, num_matches);
+ 			match_lines[num_matches++] = pos;
+ 		}
+ 		pos++;
+diff --git a/miscutils/man.c b/miscutils/man.c
+index 3685be7..b1bb153 100644
+--- a/miscutils/man.c
++++ b/miscutils/man.c
+@@ -117,11 +117,7 @@ int man_main(int argc UNUSED_PARAM, char **argv)
+ 					count_mp++;
+ 					/* man_path_list is NULL terminated */
+ 					man_path_list[count_mp] = NULL;
+-					if (!(count_mp & 0xf)) { /* 0x10, 0x20 etc */
+-						/* so that last valid man_path_list[] is [count_mp + 0x10] */
+-						man_path_list = xrealloc(man_path_list,
+-							(count_mp + 0x11) * sizeof(man_path_list[0]));
+-					}
++					man_path_list = xrealloc_vector(man_path_list, 4, count_mp);
+ 				}
+ 				if (strcmp("MANSECT", line) == 0) {
+ 					free(sec_list);
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index d928be2..df6bf10 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -2201,7 +2201,7 @@ static struct obj_section *obj_create_alloced_section(struct obj_file *f,
+ 	int newidx = f->header.e_shnum++;
+ 	struct obj_section *sec;
+ 
+-	f->sections = xrealloc(f->sections, (newidx + 1) * sizeof(sec));
++	f->sections = xrealloc_vector(f->sections, 2, newidx);
+ 	f->sections[newidx] = sec = arch_new_section();
+ 
+ 	sec->header.sh_type = SHT_PROGBITS;
+@@ -2250,7 +2250,8 @@ static void *obj_extend_section(struct obj_section *sec, unsigned long more)
+ {
+ 	unsigned long oldsize = sec->header.sh_size;
+ 	if (more) {
+-		sec->contents = xrealloc(sec->contents, sec->header.sh_size += more);
++		sec->header.sh_size += more;
++		sec->contents = xrealloc(sec->contents, sec->header.sh_size);
+ 	}
+ 	return sec->contents + oldsize;
+ }
+@@ -2736,7 +2737,8 @@ static void new_get_kernel_symbols(void)
+  retry_kern_sym_load:
+ 	if (query_module(NULL, QM_SYMBOLS, syms, bufsize, &ret)) {
+ 		if (errno == ENOSPC && bufsize < ret) {
+-			syms = xrealloc(syms, bufsize = ret);
++			bufsize = ret;
++			syms = xrealloc(syms, bufsize);
+ 			goto retry_kern_sym_load;
+ 		}
+ 		bb_perror_msg_and_die("kernel: QM_SYMBOLS");
+@@ -3080,7 +3082,7 @@ static void obj_allocate_commons(struct obj_file *f)
+ 		if (i == f->header.e_shnum) {
+ 			struct obj_section *sec;
+ 
+-			f->sections = xrealloc(f->sections, (i + 1) * sizeof(sec));
++			f->sections = xrealloc(f->sections, 2, i);
+ 			f->sections[i] = sec = arch_new_section();
+ 			f->header.e_shnum = i + 1;
+ 
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index e82ee4c..4f07353 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -317,9 +317,7 @@ static FAST_FUNC int fileAction(const char *pathname,
+ 	}
+ 
+ 	cur = module_count++;
+-	if (!(cur & 0xfff)) {
+-		modinfo = xrealloc(modinfo, sizeof(modinfo[0]) * (cur + 0x1001));
+-	}
++	modinfo = xrealloc_vector(modinfo, 12, cur);
+ 	modinfo[cur].pathname = xstrdup(pathname);
+ 	modinfo[cur].desc = NULL;
+ 	modinfo[cur+1].pathname = NULL;
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index 3ac5a81..1a4f5d4 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -482,10 +482,8 @@ static struct dep_t *build_dep(void)
+ 				dep = xstrndup(deps, next - deps - ext + 1);
+ 
+ 				/* Add the new dependable module name */
+-				current->m_depcnt++;
+-				current->m_deparr = xrealloc(current->m_deparr,
+-						sizeof(char *) * current->m_depcnt);
+-				current->m_deparr[current->m_depcnt - 1] = dep;
++				current->m_deparr = xrealloc_vector(current->m_deparr, 2, current->m_depcnt);
++				current->m_deparr[current->m_depcnt++] = dep;
+ 
+ 				p = next + 2;
+ 			} while (next < end);
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 2b5e8a1..cb937ca 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -721,11 +721,7 @@ static struct interfaces_file_t *read_interfaces(const char *filename)
+ 			currmap = xzalloc(sizeof(*currmap));
+ 
+ 			while ((first_word = next_word(&rest_of_line)) != NULL) {
+-				if (currmap->n_matches >= currmap->max_matches) {
+-					currmap->max_matches = currmap->max_matches * 2 + 1;
+-					currmap->match = xrealloc(currmap->match,
+-						sizeof(*currmap->match) * currmap->max_matches);
+-				}
++				currmap->match = xrealloc_vector(currmap->match, 4, currmap->n_matches);
+ 				currmap->match[currmap->n_matches++] = xstrdup(first_word);
+ 			}
+ 			/*currmap->max_mappings = 0; - done by xzalloc */
+diff --git a/procps/ps.c b/procps/ps.c
+index c5dff18..d7ea9fb 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -303,9 +303,8 @@ static const ps_out_t out_spec[] = {
+ 
+ static ps_out_t* new_out_t(void)
+ {
+-	int i = out_cnt++;
+-	out = xrealloc(out, out_cnt * sizeof(*out));
+-	return &out[i];
++	out = xrealloc_vector(out, 2, out_cnt);
++	return &out[out_cnt++];
+ }
+ 
+ static const ps_out_t* find_out_spec(const char *name)
+diff --git a/procps/top.c b/procps/top.c
+index e13cd15..392a3c8 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -814,7 +814,7 @@ int top_main(int argc UNUSED_PARAM, char **argv)
+ 			int n;
+ 			if (scan_mask == TOP_MASK) {
+ 				n = ntop;
+-				top = xrealloc(top, (++ntop) * sizeof(*top));
++				top = xrealloc_vector(top, 2, ntop++);
+ 				top[n].pid = p->pid;
+ 				top[n].ppid = p->ppid;
+ 				top[n].vsz = p->vsz;
+@@ -829,7 +829,8 @@ int top_main(int argc UNUSED_PARAM, char **argv)
+ 				if (!(p->mapped_ro | p->mapped_rw))
+ 					continue; /* kernel threads are ignored */
+ 				n = ntop;
+-				top = xrealloc(topmem, (++ntop) * sizeof(*topmem));
++				/* No bug here - top and topmem are the same */
++				top = xrealloc_vector(topmem, 2, ntop++);
+ 				strcpy(topmem[n].comm, p->comm);
+ 				topmem[n].pid      = p->pid;
+ 				topmem[n].vsz      = p->mapped_rw + p->mapped_ro;
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index bdf5f97..25aa406 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -238,8 +238,8 @@ static struct option *add_long_options(struct option *long_options, char *option
+ 				if (tlen == 0)
+ 					bb_error_msg_and_die("empty long option specified");
+ 			}
+-			long_options = xrealloc(long_options,
+-					sizeof(long_options[0]) * (long_nr+2));
++//TODO: zeroing version of xrealloc_vector!
++			long_options = xrealloc_vector(long_options, 4, long_nr);
+ 			long_options[long_nr].has_arg = arg_opt;
+ 			long_options[long_nr].flag = NULL;
+ 			long_options[long_nr].val = LONG_OPT;
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 2ceabce..9f9249f 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -332,7 +332,7 @@ static long parse_mount_options(char *options, char **unrecognized)
+ 		if (unrecognized && i == ARRAY_SIZE(mount_options)) {
+ 			// Add it to strflags, to pass on to kernel
+ 			i = *unrecognized ? strlen(*unrecognized) : 0;
+-			*unrecognized = xrealloc(*unrecognized, i+strlen(options)+2);
++			*unrecognized = xrealloc(*unrecognized, i + strlen(options) + 2);
+ 
+ 			// Comma separated if it's not the first one
+ 			if (i) (*unrecognized)[i++] = ',';

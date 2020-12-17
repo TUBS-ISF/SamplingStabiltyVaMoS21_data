@@ -1,0 +1,14 @@
+2009-06-27 00:07:23 +0200
+diff --git a/coreutils/printf.c b/coreutils/printf.c
+index 5b326c6..eb53fa4 100644
+--- a/coreutils/printf.c
++++ b/coreutils/printf.c
+@@ -152,6 +152,8 @@ static void print_direc(char *format, unsigned fmt_length,
+ 	if (have_width - 1 == have_prec)
+ 		have_width = NULL;
+ 
++	errno = 0;
++
+ 	switch (format[fmt_length - 1]) {
+ 	case 'c':
+ 		printf(format, *argument);

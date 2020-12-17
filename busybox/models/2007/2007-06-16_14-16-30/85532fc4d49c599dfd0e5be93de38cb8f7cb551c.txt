@@ -1,0 +1,15 @@
+2007-06-16 14:16:30 +0000
+diff --git a/libbb/correct_password.c b/libbb/correct_password.c
+index 7affc97..f832635 100644
+--- a/libbb/correct_password.c
++++ b/libbb/correct_password.c
+@@ -47,8 +47,7 @@ int correct_password(const struct passwd *pw)
+ 	char buffer[256];
+ #endif
+ 
+-	/* fake salt. crypt() can choke otherwise.
+-	 * (bb_banner's first two chars are letters and thus are valid salt) */
++	/* fake salt. crypt() can choke otherwise. */
+ 	correct = "aa";
+ 	if (!pw) {
+ 		/* "aa" will never match */

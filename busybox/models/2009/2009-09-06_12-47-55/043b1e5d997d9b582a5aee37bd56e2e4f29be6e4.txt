@@ -1,0 +1,366 @@
+2009-09-06 12:47:55 +0200
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index 9cc22be..240ce4b 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -111,7 +111,10 @@ static void cut_file(FILE *file, char delim, const struct cut_list *cut_lists, u
+ 			int ndelim = -1;	/* zero-based / one-based problem */
+ 			int nfields_printed = 0;
+ 			char *field = NULL;
+-			const char delimiter[2] = { delim, 0 };
++			char delimiter[2];
++
++			delimiter[0] = delim;
++			delimiter[1] = 0;
+ 
+ 			/* does this line contain any delimiters? */
+ 			if (strchr(line, delim) == NULL) {
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index 5281d81..3fdfc23 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -29,7 +29,7 @@ static const struct suffix_mult dd_suffixes[] = {
+ 	{ "M", 1048576 },
+ 	{ "GD", 1000000000 },
+ 	{ "G", 1073741824 },
+-	{ }
++	{ "", 0 }
+ };
+ 
+ struct globals {
+diff --git a/coreutils/expr.c b/coreutils/expr.c
+index 54c2ee1..f5701a4 100644
+--- a/coreutils/expr.c
++++ b/coreutils/expr.c
+@@ -214,9 +214,9 @@ static arith_t arithmetic_common(VALUE *l, VALUE *r, int op)
+ 
+ static VALUE *docolon(VALUE *sv, VALUE *pv)
+ {
++	enum { NMATCH = 2 };
+ 	VALUE *v;
+ 	regex_t re_buffer;
+-	const int NMATCH = 2;
+ 	regmatch_t re_regs[NMATCH];
+ 
+ 	tostring(sv);
+diff --git a/coreutils/head.c b/coreutils/head.c
+index ac476d0..0fab8a8 100644
+--- a/coreutils/head.c
++++ b/coreutils/head.c
+@@ -25,7 +25,7 @@ static const struct suffix_mult head_suffixes[] = {
+ 	{ "b", 512 },
+ 	{ "k", 1024 },
+ 	{ "m", 1024*1024 },
+-	{ }
++	{ "", 0 }
+ };
+ #endif
+ 
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 00efec5..1d5769b 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -963,7 +963,7 @@ parse_old_offset(const char *s, off_t *offset)
+ 	static const struct suffix_mult Bb[] = {
+ 		{ "B", 1024 },
+ 		{ "b", 512 },
+-		{ }
++		{ "", 0 }
+ 	};
+ 	char *p;
+ 	int radix;
+@@ -1178,7 +1178,7 @@ int od_main(int argc, char **argv)
+ 		{ "b", 512 },
+ 		{ "k", 1024 },
+ 		{ "m", 1024*1024 },
+-		{ }
++		{ "", 0 }
+ 	};
+ 	enum {
+ 		OPT_A = 1 << 0,
+diff --git a/coreutils/sleep.c b/coreutils/sleep.c
+index b16d03c..399a38d 100644
+--- a/coreutils/sleep.c
++++ b/coreutils/sleep.c
+@@ -29,7 +29,7 @@ static const struct suffix_mult sfx[] = {
+ 	{ "m", 60 },
+ 	{ "h", 60*60 },
+ 	{ "d", 24*60*60 },
+-	{ }
++	{ "", 0 }
+ };
+ #endif
+ 
+diff --git a/coreutils/split.c b/coreutils/split.c
+index f1ec64b..2191f30 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -20,7 +20,7 @@ static const struct suffix_mult split_suffices[] = {
+ #if ENABLE_FEATURE_SPLIT_FANCY
+ 	{ "g", 1024*1024*1024 },
+ #endif
+-	{ }
++	{ "", 0 }
+ };
+ 
+ /* Increment the suffix part of the filename.
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index e02fe7c..baa1ec2 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -774,7 +774,7 @@ static const struct suffix_mult stty_suffixes[] = {
+ 	{ "b",  512 },
+ 	{ "k", 1024 },
+ 	{ "B", 1024 },
+-	{ }
++	{ "", 0 }
+ };
+ 
+ static const struct mode_info *find_mode(const char *name)
+diff --git a/coreutils/tail.c b/coreutils/tail.c
+index 05dadcd..0be1663 100644
+--- a/coreutils/tail.c
++++ b/coreutils/tail.c
+@@ -30,7 +30,7 @@ static const struct suffix_mult tail_suffixes[] = {
+ 	{ "b", 512 },
+ 	{ "k", 1024 },
+ 	{ "m", 1024*1024 },
+-	{ }
++	{ "", 0 }
+ };
+ 
+ struct globals {
+diff --git a/coreutils/uname.c b/coreutils/uname.c
+index 8453bcc..9822e49 100644
+--- a/coreutils/uname.c
++++ b/coreutils/uname.c
+@@ -48,8 +48,9 @@
+  *  Fix handling of -a to not print "unknown", add -o and -i support.
+  */
+ 
+-#include <sys/utsname.h>
+ #include "libbb.h"
++/* After libbb.h, since it needs sys/types.h on some systems */
++#include <sys/utsname.h>
+ 
+ typedef struct {
+ 	struct utsname name;
+diff --git a/findutils/find.c b/findutils/find.c
+index 5e8193f..ba8fa08 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -782,7 +782,7 @@ static action*** parse_params(char **argv)
+ 				{ "", 512 },
+ 				{ "b", 512 },
+ 				{ "k", 1024 },
+-				{ }
++				{ "", 0 }
+ 			};
+ 			action_size *ap;
+ 			ap = ALLOC_ACTION(size);
+diff --git a/libbb/kernel_version.c b/libbb/kernel_version.c
+index 8b9c4ec..937d2db 100644
+--- a/libbb/kernel_version.c
++++ b/libbb/kernel_version.c
+@@ -7,9 +7,10 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <sys/utsname.h>		/* for uname(2) */
+-
+ #include "libbb.h"
++/* After libbb.h, since it needs sys/types.h on some systems */
++#include <sys/utsname.h>  /* for uname(2) */
++
+ 
+ /* Returns current kernel version encoded as major*65536 + minor*256 + patch,
+  * so, for example,  to check if the kernel is greater than 2.2.11:
+diff --git a/libbb/login.c b/libbb/login.c
+index ba9f4d2..07247a8 100644
+--- a/libbb/login.c
++++ b/libbb/login.c
+@@ -9,9 +9,9 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <sys/param.h>  /* MAXHOSTNAMELEN */
+-#include <sys/utsname.h>
+ #include "libbb.h"
++/* After libbb.h, since it needs sys/types.h on some systems */
++#include <sys/utsname.h>
+ 
+ #define LOGIN " login: "
+ 
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index 85f93b6..a184669 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -7,6 +7,7 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
++#include <sys/socket.h> /* netinet/in.h needs it */
+ #include <netinet/in.h>
+ #include <net/if.h>
+ #include <sys/un.h>
+diff --git a/miscutils/dc.c b/miscutils/dc.c
+index ff2bc3b..3656cdd 100644
+--- a/miscutils/dc.c
++++ b/miscutils/dc.c
+@@ -182,7 +182,7 @@ static const struct op operators[] = {
+ 	{"p", print_no_pop},
+ 	{"f", print_stack_no_pop},
+ 	{"o", set_output_base},
+-	{ /* zero filled */ }
++	{ "", NULL }
+ };
+ 
+ static void stack_machine(const char *argument)
+diff --git a/miscutils/watchdog.c b/miscutils/watchdog.c
+index e334d01..8e961f0 100644
+--- a/miscutils/watchdog.c
++++ b/miscutils/watchdog.c
+@@ -33,7 +33,7 @@ int watchdog_main(int argc, char **argv)
+ 	static const struct suffix_mult suffixes[] = {
+ 		{ "ms", 1 },
+ 		{ "", 1000 },
+-		{ }
++		{ "", 0 }
+ 	};
+ 
+ 	unsigned opts;
+diff --git a/modutils/depmod.c b/modutils/depmod.c
+index 5ec2a51..d6cc8ed 100644
+--- a/modutils/depmod.c
++++ b/modutils/depmod.c
+@@ -10,9 +10,9 @@
+ 
+ #undef _GNU_SOURCE
+ #define _GNU_SOURCE
+-#include <libbb.h>
+-#include <sys/utsname.h> /* uname() */
++#include "libbb.h"
+ #include "modutils.h"
++#include <sys/utsname.h> /* uname() */
+ 
+ /*
+  * Theory of operation:
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index bbd700e..02d8fbd 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -9,7 +9,7 @@
+  */
+ 
+ #include "libbb.h"
+-
++/* After libbb.h, since it needs sys/types.h on some systems */
+ #include <sys/utsname.h> /* uname() */
+ #include <fnmatch.h>
+ 
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 7a9709e..6b94492 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -17,11 +17,11 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
++#include "libbb.h"
++/* After libbb.h, since it needs sys/types.h on some systems */
+ #include <sys/utsname.h>
+ #include <fnmatch.h>
+ 
+-#include "libbb.h"
+-
+ #define MAX_OPT_DEPTH 10
+ #define EUNBALBRACK 10001
+ #define EUNDEFVAR   10002
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index ddb8944..38f9919 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -57,7 +57,7 @@ const struct dhcp_option dhcp_options[] = {
+ 	 * with "option XXX YYY" syntax in dhcpd config file. */
+ 
+ 	{ OPTION_U16                              , 0x39 }, /* DHCP_MAX_SIZE      */
+-	{ } /* zeroed terminating entry */
++	{ 0, 0 } /* zeroed terminating entry */
+ };
+ 
+ /* Used for converting options from incoming packets to env variables
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 66a13fb..34ceadf 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -682,7 +682,7 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 				static const struct suffix_mult km_suffixes[] = {
+ 					{ "k", 1024 },
+ 					{ "m", 1024*1024 },
+-					{ }
++					{ "", 0 }
+ 				};
+ 				ld->sizemax = xatou_sfx(&s[1], km_suffixes);
+ 				break;
+@@ -698,7 +698,7 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 					{ "m", 60 },
+ 					{ "h", 60*60 },
+ 					/*{ "d", 24*60*60 },*/
+-					{ }
++					{ "", 0 }
+ 				};
+ 				ld->rotate_period = xatou_sfx(&s[1], mh_suffixes);
+ 				if (ld->rotate_period) {
+diff --git a/shell/msh_unused.c b/shell/msh_unused.c
+index fe85a81..d4fe3db 100644
+--- a/shell/msh_unused.c
++++ b/shell/msh_unused.c
+@@ -2064,7 +2064,7 @@ static int rlookup(char *n)
+ 		{ "{"    , '{'    },
+ 		{ "}"    , '}'    },
+ 		{ "."    , DOT    },
+-		{ },
++		{ ""     , 0      },
+ 	};
+ 
+ 	const struct res *rp;
+diff --git a/util-linux/hexdump.c b/util-linux/hexdump.c
+index 98d1ac2..f3878f4 100644
+--- a/util-linux/hexdump.c
++++ b/util-linux/hexdump.c
+@@ -47,7 +47,7 @@ static const struct suffix_mult suffixes[] = {
+ 	{ "b", 512 },
+ 	{ "k", 1024 },
+ 	{ "m", 1024*1024 },
+-	{ }
++	{ "", 0 }
+ };
+ 
+ int hexdump_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index 2cdb186..6dff57f 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -7,8 +7,9 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ */
+ 
+-#include <sys/utsname.h>
+ #include "libbb.h"
++/* After libbb.h, since it needs sys/types.h on some systems */
++#include <sys/utsname.h>
+ #include "rtc_.h"
+ 
+ #if ENABLE_FEATURE_HWCLOCK_LONG_OPTIONS
+@@ -67,7 +68,10 @@ static void show_clock(int utc)
+ static void to_sys_clock(int utc)
+ {
+ 	struct timeval tv;
+-	const struct timezone tz = { timezone/60 - 60*daylight, 0 };
++	struct timezone tz;
++
++	tz.tz_minuteswest = timezone/60 - 60*daylight;
++	tz.tz_dsttime = 0;
+ 
+ 	tv.tv_sec = read_rtc(utc);
+ 	tv.tv_usec = 0;

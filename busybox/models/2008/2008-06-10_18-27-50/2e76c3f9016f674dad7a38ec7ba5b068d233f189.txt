@@ -1,0 +1,110 @@
+2008-06-10 18:27:50 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 603e19f..82bad66 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2691,19 +2691,18 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 		arg = ++p;
+ 	} /* end of "while (SPECIAL_VAR_SYMBOL is found) ..." */
+ 
+-	{
+-		int len = strlen(arg);
+-		if (len) {
+-			o_debug_list("expand_vars_to_list[a]", output, n);
+-			o_addstr(output, arg, len + 1);
+-			o_debug_list("expand_vars_to_list[b]", output, n);
+-		} else if (output->length == o_get_last_ptr(output, n)) { /* expansion is empty */
+-			if (!(ored_ch & 0x80)) { /* all vars were not quoted... */
+-				n--;
+-				/* allow to reuse list[n] later without re-growth */
+-				output->has_empty_slot = 1;
+-			}
+-		}
++	if (arg[0]) {
++		o_debug_list("expand_vars_to_list[a]", output, n);
++		o_addstr(output, arg, strlen(arg) + 1);
++		o_debug_list("expand_vars_to_list[b]", output, n);
++	} else if (output->length == o_get_last_ptr(output, n) /* expansion is empty */
++	 && !(ored_ch & 0x80) /* and all vars were not quoted. */
++	) {
++		n--;
++		/* allow to reuse list[n] later without re-growth */
++		output->has_empty_slot = 1;
++	} else {
++		o_addchr(output, '\0');
+ 	}
+ 	return n;
+ }
+diff --git a/shell/hush_test/hush-bugs/tick.right b/shell/hush_test/hush-bugs/tick.right
+deleted file mode 100644
+index 6ed281c..0000000
+--- a/shell/hush_test/hush-bugs/tick.right
++++ /dev/null
+@@ -1,2 +0,0 @@
+-1
+-1
+diff --git a/shell/hush_test/hush-bugs/tick.tests b/shell/hush_test/hush-bugs/tick.tests
+deleted file mode 100755
+index 1f749a9..0000000
+--- a/shell/hush_test/hush-bugs/tick.tests
++++ /dev/null
+@@ -1,4 +0,0 @@
+-true
+-false; echo `echo $?`
+-true
+-{ false; echo `echo $?`; }
+diff --git a/shell/hush_test/hush-bugs/tick2.right b/shell/hush_test/hush-bugs/tick2.right
+deleted file mode 100644
+index 216c883..0000000
+--- a/shell/hush_test/hush-bugs/tick2.right
++++ /dev/null
+@@ -1 +0,0 @@
+-BAZ
+diff --git a/shell/hush_test/hush-bugs/tick2.tests b/shell/hush_test/hush-bugs/tick2.tests
+deleted file mode 100755
+index dc51805..0000000
+--- a/shell/hush_test/hush-bugs/tick2.tests
++++ /dev/null
+@@ -1,6 +0,0 @@
+-# Bag: backticks are executed even inside not-taken if
+-if false; then
+-    echo "FOO"
+-    tmp=`echo BAR >&2`
+-fi
+-echo BAZ
+diff --git a/shell/hush_test/hush-psubst/tick.right b/shell/hush_test/hush-psubst/tick.right
+new file mode 100644
+index 0000000..6ed281c
+--- /dev/null
++++ b/shell/hush_test/hush-psubst/tick.right
+@@ -0,0 +1,2 @@
++1
++1
+diff --git a/shell/hush_test/hush-psubst/tick.tests b/shell/hush_test/hush-psubst/tick.tests
+new file mode 100755
+index 0000000..1f749a9
+--- /dev/null
++++ b/shell/hush_test/hush-psubst/tick.tests
+@@ -0,0 +1,4 @@
++true
++false; echo `echo $?`
++true
++{ false; echo `echo $?`; }
+diff --git a/shell/hush_test/hush-psubst/tick2.right b/shell/hush_test/hush-psubst/tick2.right
+new file mode 100644
+index 0000000..216c883
+--- /dev/null
++++ b/shell/hush_test/hush-psubst/tick2.right
+@@ -0,0 +1 @@
++BAZ
+diff --git a/shell/hush_test/hush-psubst/tick2.tests b/shell/hush_test/hush-psubst/tick2.tests
+new file mode 100755
+index 0000000..db4e944
+--- /dev/null
++++ b/shell/hush_test/hush-psubst/tick2.tests
+@@ -0,0 +1,5 @@
++if false; then
++    echo "FOO"
++    tmp=`echo BAR >&2`
++fi
++echo BAZ

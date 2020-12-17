@@ -1,0 +1,235 @@
+2008-07-21 14:41:33 +0000
+diff --git a/coreutils/install.c b/coreutils/install.c
+index c5d7a0c..c7ddbb2 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -170,7 +170,7 @@ int install_main(int argc, char **argv)
+ 
+ 		/* Set the file mode */
+ 		if ((flags & OPT_MODE) && chmod(dest, mode) == -1) {
+-			bb_perror_msg("cannot change permissions of %s", dest);
++			bb_perror_msg("can't change %s of %s", "permissions", dest);
+ 			ret = EXIT_FAILURE;
+ 		}
+ #if ENABLE_SELINUX
+@@ -181,7 +181,7 @@ int install_main(int argc, char **argv)
+ 		if ((flags & (OPT_OWNER|OPT_GROUP))
+ 		 && lchown(dest, uid, gid) == -1
+ 		) {
+-			bb_perror_msg("cannot change ownership of %s", dest);
++			bb_perror_msg("can't change %s of %s", "ownership", dest);
+ 			ret = EXIT_FAILURE;
+ 		}
+ 		if (flags & OPT_STRIP) {
+diff --git a/include/libbb.h b/include/libbb.h
+index 4e4e379..4b2a839 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -691,6 +691,8 @@ struct bb_uidgid_t {
+ };
+ /* always sets uid and gid */
+ int get_uidgid(struct bb_uidgid_t*, const char*, int numeric_ok) FAST_FUNC;
++/* always sets uid and gid, allows numeric; exits on failure */
++void xget_uidgid(struct bb_uidgid_t*, const char*) FAST_FUNC;
+ /* chown-like handling of "user[:[group]" */
+ void parse_chown_usergroup_or_die(struct bb_uidgid_t *u, char *user_group) FAST_FUNC;
+ /* bb_getpwuid, bb_getgrgid:
+diff --git a/libbb/bb_pwd.c b/libbb/bb_pwd.c
+index b03dc83..65eb692 100644
+--- a/libbb/bb_pwd.c
++++ b/libbb/bb_pwd.c
+@@ -82,7 +82,7 @@ long FAST_FUNC xuname2uid(const char *name)
+ 
+ 	myuser = getpwnam(name);
+ 	if (myuser == NULL)
+-		bb_error_msg_and_die("unknown user name: %s", name);
++		bb_error_msg_and_die("unknown user %s", name);
+ 
+ 	return myuser->pw_uid;
+ }
+diff --git a/libpwdgrp/uidgid_get.c b/libpwdgrp/uidgid_get.c
+index 88f4e25..dc7cc66 100644
+--- a/libpwdgrp/uidgid_get.c
++++ b/libpwdgrp/uidgid_get.c
+@@ -76,6 +76,11 @@ int FAST_FUNC get_uidgid(struct bb_uidgid_t *u, const char *ug, int numeric_ok)
+ 	}
+ 	return 1;
+ }
++void FAST_FUNC xget_uidgid(struct bb_uidgid_t *u, const char *ug)
++{
++    if (!get_uidgid(u, ug, 1))
++	bb_error_msg_and_die("unknown user/group %s", ug);
++}
+ 
+ /* chown-like:
+  * "user" sets uid only,
+@@ -106,8 +111,7 @@ void FAST_FUNC parse_chown_usergroup_or_die(struct bb_uidgid_t *u, char *user_gr
+ 	} else {
+ 		if (!group[1]) /* "user:" */
+ 			*group = '\0';
+-		if (!get_uidgid(u, user_group, 1))
+-			bb_error_msg_and_die("unknown user/group %s", user_group);
++		xget_uidgid(u, user_group);
+ 	}
+ }
+ 
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index 84e5aeb..99fb76e 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -27,7 +27,7 @@ static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
+ 			goto err_ret;
+ 		encrypted = pw_encrypt(orig, pw->pw_passwd, 1); /* returns malloced str */
+ 		if (strcmp(encrypted, pw->pw_passwd) != 0) {
+-			syslog(LOG_WARNING, "incorrect password for '%s'",
++			syslog(LOG_WARNING, "incorrect password for %s",
+ 				pw->pw_name);
+ 			bb_do_delay(FAIL_DELAY);
+ 			puts("Incorrect password");
+@@ -119,7 +119,8 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
+ 	name = argv[0] ? argv[0] : myname;
+ 
+ 	pw = getpwnam(name);
+-	if (!pw) bb_error_msg_and_die("unknown user %s", name);
++	if (!pw)
++		bb_error_msg_and_die("unknown user %s", name);
+ 	if (myuid && pw->pw_uid != myuid) {
+ 		/* LOGMODE_BOTH */
+ 		bb_error_msg_and_die("%s can't change password for %s", myname, name);
+diff --git a/loginutils/vlock.c b/loginutils/vlock.c
+index 442272a..42ef447 100644
+--- a/loginutils/vlock.c
++++ b/loginutils/vlock.c
+@@ -40,7 +40,7 @@ int vlock_main(int argc UNUSED_PARAM, char **argv)
+ 	struct vt_mode ovtm;
+ 	uid_t uid;
+ 	struct passwd *pw;
+-
++/* XXX: xgetpwuid */
+ 	uid = getuid();
+ 	pw = getpwuid(uid);
+ 	if (pw == NULL)
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 64ea4e6..f8662ba 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -129,11 +129,11 @@ int crontab_main(int argc UNUSED_PARAM, char **argv)
+ 		if (!pas)
+ 			bb_error_msg_and_die("user %s is not known", user_name);
+ 	} else {
++/* XXX: xgetpwuid */
+ 		uid_t my_uid = getuid();
+ 		pas = getpwuid(my_uid);
+ 		if (!pas)
+-			bb_perror_msg_and_die("no user record for UID %u",
+-					(unsigned)my_uid);
++			bb_perror_msg_and_die("unknown uid %d", (int)my_uid);
+ 	}
+ 
+ #define user_name DONT_USE_ME_BEYOND_THIS_POINT
+diff --git a/networking/httpd.c b/networking/httpd.c
+index f7e044d..8c4242e 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -2351,9 +2351,7 @@ int httpd_main(int argc UNUSED_PARAM, char **argv)
+ #endif
+ #if ENABLE_FEATURE_HTTPD_SETUID
+ 	if (opt & OPT_SETUID) {
+-		if (!get_uidgid(&ugid, s_ugid, 1))
+-			bb_error_msg_and_die("unknown user[:group] "
+-						"name '%s'", s_ugid);
++		xget_uidgid(&ugid, s_ugid);
+ 	}
+ #endif
+ 
+diff --git a/networking/libiproute/libnetlink.c b/networking/libiproute/libnetlink.c
+index 6b599d9..01454fb 100644
+--- a/networking/libiproute/libnetlink.c
++++ b/networking/libiproute/libnetlink.c
+@@ -37,7 +37,7 @@ int FAST_FUNC xrtnl_open(struct rtnl_handle *rth/*, unsigned subscriptions*/)
+ 	xbind(rth->fd, (struct sockaddr*)&rth->local, sizeof(rth->local));
+ 	addr_len = sizeof(rth->local);
+ 	if (getsockname(rth->fd, (struct sockaddr*)&rth->local, &addr_len) < 0)
+-		bb_perror_msg_and_die("cannot getsockname");
++		bb_perror_msg_and_die("getsockname");
+ 	if (addr_len != sizeof(rth->local))
+ 		bb_error_msg_and_die("wrong address length %d", addr_len);
+ 	if (rth->local.nl_family != AF_NETLINK)
+diff --git a/networking/tcpudp.c b/networking/tcpudp.c
+index 29408c5..d673119 100644
+--- a/networking/tcpudp.c
++++ b/networking/tcpudp.c
+@@ -216,8 +216,7 @@ int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
+ 	if (max_per_host > cmax)
+ 		max_per_host = cmax;
+ 	if (option_mask32 & OPT_u) {
+-		if (!get_uidgid(&ugid, user, 1))
+-			bb_error_msg_and_die("unknown user/group: %s", user);
++		xget_uidgid(&ugid, user);
+ 	}
+ #ifdef SSLSVD
+ 	if (option_mask32 & OPT_U) ssluser = optarg;
+@@ -245,9 +244,9 @@ int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
+ 	if (option_mask32 & OPT_u)
+ 		if (!uidgid_get(&sslugid, ssluser, 1)) {
+ 			if (errno) {
+-				bb_perror_msg_and_die("fatal: cannot get user/group: %s", ssluser);
++				bb_perror_msg_and_die("can't get user/group: %s", ssluser);
+ 			}
+-			bb_error_msg_and_die("unknown user/group '%s'", ssluser);
++			bb_error_msg_and_die("unknown user/group %s", ssluser);
+ 		}
+ 	if (!cert) cert = "./cert.pem";
+ 	if (!key) key = cert;
+diff --git a/networking/tftp.c b/networking/tftp.c
+index d09a6eb..07d672d 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -225,7 +225,7 @@ static int tftp_protocol(
+ 		if (user_opt) {
+ 			struct passwd *pw = getpwnam(user_opt);
+ 			if (!pw)
+-				bb_error_msg_and_die("unknown user '%s'", user_opt);
++				bb_error_msg_and_die("unknown user %s", user_opt);
+ 			change_identity(pw); /* initgroups, setgid, setuid */
+ 		}
+ 	}
+diff --git a/procps/renice.c b/procps/renice.c
+index 4c309e9..ea5fc70 100644
+--- a/procps/renice.c
++++ b/procps/renice.c
+@@ -84,7 +84,7 @@ int renice_main(int argc UNUSED_PARAM, char **argv)
+ 			struct passwd *p;
+ 			p = getpwnam(arg);
+ 			if (!p) {
+-				bb_error_msg("unknown user: %s", arg);
++				bb_error_msg("unknown user %s", arg);
+ 				goto HAD_ERROR;
+ 			}
+ 			who = p->pw_uid;
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 899a4ee..3c841dd 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -81,9 +81,7 @@ static void suidgid(char *user)
+ {
+ 	struct bb_uidgid_t ugid;
+ 
+-	if (!get_uidgid(&ugid, user, 1)) {
+-		bb_error_msg_and_die("unknown user/group: %s", user);
+-	}
++	xget_uidgid(&ugid, user);
+ 	if (setgroups(1, &ugid.gid) == -1)
+ 		bb_perror_msg_and_die("setgroups");
+ 	xsetgid(ugid.gid);
+@@ -94,9 +92,7 @@ static void euidgid(char *user)
+ {
+ 	struct bb_uidgid_t ugid;
+ 
+-	if (!get_uidgid(&ugid, user, 1)) {
+-		bb_error_msg_and_die("unknown user/group: %s", user);
+-	}
++	xget_uidgid(&ugid, user);
+ 	xsetenv("GID", utoa(ugid.gid));
+ 	xsetenv("UID", utoa(ugid.uid));
+ }

@@ -1,0 +1,67 @@
+2007-07-24 06:17:43 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 6608938..a17f5b1 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2978,7 +2978,7 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "\n	-d	Show which specification matched each file" \
+        "\n	-l	Log changes in file labels to syslog" \
+        "\n	-n	Don't change any file labels" \
+-       "\n	-q	Suppress no-error output" \
++       "\n	-q	Suppress warnings" \
+        "\n	-r dir	Use an altenate root path" \
+        "\n	-e dir	Exclude directory" \
+        "\n	-F	Force reset of context to match file_context for customizable files" \
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index cadec83..d9fb507 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -128,10 +128,10 @@ static void inc_err(void)
+ 	}
+ }
+ 
+-static int add_exclude(const char *directory)
++static bool add_exclude(const char *const directory)
+ {
+ 	struct stat sb;
+-	size_t len = 0;
++	size_t len;
+ 
+ 	if (directory == NULL || directory[0] != '/') {
+ 		bb_error_msg("full path required for exclude: %s", directory);
+@@ -161,7 +161,7 @@ static int add_exclude(const char *directory)
+ 	return 0;
+ }
+ 
+-static int exclude(const char *file)
++static bool exclude(const char *file)
+ {
+ 	int i = 0;
+ 	for (i = 0; i < excludeCtr; i++) {
+@@ -268,7 +268,7 @@ static int match(const char *name, struct stat *sb, char **con)
+ 
+ /* Compare two contexts to see if their differences are "significant",
+  * or whether the only difference is in the user. */
+-static int only_changed_user(const char *a, const char *b)
++static bool only_changed_user(const char *a, const char *b)
+ {
+ 	if (FLAG_F_force)
+ 		return 0;
+@@ -289,7 +289,7 @@ static int restore(const char *file)
+ 	int i, j, ret;
+ 	char *context = NULL;
+ 	char *newcon = NULL;
+-	int user_only_changed = 0;
++	bool user_only_changed = 0;
+ 	size_t len = strlen(my_file);
+ 	int retval = 0;
+ 
+@@ -561,7 +561,7 @@ int setfiles_main(int argc, char **argv)
+ 
+ 	set_matchpathcon_flags(matchpathcon_flags);
+ 
+-	opt_complementary = "e::vv:v--p:p--v";
++	opt_complementary = "e::vv:v--p:p--v:v--q:q--v";
+ 	/* Option order must match OPT_x definitions! */
+ 	if (applet_name[0] == 'r') { /* restorecon */
+ 		flags = getopt32(argc, argv, "de:f:ilnpqrsvo:FWR",

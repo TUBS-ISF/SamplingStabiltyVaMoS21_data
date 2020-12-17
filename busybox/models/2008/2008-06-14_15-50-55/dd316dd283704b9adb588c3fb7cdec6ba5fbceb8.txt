@@ -1,0 +1,273 @@
+2008-06-14 15:50:55 +0000
+diff --git a/scripts/trylink b/scripts/trylink
+index c24d49d..adc045a 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -126,11 +126,12 @@ try $CC $CFLAGS $LDFLAGS \
+ while test "$LDLIBS"; do
+     $debug && echo "Trying libraries: $LDLIBS"
+     all_needed=true
++    last_needed=false
+     for one in $LDLIBS; do
+ 	without_one=`echo " $LDLIBS " | sed "s/ $one / /g" | xargs`
+ 	# "lib1 lib2 lib3" -> "-llib1 -llib2 -llib3"
+ 	l_list=`echo "$without_one" | sed -e 's/ / -l/g' -e 's/^/-l/' -e 's/^-l$//'`
+-	test "x$l_list" != "x" && l_list="-Wl,--start-group $l_list -Wl,--end-group"
++	test x"$l_list" != x"" && l_list="-Wl,--start-group $l_list -Wl,--end-group"
+ 	$debug && echo "Trying -l options: '$l_list'"
+ 	try $CC $CFLAGS $LDFLAGS \
+ 		-o $EXE \
+@@ -143,16 +144,19 @@ while test "$LDLIBS"; do
+ 	    echo " Library $one is not needed"
+ 	    LDLIBS="$without_one"
+ 	    all_needed=false
++	    last_needed=false
+ 	else
+ 	    echo " Library $one is needed"
++	    last_needed=true
+ 	fi
+     done
+     # All libs were needed, can't remove any
+     $all_needed && break
+-    # If there is no space char, the list has just one lib.
+-    # I'm not sure that in this case lib really is 100% needed.
+-    # Let's try linking without it anyway... thus commented out.
+-    #{ echo "$LDLIBS" | grep -q ' '; } || break
++    # Optimization: was the last tried lib needed?
++    if $last_needed; then
++	# Was it the only one lib left? Don't test again then.
++	{ echo "$LDLIBS" | grep -q ' '; } || break
++    fi
+ done
+ 
+ # Make the binary with final, minimal list of libs
+diff --git a/shell/hush.c b/shell/hush.c
+index 222fd9f..a84bb92 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -615,6 +615,7 @@ static int builtin_help(char **argv);
+ static int builtin_pwd(char **argv);
+ static int builtin_read(char **argv);
+ static int builtin_test(char **argv);
++static int builtin_true(char **argv);
+ static int builtin_set(char **argv);
+ static int builtin_shift(char **argv);
+ static int builtin_source(char **argv);
+@@ -629,10 +630,10 @@ static int builtin_unset(char **argv);
+  * For example, 'unset foo | whatever' will parse and run, but foo will
+  * still be set at the end. */
+ struct built_in_command {
+-	const char *cmd;                /* name */
+-	int (*function) (char **argv);  /* function ptr */
++	const char *cmd;
++	int (*function)(char **argv);
+ #if ENABLE_HUSH_HELP
+-	const char *descr;              /* description */
++	const char *descr;
+ #define BLTIN(cmd, func, help) { cmd, func, help }
+ #else
+ #define BLTIN(cmd, func, help) { cmd, func }
+@@ -642,24 +643,25 @@ struct built_in_command {
+ /* For now, echo and test are unconditionally enabled.
+  * Maybe make it configurable? */
+ static const struct built_in_command bltins[] = {
++	BLTIN("."     , builtin_source, "Run commands in a file"),
++	BLTIN(":"     , builtin_true, "No-op"),
+ 	BLTIN("["     , builtin_test, "Test condition"),
+ 	BLTIN("[["    , builtin_test, "Test condition"),
+ #if ENABLE_HUSH_JOB
+ 	BLTIN("bg"    , builtin_fg_bg, "Resume a job in the background"),
+ #endif
+ //	BLTIN("break" , builtin_not_written, "Exit for, while or until loop"),
+-	BLTIN("cd"    , builtin_cd, "Change working directory"),
++	BLTIN("cd"    , builtin_cd, "Change directory"),
+ //	BLTIN("continue", builtin_not_written, "Continue for, while or until loop"),
+ 	BLTIN("echo"  , builtin_echo, "Write strings to stdout"),
+ 	BLTIN("eval"  , builtin_eval, "Construct and run shell command"),
+-	BLTIN("exec"  , builtin_exec, "Exec command, replacing this shell with the exec'd process"),
+-	BLTIN("exit"  , builtin_exit, "Exit from shell"),
++	BLTIN("exec"  , builtin_exec, "Execute command, don't return to shell"),
++	BLTIN("exit"  , builtin_exit, "Exit"),
+ 	BLTIN("export", builtin_export, "Set environment variable"),
+ #if ENABLE_HUSH_JOB
+ 	BLTIN("fg"    , builtin_fg_bg, "Bring job into the foreground"),
+-	BLTIN("jobs"  , builtin_jobs, "Lists the active jobs"),
++	BLTIN("jobs"  , builtin_jobs, "List active jobs"),
+ #endif
+-// TODO: remove pwd? we have it as an applet...
+ 	BLTIN("pwd"   , builtin_pwd, "Print current directory"),
+ 	BLTIN("read"  , builtin_read, "Input environment variable"),
+ //	BLTIN("return", builtin_not_written, "Return from a function"),
+@@ -667,14 +669,12 @@ static const struct built_in_command bltins[] = {
+ 	BLTIN("shift" , builtin_shift, "Shift positional parameters"),
+ //	BLTIN("trap"  , builtin_not_written, "Trap signals"),
+ 	BLTIN("test"  , builtin_test, "Test condition"),
+-//	BLTIN("ulimit", builtin_not_written, "Controls resource limits"),
+-	BLTIN("umask" , builtin_umask, "Sets file creation mask"),
++//	BLTIN("ulimit", builtin_not_written, "Control resource limits"),
++	BLTIN("umask" , builtin_umask, "Set file creation mask"),
+ 	BLTIN("unset" , builtin_unset, "Unset environment variable"),
+-	BLTIN("."     , builtin_source, "Source-in and run commands in a file"),
+ #if ENABLE_HUSH_HELP
+ 	BLTIN("help"  , builtin_help, "List shell built-in commands"),
+ #endif
+-	BLTIN(NULL, NULL, NULL)
+ };
+ 
+ /* Signals are grouped, we handle them in batches */
+@@ -810,6 +810,12 @@ static const char *set_cwd(void)
+ }
+ 
+ 
++/* built-in 'true' handler */
++static int builtin_true(char **argv ATTRIBUTE_UNUSED)
++{
++	return 0;
++}
++
+ /* built-in 'test' handler */
+ static int builtin_test(char **argv)
+ {
+@@ -1005,7 +1011,7 @@ static int builtin_help(char **argv ATTRIBUTE_UNUSED)
+ 
+ 	printf("\nBuilt-in commands:\n");
+ 	printf("-------------------\n");
+-	for (x = bltins; x->cmd; x++) {
++	for (x = bltins; x != &bltins[ARRAY_SIZE(bltins)]; x++) {
+ 		printf("%s\t%s\n", x->cmd, x->descr);
+ 	}
+ 	printf("\n\n");
+@@ -1583,7 +1589,7 @@ static void pseudo_exec_argv(char **ptrs2free, char **argv)
+ 	 * easier to waste a few CPU cycles than it is to figure out
+ 	 * if this is one of those cases.
+ 	 */
+-	for (x = bltins; x->cmd; x++) {
++	for (x = bltins; x != &bltins[ARRAY_SIZE(bltins)]; x++) {
+ 		if (strcmp(argv[0], x->cmd) == 0) {
+ 			debug_printf_exec("running builtin '%s'\n", argv[0]);
+ 			rcode = x->function(argv);
+@@ -1965,7 +1971,7 @@ static int run_pipe(struct pipe *pi)
+ 			p = expand_string_to_string(argv[i]);
+ 			putenv(p);
+ 		}
+-		for (x = bltins; x->cmd; x++) {
++		for (x = bltins; x != &bltins[ARRAY_SIZE(bltins)]; x++) {
+ 			if (strcmp(argv[i], x->cmd) == 0) {
+ 				if (x->function == builtin_exec && argv[i+1] == NULL) {
+ 					debug_printf("magic exec\n");
+diff --git a/shell/hush_test/hush-bugs/glob_and_assign.right b/shell/hush_test/hush-bugs/glob_and_assign.right
+new file mode 100644
+index 0000000..dae8323
+--- /dev/null
++++ b/shell/hush_test/hush-bugs/glob_and_assign.right
+@@ -0,0 +1,2 @@
++ZVAR=z.map
++*.map
+diff --git a/shell/hush_test/hush-bugs/glob_and_assign.tests b/shell/hush_test/hush-bugs/glob_and_assign.tests
+new file mode 100755
+index 0000000..ea11e36
+--- /dev/null
++++ b/shell/hush_test/hush-bugs/glob_and_assign.tests
+@@ -0,0 +1,18 @@
++## # bash zbad2
++## ZVAR=z.map
++## *.map
++## # hush zbad2
++## ZVAR=z.map
++## z.map  <====== !!!
++
++## hush does globbing for "VAR=val" too!
++## it should do it only for non-assignments.
++## even if word looks like assignment, it can be non-assignment:
++## ZVAR=*.map /bin/echo ZVAR=*.map
++## ^dont_glob           ^glob
++
++>ZVAR=z.map
++ZVAR=*.map /bin/echo ZVAR=*.map
++ZVAR=*.map
++echo "$ZVAR"
++rm ZVAR=z.map
+diff --git a/shell/hush_test/hush-bugs/glob_and_vars.right b/shell/hush_test/hush-bugs/glob_and_vars.right
+new file mode 100644
+index 0000000..3ac7ec5
+--- /dev/null
++++ b/shell/hush_test/hush-bugs/glob_and_vars.right
+@@ -0,0 +1 @@
++./glob_and_vars.right ./glob_and_vars.tests
+diff --git a/shell/hush_test/hush-bugs/glob_and_vars.tests b/shell/hush_test/hush-bugs/glob_and_vars.tests
+new file mode 100755
+index 0000000..c8e0c06
+--- /dev/null
++++ b/shell/hush_test/hush-bugs/glob_and_vars.tests
+@@ -0,0 +1,2 @@
++v=.
++echo $v/glob_and_vars.*
+diff --git a/shell/hush_test/hush-bugs/while_in_subshell.right b/shell/hush_test/hush-bugs/while_in_subshell.right
+new file mode 100644
+index 0000000..290d39b
+--- /dev/null
++++ b/shell/hush_test/hush-bugs/while_in_subshell.right
+@@ -0,0 +1 @@
++OK: 0
+diff --git a/shell/hush_test/hush-bugs/while_in_subshell.tests b/shell/hush_test/hush-bugs/while_in_subshell.tests
+new file mode 100755
+index 0000000..def8e09
+--- /dev/null
++++ b/shell/hush_test/hush-bugs/while_in_subshell.tests
+@@ -0,0 +1,2 @@
++(while true; do exit; done)
++echo OK: $?
+diff --git a/shell/hush_test/hush-misc/colon.right b/shell/hush_test/hush-misc/colon.right
+new file mode 100644
+index 0000000..2a87d02
+--- /dev/null
++++ b/shell/hush_test/hush-misc/colon.right
+@@ -0,0 +1,2 @@
++0
++OK: 0
+diff --git a/shell/hush_test/hush-misc/colon.tests b/shell/hush_test/hush-misc/colon.tests
+new file mode 100755
+index 0000000..ea3b4d5
+--- /dev/null
++++ b/shell/hush_test/hush-misc/colon.tests
+@@ -0,0 +1,6 @@
++false
++:
++echo $?
++# Extra ; after done is due to a bug
++(while :; do exit; done;)
++echo OK: $?
+diff --git a/shell/hush_test/zbad b/shell/hush_test/zbad
+deleted file mode 100644
+index e4b5caa..0000000
+--- a/shell/hush_test/zbad
++++ /dev/null
+@@ -1,3 +0,0 @@
+-# TODO: hush doesn't know ':' null command
+-
+-while :; do exit; done
+diff --git a/shell/hush_test/zbad2 b/shell/hush_test/zbad2
+deleted file mode 100644
+index b6fffe5..0000000
+--- a/shell/hush_test/zbad2
++++ /dev/null
+@@ -1,19 +0,0 @@
+-## TODO: fix and add to testsuite
+-
+-## # bash zbad2
+-## ZVAR=z.map
+-## *.map
+-## # hush zbad2
+-## ZVAR=z.map
+-## z.map  <====== !!!
+-
+-## hush does globbing for "VAR=val" too!
+-## it should do it only for non-assignments.
+-## even if word looks like assignment, it can be non-assignment:
+-## ZVAR=*.map /bin/echo ZVAR=*.map
+-## ^dont_glob           ^glob
+-
+->ZVAR=z.map
+-ZVAR=*.map /bin/echo ZVAR=*.map
+-ZVAR=*.map
+-echo "$ZVAR"

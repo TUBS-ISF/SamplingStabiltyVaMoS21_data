@@ -1,0 +1,61 @@
+2009-09-09 23:12:10 +0200
+diff --git a/coreutils/logname.c b/coreutils/logname.c
+index 3400c30..7983d17 100644
+--- a/coreutils/logname.c
++++ b/coreutils/logname.c
+@@ -27,7 +27,7 @@
+ int logname_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int logname_main(int argc, char **argv UNUSED_PARAM)
+ {
+-	char buf[128];
++	char buf[64];
+ 
+ 	if (argc > 1) {
+ 		bb_show_usage();
+diff --git a/editors/awk.c b/editors/awk.c
+index 30f09cb..cb98a67 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -114,7 +114,7 @@ typedef struct nvblock_s {
+ 	var *pos;
+ 	struct nvblock_s *prev;
+ 	struct nvblock_s *next;
+-	var nv[0];
++	var nv[];
+ } nvblock;
+ 
+ typedef struct tsplitter_s {
+diff --git a/loginutils/su.c b/loginutils/su.c
+index a8b852b..a3f7ed8 100644
+--- a/loginutils/su.c
++++ b/loginutils/su.c
+@@ -40,11 +40,24 @@ int su_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	if (ENABLE_FEATURE_SU_SYSLOG) {
+ 		/* The utmp entry (via getlogin) is probably the best way to identify
+-		the user, especially if someone su's from a su-shell.
+-		But getlogin can fail -- usually due to lack of utmp entry.
+-		in this case resort to getpwuid.  */
+-		old_user = xstrdup(IF_FEATURE_UTMP(getlogin() ? : ) (pw = getpwuid(cur_uid)) ? pw->pw_name : "");
+-		tty = xmalloc_ttyname(2) ? : "none";
++		 * the user, especially if someone su's from a su-shell.
++		 * But getlogin can fail -- usually due to lack of utmp entry.
++		 * in this case resort to getpwuid.  */
++		const char *user;
++#if ENABLE_FEATURE_UTMP
++		char user_buf[64];
++		user = user_buf;
++		if (getlogin_r(user_buf, sizeof(user_buf)) != 0)
++#endif
++		{
++			pw = getpwuid(cur_uid);
++			user = pw ? pw->pw_name : "";
++		}
++		old_user = xstrdup(user);
++		tty = xmalloc_ttyname(2);
++		if (!tty) {
++			tty = "none";
++		}
+ 		openlog(applet_name, 0, LOG_AUTH);
+ 	}
+ 

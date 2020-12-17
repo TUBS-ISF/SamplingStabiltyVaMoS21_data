@@ -1,0 +1,19 @@
+2009-03-29 17:13:20 +0000
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 62be3e6..7feaf4a 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -414,12 +414,11 @@ config FEATURE_HDPARM_HDIO_TRISTATE_HWIF
+ 	  stuff, so you should probably say N.
+ 
+ config FEATURE_HDPARM_HDIO_GETSET_DMA
+-	bool "Get/set using_dma flag (DANGEROUS)"
++	bool "Get/set using_dma flag"
+ 	default n
+ 	depends on HDPARM
+ 	help
+ 	  Enables the 'hdparm -d' option to get/set using_dma flag.
+-	  This is dangerous stuff, so you should probably say N.
+ 
+ config MAKEDEVS
+ 	bool "makedevs"

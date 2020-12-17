@@ -1,0 +1,264 @@
+2007-12-24 17:32:22 +0000
+diff --git a/Makefile b/Makefile
+index 618b518..eabc21b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ VERSION = 1
+-PATCHLEVEL = 9
++PATCHLEVEL = 10
+ SUBLEVEL = 0
+-EXTRAVERSION =
++EXTRAVERSION = .svn
+ NAME = Unnamed
+ 
+ # *DOCUMENTATION*
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 0347310..b8190ba 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -167,39 +167,40 @@ int send_release(uint32_t server, uint32_t ciaddr)
+ }
+ 
+ 
+-/* return -1 on errors that are fatal for the socket, -2 for those that aren't */
++/* Returns -1 on errors that are fatal for the socket, -2 for those that aren't */
+ int get_raw_packet(struct dhcpMessage *payload, int fd)
+ {
+ 	int bytes;
+ 	struct udp_dhcp_packet packet;
+ 	uint16_t check;
+ 
+-	memset(&packet, 0, sizeof(struct udp_dhcp_packet));
+-	bytes = read(fd, &packet, sizeof(struct udp_dhcp_packet));
++	memset(&packet, 0, sizeof(packet));
++	bytes = safe_read(fd, &packet, sizeof(packet));
+ 	if (bytes < 0) {
+ 		DEBUG("Cannot read on raw listening socket - ignoring");
+ 		sleep(1); /* possible down interface, looping condition */
+-		return -1;
++		return bytes; /* returns -1 */
+ 	}
+ 
+-	if (bytes < (int) (sizeof(struct iphdr) + sizeof(struct udphdr))) {
+-		DEBUG("Message too short, ignoring");
++	if (bytes < (int) (sizeof(packet.ip) + sizeof(packet.udp))) {
++		DEBUG("Packet is too short, ignoring");
+ 		return -2;
+ 	}
+ 
+ 	if (bytes < ntohs(packet.ip.tot_len)) {
+-		DEBUG("Truncated packet");
++		/* packet is bigger than sizeof(packet), we did partial read */
++		DEBUG("Oversized packet, ignoring");
+ 		return -2;
+ 	}
+ 
+ 	/* ignore any extra garbage bytes */
+ 	bytes = ntohs(packet.ip.tot_len);
+ 
+-	/* Make sure its the right packet for us, and that it passes sanity checks */
++	/* make sure its the right packet for us, and that it passes sanity checks */
+ 	if (packet.ip.protocol != IPPROTO_UDP || packet.ip.version != IPVERSION
+ 	 || packet.ip.ihl != (sizeof(packet.ip) >> 2)
+ 	 || packet.udp.dest != htons(CLIENT_PORT)
+-	 || bytes > (int) sizeof(struct udp_dhcp_packet)
++	/* || bytes > (int) sizeof(packet) - can't happen */
+ 	 || ntohs(packet.udp.len) != (uint16_t)(bytes - sizeof(packet.ip))
+ 	) {
+ 		DEBUG("Unrelated/bogus packet");
+@@ -211,12 +212,12 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
+ 	packet.ip.check = 0;
+ 	if (check != udhcp_checksum(&packet.ip, sizeof(packet.ip))) {
+ 		DEBUG("Bad IP header checksum, ignoring");
+-		return -1;
++		return -2;
+ 	}
+ 
+ 	/* verify UDP checksum. IP header has to be modified for this */
+ 	memset(&packet.ip, 0, offsetof(struct iphdr, protocol));
+-	/* fields which are not memset: protocol, check, saddr, daddr */
++	/* ip.xx fields which are not memset: protocol, check, saddr, daddr */
+ 	packet.ip.tot_len = packet.udp.len; /* yes, this is needed */
+ 	check = packet.udp.check;
+ 	packet.udp.check = 0;
+@@ -228,7 +229,7 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
+ 	memcpy(payload, &packet.data, bytes - (sizeof(packet.ip) + sizeof(packet.udp)));
+ 
+ 	if (payload->cookie != htonl(DHCP_MAGIC)) {
+-		bb_error_msg("received bogus message (bad magic) - ignoring");
++		bb_error_msg("received bogus message (bad magic), ignoring");
+ 		return -2;
+ 	}
+ 	DEBUG("Got valid DHCP packet");
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 3de389f..d76a62c 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -454,7 +454,7 @@ int udhcpc_main(int argc, char **argv)
+ 				len = udhcp_recv_packet(&packet, sockfd);
+ 			else len = get_raw_packet(&packet, sockfd);
+ 
+-			if (len == -1 && errno != EINTR) {
++			if (len == -1) { /* error is severe, reopen socket */
+ 				DEBUG("error on read, %s, reopening socket", strerror(errno));
+ 				change_listen_mode(listen_mode); /* just close and reopen */
+ 			}
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index 22c18de..443fea6 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -41,20 +41,14 @@ void udhcp_init_header(struct dhcpMessage *packet, char type)
+ /* read a packet from socket fd, return -1 on read error, -2 on packet error */
+ int udhcp_recv_packet(struct dhcpMessage *packet, int fd)
+ {
+-#if 0
+-	static const char broken_vendors[][8] = {
+-		"MSFT 98",
+-		""
+-	};
+-#endif
+ 	int bytes;
+ 	unsigned char *vendor;
+ 
+ 	memset(packet, 0, sizeof(*packet));
+-	bytes = read(fd, packet, sizeof(*packet));
++	bytes = safe_read(fd, packet, sizeof(*packet));
+ 	if (bytes < 0) {
+ 		DEBUG("cannot read on listening socket, ignoring");
+-		return -1;
++		return bytes; /* returns -1 */
+ 	}
+ 
+ 	if (packet->cookie != htonl(DHCP_MAGIC)) {
+@@ -67,6 +61,10 @@ int udhcp_recv_packet(struct dhcpMessage *packet, int fd)
+ 		vendor = get_option(packet, DHCP_VENDOR);
+ 		if (vendor) {
+ #if 0
++			static const char broken_vendors[][8] = {
++				"MSFT 98",
++				""
++			};
+ 			int i;
+ 			for (i = 0; broken_vendors[i][0]; i++) {
+ 				if (vendor[OPT_LEN - 2] == (uint8_t)strlen(broken_vendors[i])
+@@ -127,10 +125,11 @@ int udhcp_send_raw_packet(struct dhcpMessage *payload,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port, const uint8_t *dest_arp, int ifindex)
+ {
+-	int fd;
+-	int result;
+ 	struct sockaddr_ll dest;
+ 	struct udp_dhcp_packet packet;
++	int fd;
++	int result = -1;
++	const char *msg;
+ 
+ 	enum {
+ 		IP_UPD_DHCP_SIZE = sizeof(struct udp_dhcp_packet) - CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS,
+@@ -139,8 +138,8 @@ int udhcp_send_raw_packet(struct dhcpMessage *payload,
+ 
+ 	fd = socket(PF_PACKET, SOCK_DGRAM, htons(ETH_P_IP));
+ 	if (fd < 0) {
+-		bb_perror_msg("socket");
+-		return -1;
++		msg = "socket(%s)";
++		goto ret_msg;
+ 	}
+ 
+ 	memset(&dest, 0, sizeof(dest));
+@@ -152,10 +151,9 @@ int udhcp_send_raw_packet(struct dhcpMessage *payload,
+ 	dest.sll_ifindex = ifindex;
+ 	dest.sll_halen = 6;
+ 	memcpy(dest.sll_addr, dest_arp, 6);
+-	if (bind(fd, (struct sockaddr *)&dest, sizeof(struct sockaddr_ll)) < 0) {
+-		bb_perror_msg("bind");
+-		close(fd);
+-		return -1;
++	if (bind(fd, (struct sockaddr *)&dest, sizeof(dest)) < 0) {
++		msg = "bind(%s)";
++		goto ret_close;
+ 	}
+ 
+ 	packet.ip.protocol = IPPROTO_UDP;
+@@ -179,11 +177,15 @@ int udhcp_send_raw_packet(struct dhcpMessage *payload,
+ 	 * If you need to change this: last byte of the packet is
+ 	 * packet.data.options[end_option(packet.data.options)]
+ 	 */
+-	result = sendto(fd, &packet, IP_UPD_DHCP_SIZE, 0, (struct sockaddr *) &dest, sizeof(dest));
+-	if (result <= 0) {
+-		bb_perror_msg("sendto");
+-	}
++	result = sendto(fd, &packet, IP_UPD_DHCP_SIZE, 0,
++				(struct sockaddr *) &dest, sizeof(dest));
++	msg = "sendto";
++ ret_close:
+ 	close(fd);
++	if (result < 0) {
++ ret_msg:
++		bb_perror_msg(msg, "PACKET");
++	}
+ 	return result;
+ }
+ 
+@@ -193,41 +195,48 @@ int udhcp_send_kernel_packet(struct dhcpMessage *payload,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port)
+ {
+-	int fd, result;
+ 	struct sockaddr_in client;
++	int fd;
++	int result = -1;
++	const char *msg;
+ 
+ 	enum {
+ 		DHCP_SIZE = sizeof(struct dhcpMessage) - CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS,
+ 	};
+ 
+ 	fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+-	if (fd < 0)
+-		return -1;
+-
++	if (fd < 0) {
++		msg = "socket(%s)";
++		goto ret_msg;
++	}
+ 	setsockopt_reuseaddr(fd);
+ 
+ 	memset(&client, 0, sizeof(client));
+ 	client.sin_family = AF_INET;
+ 	client.sin_port = htons(source_port);
+ 	client.sin_addr.s_addr = source_ip;
+-
+ 	if (bind(fd, (struct sockaddr *)&client, sizeof(client)) == -1) {
+-		close(fd);
+-		return -1;
++		msg = "bind(%s)";
++		goto ret_close;
+ 	}
+ 
+ 	memset(&client, 0, sizeof(client));
+ 	client.sin_family = AF_INET;
+ 	client.sin_port = htons(dest_port);
+ 	client.sin_addr.s_addr = dest_ip;
+-
+-	if (connect(fd, (struct sockaddr *)&client, sizeof(struct sockaddr)) == -1) {
+-		close(fd);
+-		return -1;
++	if (connect(fd, (struct sockaddr *)&client, sizeof(client)) == -1) {
++		msg = "connect";
++		goto ret_close;
+ 	}
+ 
+ 	/* Currently we send full-sized DHCP packets (see above) */
+-	result = write(fd, payload, DHCP_SIZE);
++	result = safe_write(fd, payload, DHCP_SIZE);
++	msg = "write";
++ ret_close:
+ 	close(fd);
++	if (result < 0) {
++ ret_msg:
++		bb_perror_msg(msg, "UDP");
++	}
+ 	return result;
+ }

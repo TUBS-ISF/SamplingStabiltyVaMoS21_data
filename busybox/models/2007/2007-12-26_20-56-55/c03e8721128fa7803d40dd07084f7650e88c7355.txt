@@ -1,0 +1,88 @@
+2007-12-26 20:56:55 +0000
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index f80de81..8dd9785 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -349,9 +349,7 @@ static int parse_fstab_line(char *line, struct fs_info **ret_fs)
+ 
+ 	*ret_fs = 0;
+ 	strip_line(line);
+-	cp = strchr(line, '#');
+-	if (cp)
+-		*cp = '\0'; /* Ignore everything after the comment char */
++	*strchrnul(line, '#') = '\0'; /* Ignore everything after comment */
+ 	cp = line;
+ 
+ 	device = parse_word(&cp);
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index bc2dbd1..f6681a8 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -242,11 +242,8 @@ static void include_conf(struct dep_t **first, struct dep_t **current, char *buf
+ 
+ 	while (reads(fd, buffer, buflen)) {
+ 		int l;
+-		char *p;
+ 
+-		p = strchr(buffer, '#');
+-		if (p)
+-			*p = '\0';
++		*strchrnul(buffer, '#') = '\0';
+ 
+ 		l = strlen(buffer);
+ 
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 5d37746..a9c9397 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -554,13 +554,9 @@ static void setup(servtab_t *sep)
+ 
+ static char *nextline(void)
+ {
+-	char *cp;
+-
+ 	if (fgets(line, LINE_SIZE, fconfig) == NULL)
+ 		return NULL;
+-	cp = strchr(line, '\n');
+-	if (cp)
+-		*cp = '\0';
++	*strchrnul(line, '\n') = '\0';
+ 	return line;
+ }
+ 
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 63c9064..491b887 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -332,14 +332,12 @@ int read_config(const char *file)
+ 
+ 	while (fgets(buffer, READ_CONFIG_BUF_SIZE, in)) {
+ 		char debug_orig[READ_CONFIG_BUF_SIZE];
+-		char *p;
+ 
+ 		lm++;
+-		p = strchr(buffer, '\n');
+-		if (p) *p = '\0';
+-		if (ENABLE_FEATURE_UDHCP_DEBUG) strcpy(debug_orig, buffer);
+-		p = strchr(buffer, '#');
+-		if (p) *p = '\0';
++		*strchrnul(buffer, '\n') = '\0';
++		if (ENABLE_FEATURE_UDHCP_DEBUG)
++			strcpy(debug_orig, buffer);
++		*strchrnul(buffer, '#') = '\0';
+ 
+ 		token = strtok(buffer, " \t");
+ 		if (!token) continue;
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 1ecdd95..abf5cd0 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -1448,7 +1448,7 @@ static int singlemount(struct mntent *mp, int ignore_busy)
+ 	// Might this be a virtual filesystem?
+ 
+ 	if (ENABLE_FEATURE_MOUNT_HELPERS
+-	 && (strchr(mp->mnt_fsname,'#'))
++	 && (strchr(mp->mnt_fsname, '#'))
+ 	) {
+ 		char *s, *p, *args[35];
+ 		int n = 0;

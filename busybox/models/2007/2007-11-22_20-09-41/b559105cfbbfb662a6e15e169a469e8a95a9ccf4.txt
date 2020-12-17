@@ -1,0 +1,14 @@
+2007-11-22 20:09:41 +0000
+diff --git a/networking/udhcp/Kbuild b/networking/udhcp/Kbuild
+index 7d47470..f4be6df 100644
+--- a/networking/udhcp/Kbuild
++++ b/networking/udhcp/Kbuild
+@@ -15,7 +15,7 @@ lib-$(CONFIG_APP_UDHCPC)        += dhcpc.o clientpacket.o clientsocket.o \
+                                    script.o
+ 
+ UDHCPC_NEEDS_ARPING-$(CONFIG_FEATURE_UDHCPC_ARPING) = y
+-lib-$(UDHCPC_NEEDS_ARPING)      += arpping.o
++lib-$(UDHCPC_NEEDS_ARPING-y)    += arpping.o
+ 
+ lib-$(CONFIG_APP_UDHCPD)        += dhcpd.o arpping.o files.o leases.o \
+                                    serverpacket.o static_leases.o

@@ -1,0 +1,746 @@
+2007-07-03 15:47:50 +0000
+diff --git a/networking/udhcp/arpping.c b/networking/udhcp/arpping.c
+index 615a911..4ac52c6 100644
+--- a/networking/udhcp/arpping.c
++++ b/networking/udhcp/arpping.c
+@@ -15,44 +15,36 @@
+ 
+ struct arpMsg {
+ 	/* Ethernet header */
+-	uint8_t  h_dest[6];			/* destination ether addr */
+-	uint8_t  h_source[6];			/* source ether addr */
+-	uint16_t h_proto;			/* packet type ID field */
++	uint8_t  h_dest[6];     /* 00 destination ether addr */
++	uint8_t  h_source[6];   /* 06 source ether addr */
++	uint16_t h_proto;       /* 0c packet type ID field */
+ 
+ 	/* ARP packet */
+-	uint16_t htype;				/* hardware type (must be ARPHRD_ETHER) */
+-	uint16_t ptype;				/* protocol type (must be ETH_P_IP) */
+-	uint8_t  hlen;				/* hardware address length (must be 6) */
+-	uint8_t  plen;				/* protocol address length (must be 4) */
+-	uint16_t operation;			/* ARP opcode */
+-	uint8_t  sHaddr[6];			/* sender's hardware address */
+-	uint8_t  sInaddr[4];			/* sender's IP address */
+-	uint8_t  tHaddr[6];			/* target's hardware address */
+-	uint8_t  tInaddr[4];			/* target's IP address */
+-	uint8_t  pad[18];			/* pad for min. Ethernet payload (60 bytes) */
++	uint16_t htype;         /* 0e hardware type (must be ARPHRD_ETHER) */
++	uint16_t ptype;         /* 10 protocol type (must be ETH_P_IP) */
++	uint8_t  hlen;          /* 12 hardware address length (must be 6) */
++	uint8_t  plen;          /* 13 protocol address length (must be 4) */
++	uint16_t operation;     /* 14 ARP opcode */
++	uint8_t  sHaddr[6];     /* 16 sender's hardware address */
++	uint8_t  sInaddr[4];    /* 1c sender's IP address */
++	uint8_t  tHaddr[6];     /* 20 target's hardware address */
++	uint8_t  tInaddr[4];    /* 26 target's IP address */
++	uint8_t  pad[18];       /* 2a pad for min. ethernet payload (60 bytes) */
+ } ATTRIBUTE_PACKED;
+ 
+-/* args:	yiaddr - what IP to ping
+- *		ip - our ip
+- *		mac - our arp address
+- *		interface - interface to use
+- * retn:	1 addr free
+- *		0 addr used
+- *		-1 error
+- */
+ 
+-/* FIXME: match response against chaddr */
+-int arpping(uint32_t yiaddr, uint32_t ip, uint8_t *mac, char *interface)
+-{
+-	int	timeout = 2;
+-	int	s;			/* socket */
+-	int	rv = 1;			/* return value */
+-	struct sockaddr addr;		/* for interface name */
+-	struct arpMsg	arp;
+-	fd_set		fdset;
+-	struct timeval	tm;
+-	time_t		prevTime;
++/* Returns 1 if no reply received */
+ 
++int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *interface)
++{
++	int timeout = 2;
++	int s;                  /* socket */
++	int rv = 1;             /* "no reply received" yet */
++	struct sockaddr addr;   /* for interface name */
++	struct arpMsg arp;
++	fd_set fdset;
++	struct timeval tm;
++	unsigned prevTime;
+ 
+ 	s = socket(PF_PACKET, SOCK_PACKET, htons(ETH_P_ARP));
+ 	if (s == -1) {
+@@ -62,55 +54,58 @@ int arpping(uint32_t yiaddr, uint32_t ip, uint8_t *mac, char *interface)
+ 
+ 	if (setsockopt_broadcast(s) == -1) {
+ 		bb_perror_msg("cannot setsocketopt on raw socket");
+-		close(s);
+-		return -1;
++		goto ret;
+ 	}
+ 
+ 	/* send arp request */
+ 	memset(&arp, 0, sizeof(arp));
+-	memcpy(arp.h_dest, MAC_BCAST_ADDR, 6);		/* MAC DA */
+-	memcpy(arp.h_source, mac, 6);			/* MAC SA */
+-	arp.h_proto = htons(ETH_P_ARP);			/* protocol type (Ethernet) */
+-	arp.htype = htons(ARPHRD_ETHER);		/* hardware type */
+-	arp.ptype = htons(ETH_P_IP);			/* protocol type (ARP message) */
+-	arp.hlen = 6;					/* hardware address length */
+-	arp.plen = 4;					/* protocol address length */
+-	arp.operation = htons(ARPOP_REQUEST);		/* ARP op code */
+-	memcpy(arp.sInaddr, &ip, sizeof(ip));		/* source IP address */
+-	memcpy(arp.sHaddr, mac, 6);			/* source hardware address */
+-	memcpy(arp.tInaddr, &yiaddr, sizeof(yiaddr));	/* target IP address */
++	memset(arp.h_dest, 0xff, 6);                    /* MAC DA */
++	memcpy(arp.h_source, from_mac, 6);              /* MAC SA */
++	arp.h_proto = htons(ETH_P_ARP);                 /* protocol type (Ethernet) */
++	arp.htype = htons(ARPHRD_ETHER);                /* hardware type */
++	arp.ptype = htons(ETH_P_IP);                    /* protocol type (ARP message) */
++	arp.hlen = 6;                                   /* hardware address length */
++	arp.plen = 4;                                   /* protocol address length */
++	arp.operation = htons(ARPOP_REQUEST);           /* ARP op code */
++	memcpy(arp.sHaddr, from_mac, 6);                /* source hardware address */
++	memcpy(arp.sInaddr, &from_ip, sizeof(from_ip)); /* source IP address */
++	/* tHaddr */                                    /* target hardware address */
++	memcpy(arp.tInaddr, &test_ip, sizeof(test_ip)); /* target IP address */
+ 
+ 	memset(&addr, 0, sizeof(addr));
+-	strcpy(addr.sa_data, interface);
++	safe_strncpy(addr.sa_data, interface, sizeof(addr.sa_data));
+ 	if (sendto(s, &arp, sizeof(arp), 0, &addr, sizeof(addr)) < 0)
+-		rv = 0;
++		goto ret;
+ 
+-	/* wait arp reply, and check it */
+-	tm.tv_usec = 0;
+-	prevTime = uptime();
+-	while (timeout > 0) {
++	/* wait for arp reply, and check it */
++	do {
++		int r;
++		prevTime = monotonic_sec();
+ 		FD_ZERO(&fdset);
+ 		FD_SET(s, &fdset);
+ 		tm.tv_sec = timeout;
+-		if (select(s + 1, &fdset, (fd_set *) NULL, (fd_set *) NULL, &tm) < 0) {
++		tm.tv_usec = 0;
++		r = select(s + 1, &fdset, NULL, NULL, &tm);
++		if (r < 0) {
+ 			bb_perror_msg("error on ARPING request");
+ 			if (errno != EINTR)
+-				rv = 0;
+-		} else if (FD_ISSET(s, &fdset)) {
++				break;
++		} else if (r) {
+ 			if (recv(s, &arp, sizeof(arp), 0) < 0)
+-				rv = 0;
+-			if (arp.operation == htons(ARPOP_REPLY) &&
+-			    memcmp(arp.tHaddr, mac, 6) == 0 &&
+-			    *((uint32_t *) arp.sInaddr) == yiaddr) {
+-				DEBUG("Valid arp reply received for this address");
++				break;
++			if (arp.operation == htons(ARPOP_REPLY)
++			 && memcmp(arp.tHaddr, from_mac, 6) == 0
++			 && *((uint32_t *) arp.sInaddr) == test_ip
++			) {
+ 				rv = 0;
+ 				break;
+ 			}
+ 		}
+-		timeout -= uptime() - prevTime;
+-		prevTime = uptime();
+-	}
++		timeout -= monotonic_sec() - prevTime;
++	} while (timeout > 0);
++
++ ret:
+ 	close(s);
+-	DEBUG("%salid arp replies for this address", rv ? "No v" : "V");
++	DEBUG("%srp reply received for this address", rv ? "No a" : "A");
+ 	return rv;
+ }
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index af97962..42b4895 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -25,7 +25,7 @@
+ 
+ 
+ /* Create a random xid */
+-unsigned random_xid(void)
++uint32_t random_xid(void)
+ {
+ 	static smallint initialized;
+ 
+@@ -44,8 +44,10 @@ static void init_packet(struct dhcpMessage *packet, char type)
+ 	memcpy(packet->chaddr, client_config.arp, 6);
+ 	if (client_config.clientid)
+ 		add_option_string(packet->options, client_config.clientid);
+-	if (client_config.hostname) add_option_string(packet->options, client_config.hostname);
+-	if (client_config.fqdn) add_option_string(packet->options, client_config.fqdn);
++	if (client_config.hostname)
++		add_option_string(packet->options, client_config.hostname);
++	if (client_config.fqdn)
++		add_option_string(packet->options, client_config.fqdn);
+ 	add_option_string(packet->options, client_config.vendorclass);
+ }
+ 
+@@ -69,7 +71,7 @@ static void add_requests(struct dhcpMessage *packet)
+ 
+ 
+ /* Broadcast a DHCP discover packet to the network, with an optionally requested IP */
+-int send_discover(unsigned long xid, unsigned long requested)
++int send_discover(uint32_t xid, uint32_t requested)
+ {
+ 	struct dhcpMessage packet;
+ 
+@@ -86,7 +88,7 @@ int send_discover(unsigned long xid, unsigned long requested)
+ 
+ 
+ /* Broadcasts a DHCP request message */
+-int send_selecting(unsigned long xid, unsigned long server, unsigned long requested)
++int send_selecting(uint32_t xid, uint32_t server, uint32_t requested)
+ {
+ 	struct dhcpMessage packet;
+ 	struct in_addr addr;
+@@ -106,10 +108,9 @@ int send_selecting(unsigned long xid, unsigned long server, unsigned long reques
+ 
+ 
+ /* Unicasts or broadcasts a DHCP renew message */
+-int send_renew(unsigned long xid, unsigned long server, unsigned long ciaddr)
++int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr)
+ {
+ 	struct dhcpMessage packet;
+-	int ret = 0;
+ 
+ 	init_packet(&packet, DHCPREQUEST);
+ 	packet.xid = xid;
+@@ -118,15 +119,15 @@ int send_renew(unsigned long xid, unsigned long server, unsigned long ciaddr)
+ 	add_requests(&packet);
+ 	bb_info_msg("Sending renew...");
+ 	if (server)
+-		ret = udhcp_kernel_packet(&packet, ciaddr, CLIENT_PORT, server, SERVER_PORT);
+-	else ret = udhcp_raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST,
++		return udhcp_kernel_packet(&packet, ciaddr, CLIENT_PORT, server, SERVER_PORT);
++
++	return udhcp_raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST,
+ 				SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
+-	return ret;
+ }
+ 
+ 
+ /* Unicasts a DHCP release message */
+-int send_release(unsigned long server, unsigned long ciaddr)
++int send_release(uint32_t server, uint32_t ciaddr)
+ {
+ 	struct dhcpMessage packet;
+ 
+@@ -214,5 +215,4 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
+ 	}
+ 	DEBUG("oooooh!!! got some!");
+ 	return bytes - (sizeof(packet.ip) + sizeof(packet.udp));
+-
+ }
+diff --git a/networking/udhcp/common.c b/networking/udhcp/common.c
+index 76f8bf7..108ab2e 100644
+--- a/networking/udhcp/common.c
++++ b/networking/udhcp/common.c
+@@ -10,31 +10,10 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <syslog.h>
+-
+ #include "common.h"
+ 
+-
+ const uint8_t MAC_BCAST_ADDR[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+ 
+-long uptime(void)
+-{
+-	struct sysinfo info;
+-	sysinfo(&info);
+-	return info.uptime;
+-}
+-
+-static void create_pidfile(const char *pidfile)
+-{
+-	if (!pidfile)
+-		return;
+-
+-	if (!write_pidfile(pidfile)) {
+-		bb_perror_msg("cannot create pidfile %s", pidfile);
+-		return;
+-	}
+-}
+-
+ void udhcp_make_pidfile(const char *pidfile)
+ {
+ 	/* Make sure fd 0,1,2 are open */
+@@ -44,7 +23,8 @@ void udhcp_make_pidfile(const char *pidfile)
+ 	setlinebuf(stdout);
+ 
+ 	/* Create pidfile */
+-	create_pidfile(pidfile);
++	if (pidfile && !write_pidfile(pidfile))
++		bb_perror_msg("cannot create pidfile %s", pidfile);
+ 
+ 	bb_info_msg("%s (v%s) started", applet_name, BB_VER);
+ }
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 006d580..5887504 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -80,14 +80,14 @@ void udhcp_run_script(struct dhcpMessage *packet, const char *name);
+ /* from dhcpd.h */
+ #define server_config		udhcp_server_config
+ 
+-long uptime(void);
+ void udhcp_sp_setup(void);
+ int udhcp_sp_fd_set(fd_set *rfds, int extra_fd);
+ int udhcp_sp_read(fd_set *rfds);
+ int raw_socket(int ifindex);
+ int read_interface(const char *interface, int *ifindex, uint32_t *addr, uint8_t *arp);
+ int listen_socket(uint32_t ip, int port, const char *inf);
+-int arpping(uint32_t yiaddr, uint32_t ip, uint8_t *arp, char *interface);
++/* Returns 1 if no reply received */
++int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *interface);
+ 
+ #if ENABLE_FEATURE_UDHCP_DEBUG
+ # define DEBUG(str, args...) bb_info_msg(str, ## args)
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 50ac31e..6909e84 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -22,8 +22,8 @@
+  * in the code. Manpage says that struct in_addr has a member of type long (!)
+  * which holds IPv4 address, and the struct is passed by value (!!)
+  */
+-static unsigned long timeout;
+-static unsigned long requested_ip; /* = 0 */
++static unsigned timeout;
++static uint32_t requested_ip; /* = 0 */
+ static uint32_t server_addr;
+ static int packet_num; /* = 0 */
+ static int sockfd = -1;
+@@ -84,13 +84,13 @@ static void perform_renew(void)
+ /* perform a release */
+ static void perform_release(void)
+ {
+-	char buffer[16];
++	char buffer[sizeof("255.255.255.255")];
+ 	struct in_addr temp_addr;
+ 
+ 	/* send release packet */
+ 	if (state == BOUND || state == RENEWING || state == REBINDING) {
+ 		temp_addr.s_addr = server_addr;
+-		sprintf(buffer, "%s", inet_ntoa(temp_addr));
++		strcpy(buffer, inet_ntoa(temp_addr));
+ 		temp_addr.s_addr = requested_ip;
+ 		bb_info_msg("Unicasting a release of %s to %s",
+ 				inet_ntoa(temp_addr), buffer);
+@@ -101,7 +101,7 @@ static void perform_release(void)
+ 
+ 	change_mode(LISTEN_NONE);
+ 	state = RELEASED;
+-	timeout = 0x7fffffff;
++	timeout = INT_MAX;
+ }
+ 
+ 
+@@ -115,12 +115,13 @@ static void client_background(void)
+  * will work on NOMMU too */
+ #else
+ 	bb_daemonize(0);
++	logmode &= ~LOGMODE_STDIO;
+ 	/* rewrite pidfile, as our pid is different now */
+ 	if (client_config.pidfile)
+ 		write_pidfile(client_config.pidfile);
+-	logmode &= ~LOGMODE_STDIO;
+ #endif
+-	client_config.foreground = 1; /* Do not fork again. */
++	/* Do not fork again. */
++	client_config.foreground = 1;
+ 	client_config.background_if_no_lease = 0;
+ }
+ 
+@@ -143,9 +144,11 @@ int udhcpc_main(int argc, char **argv)
+ {
+ 	uint8_t *temp, *message;
+ 	char *str_c, *str_V, *str_h, *str_F, *str_r, *str_T, *str_t;
+-	unsigned long t1 = 0, t2 = 0, xid = 0;
+-	unsigned long start = 0, lease = 0;
+-	long now;
++	uint32_t xid = 0;
++	uint32_t lease = 0; /* can be given as 32-bit quantity */
++	unsigned t1 = 0, t2 = 0;
++	unsigned start = 0;
++	unsigned now;
+ 	unsigned opt;
+ 	int max_fd;
+ 	int sig;
+@@ -292,7 +295,7 @@ int udhcpc_main(int argc, char **argv)
+ 	change_mode(LISTEN_RAW);
+ 
+ 	for (;;) {
+-		tv.tv_sec = timeout - uptime();
++		tv.tv_sec = timeout - monotonic_sec();
+ 		tv.tv_usec = 0;
+ 
+ 		if (listen_mode != LISTEN_NONE && sockfd < 0) {
+@@ -308,7 +311,7 @@ int udhcpc_main(int argc, char **argv)
+ 			retval = select(max_fd + 1, &rfds, NULL, NULL, &tv);
+ 		} else retval = 0; /* If we already timed out, fall through */
+ 
+-		now = uptime();
++		now = monotonic_sec();
+ 		if (retval == 0) {
+ 			/* timeout dropped to zero */
+ 			switch (state) {
+@@ -398,7 +401,7 @@ int udhcpc_main(int argc, char **argv)
+ 				break;
+ 			case RELEASED:
+ 				/* yah, I know, *you* say it would never happen */
+-				timeout = 0x7fffffff;
++				timeout = INT_MAX;
+ 				break;
+ 			}
+ 		} else if (retval > 0 && listen_mode != LISTEN_NONE && FD_ISSET(sockfd, &rfds)) {
+@@ -415,8 +418,8 @@ int udhcpc_main(int argc, char **argv)
+ 			if (len < 0) continue;
+ 
+ 			if (packet.xid != xid) {
+-				DEBUG("Ignoring XID %lx (our xid is %lx)",
+-					(unsigned long) packet.xid, xid);
++				DEBUG("Ignoring XID %x (our xid is %x)",
++					(unsigned)packet.xid, (unsigned)xid);
+ 				continue;
+ 			}
+ 
+@@ -471,10 +474,10 @@ int udhcpc_main(int argc, char **argv)
+ 					t1 = lease / 2;
+ 
+ 					/* little fixed point for n * .875 */
+-					t2 = (lease * 0x7) >> 3;
++					t2 = (lease * 7) >> 3;
+ 					temp_addr.s_addr = packet.yiaddr;
+-					bb_info_msg("Lease of %s obtained, lease time %ld",
+-						inet_ntoa(temp_addr), lease);
++					bb_info_msg("Lease of %s obtained, lease time %u",
++						inet_ntoa(temp_addr), (unsigned)lease);
+ 					start = now;
+ 					timeout = t1 + start;
+ 					requested_ip = packet.yiaddr;
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index 09b0142..20f4e52 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -38,12 +38,12 @@ extern struct client_config_t client_config;
+ 
+ /*** clientpacket.h ***/
+ 
+-unsigned random_xid(void);
+-int send_discover(unsigned long xid, unsigned long requested);
+-int send_selecting(unsigned long xid, unsigned long server, unsigned long requested);
+-int send_renew(unsigned long xid, unsigned long server, unsigned long ciaddr);
+-int send_renew(unsigned long xid, unsigned long server, unsigned long ciaddr);
+-int send_release(unsigned long server, unsigned long ciaddr);
++uint32_t random_xid(void);
++int send_discover(uint32_t xid, uint32_t requested);
++int send_selecting(uint32_t xid, uint32_t server, uint32_t requested);
++int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr);
++int send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr);
++int send_release(uint32_t server, uint32_t ciaddr);
+ int get_raw_packet(struct dhcpMessage *payload, int fd);
+ 
+ 
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 9dbd35d..8cac681 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -30,7 +30,8 @@ int udhcpd_main(int argc, char **argv)
+ 	struct dhcpMessage packet;
+ 	uint8_t *state, *server_id, *requested;
+ 	uint32_t server_id_align, requested_align, static_lease_ip;
+-	unsigned long timeout_end, num_ips;
++	unsigned timeout_end;
++	unsigned num_ips;
+ 	struct option_set *option;
+ 	struct dhcpOfferedAddr *lease, static_lease;
+ 
+@@ -48,7 +49,7 @@ int udhcpd_main(int argc, char **argv)
+ 
+ 	/* Would rather not do read_config before daemonization -
+ 	 * otherwise NOMMU machines will parse config twice */
+-	read_config(argc < 2 ? DHCPD_CONF_FILE : argv[1]);
++	read_config(argv[1] ? argv[1] : DHCPD_CONF_FILE);
+ 
+ 	udhcp_make_pidfile(server_config.pidfile);
+ 
+@@ -62,9 +63,8 @@ int udhcpd_main(int argc, char **argv)
+ 	/* Sanity check */
+ 	num_ips = server_config.end_ip - server_config.start_ip + 1;
+ 	if (server_config.max_leases > num_ips) {
+-		bb_error_msg("max_leases=%lu is too big, "
+-			"setting to %lu",
+-			server_config.max_leases, num_ips);
++		bb_error_msg("max_leases=%u is too big, setting to %u",
++			(unsigned)server_config.max_leases, num_ips);
+ 		server_config.max_leases = num_ips;
+ 	}
+ 
+@@ -80,7 +80,7 @@ int udhcpd_main(int argc, char **argv)
+ 	/* Setup the signal pipe */
+ 	udhcp_sp_setup();
+ 
+-	timeout_end = time(0) + server_config.auto_time;
++	timeout_end = monotonic_sec() + server_config.auto_time;
+ 	while (1) { /* loop until universe collapses */
+ 
+ 		if (server_socket < 0) {
+@@ -90,7 +90,7 @@ int udhcpd_main(int argc, char **argv)
+ 
+ 		max_sock = udhcp_sp_fd_set(&rfds, server_socket);
+ 		if (server_config.auto_time) {
+-			tv.tv_sec = timeout_end - time(0);
++			tv.tv_sec = timeout_end - monotonic_sec();
+ 			tv.tv_usec = 0;
+ 		}
+ 		retval = 0;
+@@ -100,7 +100,7 @@ int udhcpd_main(int argc, char **argv)
+ 		}
+ 		if (retval == 0) {
+ 			write_leases();
+-			timeout_end = time(0) + server_config.auto_time;
++			timeout_end = monotonic_sec() + server_config.auto_time;
+ 			continue;
+ 		}
+ 		if (retval < 0 && errno != EINTR) {
+@@ -113,7 +113,7 @@ int udhcpd_main(int argc, char **argv)
+ 			bb_info_msg("Received a SIGUSR1");
+ 			write_leases();
+ 			/* why not just reset the timeout, eh */
+-			timeout_end = time(0) + server_config.auto_time;
++			timeout_end = monotonic_sec() + server_config.auto_time;
+ 			continue;
+ 		case SIGTERM:
+ 			bb_info_msg("Received a SIGTERM");
+@@ -244,7 +244,7 @@ int udhcpd_main(int argc, char **argv)
+  ret0:
+ 	retval = 0;
+  ret:
+-	if (server_config.pidfile)
++	/*if (server_config.pidfile) - server_config.pidfile is never NULL */
+ 		remove_pidfile(server_config.pidfile);
+ 	return retval;
+ }
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 05e3cf0..fc6b1d6 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -20,37 +20,37 @@ struct option_set {
+ };
+ 
+ struct static_lease {
++	struct static_lease *next;
+ 	uint8_t *mac;
+ 	uint32_t *ip;
+-	struct static_lease *next;
+ };
+ 
+ struct server_config_t {
+-	uint32_t server;		/* Our IP, in network order */
++	uint32_t server;                /* Our IP, in network order */
+ 	/* start,end are in host order: we need to compare start <= ip <= end */
+-	uint32_t start_ip;		/* Start address of leases, in host order */
+-	uint32_t end_ip;		/* End of leases, in host order */
+-	struct option_set *options;	/* List of DHCP options loaded from the config file */
+-	char *interface;		/* The name of the interface to use */
+-	int ifindex;			/* Index number of the interface to use */
+-	uint8_t arp[6];			/* Our arp address */
+-	char remaining;			/* should the lease file be interpreted as lease time remaining, or
+-					 * as the time the lease expires */
+-	unsigned long lease;		/* lease time in seconds (host order) */
+-	unsigned long max_leases;	/* maximum number of leases (including reserved address) */
+-	unsigned long auto_time;	/* how long should udhcpd wait before writing a config file.
+-					 * if this is zero, it will only write one on SIGUSR1 */
+-	unsigned long decline_time;	/* how long an address is reserved if a client returns a
+-					 * decline message */
+-	unsigned long conflict_time;	/* how long an arp conflict offender is leased for */
+-	unsigned long offer_time;	/* how long an offered address is reserved */
+-	unsigned long min_lease;	/* minimum lease a client can request */
++	uint32_t start_ip;              /* Start address of leases, in host order */
++	uint32_t end_ip;                /* End of leases, in host order */
++	struct option_set *options;     /* List of DHCP options loaded from the config file */
++	char *interface;                /* The name of the interface to use */
++	int ifindex;                    /* Index number of the interface to use */
++	uint8_t arp[6];                 /* Our arp address */
++	char remaining;                 /* should the lease file be interpreted as lease time remaining, or
++	                                 * as the time the lease expires */
++	uint32_t lease;	                /* lease time in seconds (host order) */
++	uint32_t max_leases;            /* maximum number of leases (including reserved address) */
++	uint32_t auto_time;             /* how long should udhcpd wait before writing a config file.
++	                                 * if this is zero, it will only write one on SIGUSR1 */
++	uint32_t decline_time;          /* how long an address is reserved if a client returns a
++	                                 * decline message */
++	uint32_t conflict_time;         /* how long an arp conflict offender is leased for */
++	uint32_t offer_time;            /* how long an offered address is reserved */
++	uint32_t min_lease;             /* minimum lease a client can request */
+ 	char *lease_file;
+ 	char *pidfile;
+-	char *notify_file;		/* What to run whenever leases are written */
+-	uint32_t siaddr;		/* next server bootp option */
+-	char *sname;			/* bootp server name */
+-	char *boot_file;		/* bootp boot file option */
++	char *notify_file;              /* What to run whenever leases are written */
++	uint32_t siaddr;                /* next server bootp option */
++	char *sname;                    /* bootp server name */
++	char *boot_file;                /* bootp boot file option */
+ 	struct static_lease *static_leases; /* List of ip/mac pairs to assign static leases */
+ };
+ 
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 7fc7348..8ed4855 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -17,12 +17,11 @@ static int read_ip(const char *line, void *arg)
+ 	len_and_sockaddr *lsa;
+ 
+ 	lsa = host_and_af2sockaddr(line, 0, AF_INET);
+-	if (lsa) {
+-		*(uint32_t*)arg = lsa->sin.sin_addr.s_addr;
+-		free(lsa);
+-		return 1;
+-	}
+-	return 0;
++	if (!lsa)
++		return 0;
++	*(uint32_t*)arg = lsa->sin.sin_addr.s_addr;
++	free(lsa);
++	return 1;
+ }
+ 
+ static int read_mac(const char *line, void *arg)
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index ceec073..997daea 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -95,24 +95,26 @@ struct dhcpOfferedAddr *find_lease_by_yiaddr(uint32_t yiaddr)
+ 
+ 
+ /* check is an IP is taken, if it is, add it to the lease table */
+-static int check_ip(uint32_t addr)
++static int nobody_responds_to_arp(uint32_t addr)
+ {
+ 	static const uint8_t blank_chaddr[16]; /* 16 zero bytes */
+ 
+ 	struct in_addr temp;
++	int r;
+ 
+-	if (arpping(addr, server_config.server, server_config.arp, server_config.interface) == 0) {
+-		temp.s_addr = addr;
+-		bb_info_msg("%s belongs to someone, reserving it for %ld seconds",
+-			inet_ntoa(temp), server_config.conflict_time);
+-		add_lease(blank_chaddr, addr, server_config.conflict_time);
+-		return 1;
+-	}
++	r = arpping(addr, server_config.server, server_config.arp, server_config.interface);
++	if (r)
++		return r;
++
++	temp.s_addr = addr;
++	bb_info_msg("%s belongs to someone, reserving it for %u seconds",
++		inet_ntoa(temp), (unsigned)server_config.conflict_time);
++	add_lease(blank_chaddr, addr, server_config.conflict_time);
+ 	return 0;
+ }
+ 
+ 
+-/* find an assignable address, it check_expired is true, we check all the expired leases as well.
++/* find an assignable address, if check_expired is true, we check all the expired leases as well.
+  * Maybe this should try expired leases by age... */
+ uint32_t find_address(int check_expired)
+ {
+@@ -129,15 +131,14 @@ uint32_t find_address(int check_expired)
+ 		if ((addr & 0xFF) == 0xFF) continue;
+ 
+ 		/* Only do if it isn't assigned as a static lease */
+-		if (!reservedIp(server_config.static_leases, htonl(addr))) {
+-
++		ret = htonl(addr);
++		if (!reservedIp(server_config.static_leases, ret)) {
+ 			/* lease is not taken */
+-			ret = htonl(addr);
+ 			lease = find_lease_by_yiaddr(ret);
+ 
+ 			/* no lease or it expired and we are checking for expired leases */
+ 			if ((!lease || (check_expired && lease_expired(lease)))
+-			 && /* and it isn't on the network */ !check_ip(ret)
++			 && nobody_responds_to_arp(ret) /* it isn't used on the network */ 
+ 			) {
+ 				return ret;
+ 			}
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index da38077..272e79d 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -41,16 +41,17 @@ void udhcp_init_header(struct dhcpMessage *packet, char type)
+ /* read a packet from socket fd, return -1 on read error, -2 on packet error */
+ int udhcp_get_packet(struct dhcpMessage *packet, int fd)
+ {
++#if 0
+ 	static const char broken_vendors[][8] = {
+ 		"MSFT 98",
+ 		""
+ 	};
++#endif
+ 	int bytes;
+-	int i;
+-	char unsigned *vendor;
++	unsigned char *vendor;
+ 
+-	memset(packet, 0, sizeof(struct dhcpMessage));
+-	bytes = read(fd, packet, sizeof(struct dhcpMessage));
++	memset(packet, 0, sizeof(*packet));
++	bytes = read(fd, packet, sizeof(*packet));
+ 	if (bytes < 0) {
+ 		DEBUG("cannot read on listening socket, ignoring");
+ 		return -1;
+@@ -62,15 +63,28 @@ int udhcp_get_packet(struct dhcpMessage *packet, int fd)
+ 	}
+ 	DEBUG("Received a packet");
+ 
+-	if (packet->op == BOOTREQUEST && (vendor = get_option(packet, DHCP_VENDOR))) {
+-		for (i = 0; broken_vendors[i][0]; i++) {
+-			if (vendor[OPT_LEN - 2] == (uint8_t)strlen(broken_vendors[i])
+-			 && !strncmp((char*)vendor, broken_vendors[i], vendor[OPT_LEN - 2])
++	if (packet->op == BOOTREQUEST) {
++		vendor = get_option(packet, DHCP_VENDOR);
++		if (vendor) {
++#if 0
++			int i;
++			for (i = 0; broken_vendors[i][0]; i++) {
++				if (vendor[OPT_LEN - 2] == (uint8_t)strlen(broken_vendors[i])
++				 && !strncmp((char*)vendor, broken_vendors[i], vendor[OPT_LEN - 2])
++				) {
++					DEBUG("broken client (%s), forcing broadcast",
++						broken_vendors[i]);
++					packet->flags |= htons(BROADCAST_FLAG);
++				}
++			}
++#else
++			if (vendor[OPT_LEN - 2] == (uint8_t)(sizeof("MSFT 98")-1)
++			 && memcmp(vendor, "MSFT 98", sizeof("MSFT 98")-1) == 0
+ 			) {
+-				DEBUG("broken client (%s), forcing broadcast",
+-					broken_vendors[i]);
++				DEBUG("broken client (%s), forcing broadcast", "MSFT 98");
+ 				packet->flags |= htons(BROADCAST_FLAG);
+ 			}
++#endif
+ 		}
+ 	}
+ 

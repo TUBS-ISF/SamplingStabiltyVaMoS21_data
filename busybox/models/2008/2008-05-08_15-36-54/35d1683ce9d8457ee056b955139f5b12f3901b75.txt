@@ -1,0 +1,43 @@
+2008-05-08 15:36:54 +0000
+diff --git a/docs/busybox.net/news.html b/docs/busybox.net/news.html
+index 90a6284..695e588 100644
+--- a/docs/busybox.net/news.html
++++ b/docs/busybox.net/news.html
+@@ -1,14 +1,16 @@
+ <!--#include file="header.html" -->
+ 
+ <ul>
+-  <li><b>19 April 2008 -- BusyBox 1.10.1 (stable)</b>
+-    <p><a href=http://busybox.net/downloads/busybox-1.10.1.tar.bz2>BusyBox 1.10.1</a>.
++  <li><b>8 May 2008 -- BusyBox 1.10.2 (stable)</b>
++    <p><a href=http://busybox.net/downloads/busybox-1.10.2.tar.bz2>BusyBox 1.10.2</a>.
+     (<a href=http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_10_stable/>svn</a>,
+-    <a href=http://busybox.net/downloads/fixes-1.10.1/>patches</a>,
++    <a href=http://busybox.net/downloads/fixes-1.10.2/>patches</a>,
+     <a href=http://busybox.net/fix.html>how to add a patch</a>)</p>
+     <p>
+-    Bugfix-only release for 1.10.x branch. It contains fixes for
+-    fuser, init, less, nameif, tail, taskset, tcpudp, top, udhcp.
++    Bugfix-only release for 1.10.x branch. It contains fixes for echo, httpd, pidof,
++    start-stop-daemon, tar, taskset, tab completion in shells, build system.
++    <p>Please note that mdev was backported from current svn trunk. Please
++    report if you encounter any problems with it.
+     <p>
+     <a href=http://busybox.net/~vda/HOWTO_bbox_with_uclibc.txt>How to build static busybox against uclibc</a>
+     <p>
+@@ -16,6 +18,15 @@
+     the Software Freedom Law Center to report BusyBox license violations.
+     </p>
+ 
++  <li><b>19 April 2008 -- BusyBox 1.10.1 (stable)</b>
++    <p><a href=http://busybox.net/downloads/busybox-1.10.1.tar.bz2>BusyBox 1.10.1</a>.
++    (<a href=http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_10_stable/>svn</a>,
++    <a href=http://busybox.net/downloads/fixes-1.10.1/>patches</a>,
++    <a href=http://busybox.net/fix.html>how to add a patch</a>)</p>
++    <p>
++    Bugfix-only release for 1.10.x branch. It contains fixes for
++    fuser, init, less, nameif, tail, taskset, tcpudp, top, udhcp.
++
+   <li><b>21 March 2008 -- BusyBox 1.10.0 (unstable)</b>
+     <p><a href=http://busybox.net/downloads/busybox-1.10.0.tar.bz2>BusyBox 1.10.0</a>.
+     (<a href=http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_10_stable/>svn</a>,

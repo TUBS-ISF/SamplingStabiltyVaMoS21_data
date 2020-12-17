@@ -1,0 +1,76 @@
+2009-04-05 09:02:11 +0000
+diff --git a/scripts/randomtest b/scripts/randomtest
+index 7b80f4a..eebf1c5 100755
+--- a/scripts/randomtest
++++ b/scripts/randomtest
+@@ -76,17 +76,6 @@ cat .config \
+ mv .config.new .config
+ }
+ 
+-# CONFIG_NOMMU + CONFIG_HUSH + CONFIG_WERROR don't mix
+-# (produces warning)
+-grep -q ^CONFIG_NOMMU= .config && \
+-grep -q ^CONFIG_HUSH= .config && \
+-{
+-cat .config \
+-| grep -v ^CONFIG_WERROR= \
+-| cat >.config.new
+-mv .config.new .config
+-}
+-
+ # Regenerate .config with default answers for yanked-off options
+ { yes "" | make oldconfig >/dev/null; } || exit 1
+ 
+diff --git a/shell/Config.in b/shell/Config.in
+index 7daf17f..9b3ce64 100644
+--- a/shell/Config.in
++++ b/shell/Config.in
+@@ -136,14 +136,14 @@ config ASH_OPTIMIZE_FOR_SIZE
+ 	  Compile ash for reduced size at the price of speed.
+ 
+ config ASH_RANDOM_SUPPORT
+-	bool "Pseudorandom generator and variable $RANDOM"
++	bool "Pseudorandom generator and $RANDOM variable"
+ 	default n
+ 	depends on ASH
+ 	help
+ 	  Enable pseudorandom generator and dynamic variable "$RANDOM".
+ 	  Each read of "$RANDOM" will generate a new pseudorandom value.
+ 	  You can reset the generator by using a specified start value.
+-	  After "unset RANDOM" then generator will switch off and this
++	  After "unset RANDOM" the generator will switch off and this
+ 	  variable will no longer have special treatment.
+ 
+ config ASH_EXPAND_PRMT
+@@ -151,7 +151,7 @@ config ASH_EXPAND_PRMT
+ 	default n
+ 	depends on ASH
+ 	help
+-	  "PS#" may be contain volatile content, such as backquote commands.
++	  "PS#" may contain volatile content, such as backquote commands.
+ 	  This option recreates the prompt string from the environment
+ 	  variable each time it is displayed.
+ 
+@@ -164,11 +164,11 @@ config HUSH
+ 	  options such as if/then/elif/else/fi, for/in/do/done, while loops,
+ 	  case/esac.
+ 
+-	  It uses only vfork, so it can be used on no-mmu systems.
++	  It will compile and work on no-mmu systems.
+ 
+ 	  It does not handle select, functions, here documents ( <<
+-	  word ), arithmetic expansion, aliases, brace expansion, tilde
+-	  expansion, &> and >& redirection of stdout+stderr, etc.
++	  word ), aliases, brace expansion, tilde expansion,
++	  &> and >& redirection of stdout+stderr, etc.
+ 
+ config HUSH_HELP
+ 	bool "help builtin"
+@@ -218,7 +218,6 @@ config HUSH_LOOPS
+ 	depends on HUSH
+ 	help
+ 	  Enable for, while and until loops in hush.
+-	  As of 2008-07, break and continue statements are not supported.
+ 
+ config HUSH_CASE
+ 	bool "Support case ... esac statement"

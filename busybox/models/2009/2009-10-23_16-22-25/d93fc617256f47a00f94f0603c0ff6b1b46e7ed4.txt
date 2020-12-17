@@ -1,0 +1,14 @@
+2009-10-23 16:22:25 +0200
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 38cabca..13c863c 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -633,7 +633,7 @@ static void showdirs(struct dnode **dn, int first)
+ 		}
+ 		subdnp = list_dir((*dn)->fullname, &nfiles);
+ #if ENABLE_DESKTOP
+-		if (all_fmt & STYLE_LONG)
++		if ((all_fmt & STYLE_MASK) == STYLE_LONG)
+ 			printf("total %"OFF_FMT"u\n", calculate_blocks(subdnp));
+ #endif
+ 		if (nfiles > 0) {

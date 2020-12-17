@@ -1,0 +1,119 @@
+2007-08-02 10:14:29 +0000
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index d8a0d7d..cf79270 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -14,6 +14,8 @@
+ #include <getopt.h>
+ #include <sys/resource.h>
+ 
++/* Override ENABLE_FEATURE_PIDFILE */
++#define WANT_PIDFILE 1
+ #include "libbb.h"
+ 
+ static int signal_nr = 15;
+@@ -46,7 +48,7 @@ static int pid_is_exec(pid_t pid, const char *name)
+ 	n = strcmp(execbuf, name);
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		free(execbuf);
+-	return ~n; /* nonzero (true) if execbuf == name */
++	return !n; /* nonzero (true) if execbuf == name */
+ }
+ 
+ static int pid_is_user(int pid, int uid)
+@@ -301,10 +303,14 @@ int start_stop_daemon_main(int argc, char **argv)
+ 		pid_t pid = vfork();
+ 		if (pid < 0) /* error */
+ 			bb_perror_msg_and_die("vfork");
+-		if (pid == 0) /* parent */
+-			return 0;
++		if (pid != 0) {
++			/* parent */
++			/* why _exit? the child may have changed the stack,
++			 * so "return 0" may do bad things */
++			_exit(0);
+ 		}
+ 		/* child */
++		setsid(); /* detach from controlling tty */
+ 		/* Redirect stdio to /dev/null, close extra FDs.
+ 		 * We do not actually daemonize because of DAEMON_ONLY_SANITIZE */
+ 		bb_daemonize_or_rexec(
+@@ -316,11 +322,7 @@ int start_stop_daemon_main(int argc, char **argv)
+ 	}
+ 	if (opt & OPT_MAKEPID) {
+ 		/* user wants _us_ to make the pidfile */
+-		FILE *pidf = xfopen(pidfile, "w");
+-
+-		pid_t pidt = getpid();
+-		fprintf(pidf, "%d\n", pidt);
+-		fclose(pidf);
++		write_pidfile(pidfile);
+ 	}
+ 	if (opt & OPT_c) {
+ 		struct bb_uidgid_t ugid;
+diff --git a/include/libbb.h b/include/libbb.h
+index 547b8f7..1cbcb41 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -619,8 +619,9 @@ llist_t *llist_rev(llist_t *list);
+  *   llist_t *llist_add_to(llist_t *old_head, void *data)
+  * etc does not result in smaller code... */
+ 
+-
+-#if ENABLE_FEATURE_PIDFILE
++/* start_stop_daemon and (udhcpc with ifupdown) are special - they want to
++ * create pidfiles regardless of FEATURE_PIDFILE. */
++#if ENABLE_FEATURE_PIDFILE || defined(WANT_PIDFILE)
+ int write_pidfile(const char *path);
+ #define remove_pidfile(f) ((void)unlink(f))
+ #else
+diff --git a/libbb/pidfile.c b/libbb/pidfile.c
+index 79c3108..50af91f 100644
+--- a/libbb/pidfile.c
++++ b/libbb/pidfile.c
+@@ -6,9 +6,11 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
++
++/* Override ENABLE_FEATURE_PIDFILE */
++#define WANT_PIDFILE 1
+ #include "libbb.h"
+ 
+-#if ENABLE_FEATURE_PIDFILE
+ int write_pidfile(const char *path)
+ {
+ 	int pid_fd;
+@@ -26,4 +28,3 @@ int write_pidfile(const char *path)
+ 	close(pid_fd);
+ 	return 1;
+ }
+-#endif
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index a15e141..040bbe3 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -536,8 +536,8 @@ static int manual_up_down(struct interface_defn_t *ifd, execfn *exec)
+ static int bootp_up(struct interface_defn_t *ifd, execfn *exec)
+ {
+ 	return execute("bootpc[[ --bootfile %bootfile%]] --dev %iface%"
+-			"[[ --server %server%]][[ --hwaddr %hwaddr%]] "
+-			"--returniffail --serverbcast", ifd, exec);
++			"[[ --server %server%]][[ --hwaddr %hwaddr%]]"
++			" --returniffail --serverbcast", ifd, exec);
+ }
+ 
+ static int ppp_up(struct interface_defn_t *ifd, execfn *exec)
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index b84a678..4bb90c2 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -11,6 +11,8 @@
+ #include <getopt.h>
+ #include <syslog.h>
+ 
++/* Override ENABLE_FEATURE_PIDFILE - ifupdown needs our pidfile to always exist */
++#define WANT_PIDFILE 1
+ #include "common.h"
+ #include "dhcpd.h"
+ #include "dhcpc.h"

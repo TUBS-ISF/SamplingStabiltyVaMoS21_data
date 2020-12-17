@@ -1,0 +1,25 @@
+2010-03-23 02:17:52 +0100
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index a886156..4c17353 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -9,7 +9,6 @@ struct client_config_t {
+ 	char no_default_options;        /* Do not include default options in request */
+ 	IF_FEATURE_UDHCP_PORT(uint16_t port;)
+ 	int ifindex;                    /* Index number of the interface to use */
+-	int verbose;
+ 	uint8_t opt_mask[256 / 8];      /* Bitmask of options to send (-O option) */
+ 	const char *interface;          /* The name of the interface to use */
+ 	char *pidfile;                  /* Optionally store the process ID */
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 2f2f5b3..b163ce7 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -39,7 +39,6 @@ struct server_config_t {
+ #endif
+ 	uint8_t server_mac[6];          /* our MAC address (used only for ARP probing) */
+ 	struct option_set *options;     /* list of DHCP options loaded from the config file */
+-	int verbose;
+ 	/* start,end are in host order: we need to compare start <= ip <= end */
+ 	uint32_t start_ip;              /* start address of leases, in host order */
+ 	uint32_t end_ip;                /* end of leases, in host order */

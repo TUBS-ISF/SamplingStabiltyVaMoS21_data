@@ -1,0 +1,227 @@
+2007-08-24 21:46:24 +0000
+diff --git a/coreutils/cp.c b/coreutils/cp.c
+index 884fbf7..5b57581 100644
+--- a/coreutils/cp.c
++++ b/coreutils/cp.c
+@@ -40,12 +40,16 @@ int cp_main(int argc, char **argv)
+ 		OPT_L = 1 << (sizeof(FILEUTILS_CP_OPTSTR)+3),
+ 	};
+ 
++	// Need at least two arguments
+ 	// Soft- and hardlinking don't mix
+ 	// -P and -d are the same (-P is POSIX, -d is GNU)
+ 	// -r and -R are the same
+ 	// -a = -pdR
+-	opt_complementary = "l--s:s--l:Pd:rR:apdR";
++	opt_complementary = "-2:l--s:s--l:Pd:rR:apdR";
+ 	flags = getopt32(argv, FILEUTILS_CP_OPTSTR "arPHL");
++	argc -= optind;
++	argv += optind;
++	flags ^= FILEUTILS_DEREFERENCE;		/* The sense of this flag was reversed. */
+ 	/* Default behavior of cp is to dereference, so we don't have to do
+ 	 * anything special when we are given -L.
+ 	 * The behavior of -H is *almost* like -L, but not quite, so let's
+@@ -60,19 +64,12 @@ int cp_main(int argc, char **argv)
+ 	}
+ #endif
+ 
+-	flags ^= FILEUTILS_DEREFERENCE;		/* The sense of this flag was reversed. */
+-
+-	if (optind + 2 > argc) {
+-		bb_show_usage();
+-	}
+-
+ 	last = argv[argc - 1];
+-	argv += optind;
+-
+ 	/* If there are only two arguments and...  */
+-	if (optind + 2 == argc) {
++	if (argc == 2) {
+ 		s_flags = cp_mv_stat2(*argv, &source_stat,
+ 				      (flags & FILEUTILS_DEREFERENCE) ? stat : lstat);
++		/* TODO: does coreutils cp exit? "cp BAD GOOD dir"... */
+ 		if (s_flags < 0)
+ 			return EXIT_FAILURE;
+ 		d_flags = cp_mv_stat(last, &dest_stat);
+@@ -85,19 +82,24 @@ int cp_main(int argc, char **argv)
+ 			((flags & FILEUTILS_RECUR) && (s_flags & 2) && !d_flags)
+ 		) {
+ 			/* ...do a simple copy.  */
+-			dest = xstrdup(last);
+-			goto DO_COPY; /* Note: optind+2==argc implies argv[1]==last below. */
++			dest = last;
++			goto DO_COPY; /* NB: argc==2 -> *++argv==last */
+ 		}
+ 	}
+ 
+-	do {
++	while (1) {
+ 		dest = concat_path_file(last, bb_get_last_path_component(*argv));
+  DO_COPY:
+ 		if (copy_file(*argv, dest, flags) < 0) {
+ 			status = 1;
+ 		}
++		if (*++argv == last) {
++			/* possibly leaking dest... */
++			break;
++		}
+ 		free((void*)dest);
+-	} while (*++argv != last);
++	}
+ 
++	/* Exit. We are NOEXEC, not NOFORK. We do exit at the end of main() */
+ 	return status;
+ }
+diff --git a/coreutils/install.c b/coreutils/install.c
+index cf62a00..d087306 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -123,10 +123,12 @@ int install_main(int argc, char **argv)
+ 		copy_flags |= FILEUTILS_PRESERVE_STATUS;
+ 	}
+ 	mode = 0666;
+-	if (flags & OPT_MODE) bb_parse_mode(mode_str, &mode);
++	if (flags & OPT_MODE)
++		bb_parse_mode(mode_str, &mode);
+ 	uid = (flags & OPT_OWNER) ? get_ug_id(uid_str, xuname2uid) : getuid();
+ 	gid = (flags & OPT_GROUP) ? get_ug_id(gid_str, xgroup2gid) : getgid();
+-	if (flags & (OPT_OWNER|OPT_GROUP)) umask(0);
++	if (flags & (OPT_OWNER|OPT_GROUP))
++		umask(0);
+ 
+ 	/* Create directories
+ 	 * don't use bb_make_directory() as it can't change uid or gid
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index 553bb6e..1d29770 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -47,16 +47,15 @@ int mv_main(int argc, char **argv)
+ #if ENABLE_FEATURE_MV_LONG_OPTIONS
+ 	applet_long_options = mv_longopts;
+ #endif
+-	opt_complementary = "f-i:i-f";
++	// Need at least two arguments
++	// -f unsets -i, -i unsets -f
++	opt_complementary = "-2:f-i:i-f";
+ 	flags = getopt32(argv, "fi");
+-	if (optind + 2 > argc) {
+-		bb_show_usage();
+-	}
+-
+-	last = argv[argc - 1];
++	argc -= optind;
+ 	argv += optind;
++	last = argv[argc - 1];
+ 
+-	if (optind + 2 == argc) {
++	if (argc == 2) {
+ 		dest_exists = cp_mv_stat(last, &dest_stat);
+ 		if (dest_exists < 0) {
+ 			return 1;
+@@ -75,11 +74,11 @@ int mv_main(int argc, char **argv)
+ 			goto RET_1;
+ 		}
+ 
+-DO_MOVE:
+-
+-		if (dest_exists && !(flags & OPT_FILEUTILS_FORCE) &&
+-			((access(dest, W_OK) < 0 && isatty(0)) ||
+-			(flags & OPT_FILEUTILS_INTERACTIVE))) {
++ DO_MOVE:
++		if (dest_exists && !(flags & OPT_FILEUTILS_FORCE)
++		 && ((access(dest, W_OK) < 0 && isatty(0))
++		    || (flags & OPT_FILEUTILS_INTERACTIVE))
++		) {
+ 			if (fprintf(stderr, "mv: overwrite '%s'? ", dest) < 0) {
+ 				goto RET_1;	/* Ouch! fprintf failed! */
+ 			}
+@@ -91,8 +90,9 @@ DO_MOVE:
+ 			struct stat source_stat;
+ 			int source_exists;
+ 
+-			if (errno != EXDEV ||
+-				(source_exists = cp_mv_stat(*argv, &source_stat)) < 1) {
++			if (errno != EXDEV
++			 || (source_exists = cp_mv_stat(*argv, &source_stat)) < 1
++			) {
+ 				bb_perror_msg("cannot rename '%s'", *argv);
+ 			} else {
+ 				if (dest_exists) {
+@@ -116,15 +116,16 @@ DO_MOVE:
+ #if ENABLE_SELINUX
+ 				copy_flag |= FILEUTILS_PRESERVE_SECURITY_CONTEXT;
+ #endif
+-				if ((copy_file(*argv, dest, copy_flag) >= 0) &&
+-					(remove_file(*argv, FILEUTILS_RECUR | FILEUTILS_FORCE) >= 0)) {
++				if ((copy_file(*argv, dest, copy_flag) >= 0)
++				 && (remove_file(*argv, FILEUTILS_RECUR | FILEUTILS_FORCE) >= 0)
++				) {
+ 					goto RET_0;
+ 				}
+ 			}
+-RET_1:
++ RET_1:
+ 			status = 1;
+ 		}
+-RET_0:
++ RET_0:
+ 		if (dest != last) {
+ 			free((void *) dest);
+ 		}
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 3033bf1..bcb7ea6 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -178,7 +178,7 @@ Special characters:
+         This is typically used to implement "print verbose usage message
+         and exit" option.
+ 
+- "-"    A dash between two options causes the second of the two
++ "a-b"  A dash between two options causes the second of the two
+         to be unset (and ignored) if it is given on the command line.
+ 
+         [FIXME: what if they are the same? like "x-x"? Is it ever useful?]
+@@ -204,7 +204,7 @@ Special characters:
+         if (opt & 4)
+                 printf("Detected odd -x usage\n");
+ 
+- "--"   A double dash between two options, or between an option and a group
++ "a--b" A double dash between two options, or between an option and a group
+         of options, means that they are mutually exclusive.  Unlike
+         the "-" case above, an error will be forced if the options
+         are used together.
+@@ -220,7 +220,7 @@ Special characters:
+  "x--x" Variation of the above, it means that -x option should occur
+         at most once.
+ 
+- "::"   A double colon after a char in opt_complementary means that the
++ "a::"  A double colon after a char in opt_complementary means that the
+         option can occur multiple times. Each occurrence will be saved as
+         a llist_t element instead of char*.
+ 
+@@ -240,7 +240,7 @@ Special characters:
+         root:x:0:0:root:/root:/bin/bash
+         user:x:500:500::/home/user:/bin/bash
+ 
+- "?"    An "?" between an option and a group of options means that
++ "a?b"  A "?" between an option and a group of options means that
+         at least one of them is required to occur if the first option
+         occurs in preceding command line arguments.
+ 
+@@ -259,7 +259,7 @@ Special characters:
+         For example from "start-stop-daemon" applet:
+ 
+         // Don't allow -KS -SK, but -S or -K is required
+-        opt_complementary = "K:S:?K--S:S--K";
++        opt_complementary = "K:S:K--S:S--K";
+         flags = getopt32(argv, "KS...);
+ 
+ 
+@@ -268,6 +268,7 @@ Special characters:
+         max 3 args; count uses of '-2'; min 2 args; if there is
+         a '-2' option then unset '-3', '-X' and '-a'; if there is
+         a '-2' and after it a '-x' then error out.
++	But it's far too obfuscated. Use ':' to separate groups.
+ */
+ 
+ /* Code here assumes that 'unsigned' is at least 32 bits wide */

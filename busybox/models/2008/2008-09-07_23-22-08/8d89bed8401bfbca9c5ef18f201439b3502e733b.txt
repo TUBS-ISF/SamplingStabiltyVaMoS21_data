@@ -1,0 +1,315 @@
+2008-09-07 23:22:08 +0000
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 875eca5..99864d0 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -428,7 +428,7 @@ int start_stop_daemon_main(int argc UNUSED_PARAM, char **argv)
+ 		write_pidfile(pidfile);
+ 	}
+ 	if (opt & OPT_c) {
+-		struct bb_uidgid_t ugid;
++		struct bb_uidgid_t ugid = { -1, -1 };
+ 		parse_chown_usergroup_or_die(&ugid, chuid);
+ 		if (ugid.gid != (gid_t) -1) xsetgid(ugid.gid);
+ 		if (ugid.uid != (uid_t) -1) xsetuid(ugid.uid);
+diff --git a/docs/mdev.txt b/docs/mdev.txt
+index 63ad406..a8a816c 100644
+--- a/docs/mdev.txt
++++ b/docs/mdev.txt
+@@ -51,9 +51,11 @@ device nodes if your system needs something more than the default root/root
+ 660 permissions.
+ 
+ The file has the format:
+-	<device regex> <uid>:<gid> <octal permissions>
++    <device regex>       <uid>:<gid> <octal permissions>
++ or @<maj[,min1[-min2]]> <uid>:<gid> <octal permissions>
++
+ For example:
+-	hd[a-z][0-9]* 0:3 660
++    hd[a-z][0-9]* 0:3 660
+ 
+ The config file parsing stops at the first matching line.  If no line is
+ matched, then the default of 0:0 660 is used.  To set your own default, simply
+diff --git a/include/usage.h b/include/usage.h
+index c0b81ef..fdad63a 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4561,14 +4561,15 @@
+        "Mon Dec 17 10:31:44 GMT 2000"
+ 
+ #define watchdog_trivial_usage \
+-       "[-t N[ms]] [-F] DEV"
++       "[-t N[ms]] [-T N[ms]] [-F] DEV"
+ #define watchdog_full_usage "\n\n" \
+        "Periodically write to watchdog device DEV\n" \
+      "\nOptions:" \
+-     "\n	-t N	Timer period (default 30)" \
++     "\n	-T N	Reboot after N seconds if not reset (default 60)" \
++     "\n	-t N	Reset every N seconds (default 30)" \
+      "\n	-F	Run in foreground" \
+      "\n" \
+-     "\nUse -t 500ms to specify period in milliseconds" \
++     "\nUse 500ms to specify period in milliseconds" \
+ 
+ #define wc_trivial_usage \
+        "[OPTION]... [FILE]..."
+diff --git a/libpwdgrp/uidgid_get.c b/libpwdgrp/uidgid_get.c
+index ebc7fc5..92290bf 100644
+--- a/libpwdgrp/uidgid_get.c
++++ b/libpwdgrp/uidgid_get.c
+@@ -87,15 +87,12 @@ void FAST_FUNC xget_uidgid(struct bb_uidgid_t *u, const char *ug)
+  * ":group" sets gid only
+  * "user:" sets uid and gid (to user's primary group id)
+  * "user:group" sets uid and gid
+- * ('unset' uid or gid is actually set to -1)
++ * ('unset' uid or gid retains the value it has on entry)
+  */
+ void FAST_FUNC parse_chown_usergroup_or_die(struct bb_uidgid_t *u, char *user_group)
+ {
+ 	char *group;
+ 
+-	u->uid = -1;
+-	u->gid = -1;
+-
+ 	/* Check if there is a group name */
+ 	group = strchr(user_group, '.'); /* deprecated? */
+ 	if (!group)
+diff --git a/miscutils/watchdog.c b/miscutils/watchdog.c
+index 9b1a110..e102a59 100644
+--- a/miscutils/watchdog.c
++++ b/miscutils/watchdog.c
+@@ -4,14 +4,17 @@
+  *
+  * Copyright (C) 2003  Paul Mundt <lethal@linux-sh.org>
+  * Copyright (C) 2006  Bernhard Fischer <busybox@busybox.net>
++ * Copyright (C) 2008  Darius Augulis <augulis.darius@gmail.com>
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+ #include "libbb.h"
++#include "linux/watchdog.h"
+ 
+-#define OPT_FOREGROUND 0x01
+-#define OPT_TIMER      0x02
++#define OPT_FOREGROUND  (1 << 0)
++#define OPT_STIMER      (1 << 1)
++#define OPT_HTIMER      (1 << 2)
+ 
+ static void watchdog_shutdown(int sig UNUSED_PARAM)
+ {
+@@ -26,38 +29,42 @@ static void watchdog_shutdown(int sig UNUSED_PARAM)
+ int watchdog_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int watchdog_main(int argc, char **argv)
+ {
+-	unsigned opts;
+-	unsigned timer_duration = 30000; /* Userspace timer duration, in milliseconds */
+-	char *t_arg;
++	static const struct suffix_mult suffixes[] = {
++		{ "ms", 1 },
++		{ "", 1000 },
++		{ }
++	};
+ 
+-	opt_complementary = "=1"; /* must have 1 argument */
+-	opts = getopt32(argv, "Ft:", &t_arg);
++	unsigned opts;
++	unsigned stimer_duration; /* how often to restart */
++	unsigned htimer_duration = 60000; /* reboots after N ms if not restarted */
++	char *st_arg;
++	char *ht_arg;
+ 
+-	if (opts & OPT_TIMER) {
+-		static const struct suffix_mult suffixes[] = {
+-			{ "ms", 1 },
+-			{ "", 1000 },
+-			{ }
+-		};
+-		timer_duration = xatou_sfx(t_arg, suffixes);
+-	}
++	opt_complementary = "=1"; /* must have exactly 1 argument */
++	opts = getopt32(argv, "Ft:T:", &st_arg, &ht_arg);
+ 
+-	if (!(opts & OPT_FOREGROUND)) {
+-		bb_daemonize_or_rexec(DAEMON_CHDIR_ROOT, argv);
+-	}
++	if (opts & OPT_HTIMER)
++		htimer_duration = xatou_sfx(ht_arg, suffixes);
++	stimer_duration = htimer_duration / 2;
++	if (opts & OPT_STIMER)
++		stimer_duration = xatou_sfx(st_arg, suffixes);
+ 
+ 	bb_signals(BB_FATAL_SIGS, watchdog_shutdown);
+ 
+ 	/* Use known fd # - avoid needing global 'int fd' */
+ 	xmove_fd(xopen(argv[argc - 1], O_WRONLY), 3);
+ 
+-// TODO?
+-//	if (!(opts & OPT_TIMER)) {
+-//		if (ioctl(fd, WDIOC_GETTIMEOUT, &timer_duration) == 0)
+-//			timer_duration *= 500;
+-//		else
+-//			timer_duration = 30000;
+-//	}
++	ioctl_or_warn(3, WDIOC_SETTIMEOUT, &htimer_duration);
++#if 0
++	ioctl_or_warn(3, WDIOC_GETTIMEOUT, &htimer_duration);
++	printf("watchdog: SW timer is %dms, HW timer is %dms\n",
++		stimer_duration, htimer_duration * 1000);
++#endif
++
++	if (!(opts & OPT_FOREGROUND)) {
++		bb_daemonize_or_rexec(DAEMON_CHDIR_ROOT, argv);
++	}
+ 
+ 	while (1) {
+ 		/*
+@@ -65,7 +72,7 @@ int watchdog_main(int argc, char **argv)
+ 		 * is undefined at this point -- PFM
+ 		 */
+ 		write(3, "", 1); /* write zero byte */
+-		usleep(timer_duration * 1000L);
++		usleep(stimer_duration * 1000L);
+ 	}
+ 	return EXIT_SUCCESS; /* - not reached, but gcc 4.2.1 is too dumb! */
+ }
+diff --git a/testsuite/mdev.tests b/testsuite/mdev.tests
+index dad5bdd..2285579 100755
+--- a/testsuite/mdev.tests
++++ b/testsuite/mdev.tests
+@@ -98,7 +98,6 @@ brw-r--r-- 1 0 0 a_sda
+ 
+ # continuing to use directory structure from prev test
+ rm -rf mdev.testdir/dev/*
+-# here we complicate things by having non-matching group 1 and using %0
+ echo "sda 0:0 644 @echo @echo TEST" >mdev.testdir/etc/mdev.conf
+ testing "mdev command" \
+ 	"env - PATH=$PATH ACTION=add DEVPATH=/block/sda chroot mdev.testdir /mdev 2>&1;
+@@ -110,6 +109,18 @@ brw-r--r-- 1 0 0 8,0 sda
+ " \
+ 	"" ""
+ 
++# continuing to use directory structure from prev test
++rm -rf mdev.testdir/dev/*
++echo "@8,0 :1 644" >mdev.testdir/etc/mdev.conf
++testing "mdev #maj,min and no explicit uid" \
++	"env - PATH=$PATH ACTION=add DEVPATH=/block/sda chroot mdev.testdir /mdev 2>&1;
++	ls -lnR mdev.testdir/dev | $FILTER_LS" \
++"\
++mdev.testdir/dev:
++brw-r--r-- 1 0 1 8,0 sda
++" \
++	"" ""
++
+ # clean up
+ rm -rf mdev.testdir
+ 
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index d0d0103..5ac8015 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -59,8 +59,7 @@ static void make_device(char *path, int delete)
+ 	int major, minor, type, len;
+ 	int mode = 0660;
+ #if ENABLE_FEATURE_MDEV_CONF
+-	uid_t uid = 0;
+-	gid_t gid = 0;
++	struct bb_uidgid_t ugid = { 0, 0 };
+ 	parser_t *parser;
+ 	char *tokens[5];
+ #endif
+@@ -78,9 +77,10 @@ static void make_device(char *path, int delete)
+ 
+ 	/* Try to read major/minor string.  Note that the kernel puts \n after
+ 	 * the data, so we don't need to worry about null terminating the string
+-	 * because sscanf() will stop at the first nondigit, which \n is.  We
+-	 * also depend on path having writeable space after it.
++	 * because sscanf() will stop at the first nondigit, which \n is.
++	 * We also depend on path having writeable space after it.
+ 	 */
++	major = -1;
+ 	if (!delete) {
+ 		strcpy(dev_maj_min, "/dev");
+ 		len = open_read_close(path, dev_maj_min + 1, 64);
+@@ -90,6 +90,8 @@ static void make_device(char *path, int delete)
+ 				return;
+ 			/* no "dev" file, so just try to run script */
+ 			*dev_maj_min = '\0';
++		} else if (sscanf(dev_maj_min, "%u:%u", &major, &minor) != 2) {
++			major = -1;
+ 		}
+ 	}
+ 
+@@ -113,8 +115,23 @@ static void make_device(char *path, int delete)
+ 
+ 		/* Fields: regex uid:gid mode [alias] [cmd] */
+ 
+-		/* 1st field: regex to match this device */
+-		{
++		/* 1st field: @<numeric maj,min>... */
++		if (tokens[0][0] == '@') {
++			/* @major,minor[-last] */
++			/* (useful when name is ambiguous:
++			 * "/sys/class/usb/lp0" and
++			 * "/sys/class/printer/lp0") */
++			int cmaj, cmin0, cmin1, sc;
++			if (major < 0)
++				continue; /* no dev, no match */
++			sc = sscanf(tokens[0], "@%u,%u-%u", &cmaj, &cmin0, &cmin1);
++			if (sc < 1 || major != cmaj
++			 || (sc == 2 && minor != cmin0)
++			 || (sc == 3 && (minor < cmin0 || minor > cmin1))
++			) {
++				continue; /* no match */
++			}
++		} else { /* ... or regex to match device name */
+ 			regex_t match;
+ 			int result;
+ 
+@@ -144,27 +161,7 @@ static void make_device(char *path, int delete)
+ 		 * after parsing the rest of fields */
+ 
+ 		/* 2nd field: uid:gid - device ownership */
+-		{
+-			struct passwd *pass;
+-			struct group *grp;
+-			char *str_uid = tokens[1];
+-			char *str_gid = strchrnul(str_uid, ':');
+-
+-			if (*str_gid)
+-				*str_gid++ = '\0';
+-			/* Parse UID */
+-			pass = getpwnam(str_uid);
+-			if (pass)
+-				uid = pass->pw_uid;
+-			else
+-				uid = strtoul(str_uid, NULL, 10);
+-			/* Parse GID */
+-			grp = getgrnam(str_gid);
+-			if (grp)
+-				gid = grp->gr_gid;
+-			else
+-				gid = strtoul(str_gid, NULL, 10);
+-		}
++		parse_chown_usergroup_or_die(&ugid, tokens[1]);
+ 
+ 		/* 3rd field: mode - device permissions */
+ 		mode = strtoul(tokens[2], NULL, 8);
+@@ -243,7 +240,7 @@ static void make_device(char *path, int delete)
+ 	config_close(parser);
+ #endif /* ENABLE_FEATURE_MDEV_CONF */
+ 
+-	if (!delete && sscanf(dev_maj_min, "%u:%u", &major, &minor) == 2) {
++	if (!delete && major >= 0) {
+ 
+ 		if (ENABLE_FEATURE_MDEV_RENAME)
+ 			unlink(device_name);
+@@ -255,7 +252,7 @@ static void make_device(char *path, int delete)
+ 			symlink(device_name, "root");
+ 
+ #if ENABLE_FEATURE_MDEV_CONF
+-		chown(device_name, uid, gid);
++		chown(device_name, ugid.uid, ugid.gid);
+ 
+ #if ENABLE_FEATURE_MDEV_RENAME
+ 		if (alias) {

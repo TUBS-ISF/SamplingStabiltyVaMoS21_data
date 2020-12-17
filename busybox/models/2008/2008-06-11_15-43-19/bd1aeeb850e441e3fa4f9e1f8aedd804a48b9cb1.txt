@@ -1,0 +1,208 @@
+2008-06-11 15:43:19 +0000
+diff --git a/sysklogd/Kbuild b/sysklogd/Kbuild
+index 0d5b2b9..d802198 100644
+--- a/sysklogd/Kbuild
++++ b/sysklogd/Kbuild
+@@ -6,6 +6,6 @@
+ 
+ lib-y:=
+ lib-$(CONFIG_KLOGD)		+= klogd.o
+-lib-$(CONFIG_LOGGER)		+= logger.o
++lib-$(CONFIG_LOGGER)		+= syslogd_and_logger.o
+ lib-$(CONFIG_LOGREAD)		+= logread.o
+-lib-$(CONFIG_SYSLOGD)		+= syslogd.o
++lib-$(CONFIG_SYSLOGD)		+= syslogd_and_logger.o
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index 0907501..6258113 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -7,34 +7,13 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
++/*
++ * Done in syslogd_and_logger.c:
+ #include "libbb.h"
+-#ifndef CONFIG_SYSLOGD
+ #define SYSLOG_NAMES
+ #define SYSLOG_NAMES_CONST
+ #include <syslog.h>
+-#else
+-/* brokenness alert. Everybody except dietlibc get's this wrong by neither
+- * providing a typedef nor an extern for facilitynames and prioritynames
+- * in syslog.h.
+- */
+-# include <syslog.h>
+-# ifndef __dietlibc__
+-/* We have to do this since the header file does neither provide a sane type
+- * for this structure nor extern definitions.  Argh.... bad libc, bad, bad...
+- */
+-typedef struct _code {
+-	char *c_name; /* FIXME: this should be const char *const c_name ! */
+-	int c_val;
+-} CODE;
+-#  ifdef __UCLIBC__
+-extern const CODE prioritynames[];
+-extern const CODE facilitynames[];
+-#  else
+-extern CODE prioritynames[];
+-extern CODE facilitynames[];
+-#  endif
+-# endif
+-#endif
++*/
+ 
+ /* Decode a symbolic name to a numeric value
+  * this function is based on code
+@@ -87,6 +66,7 @@ static int pencode(char *s)
+ 	return ((lev & LOG_PRIMASK) | (fac & LOG_FACMASK));
+ }
+ 
++#define strbuf bb_common_bufsiz1
+ 
+ int logger_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int logger_main(int argc, char **argv)
+@@ -113,7 +93,6 @@ int logger_main(int argc, char **argv)
+ 	argc -= optind;
+ 	argv += optind;
+ 	if (!argc) {
+-#define strbuf bb_common_bufsiz1
+ 		while (fgets(strbuf, COMMON_BUFSIZE, stdin)) {
+ 			if (strbuf[0]
+ 			 && NOT_LONE_CHAR(strbuf, '\n')
+@@ -139,6 +118,8 @@ int logger_main(int argc, char **argv)
+ 	return EXIT_SUCCESS;
+ }
+ 
++/* Clean up. Needed because we are included from syslogd_and_logger.c */
++#undef strbuf
+ 
+ /*-
+  * Copyright (c) 1983, 1993
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index 7eb8db1..ace246f 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -16,6 +16,7 @@
+ 
+ #define DEBUG 0
+ 
++/* our shared key (syslogd.c and logread.c must be in sync) */
+ enum { KEY_ID = 0x414e4547 }; /* "GENA" */
+ 
+ struct shbuf_ds {
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 1b8d718..b9af9c5 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -13,10 +13,13 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
++/*
++ * Done in syslogd_and_logger.c:
+ #include "libbb.h"
+ #define SYSLOG_NAMES
+ #define SYSLOG_NAMES_CONST
+ #include <syslog.h>
++*/
+ 
+ #include <paths.h>
+ #include <sys/un.h>
+@@ -192,8 +195,8 @@ enum {
+ #error Please check CONFIG_FEATURE_IPC_SYSLOG_BUFFER_SIZE
+ #endif
+ 
+-/* our shared key */
+-#define KEY_ID ((long)0x414e4547) /* "GENA" */
++/* our shared key (syslogd.c and logread.c must be in sync) */
++enum { KEY_ID = 0x414e4547 }; /* "GENA" */
+ 
+ static void ipcsyslog_cleanup(void)
+ {
+@@ -211,7 +214,7 @@ static void ipcsyslog_cleanup(void)
+ static void ipcsyslog_init(void)
+ {
+ 	if (DEBUG)
+-		printf("shmget(%lx, %d,...)\n", KEY_ID, G.shm_size);
++		printf("shmget(%x, %d,...)\n", (int)KEY_ID, G.shm_size);
+ 
+ 	G.shmid = shmget(KEY_ID, G.shm_size, IPC_CREAT | 0644);
+ 	if (G.shmid == -1) {
+@@ -631,6 +634,7 @@ static void do_syslogd(void)
+ 			split_escape_and_log(recvbuf, sz);
+ 		}
+ 	} /* for (;;) */
++#undef recvbuf
+ }
+ 
+ int syslogd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+@@ -682,3 +686,11 @@ int syslogd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	do_syslogd();
+ 	/* return EXIT_SUCCESS; */
+ }
++
++/* Clean up. Needed because we are included from syslogd_and_logger.c */
++#undef G
++#undef GLOBALS
++#undef INIT_G
++#undef OPTION_STR
++#undef OPTION_DECL
++#undef OPTION_PARAM
+diff --git a/sysklogd/syslogd_and_logger.c b/sysklogd/syslogd_and_logger.c
+new file mode 100644
+index 0000000..51573bd
+--- /dev/null
++++ b/sysklogd/syslogd_and_logger.c
+@@ -0,0 +1,51 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * prioritynames[] and facilitynames[]
++ *
++ * Copyright (C) 2008 by Denys Vlasenko <vda.linux@gmail.com>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
++
++#include "libbb.h"
++#define SYSLOG_NAMES
++#define SYSLOG_NAMES_CONST
++#include <syslog.h>
++
++#if 0
++/* For the record: with SYSLOG_NAMES <syslog.h> defines
++ * (not declares) the following:
++ */
++typedef struct _code {
++	/*const*/ char *c_name;
++	int c_val;
++} CODE;
++/*const*/ CODE prioritynames[] = {
++    { "alert", LOG_ALERT },
++...
++    { NULL, -1 }
++};
++/* same for facilitynames[] */
++
++/* This MUST occur only once per entire executable,
++ * therefore we can't just do it in syslogd.c and logger.c -
++ * there will be two copies of it.
++ *
++ * We cannot even do it in separate file and then just reference
++ * prioritynames[] from syslogd.c and logger.c - bare <syslog.h>
++ * will not emit extern decls for prioritynames[]! Attempts to
++ * emit "matching" struct _code declaration defeat the whole purpose
++ * of <syslog.h>.
++ *
++ * For now, syslogd.c and logger.c are simply compiled into
++ * one object file.
++ */
++#endif
++
++#if ENABLE_SYSLOGD
++#include "syslogd.c"
++#endif
++
++#if ENABLE_LOGGER
++#include "logger.c"
++#endif

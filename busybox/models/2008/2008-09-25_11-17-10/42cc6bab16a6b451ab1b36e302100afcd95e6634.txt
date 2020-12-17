@@ -1,0 +1,14 @@
+2008-09-25 11:17:10 +0000
+diff --git a/include/usage.h b/include/usage.h
+index b1c4d55..dc87515 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4211,7 +4211,7 @@
+      "\n	-v	Verbose" \
+ 
+ #define top_trivial_usage \
+-       "[-b] [-n COUNT] [-d SECONDS]"
++       "[-b] [-nCOUNT] [-dSECONDS]"
+ #define top_full_usage "\n\n" \
+        "Provide a view of process activity in real time.\n" \
+        "Read the status of all processes from /proc each SECONDS\n" \

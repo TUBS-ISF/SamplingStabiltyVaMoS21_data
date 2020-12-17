@@ -1,0 +1,15 @@
+2009-01-31 01:07:05 +0000
+diff --git a/init/init.c b/init/init.c
+index 3a02ece..59d0709 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -654,8 +654,8 @@ static void kill_all_processes(void)
+  * and unmasks all signals. However, for process with PID==1,
+  * default action (SIG_DFL) on any signal is to ignore it,
+  * even for special signals SIGKILL and SIGCONT.
+- * (SIGSTOP is still handled specially, at least in 2.6.20)
+  * Also, any signal can be caught or blocked.
++ * (but SIGSTOP is still handled specially, at least in 2.6.20)
+  *
+  * We install two kinds of handlers, "immediate" and "delayed".
+  *

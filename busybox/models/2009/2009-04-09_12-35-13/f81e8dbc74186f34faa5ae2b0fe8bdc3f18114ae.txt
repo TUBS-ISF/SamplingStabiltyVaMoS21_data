@@ -1,0 +1,1142 @@
+2009-04-09 12:35:13 +0000
+diff --git a/coreutils/libcoreutils/coreutils.h b/coreutils/libcoreutils/coreutils.h
+index 89cd953..99b67b1 100644
+--- a/coreutils/libcoreutils/coreutils.h
++++ b/coreutils/libcoreutils/coreutils.h
+@@ -4,11 +4,9 @@
+  */
+ 
+ #ifndef COREUTILS_H
+-#define COREUTILS_H		1
++#define COREUTILS_H 1
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ typedef int (*stat_func)(const char *fn, struct stat *ps);
+ 
+@@ -17,8 +15,6 @@ int cp_mv_stat(const char *fn, struct stat *fn_stat) FAST_FUNC;
+ 
+ mode_t getopt_mk_fifo_nod(char **argv) FAST_FUNC;
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/e2fsprogs/e2fs_defs.h b/e2fsprogs/e2fs_defs.h
+index b3ea3ae..379640e 100644
+--- a/e2fsprogs/e2fs_defs.h
++++ b/e2fsprogs/e2fs_defs.h
+@@ -10,8 +10,8 @@
+  * Copyright (C) 1991, 1992  Linus Torvalds
+  */
+ 
+-#ifndef _LINUX_EXT2_FS_H
+-#define _LINUX_EXT2_FS_H
++#ifndef LINUX_EXT2_FS_H
++#define LINUX_EXT2_FS_H 1
+ 
+ /*
+  * Special inode numbers
+@@ -558,4 +558,4 @@ struct ext2_dir_entry_2 {
+ #define EXT2_DIR_REC_LEN(name_len)	(((name_len) + 8 + EXT2_DIR_ROUND) & \
+ 					 ~EXT2_DIR_ROUND)
+ 
+-#endif	/* _LINUX_EXT2_FS_H */
++#endif
+diff --git a/e2fsprogs/e2fs_lib.h b/e2fsprogs/e2fs_lib.h
+index e21a0f9..25b26d3 100644
+--- a/e2fsprogs/e2fs_lib.h
++++ b/e2fsprogs/e2fs_lib.h
+@@ -9,9 +9,7 @@
+ /* Constants and structures */
+ #include "e2fs_defs.h"
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ /* Iterate a function on each entry of a directory */
+ int iterate_on_dir(const char *dir_name,
+@@ -46,6 +44,4 @@ extern const char e2attr_flags_sname[];
+ #define e2attr_flags_sname_chattr (&e2attr_flags_sname[1])
+ #endif
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/blkid.h b/e2fsprogs/old_e2fsprogs/blkid/blkid.h
+index 4fa9f6f..9a3c2af 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/blkid.h
++++ b/e2fsprogs/old_e2fsprogs/blkid/blkid.h
+@@ -10,9 +10,8 @@
+  * GNU Lesser General Public License.
+  * %End-Header%
+  */
+-
+-#ifndef _BLKID_BLKID_H
+-#define _BLKID_BLKID_H
++#ifndef BLKID_BLKID_H
++#define BLKID_BLKID_H 1
+ 
+ #include <sys/types.h>
+ #include <linux/types.h>
+@@ -102,4 +101,4 @@ extern int blkid_parse_tag_string(const char *token, char **ret_type,
+ }
+ #endif
+ 
+-#endif /* _BLKID_BLKID_H */
++#endif
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/blkidP.h b/e2fsprogs/old_e2fsprogs/blkid/blkidP.h
+index c7cb8ab..d6b2b42 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/blkidP.h
++++ b/e2fsprogs/old_e2fsprogs/blkid/blkidP.h
+@@ -10,9 +10,8 @@
+  * GNU Lesser General Public License.
+  * %End-Header%
+  */
+-
+-#ifndef _BLKID_BLKIDP_H
+-#define _BLKID_BLKIDP_H
++#ifndef BLKID_BLKIDP_H
++#define BLKID_BLKIDP_H 1
+ 
+ #include <sys/types.h>
+ #include <stdio.h>
+@@ -184,4 +183,4 @@ extern void blkid_free_dev(blkid_dev dev);
+ }
+ #endif
+ 
+-#endif /* _BLKID_BLKIDP_H */
++#endif
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/list.h b/e2fsprogs/old_e2fsprogs/blkid/list.h
+index 8b06d85..a24baaa 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/list.h
++++ b/e2fsprogs/old_e2fsprogs/blkid/list.h
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ #if !defined(_BLKID_LIST_H) && !defined(LIST_HEAD)
+-#define _BLKID_LIST_H
++#define BLKID_LIST_H 1
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -70,4 +70,4 @@ void list_splice(struct list_head *list, struct list_head *head);
+ }
+ #endif
+ 
+-#endif /* _BLKID_LIST_H */
++#endif
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/probe.h b/e2fsprogs/old_e2fsprogs/blkid/probe.h
+index ef289f5..b6d8f8e 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/probe.h
++++ b/e2fsprogs/old_e2fsprogs/blkid/probe.h
+@@ -11,9 +11,8 @@
+  * GNU Lesser General Public License.
+  * %End-Header%
+  */
+-
+-#ifndef _BLKID_PROBE_H
+-#define _BLKID_PROBE_H
++#ifndef BLKID_PROBE_H
++#define BLKID_PROBE_H 1
+ 
+ #include <linux/types.h>
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/e2fsbb.h b/e2fsprogs/old_e2fsprogs/e2fsbb.h
+index 78e7cbd..d31c319 100644
+--- a/e2fsprogs/old_e2fsprogs/e2fsbb.h
++++ b/e2fsprogs/old_e2fsprogs/e2fsbb.h
+@@ -6,8 +6,8 @@
+  * instead.  This makes upgrade between e2fsprogs versions easy.
+  */
+ 
+-#ifndef __E2FSBB_H__
+-#define __E2FSBB_H__ 1
++#ifndef E2FSBB_H
++#define E2FSBB_H 1
+ 
+ #include "libbb.h"
+ 
+@@ -40,4 +40,4 @@ typedef long errcode_t;
+ #define WORDS_BIGENDIAN 1
+ #endif
+ 
+-#endif /* __E2FSBB_H__ */
++#endif
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/ext2_fs.h b/e2fsprogs/old_e2fsprogs/ext2fs/ext2_fs.h
+index cb49d7a..6f4f708 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/ext2_fs.h
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/ext2_fs.h
+@@ -13,9 +13,8 @@
+  *
+  *  Copyright (C) 1991, 1992  Linus Torvalds
+  */
+-
+-#ifndef _LINUX_EXT2_FS_H
+-#define _LINUX_EXT2_FS_H
++#ifndef LINUX_EXT2_FS_H
++#define LINUX_EXT2_FS_H 1
+ 
+ #include "ext2_types.h"		/* Changed from linux/types.h */
+ 
+@@ -567,4 +566,4 @@ struct ext2_dir_entry_2 {
+ #define EXT2_DIR_REC_LEN(name_len)	(((name_len) + 8 + EXT2_DIR_ROUND) & \
+ 					 ~EXT2_DIR_ROUND)
+ 
+-#endif	/* _LINUX_EXT2_FS_H */
++#endif
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/ext2_io.h b/e2fsprogs/old_e2fsprogs/ext2fs/ext2_io.h
+index e6c9630..1900a76 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/ext2_io.h
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/ext2_io.h
+@@ -9,9 +9,8 @@
+  * License.
+  * %End-Header%
+  */
+-
+-#ifndef _EXT2FS_EXT2_IO_H
+-#define _EXT2FS_EXT2_IO_H
++#ifndef EXT2FS_EXT2_IO_H
++#define EXT2FS_EXT2_IO_H 1
+ 
+ /*
+  * ext2_loff_t is defined here since unix_io.c needs it.
+@@ -110,5 +109,4 @@ extern void (*test_io_cb_write_blk)
+ extern void (*test_io_cb_set_blksize)
+ 	(int blksize, errcode_t err);
+ 
+-#endif /* _EXT2FS_EXT2_IO_H */
+-
++#endif
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/ext2fs.h b/e2fsprogs/old_e2fsprogs/ext2fs/ext2fs.h
+index 133fb1f..9f77201 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/ext2fs.h
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/ext2fs.h
+@@ -9,9 +9,8 @@
+  * License.
+  * %End-Header%
+  */
+-
+-#ifndef _EXT2FS_EXT2FS_H
+-#define _EXT2FS_EXT2FS_H
++#ifndef EXT2FS_EXT2FS_H
++#define EXT2FS_EXT2FS_H 1
+ 
+ 
+ #define EXT2FS_ATTR(x)
+@@ -920,4 +919,4 @@ extern blk_t ext2fs_inode_data_blocks(ext2_filsys fs,
+ }
+ #endif
+ 
+-#endif /* _EXT2FS_EXT2FS_H */
++#endif
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/kernel-jbd.h b/e2fsprogs/old_e2fsprogs/ext2fs/kernel-jbd.h
+index 4c6c7de..853d97a 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/kernel-jbd.h
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/kernel-jbd.h
+@@ -13,9 +13,8 @@
+  * Definitions for transaction data structures for the buffer cache
+  * filesystem journaling support.
+  */
+-
+-#ifndef _LINUX_JBD_H
+-#define _LINUX_JBD_H
++#ifndef LINUX_JBD_H
++#define LINUX_JBD_H 1
+ 
+ #include <sys/types.h>
+ #include <linux/types.h>
+@@ -233,4 +232,4 @@ extern void	   journal_brelse_array(struct buffer_head *b[], int n);
+ extern void	   journal_destroy_revoke(journal_t *);
+ 
+ 
+-#endif	/* _LINUX_JBD_H */
++#endif
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/kernel-list.h b/e2fsprogs/old_e2fsprogs/ext2fs/kernel-list.h
+index 3392596..d80716a 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/kernel-list.h
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/kernel-list.h
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+-#ifndef _LINUX_LIST_H
+-#define _LINUX_LIST_H
++#ifndef LINUX_LIST_H
++#define LINUX_LIST_H 1
+ 
+ /*
+  * Simple doubly linked list implementation.
+diff --git a/e2fsprogs/old_e2fsprogs/uuid/uuid.h b/e2fsprogs/old_e2fsprogs/uuid/uuid.h
+index b30ca3c..7a97064 100644
+--- a/e2fsprogs/old_e2fsprogs/uuid/uuid.h
++++ b/e2fsprogs/old_e2fsprogs/uuid/uuid.h
+@@ -32,9 +32,8 @@
+  * DAMAGE.
+  * %End-Header%
+  */
+-
+-#ifndef _UUID_UUID_H
+-#define _UUID_UUID_H
++#ifndef UUID_UUID_H
++#define UUID_UUID_H 1
+ 
+ #include <sys/types.h>
+ #include <time.h>
+diff --git a/include/busybox.h b/include/busybox.h
+index 314b951..54c278f 100644
+--- a/include/busybox.h
++++ b/include/busybox.h
+@@ -4,14 +4,12 @@
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+-#ifndef	_BB_INTERNAL_H_
+-#define	_BB_INTERNAL_H_    1
++#ifndef BUSYBOX_H
++#define BUSYBOX_H 1
+ 
+ #include "libbb.h"
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ /* order matters: used as index into "install_dir[]" in appletlib.c */
+ typedef enum bb_install_loc_t {
+@@ -71,8 +69,6 @@ int lbb_main(char **argv);
+ #endif
+ #endif
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+-#endif	/* _BB_INTERNAL_H_ */
++#endif
+diff --git a/include/dump.h b/include/dump.h
+index 44f2082..925270d 100644
+--- a/include/dump.h
++++ b/include/dump.h
+@@ -1,8 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ #define	F_IGNORE	0x01		/* %_A */
+ #define	F_SETREP	0x02		/* rep count set, not default */
+@@ -55,6 +53,4 @@ dumper_t* alloc_dumper(void) FAST_FUNC;
+ extern void bb_dump_add(dumper_t *dumper, const char *fmt) FAST_FUNC;
+ extern int bb_dump_dump(dumper_t *dumper, char **argv) FAST_FUNC;
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+diff --git a/include/grp_.h b/include/grp_.h
+index 3d00b4a..deaf9e6 100644
+--- a/include/grp_.h
++++ b/include/grp_.h
+@@ -15,18 +15,15 @@
+    You should have received a copy of the GNU Lesser General Public
+    License along with the GNU C Library; if not, write to the Free
+    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+-   02111-1307 USA.  */
+-
++   02111-1307 USA.
++ */
+ /*
+  *	POSIX Standard: 9.2.1 Group Database Access	<grp.h>
+  */
++#ifndef BB_GRP_H
++#define BB_GRP_H 1
+ 
+-#ifndef	BB_GRP_H
+-#define	BB_GRP_H 1
+-
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ /* This file is #included after #include <grp.h>
+  * We will use libc-defined structures, but will #define function names
+@@ -115,8 +112,6 @@ extern int getgrouplist(const char *__user, gid_t __group,
+    of which USER is a member.  Also include GROUP.  */
+ extern int initgroups(const char *__user, gid_t __group);
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/include/libbb.h b/include/libbb.h
+index 74ec678..babf9c9 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -7,8 +7,8 @@
+  *
+  * Licensed under the GPL version 2, see the file LICENSE in this tarball.
+  */
+-#ifndef	__LIBBUSYBOX_H__
+-#define	__LIBBUSYBOX_H__    1
++#ifndef LIBBB_H
++#define LIBBB_H 1
+ 
+ #include "platform.h"
+ 
+@@ -110,9 +110,7 @@ int sysinfo(struct sysinfo* info);
+ 
+ /* Make all declarations hidden (-fvisibility flag only affects definitions) */
+ /* (don't include system headers after this until corresponding pop!) */
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ 
+ #if ENABLE_USE_BB_PWD_GRP
+@@ -1532,9 +1530,6 @@ extern const char bb_default_login_shell[];
+ #define ARRAY_SIZE(x) ((unsigned)(sizeof(x) / sizeof((x)[0])))
+ 
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
+-
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+-#endif /* __LIBBUSYBOX_H__ */
++#endif
+diff --git a/include/platform.h b/include/platform.h
+index 13dfcbd..47fd5f6 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -4,8 +4,8 @@
+ 
+    Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ */
+-#ifndef	__PLATFORM_H
+-#define __PLATFORM_H	1
++#ifndef	BB_PLATFORM_H
++#define BB_PLATFORM_H 1
+ 
+ /* Convenience macros to test the version of gcc. */
+ #undef __GNUC_PREREQ
+@@ -110,6 +110,16 @@
+ # define FAST_FUNC
+ #endif
+ 
++/* Make all declarations hidden (-fvisibility flag only affects definitions) */
++/* (don't include system headers after this until corresponding pop!) */
++#if __GNUC_PREREQ(4,1)
++# define PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN _Pragma("GCC visibility push(hidden)")
++# define POP_SAVED_FUNCTION_VISIBILITY              _Pragma("GCC visibility pop")
++#else
++# define PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
++# define POP_SAVED_FUNCTION_VISIBILITY
++#endif
++
+ /* ---- Endian Detection ------------------------------------ */
+ 
+ #if (defined __digital__ && defined __unix__)
+@@ -371,4 +381,4 @@ static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+ #endif
+ #endif
+ 
+-#endif	/* platform.h */
++#endif
+diff --git a/include/pwd_.h b/include/pwd_.h
+index a0cf7c9..f52445c 100644
+--- a/include/pwd_.h
++++ b/include/pwd_.h
+@@ -21,12 +21,10 @@
+  *	POSIX Standard: 9.2.2 User Database Access	<pwd.h>
+  */
+ 
+-#ifndef	BB_PWD_H
+-#define	BB_PWD_H 1
++#ifndef BB_PWD_H
++#define BB_PWD_H 1
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ /* This file is #included after #include <pwd.h>
+  * We will use libc-defined structures, but will #define function names
+@@ -107,8 +105,6 @@ extern int fgetpwent_r(FILE *__restrict __stream,
+    will expect, but this need not be the format of the password file.  */
+ /* UNUSED extern int getpw(uid_t __uid, char *__buffer); */
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif /* pwd.h  */
+diff --git a/include/rtc_.h b/include/rtc_.h
+index ae17ee7..74bb695 100644
+--- a/include/rtc_.h
++++ b/include/rtc_.h
+@@ -5,13 +5,11 @@
+  */
+ 
+ #ifndef BB_RTC_H
+-#define BB_RTC_H
++#define BB_RTC_H 1
+ 
+ #include "libbb.h"
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ extern int rtc_adjtime_is_utc(void) FAST_FUNC;
+ extern int rtc_xopen(const char **default_rtc, int flags) FAST_FUNC;
+@@ -71,8 +69,6 @@ struct linux_rtc_wkalrm {
+ #define RTC_AF 0x20
+ #define RTC_UF 0x10
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/include/shadow_.h b/include/shadow_.h
+index 60f3e6b..02d3bf9 100644
+--- a/include/shadow_.h
++++ b/include/shadow_.h
+@@ -22,9 +22,7 @@
+ #ifndef BB_SHADOW_H
+ #define BB_SHADOW_H 1
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ /* This file is #included after #include <shadow.h>
+  * We will use libc-defined structures, but will #define function names
+@@ -97,8 +95,6 @@ extern int lckpwdf(void);
+ /* Unlock password file */
+ extern int ulckpwdf(void);
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif /* shadow.h */
+diff --git a/include/unarchive.h b/include/unarchive.h
+index 9077130..beb962c 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -1,10 +1,8 @@
+ /* vi: set sw=4 ts=4: */
+-#ifndef	__UNARCHIVE_H__
+-#define	__UNARCHIVE_H__
++#ifndef UNARCHIVE_H
++#define UNARCHIVE_H 1
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ #define ARCHIVE_PRESERVE_DATE           1
+ #define ARCHIVE_CREATE_LEADING_DIRS     2
+@@ -150,8 +148,6 @@ void open_transformer(int src_fd, const char *transform_prog) FAST_FUNC;
+ #define open_transformer(fd, transformer, transform_prog) open_transformer(fd, transform_prog)
+ #endif
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/include/usage.h b/include/usage.h
+index af54b86..cbbd751 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -9,9 +9,8 @@
+  * or
+  *    |<5 spaces>"\ntext with tabs"....
+  */
+-
+-#ifndef __BB_USAGE_H__
+-#define __BB_USAGE_H__
++#ifndef BB_USAGE_H
++#define BB_USAGE_H 1
+ 
+ 
+ #define NOUSAGE_STR "\b"
+@@ -4921,4 +4920,5 @@ USE_FEATURE_TUNCTL_UG( \
+      "\nWith no -q, runs continuously monitoring for ARP conflicts," \
+      "\nexits only on I/O errors (link down etc)" \
+ 
+-#endif /* __BB_USAGE_H__ */
++
++#endif
+diff --git a/include/xatonum.h b/include/xatonum.h
+index 86a3472..ee816ef 100644
+--- a/include/xatonum.h
++++ b/include/xatonum.h
+@@ -7,9 +7,7 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ /* Provides extern declarations of functions */
+ #define DECLARE_STR_CONV(type, T, UT) \
+@@ -171,6 +169,4 @@ uint32_t bb_strtou32(const char *arg, char **endp, int base)
+ 
+ double bb_strtod(const char *arg, char **endp) FAST_FUNC;
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+diff --git a/include/xregex.h b/include/xregex.h
+index 90cf124..61658ed 100644
+--- a/include/xregex.h
++++ b/include/xregex.h
+@@ -8,20 +8,16 @@
+  *
+  * Licensed under GPLv2 or later, see file License in this tarball for details.
+  */
+-#ifndef __BB_REGEX__
+-#define __BB_REGEX__
++#ifndef BB_REGEX_H
++#define BB_REGEX_H 1
+ 
+ #include <regex.h>
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ char* regcomp_or_errmsg(regex_t *preg, const char *regex, int cflags) FAST_FUNC;
+ void xregcomp(regex_t *preg, const char *regex, int cflags) FAST_FUNC;
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/modutils/modutils.h b/modutils/modutils.h
+index 0a29ff2..086bb39 100644
+--- a/modutils/modutils.h
++++ b/modutils/modutils.h
+@@ -6,14 +6,12 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#ifndef __MODUTILS_H__
+-#define __MODUTILS_H__
++#ifndef MODUTILS_H
++#define MODUTILS_H 1
+ 
+ #include "libbb.h"
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ /* linux/include/linux/module.h has 64, but this is also used
+  * internally for the maximum alias name length, which can be quite long */
+@@ -62,8 +60,6 @@ int FAST_FUNC bb_delete_module(const char *module, unsigned int flags);
+ int FAST_FUNC bb_init_module_24(const char *module, const char *options);
+ #endif
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/networking/isrv.h b/networking/isrv.h
+index c0158a3..f20714d 100644
+--- a/networking/isrv.h
++++ b/networking/isrv.h
+@@ -8,9 +8,7 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ /* opaque structure */
+ struct isrv_state_t;
+@@ -36,6 +34,4 @@ void isrv_run(
+ 	int linger_timeout
+ );
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+diff --git a/networking/libiproute/ip_common.h b/networking/libiproute/ip_common.h
+index 305b491..aef3252 100644
+--- a/networking/libiproute/ip_common.h
++++ b/networking/libiproute/ip_common.h
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+-#ifndef _IP_COMMON_H
+-#define _IP_COMMON_H 1
++#ifndef IP_COMMON_H
++#define IP_COMMON_H 1
+ 
+ #include "libbb.h"
+ #include <asm/types.h>
+@@ -13,9 +13,7 @@
+ #include <linux/if_link.h>
+ #endif
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ extern char **ip_parse_common_args(char **argv);
+ extern int print_neigh(struct sockaddr_nl *who, struct nlmsghdr *n, void *arg);
+@@ -34,8 +32,6 @@ extern int do_ipmonitor(char **argv);
+ extern int do_multiaddr(char **argv);
+ extern int do_multiroute(char **argv);
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+-#endif /* ip_common.h */
++#endif
+diff --git a/networking/libiproute/libnetlink.h b/networking/libiproute/libnetlink.h
+index 079153b..e5fee4d 100644
+--- a/networking/libiproute/libnetlink.h
++++ b/networking/libiproute/libnetlink.h
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+-#ifndef __LIBNETLINK_H__
+-#define __LIBNETLINK_H__ 1
++#ifndef LIBNETLINK_H
++#define LIBNETLINK_H 1
+ 
+ #include <linux/types.h>
+ /* We need linux/types.h because older kernels use __u32 etc
+@@ -8,10 +8,7 @@
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+ 
+-
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ struct rtnl_handle
+ {
+@@ -48,8 +45,6 @@ extern int rta_addattr_l(struct rtattr *rta, int maxlen, int type, void *data, i
+ 
+ extern int parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len) FAST_FUNC;
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+-#endif /* __LIBNETLINK_H__ */
++#endif
+diff --git a/networking/libiproute/ll_map.h b/networking/libiproute/ll_map.h
+index 6d64ac1..3966def 100644
+--- a/networking/libiproute/ll_map.h
++++ b/networking/libiproute/ll_map.h
+@@ -1,10 +1,8 @@
+ /* vi: set sw=4 ts=4: */
+-#ifndef __LL_MAP_H__
+-#define __LL_MAP_H__ 1
++#ifndef LL_MAP_H
++#define LL_MAP_H 1
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ int ll_remember_index(const struct sockaddr_nl *who, struct nlmsghdr *n, void *arg);
+ int ll_init_map(struct rtnl_handle *rth);
+@@ -14,8 +12,6 @@ const char *ll_idx_n2a(int idx, char *buf);
+ /* int ll_index_to_type(int idx); */
+ unsigned ll_index_to_flags(int idx);
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+-#endif /* __LL_MAP_H__ */
++#endif
+diff --git a/networking/libiproute/rt_names.h b/networking/libiproute/rt_names.h
+index 3d68b67..a2d4fd1 100644
+--- a/networking/libiproute/rt_names.h
++++ b/networking/libiproute/rt_names.h
+@@ -1,10 +1,8 @@
+ /* vi: set sw=4 ts=4: */
+-#ifndef RT_NAMES_H_
+-#define RT_NAMES_H_ 1
++#ifndef RT_NAMES_H
++#define RT_NAMES_H 1
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ extern const char* rtnl_rtprot_n2a(int id, char *buf, int len);
+ extern const char* rtnl_rtscope_n2a(int id, char *buf, int len);
+@@ -17,19 +15,15 @@ extern int rtnl_rtrealm_a2n(uint32_t *id, char *arg);
+ extern int rtnl_dsfield_a2n(uint32_t *id, char *arg);
+ extern int rtnl_rttable_a2n(uint32_t *id, char *arg);
+ 
+-
+ extern const char* ll_type_n2a(int type, char *buf, int len);
+ 
+ extern const char* ll_addr_n2a(unsigned char *addr, int alen, int type,
+ 				char *buf, int blen);
+ extern int ll_addr_a2n(unsigned char *lladdr, int len, char *arg);
+ 
+-
+ extern const char* ll_proto_n2a(unsigned short id, char *buf, int len);
+ extern int ll_proto_a2n(unsigned short *id, char *buf);
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/networking/libiproute/rtm_map.h b/networking/libiproute/rtm_map.h
+index 02fa77e..ab1b70e 100644
+--- a/networking/libiproute/rtm_map.h
++++ b/networking/libiproute/rtm_map.h
+@@ -1,18 +1,14 @@
+ /* vi: set sw=4 ts=4: */
+-#ifndef __RTM_MAP_H__
+-#define __RTM_MAP_H__ 1
++#ifndef RTM_MAP_H
++#define RTM_MAP_H 1
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ const char *rtnl_rtntype_n2a(int id, char *buf, int len);
+ int rtnl_rtntype_a2n(int *id, char *arg);
+ 
+ int get_rt_realms(uint32_t *realms, char *arg);
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+-#endif /* __RTM_MAP_H__ */
++#endif
+diff --git a/networking/libiproute/utils.h b/networking/libiproute/utils.h
+index 3603c75..ed03e78 100644
+--- a/networking/libiproute/utils.h
++++ b/networking/libiproute/utils.h
+@@ -1,14 +1,12 @@
+ /* vi: set sw=4 ts=4: */
+-#ifndef __UTILS_H__
+-#define __UTILS_H__ 1
++#ifndef UTILS_H
++#define UTILS_H 1
+ 
+ #include "libnetlink.h"
+ #include "ll_map.h"
+ #include "rtm_map.h"
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ extern family_t preferred_family;
+ extern smallint show_stats;    /* UNUSED */
+@@ -87,8 +85,6 @@ int dnet_pton(int af, const char *src, void *addr);
+ const char *ipx_ntop(int af, const void *addr, char *str, size_t len);
+ int ipx_pton(int af, const char *src, void *addr);
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+-#endif /* __UTILS_H__ */
++#endif
+diff --git a/networking/tcpudp_perhost.h b/networking/tcpudp_perhost.h
+index 2e093c1..d370036 100644
+--- a/networking/tcpudp_perhost.h
++++ b/networking/tcpudp_perhost.h
+@@ -7,9 +7,7 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ struct hcc {
+ 	char *ip;
+@@ -32,6 +30,4 @@ void ipsvd_perhost_remove(int pid);
+ //unsigned ipsvd_perhost_setpid(int pid);
+ //void ipsvd_perhost_free(void);
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 15f0d9a..5a258c0 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -6,17 +6,14 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+-#ifndef _COMMON_H
+-#define _COMMON_H
++#ifndef UDHCP_COMMON_H
++#define UDHCP_COMMON_H 1
+ 
+ #include "libbb.h"
+ #include <netinet/udp.h>
+ #include <netinet/ip.h>
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ #define DEFAULT_SCRIPT   CONFIG_UDHCPC_DEFAULT_SCRIPT
+ 
+@@ -103,8 +100,6 @@ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *i
+ # define DEBUG(str, args...) do {;} while (0)
+ #endif
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index a934849..7b77942 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -1,12 +1,9 @@
+ /* vi: set sw=4 ts=4: */
+ /* dhcpc.h */
++#ifndef UDHCP_DHCPC_H
++#define UDHCP_DHCPC_H 1
+ 
+-#ifndef _DHCPC_H
+-#define _DHCPC_H
+-
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ struct client_config_t {
+ 	uint8_t arp[6];                 /* Our arp address */
+@@ -49,8 +46,6 @@ int send_release(uint32_t server, uint32_t ciaddr) FAST_FUNC;
+ 
+ int udhcp_recv_raw_packet(struct dhcpMessage *payload, int fd) FAST_FUNC;
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index b4e1808..9667c61 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -1,12 +1,9 @@
+ /* vi: set sw=4 ts=4: */
+ /* dhcpd.h */
++#ifndef UDHCP_DHCPD_H
++#define UDHCP_DHCPD_H 1
+ 
+-#ifndef _DHCPD_H
+-#define _DHCPD_H
+-
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ /************************************/
+ /* Defaults _you_ may want to tweak */
+@@ -134,8 +131,6 @@ void read_leases(const char *file) FAST_FUNC;
+ struct option_set *find_option(struct option_set *opt_list, uint8_t code) FAST_FUNC;
+ 
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/networking/udhcp/options.h b/networking/udhcp/options.h
+index 87440c3..23370da 100644
+--- a/networking/udhcp/options.h
++++ b/networking/udhcp/options.h
+@@ -1,11 +1,9 @@
+ /* vi: set sw=4 ts=4: */
+ /* options.h */
+-#ifndef _OPTIONS_H
+-#define _OPTIONS_H
++#ifndef UDHCP_OPTIONS_H
++#define UDHCP_OPTIONS_H 1
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ #define TYPE_MASK       0x0F
+ 
+@@ -111,8 +109,6 @@ char *dname_dec(const uint8_t *cstr, int clen, const char *pre) FAST_FUNC;
+ uint8_t *dname_enc(const uint8_t *cstr, int clen, const char *src, int *retlen) FAST_FUNC;
+ #endif
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+ 
+ #endif
+diff --git a/runit/runit_lib.h b/runit/runit_lib.h
+index b0b6dc2..fd94db9 100644
+--- a/runit/runit_lib.h
++++ b/runit/runit_lib.h
+@@ -25,9 +25,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ extern unsigned byte_chr(char *s,unsigned n,int c);
+ 
+@@ -100,6 +98,4 @@ struct ERR_svstatus_must_be_20_bytes {
+ 	char ERR_svstatus_must_be_20_bytes[sizeof(svstatus_t) == 20 ? 1 : -1];
+ };
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY
+diff --git a/shell/match.h b/shell/match.h
+index 863f525..3fc4de3 100644
+--- a/shell/match.h
++++ b/shell/match.h
+@@ -1,5 +1,7 @@
+ /* match.h - interface to shell ##/%% matching code */
+ 
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
++
+ typedef char *(*scan_t)(char *string, char *match, bool zero);
+ 
+ char *scanleft(char *string, char *match, bool zero);
+@@ -20,3 +22,5 @@ static inline scan_t pick_scan(char op1, char op2, bool *zero)
+ 		return op1 == op2 ? scanleft : scanright;
+ 	}
+ }
++
++POP_SAVED_FUNCTION_VISIBILITY
+diff --git a/shell/math.h b/shell/math.h
+index 195fc20..51dbb56 100644
+--- a/shell/math.h
++++ b/shell/math.h
+@@ -72,8 +72,10 @@
+  * below for the exact things that are available.
+  */
+ 
+-#ifndef _SHELL_MATH_
+-#define _SHELL_MATH_
++#ifndef SHELL_MATH_H
++#define SHELL_MATH_H 1
++
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ #if ENABLE_SH_MATH_SUPPORT_64
+ typedef long long arith_t;
+@@ -96,4 +98,6 @@ typedef struct arith_eval_hooks {
+ 
+ arith_t arith(const char *expr, int *perrcode, arith_eval_hooks_t*);
+ 
++POP_SAVED_FUNCTION_VISIBILITY
++
+ #endif
+diff --git a/util-linux/volume_id/volume_id_internal.h b/util-linux/volume_id/volume_id_internal.h
+index d5258c5..af58883 100644
+--- a/util-linux/volume_id/volume_id_internal.h
++++ b/util-linux/volume_id/volume_id_internal.h
+@@ -21,14 +21,11 @@
+ #include "libbb.h"
+ #include "volume_id.h"
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility push(hidden)
+-#endif
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ #define dbg(...) ((void)0)
+ /* #define dbg(...) bb_error_msg(__VA_ARGS__) */
+ 
+-
+ /* volume_id.h */
+ 
+ #define VOLUME_ID_VERSION		48
+@@ -227,6 +224,4 @@ int volume_id_probe_udf(struct volume_id *id /*,uint64_t off*/);
+ 
+ int volume_id_probe_xfs(struct volume_id *id /*,uint64_t off*/);
+ 
+-#if __GNUC_PREREQ(4,1)
+-# pragma GCC visibility pop
+-#endif
++POP_SAVED_FUNCTION_VISIBILITY

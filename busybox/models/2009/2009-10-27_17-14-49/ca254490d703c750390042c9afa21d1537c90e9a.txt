@@ -1,0 +1,35 @@
+2009-10-27 17:14:49 +0100
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 270ec0a..082d726 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -92,6 +92,7 @@ enum {
+ 	OPT_2 = (1 << 20) * ENABLE_CHPST,
+ };
+ 
++/* TODO: use recursive_action? */
+ static NOINLINE void edir(const char *directory_name)
+ {
+ 	int wdir;
+@@ -101,11 +102,9 @@ static NOINLINE void edir(const char *directory_name)
+ 
+ 	wdir = xopen(".", O_RDONLY | O_NDELAY);
+ 	xchdir(directory_name);
+-	dir = opendir(".");
+-	if (!dir)
+-		bb_perror_msg_and_die("opendir %s", directory_name);
++	dir = xopendir(".");
+ 	for (;;) {
+-		char buf[256];
++		RESERVE_CONFIG_BUFFER(buf, 256);
+ 		char *tail;
+ 		int size;
+ 
+@@ -149,6 +148,7 @@ static NOINLINE void edir(const char *directory_name)
+ 				break;
+ 		}
+ 		xsetenv(d->d_name, buf);
++		RELEASE_CONFIG_BUFFER(buf);
+ 	}
+ 	closedir(dir);
+ 	if (fchdir(wdir) == -1)

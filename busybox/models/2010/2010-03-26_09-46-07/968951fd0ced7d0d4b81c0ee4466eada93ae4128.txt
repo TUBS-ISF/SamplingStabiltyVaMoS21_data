@@ -1,0 +1,59 @@
+2010-03-26 09:46:07 +0100
+diff --git a/coreutils/expand.c b/coreutils/expand.c
+index 60ac9f5..cfb1e25 100644
+--- a/coreutils/expand.c
++++ b/coreutils/expand.c
+@@ -81,12 +81,13 @@ static void unexpand(FILE *file, unsigned tab_size, unsigned opt)
+ 
+ 		while (*ptr) {
+ 			unsigned n;
+-			unsigned len;
++			unsigned len = 0;
+ 
+ 			while (*ptr == ' ') {
+-				column++;
+ 				ptr++;
++				len++;
+ 			}
++			column += len;
+ 			if (*ptr == '\t') {
+ 				column += tab_size - (column % tab_size);
+ 				ptr++;
+@@ -94,16 +95,18 @@ static void unexpand(FILE *file, unsigned tab_size, unsigned opt)
+ 			}
+ 
+ 			n = column / tab_size;
+-			column = column % tab_size;
+-			while (n--)
+-				putchar('\t');
++			if (n) {
++				len = column = column % tab_size;
++				while (n--)
++					putchar('\t');
++			}
+ 
+ 			if ((opt & OPT_INITIAL) && ptr != line) {
+-				printf("%*s%s", column, "", ptr);
++				printf("%*s%s", len, "", ptr);
+ 				break;
+ 			}
+ 			n = strcspn(ptr, "\t ");
+-			printf("%*s%.*s", column, "", n, ptr);
++			printf("%*s%.*s", len, "", n, ptr);
+ # if ENABLE_FEATURE_ASSUME_UNICODE
+ 			{
+ 				char c;
+diff --git a/testsuite/unexpand.tests b/testsuite/unexpand.tests
+index 5c2a29b..1af2fdc 100755
+--- a/testsuite/unexpand.tests
++++ b/testsuite/unexpand.tests
+@@ -27,6 +27,9 @@ testing "unexpand case 6" "unexpand" \
+ testing "unexpand case 7" "unexpand" \
+ 	"123\t 45678\n" "" "123 \t 45678\n" \
+ 
++testing "unexpand case 8" "unexpand" \
++	"a b\n" "" "a b\n" \
++
+ testing "unexpand with unicode characher 0x394" "unexpand" \
+ 	"1ΔΔΔ5\t99999\n" "" "1ΔΔΔ5   99999\n" \
+ 

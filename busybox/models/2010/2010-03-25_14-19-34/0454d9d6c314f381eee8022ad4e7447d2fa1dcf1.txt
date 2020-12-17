@@ -1,0 +1,13 @@
+2010-03-25 14:19:34 +0100
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 6b490d7..49158ce 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -111,6 +111,7 @@ CONFIG_FEATURE_SEAMLESS_GZ=y
+ CONFIG_FEATURE_SEAMLESS_Z=y
+ CONFIG_AR=y
+ CONFIG_FEATURE_AR_LONG_FILENAMES=y
++CONFIG_FEATURE_AR_CREATE=y
+ CONFIG_BUNZIP2=y
+ CONFIG_BZIP2=y
+ CONFIG_CPIO=y

@@ -1,0 +1,14 @@
+2008-08-20 23:29:10 +0000
+diff --git a/Makefile b/Makefile
+index 62387cc..277aa51 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ VERSION = 1
+ PATCHLEVEL = 12
+ SUBLEVEL = 0
+-EXTRAVERSION = .svn
++EXTRAVERSION =
+ NAME = Unnamed
+ 
+ # *DOCUMENTATION*

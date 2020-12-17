@@ -1,0 +1,193 @@
+2008-08-04 13:20:36 +0000
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 9ea3087..54e9632 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -1169,10 +1169,9 @@ static char **create_list(const char *filename)
+ 	file_list = NULL;
+ 	count = 0;
+ 	while ((line = xmalloc_fgetline(list_stream)) != NULL) {
+-//TODO: zeroing xrealloc_vector?
+ 		file_list = xrealloc_vector(file_list, 2, count);
+ 		file_list[count++] = line;
+-		file_list[count] = NULL;
++		/*file_list[count] = NULL; - xrealloc_vector did it */
+ 	}
+ 	fclose(list_stream);
+ 
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index cb5f48f..a58fab3 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -92,7 +92,7 @@ static int FAST_FUNC act(const char *file, struct stat *statbuf, void *args UNUS
+ 
+ 	names = xrealloc_vector(names, 4, cur);
+ 	names[cur++] = xstrdup(file);
+-	names[cur] = NULL;
++	/*names[cur] = NULL; - xrealloc_vector did it */
+ 
+ 	return TRUE;
+ }
+diff --git a/include/libbb.h b/include/libbb.h
+index 2dcdeac..f7a6849 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -570,6 +570,10 @@ void *malloc_or_warn(size_t size) FAST_FUNC;
+ void *xmalloc(size_t size) FAST_FUNC;
+ void *xzalloc(size_t size) FAST_FUNC;
+ void *xrealloc(void *old, size_t size) FAST_FUNC;
++/* After xrealloc_vector(v, 4, idx) it's ok to use
++ * at least v[idx] and v[idx+1], for all idx values.
++ * shift specifies how many new elements are added (1: 2, 2: 4... 8: 256...)
++ * when all elements are used up. New elements are zeroed out. */
+ #define xrealloc_vector(vector, shift, idx) \
+ 	xrealloc_vector_helper((vector), (sizeof((vector)[0]) << 8) + (shift), (idx))
+ void* xrealloc_vector_helper(void *vector, unsigned sizeof_and_shift, int idx) FAST_FUNC;
+diff --git a/libbb/procps.c b/libbb/procps.c
+index ba3d250..fd19621 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -45,8 +45,8 @@ static int get_cached(cache_t *cp, unsigned id)
+ 	for (i = 0; i < cp->size; i++)
+ 		if (cp->cache[i].id == id)
+ 			return i;
+-	i = cp->size;
+-	cp->cache = xrealloc_vector(cp->cache, 2, cp->size++);
++	i = cp->size++;
++	cp->cache = xrealloc_vector(cp->cache, 2, i);
+ 	cp->cache[i++].id = id;
+ 	return -i;
+ }
+@@ -59,8 +59,8 @@ static char* get_cached(cache_t *cp, unsigned id, ug_func* fp)
+ 	for (i = 0; i < cp->size; i++)
+ 		if (cp->cache[i].id == id)
+ 			return cp->cache[i].name;
+-	i = cp->size;
+-	cp->cache = xrealloc_vector(cp->cache, 2, cp->size++);
++	i = cp->size++;
++	cp->cache = xrealloc_vector(cp->cache, 2, i);
+ 	cp->cache[i].id = id;
+ 	/* Never fails. Generates numeric string if name isn't found */
+ 	fp(cp->cache[i].name, sizeof(cp->cache[i].name), id);
+diff --git a/libbb/xrealloc_vector.c b/libbb/xrealloc_vector.c
+index ccc961b..342ae53 100644
+--- a/libbb/xrealloc_vector.c
++++ b/libbb/xrealloc_vector.c
+@@ -14,7 +14,6 @@
+  *  #define magic packed two parameters into one:
+  *  sizeof = sizeof_and_shift >> 8
+  *  shift  = (sizeof_and_shift) & 0xff
+- *  (TODO: encode "I want it zeroed" in lowest bit?)
+  *
+  * Lets say shift = 4. 1 << 4 == 0x10.
+  * If idx == 0, 0x10, 0x20 etc, vector[] is resized to next higher
+@@ -23,14 +22,25 @@
+  *
+  * In other words: after xrealloc_vector(v, 4, idx) it's ok to use
+  * at least v[idx] and v[idx+1], for all idx values.
++ *
++ * New elements are zeroed out, but only if realloc was done
++ * (not on every call). You can depend on v[idx] and v[idx+1] being
++ * zeroed out if you use it like this:
++ *  v = xrealloc_vector(v, 4, idx);
++ *  v[idx].some_fields = ...; - the rest stays 0/NULL
++ *  idx++;
++ * If you do not advance idx like above, you should be more careful.
++ * Next call to xrealloc_vector(v, 4, idx) may or may not zero out v[idx].
+  */
+ void* FAST_FUNC xrealloc_vector_helper(void *vector, unsigned sizeof_and_shift, int idx)
+ {
+ 	int mask = 1 << (uint8_t)sizeof_and_shift;
+ 
+ 	if (!(idx & (mask - 1))) {
+-		sizeof_and_shift >>= 8;
++		sizeof_and_shift >>= 8; /* sizeof(vector[0]) */
+ 		vector = xrealloc(vector, sizeof_and_shift * (idx + mask + 1));
++		vector += idx;
++		memset(vector, 0, sizeof_and_shift * (mask + 1));
+ 	}
+ 	return vector;
+ }
+diff --git a/miscutils/man.c b/miscutils/man.c
+index edeffc7..f499fef 100644
+--- a/miscutils/man.c
++++ b/miscutils/man.c
+@@ -112,7 +112,7 @@ int man_main(int argc UNUSED_PARAM, char **argv)
+ 			man_path_list[count_mp] = xstrdup(token[1]);
+ 			count_mp++;
+ 			/* man_path_list is NULL terminated */
+-			man_path_list[count_mp] = NULL;
++			/*man_path_list[count_mp] = NULL; - xrealloc_vector did it */
+ 		}
+ 		if (strcmp("MANSECT", token[0]) == 0) {
+ 			free(sec_list);
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index 63be9aa..4aa2b58 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -270,10 +270,9 @@ static FAST_FUNC int fileAction(const char *pathname,
+ 
+ 	cur = module_count++;
+ 	modinfo = xrealloc_vector(modinfo, 12, cur);
+-//TODO: use zeroing version of xrealloc_vector?
+ 	modinfo[cur].pathname = xstrdup(pathname);
+-	modinfo[cur].aliases = NULL;
+-	modinfo[cur+1].pathname = NULL;
++	/*modinfo[cur].aliases = NULL; - xrealloc_vector did it */
++	/*modinfo[cur+1].pathname = NULL;*/
+ 
+ 	if (!pathname_matches_modname(fname, modname_to_match)) {
+ 		dbg1_error_msg("'%s' module name doesn't match", pathname);
+@@ -330,8 +329,7 @@ static int load_dep_bb(void)
+ 		space = strchrnul(line, ' ');
+ 		cur = module_count++;
+ 		modinfo = xrealloc_vector(modinfo, 12, cur);
+-//TODO: use zeroing version of xrealloc_vector?
+-		modinfo[cur+1].pathname = NULL;
++		/*modinfo[cur+1].pathname = NULL; - xrealloc_vector did it */
+ 		modinfo[cur].pathname = line; /* we take ownership of malloced block here */
+ 		if (*space)
+ 			*space++ = '\0';
+diff --git a/procps/top.c b/procps/top.c
+index 1a6b8ab..1f1415f 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -814,7 +814,7 @@ int top_main(int argc UNUSED_PARAM, char **argv)
+ 			int n;
+ 			if (scan_mask == TOP_MASK) {
+ 				n = ntop;
+-				top = xrealloc_vector(top, 2, ntop++);
++				top = xrealloc_vector(top, 6, ntop++);
+ 				top[n].pid = p->pid;
+ 				top[n].ppid = p->ppid;
+ 				top[n].vsz = p->vsz;
+@@ -830,7 +830,7 @@ int top_main(int argc UNUSED_PARAM, char **argv)
+ 					continue; /* kernel threads are ignored */
+ 				n = ntop;
+ 				/* No bug here - top and topmem are the same */
+-				top = xrealloc_vector(topmem, 2, ntop++);
++				top = xrealloc_vector(topmem, 6, ntop++);
+ 				strcpy(topmem[n].comm, p->comm);
+ 				topmem[n].pid      = p->pid;
+ 				topmem[n].vsz      = p->mapped_rw + p->mapped_ro;
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 25aa406..4026303 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -238,14 +238,13 @@ static struct option *add_long_options(struct option *long_options, char *option
+ 				if (tlen == 0)
+ 					bb_error_msg_and_die("empty long option specified");
+ 			}
+-//TODO: zeroing version of xrealloc_vector!
+ 			long_options = xrealloc_vector(long_options, 4, long_nr);
+ 			long_options[long_nr].has_arg = arg_opt;
+-			long_options[long_nr].flag = NULL;
++			/*long_options[long_nr].flag = NULL; - xrealloc_vector did it */
+ 			long_options[long_nr].val = LONG_OPT;
+ 			long_options[long_nr].name = xstrdup(tokptr);
+ 			long_nr++;
+-			memset(&long_options[long_nr], 0, sizeof(long_options[0]));
++			/*memset(&long_options[long_nr], 0, sizeof(long_options[0])); - xrealloc_vector did it */
+ 		}
+ 		tokptr = strtok(NULL, ", \t\n");
+ 	}

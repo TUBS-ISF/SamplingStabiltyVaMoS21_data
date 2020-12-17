@@ -1,0 +1,64 @@
+2010-03-31 16:03:56 +0200
+diff --git a/networking/Config.in b/networking/Config.in
+index b01c38e..61e59b2 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -679,10 +679,10 @@ config NTPD
+ 	  The NTP client/server daemon.
+ 
+ config FEATURE_NTPD_SERVER
+-        bool "Make ntpd usable as a NTP server"
+-        default y
+-        depends on NTPD
+-        help
++	bool "Make ntpd usable as a NTP server"
++	default y
++	depends on NTPD
++	help
+ 	  Make ntpd usable as a NTP server. If you disable this option
+ 	  ntpd will be usable only as a NTP client.
+ 
+diff --git a/sysklogd/Config.in b/sysklogd/Config.in
+index 0d819e1..b500d54 100644
+--- a/sysklogd/Config.in
++++ b/sysklogd/Config.in
+@@ -51,14 +51,14 @@ config FEATURE_SYSLOGD_DUP
+ 	  which are totally the same.
+ 
+ config FEATURE_SYSLOGD_READ_BUFFER_SIZE
+-       int "Read buffer size in bytes"
+-       default 256
+-       range 256 20000
+-       depends on SYSLOGD
+-       help
+-         This option sets the size of the syslog read buffer.
+-         Actual memory usage increases around five times the
+-         change done here.
++	int "Read buffer size in bytes"
++	default 256
++	range 256 20000
++	depends on SYSLOGD
++	help
++	  This option sets the size of the syslog read buffer.
++	  Actual memory usage increases around five times the
++	  change done here.
+ 
+ config FEATURE_IPC_SYSLOG
+ 	bool "Circular Buffer support"
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 6999b28..acd74a2 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -789,9 +789,9 @@ config RDATE
+ 	  systems.
+ 
+ config RDEV
+-       bool "rdev"
+-       default n
+-       help
++	bool "rdev"
++	default n
++	help
+ 	  Print the device node associated with the filesystem mounted at '/'.
+ 
+ config READPROFILE

@@ -1,0 +1,54 @@
+2007-11-16 12:39:16 +0000
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index 5d0b515..d8dc6c0 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -58,7 +58,7 @@ int mv_main(int argc, char **argv)
+ 	if (argc == 2) {
+ 		dest_exists = cp_mv_stat(last, &dest_stat);
+ 		if (dest_exists < 0) {
+-			return 1;
++			return EXIT_FAILURE;
+ 		}
+ 
+ 		if (!(dest_exists & 2)) {
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 9655c23..54029ff 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -1411,7 +1411,7 @@ int od_main(int argc, char **argv)
+ 	/* skip over any unwanted header bytes */
+ 	skip(n_bytes_to_skip);
+ 	if (!in_stream)
+-		return 1;
++		return EXIT_FAILURE;
+ 
+ 	pseudo_offset = (flag_pseudo_start ? pseudo_start - n_bytes_to_skip : 0);
+ 
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index 3132346..1d6c599 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -374,9 +374,9 @@ int sort_main(int argc, char **argv)
+ 		for (i = 1; i < linecount; i++)
+ 			if (compare_keys(&lines[i-1], &lines[i]) > j) {
+ 				fprintf(stderr, "Check line %d\n", i);
+-				return 1;
++				return EXIT_FAILURE;
+ 			}
+-		return 0;
++		return EXIT_SUCCESS;
+ 	}
+ #endif
+ 	/* Perform the actual sort */
+diff --git a/coreutils/split.c b/coreutils/split.c
+index 51a631c..895a04b 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -137,5 +137,5 @@ int split_main(int argc, char **argv)
+ 			src += to_write;
+ 		} while (bytes_read);
+ 	}
+-	return 0;
++	return EXIT_SUCCESS;
+ }

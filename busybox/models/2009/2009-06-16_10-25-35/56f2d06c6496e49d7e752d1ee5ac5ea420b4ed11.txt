@@ -1,0 +1,202 @@
+2009-06-16 10:25:35 +0200
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index fef0b66..de784ad 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -34,13 +34,13 @@ struct dhcpMessage {
+ #define BROADCAST_FLAG 0x8000 /* "I need broadcast replies" */
+ 	uint32_t ciaddr; /* client IP (if client is in BOUND, RENEW or REBINDING state) */
+ 	uint32_t yiaddr; /* 'your' (client) IP address */
+-	uint32_t siaddr; /* IP address of next server to use in bootstrap,
+-	                  * returned in DHCPOFFER, DHCPACK by server */
++	/* IP address of next server to use in bootstrap, returned in DHCPOFFER, DHCPACK by server */
++	uint32_t siaddr_nip;
+ 	uint32_t gateway_nip; /* relay agent IP address */
+-	uint8_t chaddr[16];/* link-layer client hardware address (MAC) */
+-	uint8_t sname[64]; /* server host name (ASCIZ) */
+-	uint8_t file[128]; /* boot file name (ASCIZ) */
+-	uint32_t cookie;   /* fixed first four option bytes (99,130,83,99 dec) */
++	uint8_t chaddr[16];   /* link-layer client hardware address (MAC) */
++	uint8_t sname[64];    /* server host name (ASCIZ) */
++	uint8_t file[128];    /* boot file name (ASCIZ) */
++	uint32_t cookie;      /* fixed first four option bytes (99,130,83,99 dec) */
+ 	uint8_t options[DHCP_OPTIONS_BUFSIZE + CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS];
+ } PACKED;
+ 
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index bb281c5..61cd8c7 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -39,11 +39,6 @@ struct server_config_t {
+ 	char *interface;                /* The name of the interface to use */
+ 	int ifindex;                    /* Index number of the interface to use */
+ 	uint8_t arp[6];                 /* Our arp address */
+-// disabled: dumpleases has no way of knowing this value,
+-// and will break if it's off. Now it's on always.
+-//	char remaining;                 /* Should the lease time in lease file
+-//	                                 * be written as lease time remaining, or
+-//	                                 * as the absolute time the lease expires */
+ 	uint32_t lease;	                /* lease time in seconds (host order) */
+ 	uint32_t max_leases;            /* maximum number of leases (including reserved address) */
+ 	uint32_t auto_time;             /* how long should udhcpd wait before writing a config file.
+@@ -53,7 +48,7 @@ struct server_config_t {
+ 	uint32_t conflict_time;         /* how long an arp conflict offender is leased for */
+ 	uint32_t offer_time;            /* how long an offered address is reserved */
+ 	uint32_t min_lease;             /* minimum lease time a client can request */
+-	uint32_t siaddr;                /* next server bootp option */
++	uint32_t siaddr_nip;                /* next server bootp option */
+ 	char *lease_file;
+ 	char *pidfile;
+ 	char *notify_file;              /* What to run whenever leases are written */
+@@ -81,11 +76,9 @@ struct dhcpOfferedAddr {
+ 	uint8_t lease_mac16[16];
+ 	/* "nip": IP in network order */
+ 	uint32_t lease_nip;
+-	/* Unix time when lease expires, regardless of value of
+-	 * server_config.remaining. Kept in memory in host order.
++	/* Unix time when lease expires. Kept in memory in host order.
+ 	 * When written to file, converted to network order
+-	 * and optionally adjusted (current time subtracted)
+-	 * if server_config.remaining = 1 */
++	 * and adjusted (current time subtracted) */
+ 	leasetime_t expires;
+ 	uint8_t hostname[20]; /* (size is a multiply of 4) */
+ };
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 671ea94..a69a753 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -24,7 +24,7 @@ static inline uint64_t hton64(uint64_t v)
+ 
+ 
+ /* on these functions, make sure your datatype matches */
+-static int FAST_FUNC read_ip(const char *line, void *arg)
++static int FAST_FUNC read_nip(const char *line, void *arg)
+ {
+ 	len_and_sockaddr *lsa;
+ 
+@@ -187,15 +187,15 @@ static int FAST_FUNC read_opt(const char *const_line, void *arg)
+ 		opt = buffer; /* new meaning for variable opt */
+ 		switch (option->flags & TYPE_MASK) {
+ 		case OPTION_IP:
+-			retval = read_ip(val, buffer);
++			retval = read_nip(val, buffer);
+ 			break;
+ 		case OPTION_IP_PAIR:
+-			retval = read_ip(val, buffer);
++			retval = read_nip(val, buffer);
+ 			val = strtok(NULL, ", \t/-");
+ 			if (!val)
+ 				retval = 0;
+ 			if (retval)
+-				retval = read_ip(val, buffer + 4);
++				retval = read_nip(val, buffer + 4);
+ 			break;
+ 		case OPTION_STRING:
+ #if ENABLE_FEATURE_UDHCP_RFC3397
+@@ -266,7 +266,7 @@ static int FAST_FUNC read_staticlease(const char *const_line, void *arg)
+ 
+ 	/* Read ip */
+ 	ip_string = strtok_r(NULL, " \t", &line);
+-	read_ip(ip_string, &ip);
++	read_nip(ip_string, &ip);
+ 
+ 	addStaticLease(arg, (uint8_t*) &mac_bytes, ip);
+ 
+@@ -285,13 +285,12 @@ struct config_keyword {
+ 
+ static const struct config_keyword keywords[] = {
+ 	/* keyword       handler   variable address               default */
+-	{"start",        read_ip,  &(server_config.start_ip),     "192.168.0.20"},
+-	{"end",          read_ip,  &(server_config.end_ip),       "192.168.0.254"},
++	{"start",        read_nip, &(server_config.start_ip),     "192.168.0.20"},
++	{"end",          read_nip, &(server_config.end_ip),       "192.168.0.254"},
+ 	{"interface",    read_str, &(server_config.interface),    "eth0"},
+ 	/* Avoid "max_leases value not sane" warning by setting default
+ 	 * to default_end_ip - default_start_ip + 1: */
+ 	{"max_leases",   read_u32, &(server_config.max_leases),   "235"},
+-//	{"remaining",    read_yn,  &(server_config.remaining),    "yes"},
+ 	{"auto_time",    read_u32, &(server_config.auto_time),    "7200"},
+ 	{"decline_time", read_u32, &(server_config.decline_time), "3600"},
+ 	{"conflict_time",read_u32, &(server_config.conflict_time),"3600"},
+@@ -299,7 +298,7 @@ static const struct config_keyword keywords[] = {
+ 	{"min_lease",    read_u32, &(server_config.min_lease),    "60"},
+ 	{"lease_file",   read_str, &(server_config.lease_file),   LEASES_FILE},
+ 	{"pidfile",      read_str, &(server_config.pidfile),      "/var/run/udhcpd.pid"},
+-	{"siaddr",       read_ip,  &(server_config.siaddr),       "0.0.0.0"},
++	{"siaddr",       read_nip, &(server_config.siaddr_nip),   "0.0.0.0"},
+ 	/* keywords with no defaults must be last! */
+ 	{"option",       read_opt, &(server_config.options),      ""},
+ 	{"opt",          read_opt, &(server_config.options),      ""},
+diff --git a/networking/udhcp/script.c b/networking/udhcp/script.c
+index 3029b13..97c1d30 100644
+--- a/networking/udhcp/script.c
++++ b/networking/udhcp/script.c
+@@ -37,7 +37,8 @@ static inline int upper_length(int length, int opt_index)
+ }
+ 
+ 
+-static int sprintip(char *dest, const char *pre, const uint8_t *ip)
++/* note: ip is a pointer to an IP in network order, possibly misaliged */
++static int sprint_nip(char *dest, const char *pre, const uint8_t *ip)
+ {
+ 	return sprintf(dest, "%s%d.%d.%d.%d", pre, ip[0], ip[1], ip[2], ip[3]);
+ }
+@@ -76,12 +77,12 @@ static char *alloc_fill_opts(uint8_t *option, const struct dhcp_option *type_p,
+ 	for (;;) {
+ 		switch (type) {
+ 		case OPTION_IP_PAIR:
+-			dest += sprintip(dest, "", option);
++			dest += sprint_nip(dest, "", option);
+ 			*dest++ = '/';
+ 			option += 4;
+ 			optlen = 4;
+ 		case OPTION_IP:	/* Works regardless of host byte order. */
+-			dest += sprintip(dest, "", option);
++			dest += sprint_nip(dest, "", option);
+ 			break;
+ 		case OPTION_BOOLEAN:
+ 			dest += sprintf(dest, *option ? "yes" : "no");
+@@ -145,7 +146,7 @@ static char **fill_envp(struct dhcpMessage *packet)
+ 					num_options++; /* for mton */
+ 			}
+ 		}
+-		if (packet->siaddr)
++		if (packet->siaddr_nip)
+ 			num_options++;
+ 		temp = get_option(packet, DHCP_OPTION_OVERLOAD);
+ 		if (temp)
+@@ -164,7 +165,7 @@ static char **fill_envp(struct dhcpMessage *packet)
+ 		return envp;
+ 
+ 	*curr = xmalloc(sizeof("ip=255.255.255.255"));
+-	sprintip(*curr, "ip=", (uint8_t *) &packet->yiaddr);
++	sprint_nip(*curr, "ip=", (uint8_t *) &packet->yiaddr);
+ 	putenv(*curr++);
+ 
+ 	opt_name = dhcp_option_strings;
+@@ -187,9 +188,9 @@ static char **fill_envp(struct dhcpMessage *packet)
+ 		opt_name += strlen(opt_name) + 1;
+ 		i++;
+ 	}
+-	if (packet->siaddr) {
++	if (packet->siaddr_nip) {
+ 		*curr = xmalloc(sizeof("siaddr=255.255.255.255"));
+-		sprintip(*curr, "siaddr=", (uint8_t *) &packet->siaddr);
++		sprint_nip(*curr, "siaddr=", (uint8_t *) &packet->siaddr_nip);
+ 		putenv(*curr++);
+ 	}
+ 	if (!(over & FILE_FIELD) && packet->file[0]) {
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index 55ed4a8..294a6a6 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -99,7 +99,7 @@ static void init_packet(struct dhcpMessage *packet, struct dhcpMessage *oldpacke
+ /* add in the bootp options */
+ static void add_bootp_options(struct dhcpMessage *packet)
+ {
+-	packet->siaddr = server_config.siaddr;
++	packet->siaddr_nip = server_config.siaddr_nip;
+ 	if (server_config.sname)
+ 		strncpy((char*)packet->sname, server_config.sname, sizeof(packet->sname) - 1);
+ 	if (server_config.boot_file)

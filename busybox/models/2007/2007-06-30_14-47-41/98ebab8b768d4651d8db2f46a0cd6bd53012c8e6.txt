@@ -1,0 +1,296 @@
+2007-06-30 14:47:41 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 6a699a7..a95de84 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -836,7 +836,7 @@ enum { COMM_LEN = 16 };
+ typedef struct {
+ 	DIR *dir;
+ /* Fields are set to 0/NULL if failed to determine (or not requested) */
+-	char *cmd;
++	/*char *cmd;*/
+ 	char *argv0;
+ 	/*char *exe;*/
+ 	USE_SELINUX(char *context;)
+@@ -852,7 +852,9 @@ typedef struct {
+ 	unsigned gid;
+ 	unsigned tty_major,tty_minor;
+ 	char state[4];
+-	/* basename of executable in exec(2), read from /proc/N/stat */
++	/* basename of executable in exec(2), read from /proc/N/stat
++	 * (if executable is symlink or script, it is NOT replaced
++	 * by link target or interpreter name) */
+ 	char comm[COMM_LEN];
+ 	/* user/group? - use passwd/group parsing functions */
+ } procps_status_t;
+@@ -863,9 +865,9 @@ enum {
+ 	PSSCAN_SID      = 1 << 3,
+ 	PSSCAN_UIDGID   = 1 << 4,
+ 	PSSCAN_COMM     = 1 << 5,
+-	PSSCAN_CMD      = 1 << 6,
++	/* PSSCAN_CMD      = 1 << 6, - use read_cmdline instead */
+ 	PSSCAN_ARGV0    = 1 << 7,
+-	PSSCAN_EXE      = 1 << 8, /* not implemented yet */
++	/* PSSCAN_EXE      = 1 << 8, - not implemented */
+ 	PSSCAN_STATE    = 1 << 9,
+ 	PSSCAN_VSZ      = 1 << 10,
+ 	PSSCAN_RSS      = 1 << 11,
+@@ -883,6 +885,9 @@ enum {
+ procps_status_t* alloc_procps_scan(int flags);
+ void free_procps_scan(procps_status_t* sp);
+ procps_status_t* procps_scan(procps_status_t* sp, int flags);
++/* Format cmdline (up to col chars) into char buf[col+1] */
++/* Puts [comm] if cmdline is empty (-> process is a kernel thread) */
++void read_cmdline(char *buf, int col, unsigned pid, const char *comm);
+ pid_t *find_pid_by_name(const char* procName);
+ pid_t *pidlist_reverse(pid_t *pidList);
+ 
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 8413ce8..1987e98 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -102,7 +102,7 @@ procps_status_t *alloc_procps_scan(int flags)
+ void free_procps_scan(procps_status_t* sp)
+ {
+ 	closedir(sp->dir);
+-	free(sp->cmd);
++	free(sp->argv0);
+ 	USE_SELINUX(free(sp->context);)
+ 	free(sp);
+ }
+@@ -266,6 +266,7 @@ procps_status_t *procps_scan(procps_status_t* sp, int flags)
+ 
+ 		}
+ 
++#if 0 /* PSSCAN_CMD is not used */
+ 		if (flags & (PSSCAN_CMD|PSSCAN_ARGV0)) {
+ 			if (sp->argv0) {
+ 				free(sp->argv0);
+@@ -292,10 +293,42 @@ procps_status_t *procps_scan(procps_status_t* sp, int flags)
+ 				sp->cmd = xstrdup(buf);
+ 			}
+ 		}
++#else
++		if (flags & PSSCAN_ARGV0) {
++			if (sp->argv0) {
++				free(sp->argv0);
++				sp->argv0 = NULL;
++			}
++			strcpy(filename_tail, "/cmdline");
++			n = read_to_buf(filename, buf);
++			if (n <= 0)
++				break;
++			if (flags & PSSCAN_ARGV0)
++				sp->argv0 = xstrdup(buf);
++		}
++#endif
+ 		break;
+ 	}
+ 	return sp;
+ }
++
++void read_cmdline(char *buf, int col, unsigned pid, const char *comm)
++{
++	ssize_t sz;
++	char filename[sizeof("/proc//cmdline") + sizeof(int)*3];
++
++	sprintf(filename, "/proc/%u/cmdline", pid);
++	sz = open_read_close(filename, buf, col);
++	if (sz > 0) {
++		buf[sz] = '\0';
++		while (--sz >= 0)
++			if ((unsigned char)(buf[sz]) < ' ')
++				buf[sz] = ' ';
++	} else {
++		snprintf(buf, col, "[%s]", comm);
++	}
++}
++
+ /* from kernel:
+ 	//             pid comm S ppid pgid sid tty_nr tty_pgrp flg
+ 	sprintf(buffer,"%d (%s) %c %d  %d   %d  %d     %d       %lu %lu \
+diff --git a/libbb/read.c b/libbb/read.c
+index 05bf754..502d407 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -124,11 +124,11 @@ char *xmalloc_reads(int fd, char *buf)
+ 
+ ssize_t read_close(int fd, void *buf, size_t size)
+ {
+-	int e;
++	/*int e;*/
+ 	size = full_read(fd, buf, size);
+-	e = errno;
++	/*e = errno;*/
+ 	close(fd);
+-	errno = e;
++	/*errno = e;*/
+ 	return size;
+ }
+ 
+diff --git a/procps/ps.c b/procps/ps.c
+index 003e8ea..c6bffc6 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -27,11 +27,7 @@ static void func_comm(char *buf, int size, const procps_status_t *ps)
+ 
+ static void func_args(char *buf, int size, const procps_status_t *ps)
+ {
+-	buf[0] = '\0';
+-	if (ps->cmd)
+-		safe_strncpy(buf, ps->cmd, size+1);
+-	else if (size >= 2)
+-		sprintf(buf, "[%.*s]", size-2, ps->comm);
++	read_cmdline(buf, size, ps->pid, ps->comm);
+ }
+ 
+ static void func_pid(char *buf, int size, const procps_status_t *ps)
+@@ -112,25 +108,25 @@ typedef struct {
+ 
+ static const ps_out_t out_spec[] = {
+ // Mandated by POSIX:
+-	{ 8                  , "user"  ,"USER"   ,func_user  ,PSSCAN_UIDGID          },
+-	{ 16                 , "comm"  ,"COMMAND",func_comm  ,PSSCAN_COMM            },
+-	{ 256                , "args"  ,"COMMAND",func_args  ,PSSCAN_CMD|PSSCAN_COMM },
+-	{ 5                  , "pid"   ,"PID"    ,func_pid   ,PSSCAN_PID             },
+-	{ 5                  , "ppid"  ,"PPID"   ,func_ppid  ,PSSCAN_PPID            },
+-	{ 5                  , "pgid"  ,"PGID"   ,func_pgid  ,PSSCAN_PGID            },
+-//	{ sizeof("ELAPSED")-1, "etime" ,"ELAPSED",func_etime ,PSSCAN_                },
+-//	{ sizeof("GROUP"  )-1, "group" ,"GROUP"  ,func_group ,PSSCAN_UIDGID          },
+-//	{ sizeof("NI"     )-1, "nice"  ,"NI"     ,func_nice  ,PSSCAN_                },
+-//	{ sizeof("%CPU"   )-1, "pcpu"  ,"%CPU"   ,func_pcpu  ,PSSCAN_                },
+-//	{ sizeof("RGROUP" )-1, "rgroup","RGROUP" ,func_rgroup,PSSCAN_UIDGID          },
+-//	{ sizeof("RUSER"  )-1, "ruser" ,"RUSER"  ,func_ruser ,PSSCAN_UIDGID          },
+-//	{ sizeof("TIME"   )-1, "time"  ,"TIME"   ,func_time  ,PSSCAN_                },
+-	{ 6                  , "tty"   ,"TT"     ,func_tty   ,PSSCAN_TTY             },
+-	{ 4                  , "vsz"   ,"VSZ"    ,func_vsz   ,PSSCAN_VSZ             },
++	{ 8                  , "user"  ,"USER"   ,func_user  ,PSSCAN_UIDGID  },
++	{ 16                 , "comm"  ,"COMMAND",func_comm  ,PSSCAN_COMM    },
++	{ 256                , "args"  ,"COMMAND",func_args  ,PSSCAN_COMM    },
++	{ 5                  , "pid"   ,"PID"    ,func_pid   ,PSSCAN_PID     },
++	{ 5                  , "ppid"  ,"PPID"   ,func_ppid  ,PSSCAN_PPID    },
++	{ 5                  , "pgid"  ,"PGID"   ,func_pgid  ,PSSCAN_PGID    },
++//	{ sizeof("ELAPSED")-1, "etime" ,"ELAPSED",func_etime ,PSSCAN_        },
++//	{ sizeof("GROUP"  )-1, "group" ,"GROUP"  ,func_group ,PSSCAN_UIDGID  },
++//	{ sizeof("NI"     )-1, "nice"  ,"NI"     ,func_nice  ,PSSCAN_        },
++//	{ sizeof("%CPU"   )-1, "pcpu"  ,"%CPU"   ,func_pcpu  ,PSSCAN_        },
++//	{ sizeof("RGROUP" )-1, "rgroup","RGROUP" ,func_rgroup,PSSCAN_UIDGID  },
++//	{ sizeof("RUSER"  )-1, "ruser" ,"RUSER"  ,func_ruser ,PSSCAN_UIDGID  },
++//	{ sizeof("TIME"   )-1, "time"  ,"TIME"   ,func_time  ,PSSCAN_        },
++	{ 6                  , "tty"   ,"TT"     ,func_tty   ,PSSCAN_TTY     },
++	{ 4                  , "vsz"   ,"VSZ"    ,func_vsz   ,PSSCAN_VSZ     },
+ // Not mandated by POSIX, but useful:
+-	{ 4                  , "rss"   ,"RSS"    ,func_rss   ,PSSCAN_RSS             },
++	{ 4                  , "rss"   ,"RSS"    ,func_rss   ,PSSCAN_RSS     },
+ #if ENABLE_SELINUX
+-	{ 35                 , "label" ,"LABEL"  ,func_label ,PSSCAN_CONTEXT         },
++	{ 35                 , "label" ,"LABEL"  ,func_label ,PSSCAN_CONTEXT },
+ #endif
+ };
+ 
+@@ -386,10 +382,9 @@ int ps_main(int argc, char **argv)
+ 			| PSSCAN_UIDGID
+ 			| PSSCAN_STATE
+ 			| PSSCAN_VSZ
+-			| PSSCAN_CMD
++			| PSSCAN_COMM
+ 			| use_selinux
+ 	))) {
+-		char *namecmd = p->cmd;
+ #if ENABLE_SELINUX
+ 		if (use_selinux) {
+ 			len = printf("%5u %-32s %s ",
+@@ -408,21 +403,11 @@ int ps_main(int argc, char **argv)
+ 					p->pid, user, p->vsz, p->state);
+ 		}
+ 
+-		i = terminal_width-len;
+-
+-		if (namecmd && namecmd[0]) {
+-			if (i < 0)
+-				i = 0;
+-			if (strlen(namecmd) > (size_t)i)
+-				namecmd[i] = '\0';
+-			puts(namecmd);
+-		} else {
+-			namecmd = p->comm;
+-			if (i < 2)
+-				i = 2;
+-			if (strlen(namecmd) > ((size_t)i-2))
+-				namecmd[i-2] = '\0';
+-			printf("[%s]\n", namecmd);
++		{
++			char sz = terminal_width - len;
++			char buf[sz + 1];
++			read_cmdline(buf, sz, p->pid, p->comm);
++			puts(buf);
+ 		}
+ 	}
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+diff --git a/procps/top.c b/procps/top.c
+index 136f140..a37a0d0 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -40,11 +40,10 @@ typedef struct top_status_t {
+ 	unsigned pid, ppid;
+ 	unsigned uid;
+ 	char state[4];
+-/* TODO: read /proc/$PID/cmdline only for processes which are displayed */
+-	char cmd[64];
++	char comm[COMM_LEN];
+ } top_status_t;
+ 
+-typedef struct jiffy_counts_t{
++typedef struct jiffy_counts_t {
+ 	unsigned long long usr,nic,sys,idle,iowait,irq,softirq,steal;
+ 	unsigned long long total;
+ 	unsigned long long busy;
+@@ -421,7 +420,7 @@ static void display_status(int count, int scr_width)
+ 
+ 	/* Ok, all prelim data is ready, go thru the list */
+ 	while (count-- > 0) {
+-		int col = scr_width+1;
++		int col = scr_width;
+ 		CALC_STAT(pmem, (s->vsz*pmem_scale + pmem_half) >> pmem_shift);
+ #if ENABLE_FEATURE_TOP_CPU_USAGE_PERCENTAGE
+ 		CALC_STAT(pcpu, (s->pcpu*pcpu_scale + pcpu_half) >> pcpu_shift);
+@@ -444,8 +443,11 @@ static void display_status(int count, int scr_width)
+ 				, SHOW_STAT(pcpu)
+ #endif
+ 		);
+-		if (col > 0)
+-			printf("%.*s", col, s->cmd);
++		if (col > 0) {
++			char buf[col + 1];
++			read_cmdline(buf, col, s->pid, s->comm);
++			fputs(buf, stdout);
++		}
+ 		/* printf(" %d/%d %lld/%lld", s->pcpu, total_pcpu,
+ 			jif.busy - prev_jif.busy, jif.total - prev_jif.total); */
+ 		s++;
+@@ -560,12 +562,11 @@ int top_main(int argc, char **argv)
+ 				| PSSCAN_UTIME
+ 				| PSSCAN_STATE
+ 				| PSSCAN_COMM
+-				| PSSCAN_CMD
+ 				| PSSCAN_SID
+ 				| PSSCAN_UIDGID
+ 		))) {
+ 			int n = ntop;
+-			top = xrealloc(top, (++ntop)*sizeof(top_status_t));
++			top = xrealloc(top, (++ntop) * sizeof(*top));
+ 			top[n].pid = p->pid;
+ 			top[n].ppid = p->ppid;
+ 			top[n].vsz = p->vsz;
+@@ -574,10 +575,7 @@ int top_main(int argc, char **argv)
+ #endif
+ 			top[n].uid = p->uid;
+ 			strcpy(top[n].state, p->state);
+-			if (p->cmd)
+-				safe_strncpy(top[n].cmd, p->cmd, sizeof(top[n].cmd));
+-			else /* mimic ps */
+-				sprintf(top[n].cmd, "[%s]", p->comm);
++			strcpy(top[n].comm, p->comm);
+ 		}
+ 		if (ntop == 0) {
+ 			bb_error_msg_and_die("no process info in /proc");

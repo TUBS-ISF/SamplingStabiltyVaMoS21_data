@@ -1,0 +1,296 @@
+2008-07-01 15:59:42 +0000
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index 0738e3d..a6bc623 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -20,7 +20,16 @@ int FAST_FUNC open_transformer(int src_fd,
+ 
+ 	xpiped_pair(fd_pipe);
+ 
+-	pid = BB_MMU ? xfork() : xvfork();
++#if BB_MMU
++	pid = fork();
++	if (pid == -1)
++		bb_perror_msg_and_die("can't fork");
++#else
++	pid = vfork();
++	if (pid == -1)
++		bb_perror_msg_and_die("can't vfork");
++#endif
++
+ 	if (pid == 0) {
+ 		/* child process */
+ 		close(fd_pipe.rd); /* We don't want to read from the parent */
+diff --git a/archival/tar.c b/archival/tar.c
+index 17ac6c5..526edb6 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -536,7 +536,9 @@ static void NOINLINE vfork_compressor(int tar_fd, int gzip)
+ 	(void) &zip_exec;
+ #endif
+ 
+-	gzipPid = xvfork();
++	gzipPid = vfork();
++	if (gzipPid < 0)
++		bb_perror_msg_and_die("can't vfork");
+ 
+ 	if (gzipPid == 0) {
+ 		/* child */
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index f10572d..459fb77 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -404,7 +404,9 @@ int start_stop_daemon_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		/* DAEMON_DEVNULL_STDIO is superfluous -
+ 		 * it's always done by bb_daemonize() */
+ #else
+-		pid_t pid = xvfork();
++		pid_t pid = vfork();
++		if (pid < 0) /* error */
++			bb_perror_msg_and_die("vfork");
+ 		if (pid != 0) {
+ 			/* parent */
+ 			/* why _exit? the child may have changed the stack,
+diff --git a/include/libbb.h b/include/libbb.h
+index 67eef6d..54601f8 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -719,11 +719,6 @@ int bb_execvp(const char *file, char *const argv[]) FAST_FUNC;
+ #define BB_EXECLP(prog,cmd,...) execlp(prog,cmd, __VA_ARGS__)
+ #endif
+ 
+-#if BB_MMU
+-pid_t xfork(void) FAST_FUNC;
+-#endif
+-pid_t xvfork(void) FAST_FUNC;
+-
+ /* NOMMU friendy fork+exec */
+ pid_t spawn(char **argv) FAST_FUNC;
+ pid_t xspawn(char **argv) FAST_FUNC;
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 5ace87c..5cbecd5 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -109,7 +109,6 @@ lib-y += xfunc_die.o
+ lib-y += xgetcwd.o
+ lib-y += xgethostbyname.o
+ lib-y += xreadlink.o
+-lib-y += xvfork.o
+ 
+ # conditionally compiled objects:
+ lib-$(CONFIG_FEATURE_MOUNT_LOOP) += loop.o
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 989e9b8..37d4c27 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -226,7 +226,9 @@ void FAST_FUNC forkexit_or_rexec(char **argv)
+ 	if (re_execed)
+ 		return;
+ 
+-	pid = xvfork();
++	pid = vfork();
++	if (pid < 0) /* wtf? */
++		bb_perror_msg_and_die("vfork");
+ 	if (pid) /* parent */
+ 		exit(EXIT_SUCCESS);
+ 	/* child - re-exec ourself */
+@@ -238,7 +240,9 @@ void FAST_FUNC forkexit_or_rexec(char **argv)
+ void FAST_FUNC forkexit_or_rexec(void)
+ {
+ 	pid_t pid;
+-	pid = xfork();
++	pid = fork();
++	if (pid < 0) /* wtf? */
++		bb_perror_msg_and_die("fork");
+ 	if (pid) /* parent */
+ 		exit(EXIT_SUCCESS);
+ 	/* child */
+diff --git a/libbb/xvfork.c b/libbb/xvfork.c
+deleted file mode 100644
+index 3fbd0c1..0000000
+--- a/libbb/xvfork.c
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/* vi: set sw=4 ts=4: */
+-/*
+- * Utility routines.
+- *
+- * Copyright (C) 2007 Denys Vlasenko
+- *
+- * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+- */
+-
+-#include "libbb.h"
+-
+-pid_t FAST_FUNC xvfork(void)
+-{
+-	pid_t pid = vfork();
+-	if (pid < 0)
+-		bb_perror_msg_and_die("vfork");
+-	return pid;
+-}
+-
+-#if BB_MMU
+-pid_t FAST_FUNC xfork(void)
+-{
+-	pid_t pid = fork();
+-	if (pid < 0)
+-		bb_perror_msg_and_die("vfork" + 1);
+-	return pid;
+-}
+-#endif
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 4bba9fb..dc3179d 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -38,8 +38,10 @@ static void change_user(const struct passwd *pas)
+ static void edit_file(const struct passwd *pas, const char *file)
+ {
+ 	const char *ptr;
+-	int pid = xvfork();
++	int pid = vfork();
+ 
++	if (pid < 0) /* failure */
++		bb_perror_msg_and_die("vfork");
+ 	if (pid) { /* parent */
+ 		wait4pid(pid);
+ 		return;
+@@ -63,7 +65,9 @@ static int open_as_user(const struct passwd *pas, const char *file)
+ 	pid_t pid;
+ 	char c;
+ 
+-	pid = xvfork();
++	pid = vfork();
++	if (pid < 0) /* ERROR */
++		bb_perror_msg_and_die("vfork");
+ 	if (pid) { /* PARENT */
+ 		if (wait4pid(pid) == 0) {
+ 			/* exitcode 0: child says it can read */
+diff --git a/miscutils/time.c b/miscutils/time.c
+index 104548c..a6d158c 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -372,7 +372,9 @@ static void run_command(char *const *cmd, resource_t *resp)
+ 	void (*quit_signal)(int);
+ 
+ 	resp->elapsed_ms = monotonic_us() / 1000;
+-	pid = xvfork();		/* Run CMD as child process.  */
++	pid = vfork();		/* Run CMD as child process.  */
++	if (pid < 0)
++		bb_error_msg_and_die("cannot fork");
+ 	if (pid == 0) {	/* If child.  */
+ 		/* Don't cast execvp arguments; that causes errors on some systems,
+ 		   versus merely warnings if the cast is left off.  */
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 8caff3f..c123918 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -1008,9 +1008,12 @@ static int popen2(FILE **in, FILE **out, char *command, char *param)
+ 	xpiped_pair(outfd);
+ 
+ 	fflush(NULL);
+-	pid = xvfork();
++	pid = vfork();
+ 
+-	if (pid == 0) { /* child */
++	switch (pid) {
++	case -1:  /* failure */
++		bb_perror_msg_and_die("vfork");
++	case 0:  /* child */
+ 		/* NB: close _first_, then move fds! */
+ 		close(infd.wr);
+ 		close(outfd.rd);
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 0028078..08c0995 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1303,7 +1303,7 @@ int inetd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					pid = vfork();
+ 
+ 				if (pid < 0) { /* fork error */
+-					bb_perror_msg(BB_MMU ? "vfork" + 1 : "vfork");
++					bb_perror_msg("fork");
+ 					sleep(1);
+ 					restore_sigmask(&omask);
+ 					maybe_close(accepted_fd);
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index c195cc0..1c23ca2 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -120,6 +120,15 @@ static void signal_handler(int signo)
+ #undef err
+ }
+ 
++/* libbb candidate */
++static pid_t vfork_or_die(void)
++{
++	pid_t pid = vfork();
++	if (pid < 0)
++		bb_perror_msg_and_die("vfork");
++	return pid;
++}
++
+ static void launch_helper(const char **argv)
+ {
+ 	// setup vanilla unidirectional pipes interchange
+@@ -128,7 +137,7 @@ static void launch_helper(const char **argv)
+ 
+ 	xpipe(pipes);
+ 	xpipe(pipes+2);
+-	helper_pid = xvfork();
++	helper_pid = vfork_or_die();
+ 	idx = (!helper_pid) * 2;
+ 	xdup2(pipes[idx], STDIN_FILENO);
+ 	xdup2(pipes[3-idx], STDOUT_FILENO);
+diff --git a/shell/hush.c b/shell/hush.c
+index 27fab0d..72186f9 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1902,7 +1902,7 @@ static int run_pipe(struct pipe *pi)
+ #endif
+ 		if (child->pid < 0) { /* [v]fork failed */
+ 			/* Clearly indicate, was it fork or vfork */
+-			bb_perror_msg(BB_MMU ? "vfork" + 1 : "vfork");
++			bb_perror_msg(BB_MMU ? "fork" : "vfork");
+ 		} else {
+ 			pi->alive_progs++;
+ #if ENABLE_HUSH_JOB
+@@ -3096,7 +3096,9 @@ static FILE *generate_stream_from_list(struct pipe *head)
+  * huge=`cat TESTFILE` # will block here forever
+  * echo OK
+  */
+-	pid = BB_MMU ? xfork() : xvfork();
++	pid = BB_MMU ? fork() : vfork();
++	if (pid < 0)
++		bb_perror_msg_and_die(BB_MMU ? "fork" : "vfork");
+ 	if (pid == 0) { /* child */
+ 		if (ENABLE_HUSH_JOB)
+ 			die_sleep = 0; /* let nofork's xfuncs die */
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 664d24f..3b77af7 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -890,7 +890,6 @@ get_mountport(struct pmap *pm_mnt,
+ }
+ 
+ #if BB_MMU
+-/* Unlike bb_daemonize(), parent does NOT exit here, but returns 0 */
+ static int daemonize(void)
+ {
+ 	int fd;
+diff --git a/util-linux/script.c b/util-linux/script.c
+index a6c1ab8..e70294e 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -87,7 +87,10 @@ int script_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	/* TODO: SIGWINCH? pass window size changes down to slave? */
+ 
+-	child_pid = xvfork();
++	child_pid = vfork();
++	if (child_pid < 0) {
++		bb_perror_msg_and_die("vfork");
++	}
+ 
+ 	if (child_pid) {
+ 		/* parent */

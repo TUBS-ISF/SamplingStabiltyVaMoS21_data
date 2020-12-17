@@ -1,0 +1,26 @@
+2007-07-01 17:35:17 +0000
+diff --git a/findutils/find.c b/findutils/find.c
+index cb57665..6f2cbbc 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -425,8 +425,9 @@ static int find_type(const char *type)
+ }
+ #endif
+ 
+-#if ENABLE_FEATURE_FIND_PERM || ENABLE_FEATURE_FIND_MTIME \
+- || ENABLE_FEATURE_FIND_MMIN
++#if ENABLE_FEATURE_FIND_PERM \
++ || ENABLE_FEATURE_FIND_MTIME || ENABLE_FEATURE_FIND_MMIN \
++ || ENABLE_FEATURE_FIND_SIZE
+ static const char* plus_minus_num(const char* str)
+ {
+ 	if (*str == '-' || *str == '+')
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index ecd50a6..6595867 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -126,3 +126,4 @@ lib-$(CONFIG_EXPR) += xregcomp.o
+ lib-$(CONFIG_MDEV) += xregcomp.o
+ lib-$(CONFIG_LESS) += xregcomp.o
+ lib-$(CONFIG_DEVFSD) += xregcomp.o
++lib-$(CONFIG_FEATURE_FIND_REGEX) += xregcomp.o

@@ -1,0 +1,14 @@
+2009-10-09 22:00:58 +0200
+diff --git a/shell/hush.c b/shell/hush.c
+index b80b6c7..ef40e5a 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -86,7 +86,7 @@
+ #endif
+ #include "math.h"
+ #include "match.h"
+-#if ENABLE_ASH_RANDOM_SUPPORT
++#if ENABLE_HUSH_RANDOM_SUPPORT
+ # include "random.h"
+ #endif
+ #ifndef PIPE_BUF

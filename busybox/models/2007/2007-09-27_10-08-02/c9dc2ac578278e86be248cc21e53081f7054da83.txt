@@ -1,0 +1,40 @@
+2007-09-27 10:08:02 +0000
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 94397bc..8d25923 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -42,7 +42,7 @@ struct service {
+ 	smallint isgone;
+ };
+ 
+-struct service *sv;
++static struct service *sv;
+ static char *svdir;
+ static int svnum;
+ static char *rplog;
+diff --git a/runit/sv.c b/runit/sv.c
+index c87f565..406dc6f 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -163,7 +163,7 @@ static char **service;
+ static unsigned rc;
+ /* "Bernstein" time format: unix + 0x400000000000000aULL */
+ static uint64_t tstart, tnow;
+-svstatus_t svstatus;
++static svstatus_t svstatus;
+ 
+ 
+ static void fatal_cannot(const char *m1) ATTRIBUTE_NORETURN;
+diff --git a/scripts/find_stray_common_vars b/scripts/find_stray_common_vars
+index 9f26bc7..3a25d7a 100755
+--- a/scripts/find_stray_common_vars
++++ b/scripts/find_stray_common_vars
+@@ -3,7 +3,7 @@
+ # Common variables are elusive, they don't show up in size output!
+ # This script will show all commons in *.o, sorted by size
+ 
+-find -name '*.o' \
++find ! -path './scripts/*' -a ! -name built-in.o -a -name '*.o' \
+ | while read name; do
+     b=`basename "$name"`
+     nm "$name" | sed "s/^/$b: /"

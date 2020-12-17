@@ -1,0 +1,109 @@
+2009-11-07 01:31:14 +0100
+diff --git a/include/platform.h b/include/platform.h
+index 54bc27d..8ed05a4 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -324,7 +324,7 @@ typedef unsigned smalluint;
+ # include <inttypes.h>
+ # define PRIu32 "u"
+ /* use legacy setpgrp(pid_t,pid_t) for now.  move to platform.c */
+-# define bb_setpgrp() do { pid_t __me = getpid(); setpgrp(__me,__me); } while (0)
++# define bb_setpgrp() do { pid_t __me = getpid(); setpgrp(__me, __me); } while (0)
+ # if !defined ADJ_OFFSET_SINGLESHOT && defined MOD_CLKA && defined MOD_OFFSET
+ #  define ADJ_OFFSET_SINGLESHOT (MOD_CLKA | MOD_OFFSET)
+ # endif
+diff --git a/libbb/sha1.c b/libbb/sha1.c
+index ea645b7..5f42532 100644
+--- a/libbb/sha1.c
++++ b/libbb/sha1.c
+@@ -408,7 +408,7 @@ void FAST_FUNC sha512_hash(const void *buffer, size_t len, sha512_ctx_t *ctx)
+ /* Used also for sha256 */
+ void FAST_FUNC sha1_end(void *resbuf, sha1_ctx_t *ctx)
+ {
+-	unsigned i, pad, in_buf;
++	unsigned pad, in_buf;
+ 
+ 	in_buf = ctx->total64 & 63;
+ 	/* Pad the buffer to the next 64-byte boundary with 0x80,0,0,0... */
+@@ -434,16 +434,17 @@ void FAST_FUNC sha1_end(void *resbuf, sha1_ctx_t *ctx)
+ 
+ 	in_buf = (ctx->process_block == sha1_process_block64) ? 5 : 8;
+ 	/* This way we do not impose alignment constraints on resbuf: */
+-#if BB_LITTLE_ENDIAN
+-	for (i = 0; i < in_buf; ++i)
+-		ctx->hash[i] = htonl(ctx->hash[i]);
+-#endif
++	if (BB_LITTLE_ENDIAN) {
++		unsigned i;
++		for (i = 0; i < in_buf; ++i)
++			ctx->hash[i] = htonl(ctx->hash[i]);
++	}
+ 	memcpy(resbuf, ctx->hash, sizeof(ctx->hash[0]) * in_buf);
+ }
+ 
+ void FAST_FUNC sha512_end(void *resbuf, sha512_ctx_t *ctx)
+ {
+-	unsigned i, pad, in_buf;
++	unsigned pad, in_buf;
+ 
+ 	in_buf = ctx->total64[0] & 127;
+ 	/* Pad the buffer to the next 128-byte boundary with 0x80,0,0,0...
+@@ -470,9 +471,10 @@ void FAST_FUNC sha512_end(void *resbuf, sha512_ctx_t *ctx)
+ 			break;
+ 	}
+ 
+-#if BB_LITTLE_ENDIAN
+-	for (i = 0; i < ARRAY_SIZE(ctx->hash); ++i)
+-		ctx->hash[i] = hton64(ctx->hash[i]);
+-#endif
++	if (BB_LITTLE_ENDIAN) {
++		unsigned i;
++		for (i = 0; i < ARRAY_SIZE(ctx->hash); ++i)
++			ctx->hash[i] = hton64(ctx->hash[i]);
++	}
+ 	memcpy(resbuf, ctx->hash, sizeof(ctx->hash));
+ }
+diff --git a/util-linux/fdisk_osf.c b/util-linux/fdisk_osf.c
+index 09a68da..b89a2b2 100644
+--- a/util-linux/fdisk_osf.c
++++ b/util-linux/fdisk_osf.c
+@@ -615,7 +615,7 @@ xbsd_create_disklabel(void)
+ 
+ 	while (1) {
+ 		c = read_nonempty("Do you want to create a disklabel? (y/n) ");
+-		if (c == 'y' || c == 'Y') {
++		if ((c|0x20) == 'y') {
+ 			if (xbsd_initlabel(
+ #if defined(__alpha__) || defined(__powerpc__) || defined(__hppa__) || \
+ 	defined(__s390__) || defined(__s390x__)
+@@ -629,7 +629,7 @@ xbsd_create_disklabel(void)
+ 			}
+ 			return 0;
+ 		}
+-		if (c == 'n')
++		if ((c|0x20) == 'n')
+ 			return 0;
+ 	}
+ }
+@@ -964,6 +964,7 @@ xbsd_writelabel(struct partition *p)
+ #if !defined(__alpha__) && !defined(__powerpc__) && !defined(__hppa__)
+ 	sector = get_start_sect(p) + BSD_LABELSECTOR;
+ #else
++	(void)p; /* silence warning */
+ 	sector = BSD_LABELSECTOR;
+ #endif
+ 
+diff --git a/util-linux/mkfs_vfat.c b/util-linux/mkfs_vfat.c
+index de88a74..e794b31 100644
+--- a/util-linux/mkfs_vfat.c
++++ b/util-linux/mkfs_vfat.c
+@@ -471,7 +471,8 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 		strcpy(boot_blk->boot_jump, "\xeb\x58\x90" "mkdosfs"); // system_id[8] included :)
+ 		STORE_LE(boot_blk->bytes_per_sect, bytes_per_sect);
+ 		STORE_LE(boot_blk->sect_per_clust, sect_per_clust);
+-		STORE_LE(boot_blk->reserved_sect, reserved_sect);
++		// cast in needed on big endian to suppress a warning
++		STORE_LE(boot_blk->reserved_sect, (uint16_t)reserved_sect);
+ 		STORE_LE(boot_blk->fats, 2);
+ 		//STORE_LE(boot_blk->dir_entries, 0); // for FAT32, stays 0
+ 		if (volume_size_sect <= 0xffff)

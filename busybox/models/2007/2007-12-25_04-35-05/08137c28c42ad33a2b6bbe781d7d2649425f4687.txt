@@ -1,0 +1,8 @@
+2007-12-25 04:35:05 +0000
+diff --git a/shell/hush_test/hush-bugs/tick.right b/shell/hush_test/hush-bugs/tick.right
+index e69de29..6ed281c 100644
+--- a/shell/hush_test/hush-bugs/tick.right
++++ b/shell/hush_test/hush-bugs/tick.right
+@@ -0,0 +1,2 @@
++1
++1

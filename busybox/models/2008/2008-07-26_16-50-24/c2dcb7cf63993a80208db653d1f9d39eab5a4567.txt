@@ -1,0 +1,26 @@
+2008-07-26 16:50:24 +0000
+diff --git a/archival/unzip.c b/archival/unzip.c
+index 7c92f5d..36490cb 100644
+--- a/archival/unzip.c
++++ b/archival/unzip.c
+@@ -99,6 +99,12 @@ static void unzip_create_leading_dirs(const char *fn)
+ 
+ static void unzip_extract(zip_header_t *zip_header, int src_fd, int dst_fd)
+ {
++	if (zip_header->formatted.flags & (0x0008|0x0001)) {
++		/* 0x0001 - encrypted */
++		/* 0x0008 - streaming. [u]cmpsize can be reliably gotten
++		 * only from Central Directory. See unzip_doc.txt */
++		bb_error_msg_and_die("zip flags 8 and 1 are not supported");
++	}
+ 	if (zip_header->formatted.method == 0) {
+ 		/* Method 0 - stored (not compressed) */
+ 		off_t size = zip_header->formatted.ucmpsize;
+diff --git a/archival/unzip_cant_handle.odt b/archival/unzip_cant_handle.odt
+new file mode 100644
+index 0000000..715e4a9
+Binary files /dev/null and b/archival/unzip_cant_handle.odt differ
+diff --git a/archival/unzip_doc.txt.bz2 b/archival/unzip_doc.txt.bz2
+new file mode 100644
+index 0000000..ab77d10
+Binary files /dev/null and b/archival/unzip_doc.txt.bz2 differ

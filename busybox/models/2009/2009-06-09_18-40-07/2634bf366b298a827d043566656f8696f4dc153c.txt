@@ -1,0 +1,75 @@
+2009-06-09 18:40:07 +0200
+diff --git a/archival/Kbuild b/archival/Kbuild
+index de0ca43..53bd7e2 100644
+--- a/archival/Kbuild
++++ b/archival/Kbuild
+@@ -16,7 +16,7 @@ lib-$(CONFIG_DPKG)		+= dpkg.o
+ lib-$(CONFIG_DPKG_DEB)		+= dpkg_deb.o
+ lib-$(CONFIG_GUNZIP)		+= bbunzip.o
+ lib-$(CONFIG_GZIP)		+= gzip.o bbunzip.o
+-lib-$(CONFIG_LZOP)		+= lzop.o lzo1x_1.o lzo1x_1o.o lzo1x_d.o
++lib-$(CONFIG_LZOP)		+= lzop.o lzo1x_1.o lzo1x_1o.o lzo1x_d.o bbunzip.o
+ lib-$(CONFIG_LZOP_COMPR_HIGH)	+= lzo1x_9x.o
+ lib-$(CONFIG_RPM2CPIO)		+= rpm2cpio.o
+ lib-$(CONFIG_RPM)		+= rpm.o
+diff --git a/shell/ash.c b/shell/ash.c
+index cc5802c..7843afa 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -1730,13 +1730,13 @@ static const char defifs[] ALIGN1 = " \t\n";
+ 
+ /* Need to be before varinit_data[] */
+ #if ENABLE_LOCALE_SUPPORT
+-static void
++static void FAST_FUNC
+ change_lc_all(const char *value)
+ {
+ 	if (value && *value != '\0')
+ 		setlocale(LC_ALL, value);
+ }
+-static void
++static void FAST_FUNC
+ change_lc_ctype(const char *value)
+ {
+ 	if (value && *value != '\0')
+@@ -8740,9 +8740,15 @@ static int ulimitcmd(int, char **) FAST_FUNC;
+  */
+ 
+ /* Stubs for calling non-FAST_FUNC's */
++#if ENABLE_ASH_BUILTIN_ECHO
+ static int FAST_FUNC echocmd(int argc, char **argv)   { return echo_main(argc, argv); }
++#endif
++#if ENABLE_ASH_BUILTIN_PRINTF
+ static int FAST_FUNC printfcmd(int argc, char **argv) { return printf_main(argc, argv); }
++#endif
++#if ENABLE_ASH_BUILTIN_TEST
+ static int FAST_FUNC testcmd(int argc, char **argv)   { return test_main(argc, argv); }
++#endif
+ 
+ /* Keep these in proper order since it is searched via bsearch() */
+ static const struct builtincmd builtintab[] = {
+diff --git a/util-linux/script.c b/util-linux/script.c
+index 4e0deb4..2e2be33 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -36,16 +36,17 @@ int script_main(int argc UNUSED_PARAM, char **argv)
+ 		OPT_t = (1 << 4),
+ 	};
+ 
++#if ENABLE_GETOPT_LONG
+ 	static const char getopt_longopts[] ALIGN1 =
+ 		"append\0"  No_argument       "a"
+ 		"command\0" Required_argument "c"
+ 		"flush\0"   No_argument       "f"
+ 		"quiet\0"   No_argument       "q"
+-		IF_SCRIPTREPLAY("timing\0"  No_argument       "t")
++		IF_SCRIPTREPLAY("timing\0" No_argument "t")
+ 		;
+ 
+-	if (ENABLE_GETOPT_LONG)
+-		applet_long_options = getopt_longopts;
++	applet_long_options = getopt_longopts;
++#endif
+ 
+ 	opt_complementary = "?1"; /* max one arg */
+ 	opt = getopt32(argv, "ac:fq" IF_SCRIPTREPLAY("t") , &shell_arg);

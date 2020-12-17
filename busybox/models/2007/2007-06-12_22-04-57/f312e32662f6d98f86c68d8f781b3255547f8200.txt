@@ -1,0 +1,144 @@
+2007-06-12 22:04:57 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index c4743cf..4f418e7 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -943,12 +943,10 @@ extern const char bb_str_default[];
+ extern const char bb_hexdigits_upcase[];
+ 
+ extern const char bb_path_mtab_file[];
+-extern const char bb_path_nologin_file[];
+ extern const char bb_path_passwd_file[];
+ extern const char bb_path_shadow_file[];
+ extern const char bb_path_gshadow_file[];
+ extern const char bb_path_group_file[];
+-extern const char bb_path_securetty_file[];
+ extern const char bb_path_motd_file[];
+ extern const char bb_path_wtmp_file[];
+ extern const char bb_dev_null[];
+diff --git a/libbb/messages.c b/libbb/messages.c
+index 9f62b9b..27d2cc1 100644
+--- a/libbb/messages.c
++++ b/libbb/messages.c
+@@ -34,8 +34,6 @@ const char bb_path_passwd_file[] = "/etc/passwd";
+ const char bb_path_shadow_file[] = "/etc/shadow";
+ const char bb_path_group_file[] = "/etc/group";
+ const char bb_path_gshadow_file[] = "/etc/gshadow";
+-const char bb_path_nologin_file[] = "/etc/nologin";
+-const char bb_path_securetty_file[] = "/etc/securetty";
+ const char bb_path_motd_file[] = "/etc/motd";
+ const char bb_dev_null[] = "/dev/null";
+ const char bb_busybox_exec_path[] = CONFIG_BUSYBOX_EXEC_PATH;
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index cab7a11..f9ae122 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -136,12 +136,20 @@ config LOGIN_SCRIPTS
+ 	  Enable this if you want login to execute $LOGIN_PRE_SUID_SCRIPT
+ 	  just prior to switching from root to logged-in user.
+ 
++config FEATURE_NOLOGIN
++	bool "Support for /etc/nologin"
++	default y
++	depends on LOGIN
++	help
++	  The file /etc/nologin is used by (some versions of) login(1).
++	  If it exists, non-root logins are prohibited.
++
+ config FEATURE_SECURETTY
+ 	bool "Support for /etc/securetty"
+ 	default y
+ 	depends on LOGIN
+ 	help
+-	  The file  /etc/securetty  is used by (some versions of) login(1).
++	  The file /etc/securetty is used by (some versions of) login(1).
+ 	  The file contains the device names of tty lines (one per line,
+ 	  without leading /dev/) on which root is allowed to login.
+ 
+diff --git a/loginutils/login.c b/loginutils/login.c
+index b6924b6..0f71a2a 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -100,15 +100,16 @@ static void write_utent(struct utmp *utptr, const char *username)
+ #define write_utent(utptr, username) ((void)0)
+ #endif /* !ENABLE_FEATURE_UTMP */
+ 
++#if ENABLE_FEATURE_NOLOGIN
+ static void die_if_nologin_and_non_root(int amroot)
+ {
+ 	FILE *fp;
+ 	int c;
+ 
+-	if (access(bb_path_nologin_file, F_OK))
++	if (access("/etc/nologin", F_OK))
+ 		return;
+ 
+-	fp = fopen(bb_path_nologin_file, "r");
++	fp = fopen("/etc/nologin", "r");
+ 	if (fp) {
+ 		while ((c = getc(fp)) != EOF)
+ 			putchar((c=='\n') ? '\r' : c);
+@@ -118,28 +119,31 @@ static void die_if_nologin_and_non_root(int amroot)
+ 		puts("\r\nSystem closed for routine maintenance\r");
+ 	if (!amroot)
+ 		exit(1);
+-	puts("\r\n[Disconnect bypassed -- root login allowed.]\r");
++	puts("\r\n[Disconnect bypassed -- root login allowed]\r");
+ }
++#else
++static ALWAYS_INLINE void die_if_nologin_and_non_root(int amroot) {}
++#endif
+ 
+ #if ENABLE_FEATURE_SECURETTY
+ static int check_securetty(void)
+ {
+ 	FILE *fp;
+ 	int i;
+-	char buf[BUFSIZ];
++	char buf[256];
+ 
+-	fp = fopen(bb_path_securetty_file, "r");
++	fp = fopen("/etc/securetty", "r");
+ 	if (!fp) {
+ 		/* A missing securetty file is not an error. */
+ 		return 1;
+ 	}
+ 	while (fgets(buf, sizeof(buf)-1, fp)) {
+-		for (i = strlen(buf)-1; i>=0; --i) {
++		for (i = strlen(buf)-1; i >= 0; --i) {
+ 			if (!isspace(buf[i]))
+ 				break;
+ 		}
+ 		buf[++i] = '\0';
+-		if ((buf[0]=='\0') || (buf[0]=='#'))
++		if (!buf[0] || (buf[0] == '#'))
+ 			continue;
+ 		if (strcmp(buf, short_tty) == 0) {
+ 			fclose(fp);
+@@ -150,7 +154,7 @@ static int check_securetty(void)
+ 	return 0;
+ }
+ #else
+-static inline int check_securetty(void) { return 1; }
++static ALWAYS_INLINE int check_securetty(void) { return 1; }
+ #endif
+ 
+ static void get_username_or_die(char *buf, int size_buf)
+@@ -313,7 +317,7 @@ int login_main(int argc, char **argv)
+ 
+ 	write_utent(&utent, username);
+ 
+-#ifdef CONFIG_SELINUX
++#if ENABLE_SELINUX
+ 	if (is_selinux_enabled()) {
+ 		security_context_t old_tty_sid, new_tty_sid;
+ 
+@@ -368,7 +372,7 @@ int login_main(int argc, char **argv)
+ 
+ 	if (pw->pw_uid == 0)
+ 		syslog(LOG_INFO, "root login%s", fromhost);
+-#ifdef CONFIG_SELINUX
++#if ENABLE_SELINUX
+ 	/* well, a simple setexeccon() here would do the job as well,
+ 	 * but let's play the game for now */
+ 	set_current_security_context(user_sid);

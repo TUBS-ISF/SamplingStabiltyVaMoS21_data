@@ -1,0 +1,13 @@
+2008-05-28 14:57:58 +0000
+diff --git a/procps/fuser.c b/procps/fuser.c
+index 663abe4..55f7917 100644
+--- a/procps/fuser.c
++++ b/procps/fuser.c
+@@ -216,6 +216,7 @@ static pid_list *scan_proc_pids(inode_list *ilist)
+ 	pid_t pid;
+ 	pid_list *plist;
+ 
++	xchdir("/proc");
+ 	d = opendir("/proc");
+ 	if (!d)
+ 		return NULL;

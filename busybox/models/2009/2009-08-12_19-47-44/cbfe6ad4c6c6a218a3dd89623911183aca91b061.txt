@@ -1,0 +1,95 @@
+2009-08-12 19:47:44 +0200
+diff --git a/shell/hush.c b/shell/hush.c
+index f49630a..08e7f50 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -6038,6 +6038,8 @@ static struct pipe *parse_stream(char **pstring,
+ 			dest.o_assignment = NOT_ASSIGNMENT;
+ 		}
+ 
++		/* Note: nommu_addchr(&ctx.as_string, ch) is already done */
++
+ 		switch (ch) {
+ 		case '#':
+ 			if (dest.length == 0) {
+@@ -6061,12 +6063,17 @@ static struct pipe *parse_stream(char **pstring,
+ 			ch = i_getch(input);
+ 			if (ch != '\n') {
+ 				o_addchr(&dest, '\\');
+-				nommu_addchr(&ctx.as_string, '\\');
++				/*nommu_addchr(&ctx.as_string, '\\'); - already done */
+ 				o_addchr(&dest, ch);
+ 				nommu_addchr(&ctx.as_string, ch);
+ 				/* Example: echo Hello \2>file
+ 				 * we need to know that word 2 is quoted */
+ 				dest.o_quoted = 1;
++			} else {
++#if !BB_MMU
++				/* It's "\<newline>". Remove trailing '\' from ctx.as_string */
++				ctx.as_string.data[--ctx.as_string.length] = '\0';
++#endif
+ 			}
+ 			break;
+ 		case '$':
+diff --git a/shell/hush_test/hush-misc/nommu1.right b/shell/hush_test/hush-misc/nommu1.right
+new file mode 100644
+index 0000000..d206a85
+--- /dev/null
++++ b/shell/hush_test/hush-misc/nommu1.right
+@@ -0,0 +1,7 @@
++Ok
++Ok
++Ok
++Ok
++Ok
++Ok
++Done
+diff --git a/shell/hush_test/hush-misc/nommu1.tests b/shell/hush_test/hush-misc/nommu1.tests
+new file mode 100755
+index 0000000..e14ada5
+--- /dev/null
++++ b/shell/hush_test/hush-misc/nommu1.tests
+@@ -0,0 +1,12 @@
++(echo \
++Ok)
++( (echo \
++Ok) )
++( ( (echo \
++Ok) ) )
++
++(echo \Ok)
++( (echo \Ok) )
++( ( (echo \Ok) ) )
++
++echo Done
+diff --git a/shell/hush_test/run-all b/shell/hush_test/run-all
+index cde841e..ee8327f 100755
+--- a/shell/hush_test/run-all
++++ b/shell/hush_test/run-all
+@@ -38,16 +38,16 @@ do_test()
+ 	tret=0
+ 	cd "$1" || { echo "cannot cd $1!"; exit 1; }
+ 	for x in run-*; do
+-	test -f "$x" || continue
+-	case "$x" in
+-		"$0"|run-minimal|run-gprof) ;;
+-		*.orig|*~) ;;
+-		#*) echo $x ; sh $x ;;
+-		*)
+-		sh "$x" >"../$1-$x.fail" 2>&1 && \
+-		{ echo "$1/$x: ok"; rm "../$1-$x.fail"; } || echo "$1/$x: fail";
+-		;;
+-	esac
++		test -f "$x" || continue
++		case "$x" in
++			"$0"|run-minimal|run-gprof) ;;
++			*.orig|*~) ;;
++			#*) echo $x ; sh $x ;;
++			*)
++			sh "$x" >"../$1-$x.fail" 2>&1 && \
++			{ echo "$1/$x: ok"; rm "../$1-$x.fail"; } || echo "$1/$x: fail";
++			;;
++		esac
+ 	done
+ 	# Many bash run-XXX scripts just do this,
+ 	# no point in duplication it all over the place

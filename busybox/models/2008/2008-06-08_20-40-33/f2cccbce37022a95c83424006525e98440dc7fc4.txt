@@ -1,0 +1,27 @@
+2008-06-08 20:40:33 +0000
+diff --git a/debianutils/mktemp.c b/debianutils/mktemp.c
+index de27d30..c48b6e2 100644
+--- a/debianutils/mktemp.c
++++ b/debianutils/mktemp.c
+@@ -43,7 +43,7 @@ int mktemp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	opt_complementary = "?1"; /* 1 argument max */
+ 	opt = getopt32(argv, "dqtp:", &path);
+-	chp = argv[optind] ? argv[optind] : xstrdup("tmp.XXXXXXXXXX");
++	chp = argv[optind] ? argv[optind] : xstrdup("tmp.XXXXXX");
+ 
+ 	if (opt & (4|8)) { /* -t and/or -p */
+ 		const char *dir = getenv("TMPDIR");
+diff --git a/include/usage.h b/include/usage.h
+index 44e6182..3eb5b48 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2545,7 +2545,7 @@
+        "[-dt] [-p DIR] [TEMPLATE]"
+ #define mktemp_full_usage "\n\n" \
+        "Create a temporary file with name based on TEMPLATE and print its name.\n" \
+-       "TEMPLATE must end with XXXXXX (i.e., /tmp/temp.XXXXXX).\n" \
++       "TEMPLATE must end with XXXXXX (e.g. [/dir/]nameXXXXXX).\n" \
+      "\nOptions:" \
+      "\n	-d	Make a directory instead of a file" \
+ /*   "\n	-q	Fail silently if an error occurs" - we ignore it */ \

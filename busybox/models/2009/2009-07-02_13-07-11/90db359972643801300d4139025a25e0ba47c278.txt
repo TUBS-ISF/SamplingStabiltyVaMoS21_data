@@ -1,0 +1,113 @@
+2009-07-02 13:07:11 +0200
+diff --git a/testsuite/mdev.tests b/testsuite/mdev.tests
+index 912785e..d52f3b1 100755
+--- a/testsuite/mdev.tests
++++ b/testsuite/mdev.tests
+@@ -136,12 +136,12 @@ brw-r--r-- 1 0 0 8,0 sda
+ 
+ # continuing to use directory structure from prev test
+ rm -rf mdev.testdir/dev/*
+-echo "sda 0:0 644 =block/ @echo @echo TEST" >mdev.testdir/etc/mdev.conf
++echo "sda 0:0 644 =block/ @echo @echo TEST:\$MDEV" >mdev.testdir/etc/mdev.conf
+ testing "mdev move and command" \
+ 	"env - PATH=$PATH ACTION=add DEVPATH=/block/sda chroot mdev.testdir /mdev 2>&1;
+ 	ls -lnR mdev.testdir/dev | $FILTER_LS2" \
+ "\
+-@echo TEST
++@echo TEST:block/sda
+ mdev.testdir/dev:
+ drwxr-xr-x 2 0 0 block
+ 
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index c68c0a5..f9ecf3c 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -317,49 +317,51 @@ static void make_device(char *path, int delete)
+ 		/* End of field parsing */
+ 
+ 		/* "Execute" the line we found */
++		{
++			const char *node_name;
+ 
+-		if (!delete && major >= 0) {
+-			char *node_name = (char *)device_name;
++			node_name = device_name;
+ 			if (ENABLE_FEATURE_MDEV_RENAME && alias)
+-				alias = node_name = build_alias(alias, device_name);
+-			if (mknod(node_name, mode | type, makedev(major, minor)) && errno != EEXIST)
+-				bb_perror_msg_and_die("mknod %s", node_name);
+-			if (major == root_major && minor == root_minor)
+-				symlink(node_name, "root");
+-			if (ENABLE_FEATURE_MDEV_CONF) {
+-				chmod(node_name, mode);
+-				chown(node_name, ugid.uid, ugid.gid);
+-			}
+-			if (ENABLE_FEATURE_MDEV_RENAME && alias) {
+-				if (aliaslink == '>')
+-					symlink(node_name, device_name);
+-				free(alias);
++				node_name = alias = build_alias(alias, device_name);
++
++			if (!delete && major >= 0) {
++				if (mknod(node_name, mode | type, makedev(major, minor)) && errno != EEXIST)
++					bb_perror_msg_and_die("mknod %s", node_name);
++				if (major == root_major && minor == root_minor)
++					symlink(node_name, "root");
++				if (ENABLE_FEATURE_MDEV_CONF) {
++					chmod(node_name, mode);
++					chown(node_name, ugid.uid, ugid.gid);
++				}
++				if (ENABLE_FEATURE_MDEV_RENAME && alias) {
++					if (aliaslink == '>')
++						symlink(node_name, device_name);
++				}
+ 			}
+-		}
+ 
+-		if (ENABLE_FEATURE_MDEV_EXEC && command) {
+-			/* setenv will leak memory, use putenv/unsetenv/free */
+-			char *s = xasprintf("%s=%s", "MDEV", device_name);
+-			char *s1 = xasprintf("%s=%s", "SUBSYSTEM", subsystem);
+-			putenv(s);
+-			putenv(s1);
+-			if (system(command) == -1)
+-				bb_perror_msg_and_die("can't run '%s'", command);
+-			unsetenv("SUBSYSTEM");
+-			free(s1);
+-			unsetenv("MDEV");
+-			free(s);
+-			free(command);
+-		}
++			if (ENABLE_FEATURE_MDEV_EXEC && command) {
++				/* setenv will leak memory, use putenv/unsetenv/free */
++				char *s = xasprintf("%s=%s", "MDEV", node_name);
++				char *s1 = xasprintf("%s=%s", "SUBSYSTEM", subsystem);
++				putenv(s);
++				putenv(s1);
++				if (system(command) == -1)
++					bb_perror_msg_and_die("can't run '%s'", command);
++				unsetenv("SUBSYSTEM");
++				free(s1);
++				unsetenv("MDEV");
++				free(s);
++				free(command);
++			}
+ 
+-		if (delete) {
+-			char *node_name = (char *)device_name;
+-			if (ENABLE_FEATURE_MDEV_RENAME && alias) {
+-				alias = node_name = build_alias(alias, device_name);
+-				if (aliaslink == '>')
+-					unlink(device_name);
++			if (delete) {
++				if (ENABLE_FEATURE_MDEV_RENAME && alias) {
++					if (aliaslink == '>')
++						unlink(device_name);
++				}
++				unlink(node_name);
+ 			}
+-			unlink(node_name);
++
+ 			if (ENABLE_FEATURE_MDEV_RENAME)
+ 				free(alias);
+ 		}

@@ -1,0 +1,832 @@
+2009-11-08 00:55:39 +0100
+diff --git a/examples/var_service/ftpd/log/run b/examples/var_service/ftpd/log/run
+new file mode 100755
+index 0000000..560d1b1
+--- /dev/null
++++ b/examples/var_service/ftpd/log/run
+@@ -0,0 +1,21 @@
++#!/bin/sh
++
++user=logger
++
++logdir="/var/log/service/`(cd ..;basename $PWD)`"
++mkdir -p "$logdir" 2>/dev/null
++chown -R "$user": "$logdir"
++chmod -R go-rwxst,u+rwX "$logdir"
++rm logdir
++ln -s "$logdir" logdir
++
++# make this dir accessible to logger
++chmod a+rX .
++
++exec >/dev/null
++exec 2>&1
++exec \
++env - PATH="$PATH" \
++softlimit \
++setuidgid "$user" \
++svlogd -tt "$logdir"
+diff --git a/examples/var_service/ftpd/p_log b/examples/var_service/ftpd/p_log
+new file mode 100755
+index 0000000..a2521be
+--- /dev/null
++++ b/examples/var_service/ftpd/p_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++cat @* current | $PAGER
+diff --git a/examples/var_service/ftpd/run b/examples/var_service/ftpd/run
+new file mode 100755
+index 0000000..87b7d2b
+--- /dev/null
++++ b/examples/var_service/ftpd/run
+@@ -0,0 +1,17 @@
++#!/bin/sh
++
++#exec >/dev/null
++exec 2>&1
++exec </dev/null
++
++user=www
++user=root
++
++exec \
++env - PATH="$PATH" \
++softlimit \
++tcpsvd \
++  -vE -l 0 -c 40 \
++  0.0.0.0 21 \
++setuidgid "$user" \
++ftpd -vv -t10 /pub/ftpd_root
+diff --git a/examples/var_service/ftpd/w_log b/examples/var_service/ftpd/w_log
+new file mode 100755
+index 0000000..34b19b3
+--- /dev/null
++++ b/examples/var_service/ftpd/w_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++watch -n2 'w=`ttysize w`; h=`ttysize h`; tail -$((h-3)) current 2>&1 | cut -b0-$((w-2))'
+diff --git a/examples/var_service/getty_tty1/alt08x16+unimap.fnt b/examples/var_service/getty_tty1/alt08x16+unimap.fnt
+new file mode 100644
+index 0000000..9bcc457
+Binary files /dev/null and b/examples/var_service/getty_tty1/alt08x16+unimap.fnt differ
+diff --git a/examples/var_service/getty_tty1/cfg b/examples/var_service/getty_tty1/cfg
+new file mode 100755
+index 0000000..0f63e52
+--- /dev/null
++++ b/examples/var_service/getty_tty1/cfg
+@@ -0,0 +1,26 @@
++#!/bin/sh
++
++if test x"$TERM" = x"" -o x"$TERM" = x"unknown"; then
++	TERM="linux"
++	echo "* Setting TERM='$TERM'"
++fi
++export TERM
++
++ttyname=`tty`
++ttybase="${ttyname%%[0123456789]*}"     # strip numeric tail
++
++if test x"$ttybase" = x"/dev/vc/" -o x"$ttybase" = x"/dev/tty"; then
++	echo "* Activating Cyrillic KOI8-R -> CP866 font map"
++	echo -ne "\033(K" >"$ttyname"
++
++	echo "* Loading screen font"
++	setfont \
++		-C "$ttyname" \
++		-m "$PWD/koi8r_to_uni.trans" \
++		"$PWD/alt08x16+unimap.fnt" \
++	|| echo "! setfont failure"
++
++	echo "* Loading keymap"
++	loadkeys "$PWD/ru_koi8r.keymap" \
++	|| echo "! loadkeys failure"
++fi
+diff --git a/examples/var_service/getty_tty1/koi8r_to_uni.trans b/examples/var_service/getty_tty1/koi8r_to_uni.trans
+new file mode 100644
+index 0000000..6c6bd01
+--- /dev/null
++++ b/examples/var_service/getty_tty1/koi8r_to_uni.trans
+@@ -0,0 +1,256 @@
++0x00 U+0000  #  NULL (NUL)
++0x01 U+0001  #  START OF HEADING (SOH)
++0x02 U+0002  #  START OF TEXT (STX)
++0x03 U+0003  #  END OF TEXT (ETX)
++0x04 U+0004  #  END OF TRANSMISSION (EOT)
++0x05 U+0005  #  ENQUIRY (ENQ)
++0x06 U+0006  #  ACKNOWLEDGE (ACK)
++0x07 U+0007  #  BELL (BEL)
++0x08 U+0008  #  BACKSPACE (BS)
++0x09 U+0009  #  CHARACTER TABULATION (HT)
++0x0a U+000A  #  LINE FEED (LF)
++0x0b U+000B  #  LINE TABULATION (VT)
++0x0c U+000C  #  FORM FEED (FF)
++0x0d U+000D  #  CARRIAGE RETURN (CR)
++0x0e U+000E  #  SHIFT OUT (SO)
++0x0f U+000F  #  SHIFT IN (SI)
++0x10 U+0010  #  DATALINK ESCAPE (DLE)
++0x11 U+0011  #  DEVICE CONTROL ONE (DC1)
++0x12 U+0012  #  DEVICE CONTROL TWO (DC2)
++0x13 U+0013  #  DEVICE CONTROL THREE (DC3)
++0x14 U+0014  #  DEVICE CONTROL FOUR (DC4)
++0x15 U+0015  #  NEGATIVE ACKNOWLEDGE (NAK)
++0x16 U+0016  #  SYNCHRONOUS IDLE (SYN)
++0x17 U+0017  #  END OF TRANSMISSION BLOCK (ETB)
++0x18 U+0018  #  CANCEL (CAN)
++0x19 U+0019  #  END OF MEDIUM (EM)
++0x1a U+001A  #  SUBSTITUTE (SUB)
++0x1b U+001B  #  ESCAPE (ESC)
++0x1c U+001C  #  FILE SEPARATOR (IS4)
++0x1d U+001D  #  GROUP SEPARATOR (IS3)
++0x1e U+001E  #  RECORD SEPARATOR (IS2)
++0x1f U+001F  #  UNIT SEPARATOR (IS1)
++0x20 U+0020  #  SPACE
++0x21 U+0021  #  EXCLAMATION MARK
++0x22 U+0022  #  QUOTATION MARK
++0x23 U+0023  #  NUMBER SIGN
++0x24 U+0024  #  DOLLAR SIGN
++0x25 U+0025  #  PERCENT SIGN
++0x26 U+0026  #  AMPERSAND
++0x27 U+0027  #  APOSTROPHE
++0x28 U+0028  #  LEFT PARENTHESIS
++0x29 U+0029  #  RIGHT PARENTHESIS
++0x2a U+002A  #  ASTERISK
++0x2b U+002B  #  PLUS SIGN
++0x2c U+002C  #  COMMA
++0x2d U+002D  #  HYPHEN-MINUS
++0x2e U+002E  #  FULL STOP
++0x2f U+002F  #  SOLIDUS
++0x30 U+0030  #  DIGIT ZERO
++0x31 U+0031  #  DIGIT ONE
++0x32 U+0032  #  DIGIT TWO
++0x33 U+0033  #  DIGIT THREE
++0x34 U+0034  #  DIGIT FOUR
++0x35 U+0035  #  DIGIT FIVE
++0x36 U+0036  #  DIGIT SIX
++0x37 U+0037  #  DIGIT SEVEN
++0x38 U+0038  #  DIGIT EIGHT
++0x39 U+0039  #  DIGIT NINE
++0x3a U+003A  #  COLON
++0x3b U+003B  #  SEMICOLON
++0x3c U+003C  #  LESS-THAN SIGN
++0x3d U+003D  #  EQUALS SIGN
++0x3e U+003E  #  GREATER-THAN SIGN
++0x3f U+003F  #  QUESTION MARK
++0x40 U+0040  #  COMMERCIAL AT
++0x41 U+0041  #  LATIN CAPITAL LETTER A
++0x42 U+0042  #  LATIN CAPITAL LETTER B
++0x43 U+0043  #  LATIN CAPITAL LETTER C
++0x44 U+0044  #  LATIN CAPITAL LETTER D
++0x45 U+0045  #  LATIN CAPITAL LETTER E
++0x46 U+0046  #  LATIN CAPITAL LETTER F
++0x47 U+0047  #  LATIN CAPITAL LETTER G
++0x48 U+0048  #  LATIN CAPITAL LETTER H
++0x49 U+0049  #  LATIN CAPITAL LETTER I
++0x4a U+004A  #  LATIN CAPITAL LETTER J
++0x4b U+004B  #  LATIN CAPITAL LETTER K
++0x4c U+004C  #  LATIN CAPITAL LETTER L
++0x4d U+004D  #  LATIN CAPITAL LETTER M
++0x4e U+004E  #  LATIN CAPITAL LETTER N
++0x4f U+004F  #  LATIN CAPITAL LETTER O
++0x50 U+0050  #  LATIN CAPITAL LETTER P
++0x51 U+0051  #  LATIN CAPITAL LETTER Q
++0x52 U+0052  #  LATIN CAPITAL LETTER R
++0x53 U+0053  #  LATIN CAPITAL LETTER S
++0x54 U+0054  #  LATIN CAPITAL LETTER T
++0x55 U+0055  #  LATIN CAPITAL LETTER U
++0x56 U+0056  #  LATIN CAPITAL LETTER V
++0x57 U+0057  #  LATIN CAPITAL LETTER W
++0x58 U+0058  #  LATIN CAPITAL LETTER X
++0x59 U+0059  #  LATIN CAPITAL LETTER Y
++0x5a U+005A  #  LATIN CAPITAL LETTER Z
++0x5b U+005B  #  LEFT SQUARE BRACKET
++0x5c U+005C  #  REVERSE SOLIDUS
++0x5d U+005D  #  RIGHT SQUARE BRACKET
++0x5e U+005E  #  CIRCUMFLEX ACCENT
++0x5f U+005F  #  LOW LINE
++0x60 U+0060  #  GRAVE ACCENT
++0x61 U+0061  #  LATIN SMALL LETTER A
++0x62 U+0062  #  LATIN SMALL LETTER B
++0x63 U+0063  #  LATIN SMALL LETTER C
++0x64 U+0064  #  LATIN SMALL LETTER D
++0x65 U+0065  #  LATIN SMALL LETTER E
++0x66 U+0066  #  LATIN SMALL LETTER F
++0x67 U+0067  #  LATIN SMALL LETTER G
++0x68 U+0068  #  LATIN SMALL LETTER H
++0x69 U+0069  #  LATIN SMALL LETTER I
++0x6a U+006A  #  LATIN SMALL LETTER J
++0x6b U+006B  #  LATIN SMALL LETTER K
++0x6c U+006C  #  LATIN SMALL LETTER L
++0x6d U+006D  #  LATIN SMALL LETTER M
++0x6e U+006E  #  LATIN SMALL LETTER N
++0x6f U+006F  #  LATIN SMALL LETTER O
++0x70 U+0070  #  LATIN SMALL LETTER P
++0x71 U+0071  #  LATIN SMALL LETTER Q
++0x72 U+0072  #  LATIN SMALL LETTER R
++0x73 U+0073  #  LATIN SMALL LETTER S
++0x74 U+0074  #  LATIN SMALL LETTER T
++0x75 U+0075  #  LATIN SMALL LETTER U
++0x76 U+0076  #  LATIN SMALL LETTER V
++0x77 U+0077  #  LATIN SMALL LETTER W
++0x78 U+0078  #  LATIN SMALL LETTER X
++0x79 U+0079  #  LATIN SMALL LETTER Y
++0x7a U+007A  #  LATIN SMALL LETTER Z
++0x7b U+007B  #  LEFT CURLY BRACKET
++0x7c U+007C  #  VERTICAL LINE
++0x7d U+007D  #  RIGHT CURLY BRACKET
++0x7e U+007E  #  TILDE
++0x7f U+007F  #  DELETE (DEL)
++0x80 U+2500  #  BOX DRAWINGS LIGHT HORIZONTAL
++0x81 U+2502  #  BOX DRAWINGS LIGHT VERTICAL
++0x82 U+250C  #  BOX DRAWINGS LIGHT DOWN AND RIGHT
++0x83 U+2510  #  BOX DRAWINGS LIGHT DOWN AND LEFT
++0x84 U+2514  #  BOX DRAWINGS LIGHT UP AND RIGHT
++0x85 U+2518  #  BOX DRAWINGS LIGHT UP AND LEFT
++0x86 U+251C  #  BOX DRAWINGS LIGHT VERTICAL AND RIGHT
++0x87 U+2524  #  BOX DRAWINGS LIGHT VERTICAL AND LEFT
++0x88 U+252C  #  BOX DRAWINGS LIGHT DOWN AND HORIZONTAL
++0x89 U+2534  #  BOX DRAWINGS LIGHT UP AND HORIZONTAL
++0x8a U+253C  #  BOX DRAWINGS LIGHT VERTICAL AND HORIZONTAL
++0x8b U+2580  #  UPPER HALF BLOCK
++0x8c U+2584  #  LOWER HALF BLOCK
++0x8d U+2588  #  FULL BLOCK
++0x8e U+258C  #  LEFT HALF BLOCK
++0x8f U+2590  #  RIGHT HALF BLOCK
++0x90 U+2591  #  LIGHT SHADE
++0x91 U+2592  #  MEDIUM SHADE
++0x92 U+2593  #  DARK SHADE
++0x93 U+2320  #  TOP HALF INTEGRAL
++0x94 U+25A0  #  BLACK SQUARE
++0x95 U+2219  #  BULLET OPERATOR
++0x96 U+221A  #  SQUARE ROOT
++0x97 U+2248  #  ALMOST EQUAL TO
++0x98 U+2264  #  LESS-THAN OR EQUAL TO
++0x99 U+2265  #  GREATER-THAN OR EQUAL TO
++0x9a U+00A0  #  NO-BREAK SPACE
++0x9b U+2321  #  BOTTOM HALF INTEGRAL
++0x9c U+00B0  #  DEGREE SIGN
++0x9d U+00B2  #  SUPERSCRIPT TWO
++0x9e U+00B7  #  MIDDLE DOT
++0x9f U+00F7  #  DIVISION SIGN
++0xa0 U+2550  #  BOX DRAWINGS DOUBLE HORIZONTAL
++0xa1 U+2551  #  BOX DRAWINGS DOUBLE VERTICAL
++0xa2 U+2552  #  BOX DRAWINGS DOWN SINGLE AND RIGHT DOUBLE
++0xa3 U+0451  #  CYRILLIC SMALL LETTER IO
++0xa4 U+2553  #  BOX DRAWINGS DOWN DOUBLE AND RIGHT SINGLE
++0xa5 U+2554  #  BOX DRAWINGS DOUBLE DOWN AND RIGHT
++0xa6 U+2555  #  BOX DRAWINGS DOWN SINGLE AND LEFT DOUBLE
++0xa7 U+2556  #  BOX DRAWINGS DOWN DOUBLE AND LEFT SINGLE
++0xa8 U+2557  #  BOX DRAWINGS DOUBLE DOWN AND LEFT
++0xa9 U+2558  #  BOX DRAWINGS UP SINGLE AND RIGHT DOUBLE
++0xaa U+2559  #  BOX DRAWINGS UP DOUBLE AND RIGHT SINGLE
++0xab U+255A  #  BOX DRAWINGS DOUBLE UP AND RIGHT
++0xac U+255B  #  BOX DRAWINGS UP SINGLE AND LEFT DOUBLE
++0xad U+255C  #  BOX DRAWINGS UP DOUBLE AND LEFT SINGLE
++0xae U+255D  #  BOX DRAWINGS DOUBLE UP AND LEFT
++0xaf U+255E  #  BOX DRAWINGS VERTICAL SINGLE AND RIGHT DOUBLE
++0xb0 U+255F  #  BOX DRAWINGS VERTICAL DOUBLE AND RIGHT SINGLE
++0xb1 U+2560  #  BOX DRAWINGS DOUBLE VERTICAL AND RIGHT
++0xb2 U+2561  #  BOX DRAWINGS VERTICAL SINGLE AND LEFT DOUBLE
++0xb3 U+0401  #  CYRILLIC CAPITAL LETTER IO
++0xb4 U+2562  #  BOX DRAWINGS VERTICAL DOUBLE AND LEFT SINGLE
++0xb5 U+2563  #  BOX DRAWINGS DOUBLE VERTICAL AND LEFT
++0xb6 U+2564  #  BOX DRAWINGS DOWN SINGLE AND HORIZONTAL DOUBLE
++0xb7 U+2565  #  BOX DRAWINGS DOWN DOUBLE AND HORIZONTAL SINGLE
++0xb8 U+2566  #  BOX DRAWINGS DOUBLE DOWN AND HORIZONTAL
++0xb9 U+2567  #  BOX DRAWINGS UP SINGLE AND HORIZONTAL DOUBLE
++0xba U+2568  #  BOX DRAWINGS UP DOUBLE AND HORIZONTAL SINGLE
++0xbb U+2569  #  BOX DRAWINGS DOUBLE UP AND HORIZONTAL
++0xbc U+256A  #  BOX DRAWINGS VERTICAL SINGLE AND HORIZONTAL DOUBLE
++0xbd U+256B  #  BOX DRAWINGS VERTICAL DOUBLE AND HORIZONTAL SINGLE
++0xbe U+256C  #  BOX DRAWINGS DOUBLE VERTICAL AND HORIZONTAL
++0xbf U+00A9  #  COPYRIGHT SIGN
++0xc0 U+044E  #  CYRILLIC SMALL LETTER YU
++0xc1 U+0430  #  CYRILLIC SMALL LETTER A
++0xc2 U+0431  #  CYRILLIC SMALL LETTER BE
++0xc3 U+0446  #  CYRILLIC SMALL LETTER TSE
++0xc4 U+0434  #  CYRILLIC SMALL LETTER DE
++0xc5 U+0435  #  CYRILLIC SMALL LETTER IE
++0xc6 U+0444  #  CYRILLIC SMALL LETTER EF
++0xc7 U+0433  #  CYRILLIC SMALL LETTER GHE
++0xc8 U+0445  #  CYRILLIC SMALL LETTER HA
++0xc9 U+0438  #  CYRILLIC SMALL LETTER I
++0xca U+0439  #  CYRILLIC SMALL LETTER SHORT I
++0xcb U+043A  #  CYRILLIC SMALL LETTER KA
++0xcc U+043B  #  CYRILLIC SMALL LETTER EL
++0xcd U+043C  #  CYRILLIC SMALL LETTER EM
++0xce U+043D  #  CYRILLIC SMALL LETTER EN
++0xcf U+043E  #  CYRILLIC SMALL LETTER O
++0xd0 U+043F  #  CYRILLIC SMALL LETTER PE
++0xd1 U+044F  #  CYRILLIC SMALL LETTER YA
++0xd2 U+0440  #  CYRILLIC SMALL LETTER ER
++0xd3 U+0441  #  CYRILLIC SMALL LETTER ES
++0xd4 U+0442  #  CYRILLIC SMALL LETTER TE
++0xd5 U+0443  #  CYRILLIC SMALL LETTER U
++0xd6 U+0436  #  CYRILLIC SMALL LETTER ZHE
++0xd7 U+0432  #  CYRILLIC SMALL LETTER VE
++0xd8 U+044C  #  CYRILLIC SMALL LETTER SOFT SIGN
++0xd9 U+044B  #  CYRILLIC SMALL LETTER YERU
++0xda U+0437  #  CYRILLIC SMALL LETTER ZE
++0xdb U+0448  #  CYRILLIC SMALL LETTER SHA
++0xdc U+044D  #  CYRILLIC SMALL LETTER E
++0xdd U+0449  #  CYRILLIC SMALL LETTER SHCHA
++0xde U+0447  #  CYRILLIC SMALL LETTER CHE
++0xdf U+044A  #  CYRILLIC SMALL LETTER HARD SIGN
++0xe0 U+042E  #  CYRILLIC CAPITAL LETTER YU
++0xe1 U+0410  #  CYRILLIC CAPITAL LETTER A
++0xe2 U+0411  #  CYRILLIC CAPITAL LETTER BE
++0xe3 U+0426  #  CYRILLIC CAPITAL LETTER TSE
++0xe4 U+0414  #  CYRILLIC CAPITAL LETTER DE
++0xe5 U+0415  #  CYRILLIC CAPITAL LETTER IE
++0xe6 U+0424  #  CYRILLIC CAPITAL LETTER EF
++0xe7 U+0413  #  CYRILLIC CAPITAL LETTER GHE
++0xe8 U+0425  #  CYRILLIC CAPITAL LETTER HA
++0xe9 U+0418  #  CYRILLIC CAPITAL LETTER I
++0xea U+0419  #  CYRILLIC CAPITAL LETTER SHORT I
++0xeb U+041A  #  CYRILLIC CAPITAL LETTER KA
++0xec U+041B  #  CYRILLIC CAPITAL LETTER EL
++0xed U+041C  #  CYRILLIC CAPITAL LETTER EM
++0xee U+041D  #  CYRILLIC CAPITAL LETTER EN
++0xef U+041E  #  CYRILLIC CAPITAL LETTER O
++0xf0 U+041F  #  CYRILLIC CAPITAL LETTER PE
++0xf1 U+042F  #  CYRILLIC CAPITAL LETTER YA
++0xf2 U+0420  #  CYRILLIC CAPITAL LETTER ER
++0xf3 U+0421  #  CYRILLIC CAPITAL LETTER ES
++0xf4 U+0422  #  CYRILLIC CAPITAL LETTER TE
++0xf5 U+0423  #  CYRILLIC CAPITAL LETTER U
++0xf6 U+0416  #  CYRILLIC CAPITAL LETTER ZHE
++0xf7 U+0412  #  CYRILLIC CAPITAL LETTER VE
++0xf8 U+042C  #  CYRILLIC CAPITAL LETTER SOFT SIGN
++0xf9 U+042B  #  CYRILLIC CAPITAL LETTER YERU
++0xfa U+0417  #  CYRILLIC CAPITAL LETTER ZE
++0xfb U+0428  #  CYRILLIC CAPITAL LETTER SHA
++0xfc U+042D  #  CYRILLIC CAPITAL LETTER E
++0xfd U+0429  #  CYRILLIC CAPITAL LETTER SHCHA
++0xfe U+0427  #  CYRILLIC CAPITAL LETTER CHE
++0xff U+042A  #  CYRILLIC CAPITAL LETTER HARD SIGN
+diff --git a/examples/var_service/getty_tty1/login.sh b/examples/var_service/getty_tty1/login.sh
+new file mode 100755
+index 0000000..d69b6fd
+--- /dev/null
++++ b/examples/var_service/getty_tty1/login.sh
+@@ -0,0 +1,12 @@
++#!/bin/sh
++
++ttyname=`tty`
++ttybase="${ttyname%%[0123456789]*}"     # strip numeric tail
++
++if test "$ttybase" = "/dev/tty"; then
++	tail="${ttyname:8}"
++	echo "* Setting terminal device's owner to $LOGIN_UID:$LOGIN_GID"
++	chown "$LOGIN_UID:$LOGIN_GID" "/dev/vcs$tail" "/dev/vcsa$tail"
++fi
++# We can do this also, but login does it itself
++# chown "$LOGIN_UID:$LOGIN_GID" "$ttyname"
+diff --git a/examples/var_service/getty_tty1/ru_koi8r.keymap b/examples/var_service/getty_tty1/ru_koi8r.keymap
+new file mode 100644
+index 0000000..e131e62
+--- /dev/null
++++ b/examples/var_service/getty_tty1/ru_koi8r.keymap
+@@ -0,0 +1,183 @@
++keymaps 0,1, 2,3, 4,6, 8,10, 12,14
++#
++# This one is for generating koi8r Russian chars
++# Cyr/Lat switches:  RightAlt, Shift+Ctrl, Ctrl+Shift
++# (last one does not work for dark and obscure reasons 8( )
++#
++# plain,shift, plain,shift, ctrl,ctrl alt,alt ctrlalt,ctrlalt
++# lat--------  cyr--------  lat  cyr  lat cyr lat     cyr
++#
++#Shift                     1
++#AltGr (cyr)               2
++#Control                   4
++#Alt                       8
++#ShiftL                   16
++#ShiftR                   32
++#CtrlL                    64
++#CtrlR                   128
++#============== plain ========= shift========== plain cyr ===== shift cyr ===== ctrl ================== ctrl cyr ============== alt =================== alt cyr =============== ctrlalt =============== ctrlalt cyr ===========
++keycode   1 =   Escape          Escape          Escape          Escape          Escape                  Escape                  Meta_Escape             Meta_Escape             SAK                     SAK
++keycode   2 =   one             exclam          one             exclam          exclam                  exclam                  Meta_one                Meta_one
++keycode   3 =   two             at              two             at              nul                     nul                     Meta_two                Meta_two
++keycode   4 =   three           numbersign      three           numbersign      three                   three                   Meta_three              Meta_three
++keycode   5 =   four            dollar          four            dollar          Control_backslash       Control_backslash       Meta_four               Meta_four
++keycode   6 =   five            percent         five            percent         Control_bracketright    Control_bracketright    Meta_five               Meta_five
++keycode   7 =   six             asciicircum     six             asciicircum     Control_asciicircum     Control_asciicircum     Meta_six                Meta_six
++keycode   8 =   seven           ampersand       seven           ampersand       Control_underscore      Control_underscore      Meta_seven              Meta_seven
++keycode   9 =   eight           asterisk        eight           asterisk        eight                   eight                   Meta_eight              Meta_eight
++keycode  10 =   nine            parenleft       nine            parenleft       nine                    nine                    Meta_nine               Meta_nine
++keycode  11 =   zero            parenright      zero            parenright      zero                    zero                    Meta_zero               Meta_zero
++keycode  12 =   minus           underscore      minus           underscore      Control_underscore      Control_underscore      Meta_minus              Meta_minus
++keycode  13 =   equal           plus            equal           plus            equal                   equal                   Meta_equal              Meta_equal
++keycode  14 =   Delete          Delete          Delete          Delete          BackSpace               BackSpace               Meta_Delete             Meta_Delete
++keycode  15 =   Tab             Tab             Tab             Tab             Tab                     Tab                     Meta_Tab                Meta_Tab
++keycode  16 =   q               Q               202             234             Control_q               Control_q               Meta_q                  Meta_q                  Meta_Control_q          Meta_Control_q
++keycode  17 =   w               W               195             227             Control_w               Control_w               Meta_w                  Meta_w                  Meta_Control_w          Meta_Control_w
++keycode  18 =   e               E               213             245             Control_e               Control_e               Meta_e                  Meta_e                  Meta_Control_e          Meta_Control_e
++keycode  19 =   r               R               203             235             Control_r               Control_r               Meta_r                  Meta_r                  Meta_Control_r          Meta_Control_r
++keycode  20 =   t               T               197             229             Control_t               Control_t               Meta_t                  Meta_t                  Meta_Control_t          Meta_Control_t
++#============== plain ========= shift========== plain cyr ===== shift cyr ===== ctrl ================== ctrl cyr ============== alt =================== alt cyr =============== ctrlalt =============== ctrlalt cyr ===========
++keycode  21 =   y               Y               206             238             Control_y               Control_y               Meta_y                  Meta_y                  Meta_Control_y          Meta_Control_y
++keycode  22 =   u               U               199             231             Control_u               Control_u               Meta_u                  Meta_u                  Meta_Control_u          Meta_Control_u
++keycode  23 =   i               I               219             251             Control_i               Control_i               Meta_i                  Meta_i                  Meta_Control_i          Meta_Control_i
++keycode  24 =   o               O               221             253             Control_o               Control_o               Meta_o                  Meta_o                  Meta_Control_o          Meta_Control_o
++keycode  25 =   p               P               218             250             Control_p               Control_p               Meta_p                  Meta_p                  Meta_Control_p          Meta_Control_p
++keycode  26 =   bracketleft     braceleft       200             232             Escape                  Escape                  Meta_bracketleft        Meta_bracketleft
++keycode  27 =   bracketright    braceright      223             255             Control_bracketright    Control_bracketright
++keycode  28 =   Return
++# Shift+Ctrl - Cyrillic
++keycode  29 =   Control		AltGr_Lock      Control         AltGr_Lock      Control		        Control		        Control		        Control		        Control		        Control		        
++keycode  30 =   a               A               198             230             Control_a               Control_a               Meta_a                  Meta_a                  Meta_Control_a          Meta_Control_a
++keycode  31 =   s               S               217             249             Control_s               Control_s               Meta_s                  Meta_s                  Meta_Control_s          Meta_Control_s
++keycode  32 =   d               D               215             247             Control_d               Control_d               Meta_d                  Meta_d                  Meta_Control_d          Meta_Control_d
++keycode  33 =   f               F               193             225             Control_f               Control_f               Meta_f                  Meta_f                  Meta_Control_f          Meta_Control_f
++keycode  34 =   g               G               208             240             Control_g               Control_g               Meta_g                  Meta_g                  Meta_Control_g          Meta_Control_g
++keycode  35 =   h               H               210             242             Control_h               Control_h               Meta_h                  Meta_h                  Meta_Control_h          Meta_Control_h
++keycode  36 =   j               J               207             239             Control_j               Control_j               Meta_j                  Meta_j                  Meta_Control_j          Meta_Control_j
++keycode  37 =   k               K               204             236             Control_k               Control_k               Meta_k                  Meta_k                  Meta_Control_k          Meta_Control_k
++keycode  38 =   l               L               196             228             Control_l               Control_l               Meta_l                  Meta_l                  Meta_Control_l          Meta_Control_l
++keycode  39 =   semicolon       colon           214             246             semicolon               semicolon               Meta_semicolon          Meta_semicolon
++keycode  40 =   apostrophe      quotedbl        220             252             Control_g               Control_g               Meta_apostrophe         Meta_apostrophe
++#============== plain ========= shift========== plain cyr ===== shift cyr ===== ctrl ================== ctrl cyr ============== alt =================== alt cyr =============== ctrlalt =============== ctrlalt cyr ===========
++keycode  41 =   grave           asciitilde      grave           asciitilde      nul                     nul                     Meta_grave              Meta_grave
++keycode  42 =   Shift
++keycode  43 =   backslash       bar             backslash       bar             Control_backslash       Control_backslash       Meta_backslash          Meta_backslash
++keycode  44 =   z               Z               209             241             Control_z               Control_z               Meta_z                  Meta_z                  Meta_Control_z          Meta_Control_z
++keycode  45 =   x               X               222             254             Control_x               Control_x               Meta_x                  Meta_x                  Meta_Control_x          Meta_Control_x
++keycode  46 =   c               C               211             243             Control_c               Control_c               Meta_c                  Meta_c                  Meta_Control_c          Meta_Control_c
++keycode  47 =   v               V               205             237             Control_v               Control_v               Meta_v                  Meta_v                  Meta_Control_v          Meta_Control_v
++keycode  48 =   b               B               201             233             Control_b               Control_b               Meta_b                  Meta_b                  Meta_Control_b          Meta_Control_b
++keycode  49 =   n               N               212             244             Control_n               Control_n               Meta_n                  Meta_n                  Meta_Control_n          Meta_Control_n
++keycode  50 =   m               M               216             248             Control_m               Control_m               Meta_m                  Meta_m                  Meta_Control_m          Meta_Control_m
++keycode  51 =   comma           less            194             226             comma                   comma                   Meta_comma              Meta_comma
++keycode  52 =   period          greater         192             224             Compose                 Compose                 Meta_period             Meta_period
++keycode  53 =   slash           question        slash           question        Delete                  Delete                  Meta_slash              Meta_slash              Meta_question           Meta_question
++# Ctrl+Shift - Cyrillic (not working???)
++keycode  54 =   Shift           Shift           Shift           Shift           AltGr_Lock              AltGr_Lock              Shift                   Shift                   Shift                   Shift
++keycode  55 =   KP_Multiply
++keycode  56 =   Alt
++keycode  57 =   space           space           space           space           nul                     nul                     Meta_space              Meta_space
++keycode  58 =   Caps_Lock
++keycode  59 =   F1              F11             F1              F11             F1                      F1                      Console_1               Console_1               Console_1               Console_1
++keycode  60 =   F2              F12             F2              F12             F2                      F2                      Console_2               Console_2               Console_2               Console_2
++#============== plain ========= shift========== plain cyr ===== shift cyr ===== ctrl ================== ctrl cyr ============== alt =================== alt cyr =============== ctrlalt =============== ctrlalt cyr ===========
++keycode  61 =   F3              F13             F3              F13             F3                      F3                      Console_3               Console_3               Console_3               Console_3
++keycode  62 =   F4              F14             F4              F14             F4                      F4                      Console_4               Console_4               Console_4               Console_4
++keycode  63 =   F5              F15             F5              F15             F5                      F5                      Console_5               Console_5               Console_5               Console_5
++keycode  64 =   F6              F16             F6              F16             F6                      F6                      Console_6               Console_6               Console_6               Console_6
++keycode  65 =   F7              F17             F7              F17             F7                      F7                      Console_7               Console_7               Console_7               Console_7
++keycode  66 =   F8              F18             F8              F18             F8                      F8                      Console_8               Console_8               Console_8               Console_8
++keycode  67 =   F9              F19             F9              F19             F9                      F9                      Console_9               Console_9               Console_9               Console_9
++keycode  68 =   F10             F20             F10             F20             F10                     F10                     Console_10              Console_10              Console_10              Console_10
++keycode  69 =   Num_Lock        Bare_Num_Lock   Num_Lock        Bare_Num_Lock
++keycode  70 =   Scroll_Lock     Show_Memory     Scroll_Lock     Show_Memory     Show_State              Show_State
++keycode  71 =   KP_7            KP_7            KP_7            KP_7            KP_7                    KP_7                    Ascii_7                 Ascii_7
++keycode  72 =   KP_8            KP_8            KP_8            KP_8            KP_8                    KP_8                    Ascii_8                 Ascii_8
++keycode  73 =   KP_9            KP_9            KP_9            KP_9            KP_9                    KP_9                    Ascii_9                 Ascii_9
++keycode  74 =   KP_Subtract     KP_Subtract     KP_Subtract     KP_Subtract     KP_Subtract             KP_Subtract             KP_Subtract             KP_Subtract
++keycode  75 =   KP_4            KP_4            KP_4            KP_4            KP_4                    KP_4                    Ascii_4                 Ascii_4
++keycode  76 =   KP_5            KP_5            KP_5            KP_5            KP_5                    KP_5                    Ascii_5                 Ascii_5
++keycode  77 =   KP_6            KP_6            KP_6            KP_6            KP_6                    KP_6                    Ascii_6                 Ascii_6
++keycode  78 =   KP_Add          KP_Add          KP_Add          KP_Add          KP_Add                  KP_Add                  KP_Add                  KP_Add
++keycode  79 =   KP_1            KP_1            KP_1            KP_1            KP_1                    KP_1                    Ascii_1                 Ascii_1
++keycode  80 =   KP_2            KP_2            KP_2            KP_2            KP_2                    KP_2                    Ascii_2                 Ascii_2
++#============== plain ========= shift========== plain cyr ===== shift cyr ===== ctrl ================== ctrl cyr ============== alt =================== alt cyr =============== ctrlalt =============== ctrlalt cyr ===========
++keycode  81 =   KP_3            KP_3            KP_3            KP_3            KP_3                    KP_3                    Ascii_3                 Ascii_3
++keycode  82 =   KP_0            KP_0            KP_0            KP_0            KP_0                    KP_0                    Ascii_0                 Ascii_0
++keycode  83 =   KP_Period       KP_Period       KP_Period       KP_Period       KP_Period               KP_Period               KP_Period               KP_Period               Boot                    Boot
++keycode  84 =   Last_Console
++keycode  85 =
++keycode  86 =   less            greater         less            greater         less                    less                    Meta_less               Meta_less
++keycode  87 =   F11             F11             F11             F11             F11                     F11                     Console_11              Console_11              Console_11              Console_11
++keycode  88 =   F12             F12             F12             F12             F12                     F12                     Console_12              Console_12              Console_12              Console_12
++keycode  89 =
++keycode  90 =
++keycode  91 =
++keycode  92 =
++keycode  93 =
++keycode  94 =
++keycode  95 =
++keycode  96 =   KP_Enter
++keycode  97 =   Control
++keycode  98 =   KP_Divide
++keycode  99 =   Control_backslash
++# Right Alt - Cyrillic
++keycode 100 =   AltGr_Lock
++#============== plain ========= shift========== plain cyr ===== shift cyr ===== ctrl ================== ctrl cyr ============== alt =================== alt cyr =============== ctrlalt =============== ctrlalt cyr ===========
++keycode 101 =   Break
++keycode 102 =   Find
++keycode 103 =   Up
++keycode 104 =   Prior           Scroll_Backward Prior           Scroll_Backward Prior                   Prior                   Prior                   Prior                   Prior                   Prior
++keycode 105 =   Left            Left            Left            Left            Left                    Left                    Left                    Left                    Decr_Console            Decr_Console
++keycode 106 =   Right           Right           Right           Right           Right                   Right                   Right                   Right                   Incr_Console            Incr_Console
++keycode 107 =   Select
++keycode 108 =   Down
++keycode 109 =   Next            Scroll_Forward  Next            Scroll_Forward  Next                    Next                    Next                    Next                    Next                    Next
++keycode 110 =   Insert
++keycode 111 =   Remove          Remove          Remove          Remove          Remove                  Remove                  Remove                  Remove                  Boot                    Boot
++keycode 112 =   Macro
++keycode 113 =   F13
++keycode 114 =   F14
++keycode 115 =   Help
++keycode 116 =   Do
++keycode 117 =   F17
++keycode 118 =   KP_MinPlus
++keycode 119 =   Pause
++keycode 120 =
++#============== plain ========= shift========== plain cyr ===== shift cyr ===== ctrl ================== ctrl cyr ============== alt =================== alt cyr =============== ctrlalt =============== ctrlalt cyr ===========
++keycode 121 =
++keycode 122 =
++keycode 123 =
++keycode 124 =
++keycode 125 =
++keycode 126 =
++keycode 127 =
++
++string F1 = "\033[[A"
++string F2 = "\033[[B"
++string F3 = "\033[[C"
++string F4 = "\033[[D"
++string F5 = "\033[[E"
++string F6 = "\033[17~"
++string F7 = "\033[18~"
++string F8 = "\033[19~"
++string F9 = "\033[20~"
++string F10 = "\033[21~"
++string F11 = "\033[23~"
++string F12 = "\033[24~"
++string F13 = "\033[25~"
++string F14 = "\033[26~"
++string F15 = "\033[28~"
++string F16 = "\033[29~"
++string F17 = "\033[31~"
++string F18 = "\033[32~"
++string F19 = "\033[33~"
++string F20 = "\033[34~"
++string Find = "\033[1~"
++string Insert = "\033[2~"
++string Remove = "\033[3~"
++string Select = "\033[4~"
++string Prior = "\033[5~"
++string Next = "\033[6~"
++string Macro = "\033[M"
++string Pause = "\033[P"
+diff --git a/examples/var_service/getty_tty1/run b/examples/var_service/getty_tty1/run
+new file mode 100755
+index 0000000..c7c413b
+--- /dev/null
++++ b/examples/var_service/getty_tty1/run
+@@ -0,0 +1,30 @@
++#!/bin/sh
++
++exec >/dev/null
++exec 2>&1
++exec </dev/null
++
++user=root
++baud=38400
++delay=3
++export TERM=linux
++
++tty="/dev/${PWD##*/getty_}"
++
++if ! test -e "$tty"; then
++	exec env - sleep 32000
++fi
++
++sleep "$delay"
++
++chown "$user" "$tty" # - devfs made happy
++
++exec <"$tty" >"$tty" 2>&1
++# using . in order to be able to set env (TERM etc) in cfg
++test -x ./cfg && . ./cfg
++
++exec \
++env - "TERM=$TERM" PATH="$PATH" LOGIN_PRE_SUID_SCRIPT="$PWD/login.sh" \
++softlimit \
++setuidgid "$user" \
++getty "$baud" "$tty" "$TERM"
+diff --git a/examples/var_service/gpm/run b/examples/var_service/gpm/run
+new file mode 100755
+index 0000000..a13fdcd
+--- /dev/null
++++ b/examples/var_service/gpm/run
+@@ -0,0 +1,15 @@
++#!/bin/sh
++
++exec >/dev/null
++exec 2>&1
++exec </dev/null
++
++user=root
++options="-D -2 -m /dev/psaux -t ps2"
++#options="-D -2 -m /dev/ttyS0 -t bare"
++
++exec \
++env - PATH="$PATH" \
++softlimit \
++setuidgid "$user" \
++gpm $options
+diff --git a/examples/var_service/httpd/log/run b/examples/var_service/httpd/log/run
+new file mode 100755
+index 0000000..560d1b1
+--- /dev/null
++++ b/examples/var_service/httpd/log/run
+@@ -0,0 +1,21 @@
++#!/bin/sh
++
++user=logger
++
++logdir="/var/log/service/`(cd ..;basename $PWD)`"
++mkdir -p "$logdir" 2>/dev/null
++chown -R "$user": "$logdir"
++chmod -R go-rwxst,u+rwX "$logdir"
++rm logdir
++ln -s "$logdir" logdir
++
++# make this dir accessible to logger
++chmod a+rX .
++
++exec >/dev/null
++exec 2>&1
++exec \
++env - PATH="$PATH" \
++softlimit \
++setuidgid "$user" \
++svlogd -tt "$logdir"
+diff --git a/examples/var_service/httpd/p_log b/examples/var_service/httpd/p_log
+new file mode 100755
+index 0000000..a2521be
+--- /dev/null
++++ b/examples/var_service/httpd/p_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++cat @* current | $PAGER
+diff --git a/examples/var_service/httpd/run b/examples/var_service/httpd/run
+new file mode 100755
+index 0000000..ff8869b
+--- /dev/null
++++ b/examples/var_service/httpd/run
+@@ -0,0 +1,18 @@
++#!/bin/sh
++
++#exec >/dev/null
++exec 2>&1
++exec </dev/null
++
++user=www
++user=root
++
++echo "* Starting tcpsvd for httpd [$$]"
++exec \
++env - PATH="$PATH" \
++softlimit \
++tcpsvd \
++  -v -E -l localhost -c 5 \
++  0 88 \
++setuidgid "$user" \
++httpd -vvv -i -h /pub/httpd_root
+diff --git a/examples/var_service/httpd/w_log b/examples/var_service/httpd/w_log
+new file mode 100755
+index 0000000..34b19b3
+--- /dev/null
++++ b/examples/var_service/httpd/w_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++watch -n2 'w=`ttysize w`; h=`ttysize h`; tail -$((h-3)) current 2>&1 | cut -b0-$((w-2))'
+diff --git a/examples/var_service/inetd/inetd.conf b/examples/var_service/inetd/inetd.conf
+new file mode 100644
+index 0000000..c5f151b
+--- /dev/null
++++ b/examples/var_service/inetd/inetd.conf
+@@ -0,0 +1,18 @@
++# [ADDR:]service_name           must be in /etc/services, or port number
++# socket_type                   stream/dgram/raw/rdm/seqpacket
++# protocol                      tcp/udp
++# wait/nowait[.max]             wait is usually for udp, nowait for tcp
++#                               max: max copies to run
++# user[.group] or user[:group]  user and group to run under
++# binary                        program to run
++# arg0 arg1 arg2...             arguments, INCLUDING program name (arg0)
++
++# serv	socket pro  w/nw   user binary args
++
++# IPv6
++555	dgram  udp6 wait   root echo echo Hello IPv6 udp world
++# ...with ADDR prefix:
++::1:444	stream tcp6 nowait root echo echo Hello IPv6 localhost
++
++# Rarely seen case: tcp *wait* service
++telnet	stream tcp  wait   root telnetd telnetd -w10
+diff --git a/examples/var_service/inetd/log/run b/examples/var_service/inetd/log/run
+new file mode 100755
+index 0000000..560d1b1
+--- /dev/null
++++ b/examples/var_service/inetd/log/run
+@@ -0,0 +1,21 @@
++#!/bin/sh
++
++user=logger
++
++logdir="/var/log/service/`(cd ..;basename $PWD)`"
++mkdir -p "$logdir" 2>/dev/null
++chown -R "$user": "$logdir"
++chmod -R go-rwxst,u+rwX "$logdir"
++rm logdir
++ln -s "$logdir" logdir
++
++# make this dir accessible to logger
++chmod a+rX .
++
++exec >/dev/null
++exec 2>&1
++exec \
++env - PATH="$PATH" \
++softlimit \
++setuidgid "$user" \
++svlogd -tt "$logdir"
+diff --git a/examples/var_service/inetd/p_log b/examples/var_service/inetd/p_log
+new file mode 100755
+index 0000000..a2521be
+--- /dev/null
++++ b/examples/var_service/inetd/p_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++cat @* current | $PAGER
+diff --git a/examples/var_service/inetd/run b/examples/var_service/inetd/run
+new file mode 100755
+index 0000000..910c1b3
+--- /dev/null
++++ b/examples/var_service/inetd/run
+@@ -0,0 +1,17 @@
++#!/bin/sh
++
++#exec >/dev/null
++exec 2>&1
++exec </dev/null
++
++echo "* Starting inetd [$$]"
++exec \
++env - PATH="$PATH" \
++softlimit \
++inetd -f -e "$PWD/inetd.conf"
++
++# inetd [-f] [-q len] [conf]
++# -f      Run in foreground
++# -e      Log to stderr (default is syslog)
++# -q N    Set the size of the socket listen queue to N
++#         (default: 128)
+diff --git a/examples/var_service/inetd/w_log b/examples/var_service/inetd/w_log
+new file mode 100755
+index 0000000..34b19b3
+--- /dev/null
++++ b/examples/var_service/inetd/w_log
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++cd log/logdir || exit 1
++watch -n2 'w=`ttysize w`; h=`ttysize h`; tail -$((h-3)) current 2>&1 | cut -b0-$((w-2))'
+diff --git a/examples/var_service/nmeter/run b/examples/var_service/nmeter/run
+index fa0837b..7e51124 100755
+--- a/examples/var_service/nmeter/run
++++ b/examples/var_service/nmeter/run
+@@ -1,21 +1,20 @@
+ #!/bin/sh
+ 
++exec >/dev/null
++exec 2>&1
++exec </dev/null
++
+ # Since per-process /proc/net/ (-> /proc/self/net/) appeared,
+ # we need to be root
+-user=root
++user="root"
+ tty="/dev/tty9"
+-
+-chmod -R a+X . # or else env will moan
+-chown $user: $tty # devfs made happy
+-
+ cmd="nmeter '%t %c x %x p%p f %f b %b m %m if%[nif]'"
+ 
+-exec >/dev/null
+-exec 2>&1
+-exec </dev/null
++chmod -R a+X . # or else env will moan
++chown "$user": "$tty" # devfs made happy
+ 
+ eval exec \
+-setuidgid "$user" \
+ env - PATH="$PATH" \
++setuidgid "$user" \
+ <"$tty" >"$tty" 2>&1 \
+ $cmd

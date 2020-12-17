@@ -1,0 +1,15 @@
+2009-09-20 20:29:25 +0200
+diff --git a/include/usage.h b/include/usage.h
+index 6f9d155..c7013de 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3424,6 +3424,9 @@
+        "Report process status\n" \
+      "\nOptions:" \
+      "\n	-o col1,col2=header	Select columns for display" \
++	IF_FEATURE_SHOW_THREADS( \
++     "\n	-T			Show threads" \
++	)
+ 
+ #else /* !ENABLE_DESKTOP */
+ 

@@ -1,0 +1,202 @@
+2008-06-01 22:36:39 +0000
+diff --git a/coreutils/Kbuild b/coreutils/Kbuild
+index cb45439..a5a2d4c 100644
+--- a/coreutils/Kbuild
++++ b/coreutils/Kbuild
+@@ -54,6 +54,7 @@ lib-$(CONFIG_NOHUP)     += nohup.o
+ lib-$(CONFIG_OD)        += od.o
+ lib-$(CONFIG_PRINTENV)  += printenv.o
+ lib-$(CONFIG_PRINTF)    += printf.o
++lib-$(CONFIG_ASH_BUILTIN_PRINTF) += printf.o
+ lib-$(CONFIG_PWD)       += pwd.o
+ lib-$(CONFIG_READLINK)  += readlink.o
+ lib-$(CONFIG_REALPATH)  += realpath.o
+diff --git a/coreutils/chown.c b/coreutils/chown.c
+index eaaefaf..78377e6 100644
+--- a/coreutils/chown.c
++++ b/coreutils/chown.c
+@@ -61,7 +61,6 @@ static int fileAction(const char *fileName, struct stat *statbuf,
+ 	return FALSE;
+ }
+ 
+-int chown_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chown_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+diff --git a/coreutils/printf.c b/coreutils/printf.c
+index ebe9615..b775236 100644
+--- a/coreutils/printf.c
++++ b/coreutils/printf.c
+@@ -193,6 +193,7 @@ static char **print_formatted(char *f, char **argv)
+ 	unsigned direc_length;  /* Length of % directive.  */
+ 	int field_width;        /* Arg to first '*', or -1 if none.  */
+ 	int precision;          /* Arg to second '*', or -1 if none.  */
++	char **saved_argv = argv;
+ 
+ 	for (; *f; ++f) {
+ 		switch (*f) {
+@@ -264,8 +265,9 @@ static char **print_formatted(char *f, char **argv)
+ 							precision, "");
+ 			break;
+ 		case '\\':
+-			if (*++f == 'c')
+-				exit(EXIT_SUCCESS);
++			if (*++f == 'c') {
++				return saved_argv; /* causes main() to exit */
++			}
+ 			bb_putchar(bb_process_escape_sequence((const char **)&f));
+ 			f--;
+ 			break;
+@@ -277,12 +279,22 @@ static char **print_formatted(char *f, char **argv)
+ 	return argv;
+ }
+ 
+-int printf_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int printf_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *format;
+ 	char **argv2;
+ 
++	/* We must check that stdout is not closed.
++	 * The reason for this is highly non-obvious. printf_main is used from shell.
++	 * Shell must correctly handle 'printf "%s" foo'
++	 * if stdout is closed. With stdio, output gets shoveled into
++	 * stdout buffer, and even fflush cannot clear it out. It seems that
++	 * even if libc receives EBADF on write attempts, it feels determined
++	 * to output data no matter what. So it will try later,
++	 * and possibly will clobber future output. Not good. */
++	if (dup2(1, 1) != 1)
++		return -1;
++
+ 	/* bash builtin errors out on "printf '-%s-\n' foo",
+ 	 * coreutils-6.9 works. Both work with "printf -- '-%s-\n' foo".
+ 	 * We will mimic coreutils. */
+diff --git a/include/applets.h b/include/applets.h
+index 17113df..e7fc3c0 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -275,7 +275,7 @@ USE_PIVOT_ROOT(APPLET(pivot_root, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_PKILL(APPLET_ODDNAME(pkill, pgrep, _BB_DIR_USR_BIN, _BB_SUID_NEVER, pkill))
+ USE_HALT(APPLET_ODDNAME(poweroff, halt, _BB_DIR_SBIN, _BB_SUID_NEVER, poweroff))
+ USE_PRINTENV(APPLET(printenv, _BB_DIR_BIN, _BB_SUID_NEVER))
+-USE_PRINTF(APPLET(printf, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
++USE_PRINTF(APPLET_NOFORK(printf, printf, _BB_DIR_USR_BIN, _BB_SUID_NEVER, printf))
+ USE_PS(APPLET(ps, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_PSCAN(APPLET(pscan, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_PWD(APPLET_NOFORK(pwd, pwd, _BB_DIR_BIN, _BB_SUID_NEVER, pwd))
+diff --git a/include/libbb.h b/include/libbb.h
+index 947f28d..c79cd8b 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -878,13 +878,16 @@ extern void bb_verror_msg(const char *s, va_list p, const char *strerr);
+ #endif
+ 
+ 
+-/* applets which are useful from another applets */
++/* Applets which are useful from another applets */
+ int bb_cat(char** argv);
+-/* If shell needs them, these three "exist" even if not enabled as applets */
++/* If shell needs them, they exist even if not enabled as applets */
+ int echo_main(int argc, char** argv) USE_ECHO(MAIN_EXTERNALLY_VISIBLE);
++int printf_main(int argc, char **argv) USE_PRINTF(MAIN_EXTERNALLY_VISIBLE);
+ int test_main(int argc, char **argv) USE_TEST(MAIN_EXTERNALLY_VISIBLE);
+ int kill_main(int argc, char **argv) USE_KILL(MAIN_EXTERNALLY_VISIBLE);
+-int chown_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++/* Similar, but used by chgrp, not shell */
++int chown_main(int argc, char **argv) USE_CHOWN(MAIN_EXTERNALLY_VISIBLE);
++/* Don't need USE_xxx() guard for these */
+ int gunzip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int bunzip2_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int bbunpack(char **argv,
+diff --git a/miscutils/last.c b/miscutils/last.c
+index a8800bf..612f504 100644
+--- a/miscutils/last.c
++++ b/miscutils/last.c
+@@ -10,6 +10,9 @@
+ #include "libbb.h"
+ #include <utmp.h>
+ 
++/* NB: ut_name and ut_user are the same field, use only one name (ut_user)
++ * to reduce confusion */
++
+ #ifndef SHUTDOWN_TIME
+ #  define SHUTDOWN_TIME 254
+ #endif
+diff --git a/miscutils/last_fancy.c b/miscutils/last_fancy.c
+index 0dba9dc..2b7fee6 100644
+--- a/miscutils/last_fancy.c
++++ b/miscutils/last_fancy.c
+@@ -10,6 +10,9 @@
+ #include "libbb.h"
+ #include <utmp.h>
+ 
++/* NB: ut_name and ut_user are the same field, use only one name (ut_user)
++ * to reduce confusion */
++
+ #ifndef SHUTDOWN_TIME
+ #  define SHUTDOWN_TIME 254
+ #endif
+diff --git a/shell/Config.in b/shell/Config.in
+index 94ffa09..a670162 100644
+--- a/shell/Config.in
++++ b/shell/Config.in
+@@ -114,6 +114,13 @@ config ASH_BUILTIN_ECHO
+ 	help
+ 	  Enable support for echo, builtin to ash.
+ 
++config ASH_BUILTIN_PRINTF
++	bool "Builtin version of 'printf'"
++	default y
++	depends on ASH
++	help
++	  Enable support for printf, builtin to ash.
++
+ config ASH_BUILTIN_TEST
+ 	bool "Builtin version of 'test'"
+ 	default y
+diff --git a/shell/ash.c b/shell/ash.c
+index 20b93f3..31beb86 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -8488,17 +8488,18 @@ static int ulimitcmd(int, char **);
+  * Apart from the above, [[ expr ]] should work as [ expr ]
+  */
+ 
+-#define testcmd test_main
+-#define echocmd echo_main
++#define echocmd   echo_main
++#define printfcmd printf_main
++#define testcmd   test_main
+ 
+ /* Keep these in proper order since it is searched via bsearch() */
+ static const struct builtincmd builtintab[] = {
+ 	{ BUILTIN_SPEC_REG      ".", dotcmd },
+ 	{ BUILTIN_SPEC_REG      ":", truecmd },
+ #if ENABLE_ASH_BUILTIN_TEST
+-	{ BUILTIN_REGULAR	"[", testcmd },
++	{ BUILTIN_REGULAR       "[", testcmd },
+ #if ENABLE_ASH_BASH_COMPAT
+-	{ BUILTIN_REGULAR	"[[", testcmd },
++	{ BUILTIN_REGULAR       "[[", testcmd },
+ #endif
+ #endif
+ #if ENABLE_ASH_ALIAS
+@@ -8540,6 +8541,9 @@ static const struct builtincmd builtintab[] = {
+ 	{ BUILTIN_NOSPEC        "let", letcmd },
+ #endif
+ 	{ BUILTIN_ASSIGN        "local", localcmd },
++#if ENABLE_ASH_BUILTIN_PRINTF
++	{ BUILTIN_REGULAR       "printf", printfcmd },
++#endif
+ 	{ BUILTIN_NOSPEC        "pwd", pwdcmd },
+ 	{ BUILTIN_REGULAR       "read", readcmd },
+ 	{ BUILTIN_SPEC_REG_ASSG "readonly", exportcmd },
+@@ -8548,7 +8552,7 @@ static const struct builtincmd builtintab[] = {
+ 	{ BUILTIN_SPEC_REG      "shift", shiftcmd },
+ 	{ BUILTIN_SPEC_REG      "source", dotcmd },
+ #if ENABLE_ASH_BUILTIN_TEST
+-	{ BUILTIN_REGULAR	"test", testcmd },
++	{ BUILTIN_REGULAR       "test", testcmd },
+ #endif
+ 	{ BUILTIN_SPEC_REG      "times", timescmd },
+ 	{ BUILTIN_SPEC_REG      "trap", trapcmd },

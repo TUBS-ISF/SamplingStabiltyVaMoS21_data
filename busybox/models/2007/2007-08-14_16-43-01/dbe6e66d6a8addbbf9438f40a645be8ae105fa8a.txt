@@ -1,0 +1,185 @@
+2007-08-14 16:43:01 +0000
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index f842d45..f824fcf 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -212,7 +212,7 @@ char* make_new_name_gunzip(char *filename)
+ 
+ 	extension++;
+ 	if (strcmp(extension, "tgz" + 1) == 0
+-#if  ENABLE_FEATURE_GUNZIP_UNCOMPRESS
++#if ENABLE_FEATURE_GUNZIP_UNCOMPRESS
+ 	 || strcmp(extension, "Z") == 0
+ #endif
+ 	) {
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index caa50f9..b5fc06d 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -1412,10 +1412,10 @@ static void init_archive_deb_control(archive_handle_t *ar_handle)
+ 	tar_handle->src_fd = ar_handle->src_fd;
+ 
+ 	/* We don't care about data.tar.* or debian-binary, just control.tar.* */
+-#if  ENABLE_FEATURE_DEB_TAR_GZ
++#if ENABLE_FEATURE_DEB_TAR_GZ
+ 	llist_add_to(&(ar_handle->accept), (char*)"control.tar.gz");
+ #endif
+-#if  ENABLE_FEATURE_DEB_TAR_BZ2
++#if ENABLE_FEATURE_DEB_TAR_BZ2
+ 	llist_add_to(&(ar_handle->accept), (char*)"control.tar.bz2");
+ #endif
+ 
+@@ -1432,10 +1432,10 @@ static void init_archive_deb_data(archive_handle_t *ar_handle)
+ 	tar_handle->src_fd = ar_handle->src_fd;
+ 
+ 	/* We don't care about control.tar.* or debian-binary, just data.tar.* */
+-#if  ENABLE_FEATURE_DEB_TAR_GZ
++#if ENABLE_FEATURE_DEB_TAR_GZ
+ 	llist_add_to(&(ar_handle->accept), (char*)"data.tar.gz");
+ #endif
+-#if  ENABLE_FEATURE_DEB_TAR_BZ2
++#if ENABLE_FEATURE_DEB_TAR_BZ2
+ 	llist_add_to(&(ar_handle->accept), (char*)"data.tar.bz2");
+ #endif
+ 
+diff --git a/coreutils/wc.c b/coreutils/wc.c
+index e746365..627267d 100644
+--- a/coreutils/wc.c
++++ b/coreutils/wc.c
+@@ -43,7 +43,7 @@
+ 
+ #include "libbb.h"
+ 
+-#if  ENABLE_LOCALE_SUPPORT
++#if ENABLE_LOCALE_SUPPORT
+ #define isspace_given_isprint(c) isspace(c)
+ #else
+ #undef isspace
+diff --git a/include/libbb.h b/include/libbb.h
+index 0ea88a6..fc0a0ae 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -280,7 +280,7 @@ int xsocket(int domain, int type, int protocol);
+ void xbind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen);
+ void xlisten(int s, int backlog);
+ void xconnect(int s, const struct sockaddr *s_addr, socklen_t addrlen);
+-ssize_t xsendto(int s, const  void *buf, size_t len, const struct sockaddr *to,
++ssize_t xsendto(int s, const void *buf, size_t len, const struct sockaddr *to,
+ 				socklen_t tolen);
+ int setsockopt_reuseaddr(int fd);
+ int setsockopt_broadcast(int fd);
+@@ -656,7 +656,6 @@ extern void bb_info_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2
+ /* These are used internally -- you shouldn't need to use them */
+ extern void bb_verror_msg(const char *s, va_list p, const char *strerr);
+ extern void bb_vperror_msg(const char *s, va_list p);
+-extern void bb_vinfo_msg(const char *s, va_list p);
+ 
+ 
+ /* applets which are useful from another applets */
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index c0cbe1a..3ffda12 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -88,7 +88,6 @@ lib-y += vdprintf.o
+ lib-y += verror_msg.o
+ lib-y += vfork_daemon_rexec.o
+ lib-y += vherror_msg.o
+-lib-y += vinfo_msg.o
+ lib-y += vperror_msg.o
+ lib-y += warn_ignoring_args.o
+ lib-y += wfopen.o
+diff --git a/libbb/info_msg.c b/libbb/info_msg.c
+index c763ce6..b0ce643 100644
+--- a/libbb/info_msg.c
++++ b/libbb/info_msg.c
+@@ -7,13 +7,24 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
++#include <syslog.h>
+ #include "libbb.h"
+ 
+ void bb_info_msg(const char *s, ...)
+ {
+ 	va_list p;
++	/* va_copy is used because it is not portable
++	 * to use va_list p twice */
++	va_list p2;
+ 
+ 	va_start(p, s);
+-	bb_vinfo_msg(s, p);
++	va_copy(p2, p);
++	if (logmode & LOGMODE_STDIO) {
++		vprintf(s, p);
++		fputs(msg_eol, stdout);
++	}
++	if (ENABLE_FEATURE_SYSLOG && (logmode & LOGMODE_SYSLOG))
++		vsyslog(LOG_INFO, s, p2);
++	va_end(p2);
+ 	va_end(p);
+ }
+diff --git a/libbb/vinfo_msg.c b/libbb/vinfo_msg.c
+deleted file mode 100644
+index fa27986..0000000
+--- a/libbb/vinfo_msg.c
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/* vi: set sw=4 ts=4: */
+-/*
+- * Utility routines.
+- *
+- * Copyright (C) 1999-2004 by Erik Andersen <andersen@codepoet.org>
+- *
+- * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+- */
+-
+-#include "libbb.h"
+-#include <syslog.h>
+-
+-void bb_vinfo_msg(const char *s, va_list p)
+-{
+-	/* va_copy is used because it is not portable
+-	 * to use va_list p twice */
+-	va_list p2;
+-	va_copy(p2, p);
+-	if (logmode & LOGMODE_STDIO) {
+-		vprintf(s, p);
+-		fputs(msg_eol, stdout);
+-	}
+-	if (ENABLE_FEATURE_SYSLOG && (logmode & LOGMODE_SYSLOG))
+-		vsyslog(LOG_INFO, s, p2);
+-	va_end(p2);
+-}
+diff --git a/scripts/trylink b/scripts/trylink
+index 9b67deb..5e96230 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -64,16 +64,18 @@ done
+     echo "Final link with: $BBOX_LIB_LIST"
+     l_list=`echo "$BBOX_LIB_LIST" | sed -e 's/ / -l/g' -e 's/^/-l/'`
+     # --verbose gives us gobs of info to stdout (e.g. linker script used)
+-    try "-Wl,--start-group $l_list -Wl,--end-group -Wl,--verbose" "$@" >busybox_ld.out ####|| exit 1
+-    #
+-    # Add SORT_BY_ALIGNMENT to linker script (found in busybox_ld.out):
+-    #  .rodata         : { *(.rodata SORT_BY_ALIGNMENT(.rodata.*) .gnu.linkonce.r.*) }
+-    #  *(.data SORT_BY_ALIGNMENT(.data.*) .gnu.linkonce.d.*)
+-    #  *(.bss SORT_BY_ALIGNMENT(.bss.*) .gnu.linkonce.b.*)
+-    # This will eliminate most of the data padding. Use linker script
+-    # by commenting "try" above and uncommenting this one (tested on i386):
+-    #try "-Wl,--start-group $l_list -Wl,--end-group -Wl,--verbose -Wl,-T -Wl,busybox_ldscript" "$@" >busybox_ld.out
+-    #
++    if ! test -f busybox_ldscript; then
++	try "-Wl,--start-group $l_list -Wl,--end-group -Wl,--verbose" "$@" >busybox_ld.out ####|| exit 1
++    else
++	echo "Custom linker script 'busybox_ldscript' found, using it"
++	# Add SORT_BY_ALIGNMENT to linker script (found in busybox_ld.out):
++	#  .rodata         : { *(.rodata SORT_BY_ALIGNMENT(.rodata.*) .gnu.linkonce.r.*) }
++	#  *(.data SORT_BY_ALIGNMENT(.data.*) .gnu.linkonce.d.*)
++	#  *(.bss SORT_BY_ALIGNMENT(.bss.*) .gnu.linkonce.b.*)
++	# This will eliminate most of the data padding. Use linker script
++	# by commenting "try" above and uncommenting this one (tested on i386):
++	try "-Wl,--start-group $l_list -Wl,--end-group -Wl,--verbose -Wl,-T -Wl,busybox_ldscript" "$@" >busybox_ld.out
++    fi
+ ####}
+ ####rm busybox_ld.err
+ ####exit 0  # Ensure "success" exit code

@@ -1,0 +1,173 @@
+2009-06-13 22:49:08 +0200
+diff --git a/coreutils/test.c b/coreutils/test.c
+index ae40192..cfaf4ca 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -51,39 +51,49 @@
+ 
+ enum token {
+ 	EOI,
+-	FILRD,
++
++	FILRD, /* file access */
+ 	FILWR,
+ 	FILEX,
++
+ 	FILEXIST,
+-	FILREG,
++
++	FILREG, /* file type */
+ 	FILDIR,
+ 	FILCDEV,
+ 	FILBDEV,
+ 	FILFIFO,
+ 	FILSOCK,
++
+ 	FILSYM,
+ 	FILGZ,
+ 	FILTT,
+-	FILSUID,
++
++	FILSUID, /* file bit */
+ 	FILSGID,
+ 	FILSTCK,
+-	FILNT,
++
++	FILNT, /* file ops */
+ 	FILOT,
+ 	FILEQ,
++
+ 	FILUID,
+ 	FILGID,
+-	STREZ,
++
++	STREZ, /* str ops */
+ 	STRNZ,
+ 	STREQ,
+ 	STRNE,
+ 	STRLT,
+ 	STRGT,
+-	INTEQ,
++
++	INTEQ, /* int ops */
+ 	INTNE,
+ 	INTGE,
+ 	INTGT,
+ 	INTLE,
+ 	INTLT,
++
+ 	UNOT,
+ 	BAND,
+ 	BOR,
+@@ -385,8 +395,8 @@ static int binop(void)
+ 			return val1 >  val2;
+ 		if (op->op_num == INTLE)
+ 			return val1 <= val2;
+-		if (op->op_num == INTLT)
+-			return val1 <  val2;
++		/*if (op->op_num == INTLT)*/
++		return val1 <  val2;
+ 	}
+ 	if (is_str_op(op->op_num)) {
+ 		val1 = strcmp(opnd1, opnd2);
+@@ -396,8 +406,8 @@ static int binop(void)
+ 			return val1 != 0;
+ 		if (op->op_num == STRLT)
+ 			return val1 < 0;
+-		if (op->op_num == STRGT)
+-			return val1 > 0;
++		/*if (op->op_num == STRGT)*/
++		return val1 > 0;
+ 	}
+ 	/* We are sure that these three are by now the only binops we didn't check
+ 	 * yet, so we do not check if the class is correct:
+@@ -412,25 +422,29 @@ static int binop(void)
+ 			return b1.st_mtime > b2.st_mtime;
+ 		if (op->op_num == FILOT)
+ 			return b1.st_mtime < b2.st_mtime;
+-		if (op->op_num == FILEQ)
+-			return b1.st_dev == b2.st_dev && b1.st_ino == b2.st_ino;
++		/*if (op->op_num == FILEQ)*/
++		return b1.st_dev == b2.st_dev && b1.st_ino == b2.st_ino;
+ 	}
+-	return 1; /* NOTREACHED */
++	/*return 1; - NOTREACHED */
+ }
+ 
+ 
+ static void initialize_group_array(void)
+ {
+-	ngroups = getgroups(0, NULL);
+-	if (ngroups > 0) {
++	int n;
++
++	/* getgroups may be expensive, try to use it only once */
++	ngroups = 32;
++	do {
+ 		/* FIXME: ash tries so hard to not die on OOM,
+ 		 * and we spoil it with just one xrealloc here */
+ 		/* We realloc, because test_main can be entered repeatedly by shell.
+ 		 * Testcase (ash): 'while true; do test -x some_file; done'
+ 		 * and watch top. (some_file must have owner != you) */
+-		group_array = xrealloc(group_array, ngroups * sizeof(gid_t));
+-		getgroups(ngroups, group_array);
+-	}
++		n = ngroups;
++		group_array = xrealloc(group_array, n * sizeof(gid_t));
++		ngroups = getgroups(n, group_array);
++	} while (ngroups > n);
+ }
+ 
+ 
+@@ -717,7 +731,7 @@ int test_main(int argc, char **argv)
+ 	 * isn't likely in the case of a shell.  paranoia
+ 	 * prevails...
+ 	 */
+-	ngroups = 0;
++	/*ngroups = 0; - done by INIT_S() */
+ 
+ 	//argc--;
+ 	argv++;
+diff --git a/networking/tcpudp.c b/networking/tcpudp.c
+index 55a3e08..a5be192 100644
+--- a/networking/tcpudp.c
++++ b/networking/tcpudp.c
+@@ -276,10 +276,12 @@ int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
+ 	setsockopt_reuseaddr(sock);
+ 	sa_len = lsa->len; /* I presume sockaddr len stays the same */
+ 	xbind(sock, &lsa->u.sa, sa_len);
+-	if (tcp)
++	if (tcp) {
+ 		xlisten(sock, backlog);
+-	else /* udp: needed for recv_from_to to work: */
++		close_on_exec_on(sock);
++	} else { /* udp: needed for recv_from_to to work: */
+ 		socket_want_pktinfo(sock);
++	}
+ 	/* ndelay_off(sock); - it is the default I think? */
+ 
+ #ifndef SSLSVD
+@@ -410,10 +412,6 @@ int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* Child: prepare env, log, and exec prog */
+ 
+-	/* Closing tcp listening socket */
+-	if (tcp)
+-		close(sock);
+-
+ 	{ /* vfork alert! every xmalloc in this block should be freed! */
+ 		char *local_hostname = local_hostname; /* for compiler */
+ 		char *local_addr = NULL;
+diff --git a/testsuite/makedevs.device_table.txt b/testsuite/makedevs.device_table.txt
+index 4400083..88ac209 100644
+--- a/testsuite/makedevs.device_table.txt
++++ b/testsuite/makedevs.device_table.txt
+@@ -8,7 +8,7 @@
+ # you can just add an entry like:
+ #   /sbin/foobar        f       2755    0       0       -       -       -       -       -
+ # and (assuming the file /sbin/foobar exists) it will be made setuid
+-# root (regardless of what its permissions are on the host filesystem.
++# root (regardless of what its permissions are on the host filesystem).
+ # Furthermore, you can use a single table entry to create a many device
+ # minors.  For example, if I wanted to create /dev/hda and /dev/hda[0-15]
+ # I could just use the following two table entries:

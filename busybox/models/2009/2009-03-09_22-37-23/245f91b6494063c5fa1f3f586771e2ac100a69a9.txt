@@ -1,0 +1,27 @@
+2009-03-09 22:37:23 +0000
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index f4f2724..a461b15 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -40,6 +40,21 @@
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+ 
++#if ENABLE_FTPD
++/* ftpd uses ls, and without timestamps Mozilla won't understand
++ * ftpd's LIST output.
++ */
++# undef CONFIG_FEATURE_LS_TIMESTAMPS
++# undef ENABLE_FEATURE_LS_TIMESTAMPS
++# undef USE_FEATURE_LS_TIMESTAMPS
++# undef SKIP_FEATURE_LS_TIMESTAMPS
++# define CONFIG_FEATURE_LS_TIMESTAMPS 1
++# define ENABLE_FEATURE_LS_TIMESTAMPS 1
++# define USE_FEATURE_LS_TIMESTAMPS(...) __VA_ARGS__
++# define SKIP_FEATURE_LS_TIMESTAMPS(...)
++#endif
++
++
+ enum {
+ 
+ TERMINAL_WIDTH  = 80,           /* use 79 if terminal has linefold bug */

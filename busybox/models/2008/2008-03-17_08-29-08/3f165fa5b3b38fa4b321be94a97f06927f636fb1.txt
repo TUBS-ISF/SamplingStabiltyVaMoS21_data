@@ -1,0 +1,264 @@
+2008-03-17 08:29:08 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 505396b..73638a1 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -311,13 +311,14 @@ void bb_signals_recursive(int sigs, void (*f)(int));
+ void signal_no_SA_RESTART_empty_mask(int sig, void (*handler)(int));
+ /* syscalls like read() won't be interrupted (though select/poll will be): */
+ void signal_SA_RESTART_empty_mask(int sig, void (*handler)(int));
+-/* Will do sigaction(signum, act, NULL): */
+-int sigaction_set(int signum, const struct sigaction *act);
+-void sig_block(int);
+-void sig_unblock(int);
+-/* UNUSED: void sig_blocknone(void); */
+-void sig_pause(void);
++void wait_for_any_sig(void);
+ void kill_myself_with_sig(int sig) ATTRIBUTE_NORETURN;
++void sig_block(int sig);
++void sig_unblock(int sig);
++/* Will do sigaction(signum, act, NULL): */
++int sigaction_set(int sig, const struct sigaction *act);
++/* SIG_BLOCK/SIG_UNBLOCK all signals: */
++int sigprocmask_allsigs(int how);
+ 
+ 
+ void xsetgid(gid_t gid);
+diff --git a/init/init.c b/init/init.c
+index 13410ac..1145c04 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -526,27 +526,13 @@ static void init_reboot(unsigned long magic)
+ 
+ static void kill_all_processes(void)
+ {
+-	sigset_t block_signals;
+-
+ 	/* run everything to be run at "shutdown".  This is done _prior_
+ 	 * to killing everything, in case people wish to use scripts to
+ 	 * shut things down gracefully... */
+ 	run_actions(SHUTDOWN);
+ 
+ 	/* first disable all our signals */
+-	sigfillset(&block_signals);
+-	/*sigemptyset(&block_signals);
+-	sigaddset(&block_signals, SIGHUP);
+-	sigaddset(&block_signals, SIGQUIT);
+-	sigaddset(&block_signals, SIGCHLD);
+-	sigaddset(&block_signals, SIGUSR1);
+-	sigaddset(&block_signals, SIGUSR2);
+-	sigaddset(&block_signals, SIGINT);
+-	sigaddset(&block_signals, SIGTERM);
+-	sigaddset(&block_signals, SIGCONT);
+-	sigaddset(&block_signals, SIGSTOP);
+-	sigaddset(&block_signals, SIGTSTP);*/
+-	sigprocmask(SIG_BLOCK, &block_signals, NULL);
++	sigprocmask_allsigs(SIG_BLOCK);
+ 
+ 	message(L_CONSOLE | L_LOG, "The system is going down NOW!");
+ 
+@@ -593,26 +579,13 @@ static void halt_reboot_pwoff(int sig)
+ static void exec_restart_action(int sig ATTRIBUTE_UNUSED)
+ {
+ 	struct init_action *a;
+-	sigset_t unblock_signals;
+ 
+ 	for (a = init_action_list; a; a = a->next) {
+ 		if (a->action_type & RESTART) {
+ 			kill_all_processes();
+ 
+ 			/* unblock all signals (blocked in kill_all_processes()) */
+-			sigfillset(&unblock_signals);
+-			/*sigemptyset(&unblock_signals);
+-			sigaddset(&unblock_signals, SIGHUP);
+-			sigaddset(&unblock_signals, SIGQUIT);
+-			sigaddset(&unblock_signals, SIGCHLD);
+-			sigaddset(&unblock_signals, SIGUSR1);
+-			sigaddset(&unblock_signals, SIGUSR2);
+-			sigaddset(&unblock_signals, SIGINT);
+-			sigaddset(&unblock_signals, SIGTERM);
+-			sigaddset(&unblock_signals, SIGCONT);
+-			sigaddset(&unblock_signals, SIGSTOP);
+-			sigaddset(&unblock_signals, SIGTSTP);*/
+-			sigprocmask(SIG_UNBLOCK, &unblock_signals, NULL);
++			sigprocmask_allsigs(SIG_UNBLOCK);
+ 
+ 			/* Open the new terminal device */
+ 			open_stdio_to_tty(a->terminal, 0 /* - halt if open fails */);
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index 8b4ae88..5362af5 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -290,7 +290,7 @@ int tcpudpsvd_main(int argc, char **argv)
+ 	hccp = NULL;
+ 
+ 	while (cnum >= cmax)
+-		sig_pause(); /* wait for any signal (expecting SIGCHLD) */
++		wait_for_any_sig(); /* expecting SIGCHLD */
+ 
+ 	/* Accept a connection to fd #0 */
+  again1:
+diff --git a/libbb/signals.c b/libbb/signals.c
+index 719beab..685c552 100644
+--- a/libbb/signals.c
++++ b/libbb/signals.c
+@@ -17,6 +17,13 @@ int sigaction_set(int signum, const struct sigaction *act)
+ 	return sigaction(signum, act, NULL);
+ }
+ 
++int sigprocmask_allsigs(int how)
++{
++	sigset_t set;
++	sigfillset(&set);
++	return sigprocmask(how, &set, NULL);
++}
++
+ void bb_signals(int sigs, void (*f)(int))
+ {
+ 	int sig_no = 0;
+@@ -69,16 +76,7 @@ void sig_unblock(int sig)
+ 	sigprocmask(SIG_UNBLOCK, &ss, NULL);
+ }
+ 
+-#if 0
+-void sig_blocknone(void)
+-{
+-	sigset_t ss;
+-	sigemptyset(&ss);
+-	sigprocmask(SIG_SETMASK, &ss, NULL);
+-}
+-#endif
+-
+-void sig_pause(void)
++void wait_for_any_sig(void)
+ {
+ 	sigset_t ss;
+ 	sigemptyset(&ss);
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 196f6d2..0620188 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -378,12 +378,12 @@ static void block_CHLD_HUP_ALRM(sigset_t *m)
+ 	sigaddset(m, SIGCHLD);
+ 	sigaddset(m, SIGHUP);
+ 	sigaddset(m, SIGALRM);
+-	sigprocmask(SIG_BLOCK, m, NULL);
++	sigprocmask(SIG_BLOCK, m, m); /* old sigmask is stored in m */
+ }
+ 
+-static void unblock_sigs(sigset_t *m)
++static void restore_sigmask(sigset_t *m)
+ {
+-	sigprocmask(SIG_UNBLOCK, m, NULL);
++	sigprocmask(SIG_SETMASK, m, NULL);
+ }
+ 
+ #if ENABLE_FEATURE_INETD_RPC
+@@ -870,7 +870,7 @@ static servtab_t *insert_in_servlist(servtab_t *cp)
+ 	block_CHLD_HUP_ALRM(&omask);
+ 	sep->se_next = serv_list;
+ 	serv_list = sep;
+-	unblock_sigs(&omask);
++	restore_sigmask(&omask);
+ 	return sep;
+ }
+ 
+@@ -941,7 +941,7 @@ static void reread_config_file(int sig ATTRIBUTE_UNUSED)
+ 			for (i = 0; i < MAXARGV; i++)
+ 				SWAP(char*, sep->se_argv[i], cp->se_argv[i]);
+ #undef SWAP
+-			unblock_sigs(&omask);
++			restore_sigmask(&omask);
+ 			free_servtab_strings(cp);
+ 		}
+  after_check:
+@@ -1052,7 +1052,7 @@ static void reread_config_file(int sig ATTRIBUTE_UNUSED)
+ 		free_servtab_strings(sep);
+ 		free(sep);
+ 	}
+-	unblock_sigs(&omask);
++	restore_sigmask(&omask);
+ }
+ 
+ static void reap_child(int sig ATTRIBUTE_UNUSED)
+@@ -1252,7 +1252,7 @@ int inetd_main(int argc, char **argv)
+ 							sep->se_fd = -1;
+ 							sep->se_count = 0;
+ 							rearm_alarm(); /* will revive it in RETRYTIME sec */
+-							unblock_sigs(&omask);
++							restore_sigmask(&omask);
+ 							maybe_close(accepted_fd);
+ 							continue; /* -> check next fd in fd set */
+ 						}
+@@ -1272,7 +1272,7 @@ int inetd_main(int argc, char **argv)
+ 				if (pid < 0) { /* fork error */
+ 					bb_perror_msg("fork");
+ 					sleep(1);
+-					unblock_sigs(&omask);
++					restore_sigmask(&omask);
+ 					maybe_close(accepted_fd);
+ 					continue; /* -> check next fd in fd set */
+ 				}
+@@ -1288,7 +1288,7 @@ int inetd_main(int argc, char **argv)
+ 					/* we passed listening socket to child,
+ 					 * will wait for child to terminate */
+ 				}
+-				unblock_sigs(&omask);
++				restore_sigmask(&omask);
+ 				maybe_close(accepted_fd);
+ 				continue; /* -> check next fd in fd set */
+ 			}
+@@ -1300,7 +1300,7 @@ int inetd_main(int argc, char **argv)
+ 					close(sep->se_fd); /* listening socket */
+ 					logmode = 0; /* make xwrite etc silent */
+ 				}
+-				unblock_sigs(&omask);
++				restore_sigmask(&omask);
+ 				if (sep->se_socktype == SOCK_STREAM)
+ 					sep->se_builtin->bi_stream_fn(ctrl, sep);
+ 				else
+@@ -1383,7 +1383,7 @@ int inetd_main(int argc, char **argv)
+ 			for (sep2 = serv_list; sep2; sep2 = sep2->se_next)
+ 				maybe_close(sep2->se_fd);
+ 			sigaction_set(SIGPIPE, &saved_pipe_handler);
+-			unblock_sigs(&omask);
++			restore_sigmask(&omask);
+ 			BB_EXECVP(sep->se_program, sep->se_argv);
+ 			bb_perror_msg("exec %s", sep->se_program);
+  do_exit1:
+diff --git a/shell/ash.c b/shell/ash.c
+index 6f675ce..0699091 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -273,13 +273,11 @@ static void
+ raise_interrupt(void)
+ {
+ 	int i;
+-	sigset_t mask;
+ 
+ 	intpending = 0;
+ 	/* Signal is not automatically unmasked after it is raised,
+ 	 * do it ourself - unmask all signals */
+-	sigemptyset(&mask);
+-	sigprocmask(SIG_SETMASK, &mask, NULL);
++	sigprocmask_allsigs(SIG_UNBLOCK);
+ 	/* pendingsig = 0; - now done in onsig() */
+ 
+ 	i = EXSIG;
+diff --git a/shell/hush.c b/shell/hush.c
+index baa2db7..c61607d 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -788,11 +788,8 @@ static void handler_ctrl_z(int sig)
+ static void sigexit(int sig) ATTRIBUTE_NORETURN;
+ static void sigexit(int sig)
+ {
+-	sigset_t block_all;
+-
+ 	/* Disable all signals: job control, SIGPIPE, etc. */
+-	sigfillset(&block_all);
+-	sigprocmask(SIG_SETMASK, &block_all, NULL);
++	sigprocmask_allsigs(SIG_BLOCK);
+ 
+ 	if (interactive_fd)
+ 		tcsetpgrp(interactive_fd, saved_tty_pgrp);

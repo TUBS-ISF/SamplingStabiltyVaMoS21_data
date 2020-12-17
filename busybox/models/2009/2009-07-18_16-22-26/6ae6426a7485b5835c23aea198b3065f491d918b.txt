@@ -1,0 +1,380 @@
+2009-07-18 16:22:26 +0200
+diff --git a/coreutils/df.c b/coreutils/df.c
+index d95aff3..4bbfe94 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -119,7 +119,7 @@ int df_main(int argc, char **argv)
+ 			mount_point = *argv++;
+ 			if (!mount_point)
+ 				break;
+-			mount_entry = find_mount_point(mount_point);
++			mount_entry = find_mount_point(mount_point, 1);
+ 			if (!mount_entry) {
+ 				bb_error_msg("%s: can't find mount point", mount_point);
+  set_error:
+diff --git a/include/libbb.h b/include/libbb.h
+index 936d98a..c7b4de1 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -995,7 +995,7 @@ extern void run_applet_no_and_exit(int a, char **argv) NORETURN FAST_FUNC;
+ 
+ #ifdef HAVE_MNTENT_H
+ extern int match_fstype(const struct mntent *mt, const char *fstypes) FAST_FUNC;
+-extern struct mntent *find_mount_point(const char *name) FAST_FUNC;
++extern struct mntent *find_mount_point(const char *name, int subdir_too) FAST_FUNC;
+ #endif
+ extern void erase_mtab(const char * name) FAST_FUNC;
+ extern unsigned int tty_baud_to_value(speed_t speed) FAST_FUNC;
+diff --git a/libbb/find_mount_point.c b/libbb/find_mount_point.c
+index 12b2cfc..bcb18ef 100644
+--- a/libbb/find_mount_point.c
++++ b/libbb/find_mount_point.c
+@@ -17,27 +17,29 @@
+  * Given any other file (or directory), find the mount table entry for its
+  * filesystem.
+  */
+-struct mntent* FAST_FUNC find_mount_point(const char *name)
++struct mntent* FAST_FUNC find_mount_point(const char *name, int subdir_too)
+ {
+ 	struct stat s;
+-	dev_t mountDevice;
+-	FILE *mountTable;
++	FILE *mtab_fp;
+ 	struct mntent *mountEntry;
++	dev_t devno_of_name;
++	bool block_dev;
+ 
+ 	if (stat(name, &s) != 0)
+ 		return NULL;
+ 
+-	if (S_ISBLK(s.st_mode))
+-		mountDevice = s.st_rdev;
+-	else
+-		mountDevice = s.st_dev;
+-
++	devno_of_name = s.st_dev;
++	block_dev = 0;
++	if (S_ISBLK(s.st_mode)) {
++		devno_of_name = s.st_rdev;
++		block_dev = 1;
++	}
+ 
+-	mountTable = setmntent(bb_path_mtab_file, "r");
+-	if (!mountTable)
+-		return 0;
++	mtab_fp = setmntent(bb_path_mtab_file, "r");
++	if (!mtab_fp)
++		return NULL;
+ 
+-	while ((mountEntry = getmntent(mountTable)) != NULL) {
++	while ((mountEntry = getmntent(mtab_fp)) != NULL) {
+ 		/* rootfs mount in Linux 2.6 exists always,
+ 		 * and it makes sense to always ignore it.
+ 		 * Otherwise people can't reference their "real" root! */
+@@ -49,13 +51,18 @@ struct mntent* FAST_FUNC find_mount_point(const char *name)
+ 		) { /* String match. */
+ 			break;
+ 		}
+-		/* Match the device. */
+-		if (stat(mountEntry->mnt_fsname, &s) == 0 && s.st_rdev == mountDevice)
++
++		if (!(subdir_too || block_dev))
++			continue;
++
++		/* Is device's dev_t == name's dev_t? */
++		if (stat(mountEntry->mnt_fsname, &s) == 0 && s.st_rdev == devno_of_name)
+ 			break;
+ 		/* Match the directory's mount point. */
+-		if (stat(mountEntry->mnt_dir, &s) == 0 && s.st_dev == mountDevice)
++		if (stat(mountEntry->mnt_dir, &s) == 0 && s.st_dev == devno_of_name)
+ 			break;
+ 	}
+-	endmntent(mountTable);
++	endmntent(mtab_fp);
++
+ 	return mountEntry;
+ }
+diff --git a/testsuite/README b/testsuite/README
+index 3c52254..03ac377 100644
+--- a/testsuite/README
++++ b/testsuite/README
+@@ -27,6 +27,8 @@ For busybox built against uclibc, /etc/TZ does not exist or does not match
+ host system timezone setting. For glibc based host systems, timezona settings
+ are in /etc/localtime.
+ 
++LANG and LC_xxx environment variables set to non-C locale.
++
+ 
+ For the entire testsuite, the copyright is as follows:
+ 
+diff --git a/testsuite/cpio.tests b/testsuite/cpio.tests
+index 576180f..fa0b65a 100755
+--- a/testsuite/cpio.tests
++++ b/testsuite/cpio.tests
+@@ -41,6 +41,7 @@ ls -ln cpio.testdir | $FILTER_LS" \
+ " \
+ 	"" ""
+ 
++test x"$SKIP_KNOWN_BUGS" = x"" && {
+ # Currently fails. Numerous buglets: "1 blocks" versus "1 block",
+ # "1 block" must go to stderr, does not list cpio.testdir/x and cpio.testdir/y
+ testing "cpio lists hardlinks" \
+@@ -53,6 +54,7 @@ cpio.testdir/y
+ 0
+ " \
+ 	"" ""
++}
+ 
+ # More complex case
+ rm -rf cpio.testdir cpio.testdir2 2>/dev/null
+diff --git a/testsuite/mount.tests b/testsuite/mount.tests
+index 5374ecb..c8381a0 100755
+--- a/testsuite/mount.tests
++++ b/testsuite/mount.tests
+@@ -1,5 +1,4 @@
+ #!/bin/sh
+-
+ # Copyright 2007 by Denys Vlasenko <vda.linux@googlemail.com>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+@@ -10,8 +9,8 @@ test "`id -u`" = 0 || {
+ 	exit 0
+ }
+ 
+-dd if=/dev/zero of=mount.image1m count=1 bs=1M 2>/dev/null || exit 1
+-mkfs.minix -v mount.image1m >/dev/null 2>&1 || exit 1
++dd if=/dev/zero of=mount.image1m count=1 bs=1M 2>/dev/null || { echo "dd error"; exit 1; }
++mkfs.minix -v mount.image1m >/dev/null 2>&1 || { echo "mkfs.minix error"; exit 1; }
+ testdir=$PWD/testdir
+ mkdir $testdir 2>/dev/null
+ umount -d $testdir 2>/dev/null
+diff --git a/testsuite/od.tests b/testsuite/od.tests
+index 69c2995..f136bb5 100755
+--- a/testsuite/od.tests
++++ b/testsuite/od.tests
+@@ -10,7 +10,7 @@ testing "od -b" \
+ 	"od -b" \
+ "\
+ 0000000 110 105 114 114 117
+-0000006
++0000005
+ " \
+ 	"" "HELLO"
+ 
+diff --git a/testsuite/runtest b/testsuite/runtest
+index 5560f7b..2428f6c 100755
+--- a/testsuite/runtest
++++ b/testsuite/runtest
+@@ -1,20 +1,8 @@
+ #!/bin/sh
+-
+ # Usage:
+ # runtest [applet1] [applet2...]
+ 
+-# Helper for helpers. Oh my...
+-test x"$ECHO" != x"" || {
+-	ECHO="echo"
+-	test x"`echo -ne`" = x"" || {
+-		# Compile and use a replacement 'echo' which understands -e -n
+-		ECHO="$PWD/echo-ne"
+-		test -x "$ECHO" || {
+-			gcc -Os -o "$ECHO" ../scripts/echo.c || exit 1
+-		}
+-	}
+-	export ECHO
+-}
++. testing.sh
+ 
+ # Run one old-style test.
+ # Tests are stored in applet/testcase shell scripts.
+diff --git a/testsuite/sed.tests b/testsuite/sed.tests
+index 677303b..a9d9ada 100755
+--- a/testsuite/sed.tests
++++ b/testsuite/sed.tests
+@@ -51,8 +51,10 @@ testing "sed -n" "sed -n -e s/foo/bar/ -e s/bar/baz/" "" "" "foo\n"
+ testing "sed s//p" "sed -e s/foo/bar/p -e s/bar/baz/p" "bar\nbaz\nbaz\n" \
+ 	"" "foo\n"
+ testing "sed -n s//p" "sed -ne s/abc/def/p" "def\n" "" "abc\n"
++test x"$SKIP_KNOWN_BUGS" = x"" && {
+ testing "sed s//g (exhaustive)" "sed -e 's/[[:space:]]*/,/g'" ",1,2,3,4,5,\n" \
+ 	"" "12345\n"
++}
+ testing "sed s arbitrary delimiter" "sed -e 's woo boing '" "boing\n" "" "woo\n"
+ testing "sed s chains" "sed -e s/foo/bar/ -e s/bar/baz/" "baz\n" "" "foo\n"
+ testing "sed s chains2" "sed -e s/foo/bar/ -e s/baz/nee/" "bar\n" "" "foo\n"
+@@ -72,6 +74,7 @@ testing "sed t (test/branch clears test bit)" "sed -e 's/a/b/;:loop;t loop'" \
+ testing "sed T (!test/branch)" "sed -e 's/a/1/;T notone;p;: notone;p'" \
+ 	"1\n1\n1\nb\nb\nc\nc\n" "" "a\nb\nc\n"
+ 
++test x"$SKIP_KNOWN_BUGS" = x"" && {
+ # Normal sed end-of-script doesn't print "c" because n flushed the pattern
+ # space.  If n hits EOF, pattern space is empty when script ends.
+ # Query: how does this interact with no newline at EOF?
+@@ -80,6 +83,7 @@ testing "sed n (flushes pattern space, terminates early)" "sed -e 'n;p'" \
+ # N does _not_ flush pattern space, therefore c is still in there @ script end.
+ testing "sed N (doesn't flush pattern space when terminating)" "sed -e 'N;p'" \
+ 	"a\nb\na\nb\nc\n" "" "a\nb\nc\n"
++}
+ testing "sed address match newline" 'sed "/b/N;/b\\nc/i woo"' \
+ 	"a\nwoo\nb\nc\nd\n" "" "a\nb\nc\nd\n"
+ 
+@@ -99,13 +103,17 @@ testing "sed d ends script iteration (2)" \
+ 	"sed -e '/ook/d;a\' -e 'bang'" "woot\nbang\n" "" "ook\nwoot\n"
+ 
+ # Multiple files, with varying newlines and NUL bytes
++test x"$SKIP_KNOWN_BUGS" = x"" && {
+ testing "sed embedded NUL" "sed -e 's/woo/bang/'" "\0bang\0woo\0" "" \
+ 	"\0woo\0woo\0"
++}
+ testing "sed embedded NUL g" "sed -e 's/woo/bang/g'" "bang\0bang\0" "" \
+ 	"woo\0woo\0"
++test x"$SKIP_KNOWN_BUGS" = x"" && {
+ echo -e "/woo/a he\0llo" > sed.commands
+ testing "sed NUL in command" "sed -f sed.commands" "woo\nhe\0llo\n" "" "woo"
+ rm sed.commands
++}
+ 
+ # sed has funky behavior with newlines at the end of file.  Test lots of
+ # corner cases with the optional newline appending behavior.
+@@ -120,8 +128,10 @@ testing "sed empty file plus cat" "sed -e 's/nohit//' input -" "one\ntwo" \
+ 	"" "one\ntwo"
+ testing "sed cat plus empty file" "sed -e 's/nohit//' input -" "one\ntwo" \
+ 	"one\ntwo" ""
++test x"$SKIP_KNOWN_BUGS" = x"" && {
+ testing "sed append autoinserts newline" "sed -e '/woot/a woo' -" \
+ 	"woot\nwoo\n" "" "woot"
++}
+ testing "sed insert doesn't autoinsert newline" "sed -e '/woot/i woo' -" \
+ 	"woo\nwoot" "" "woot"
+ testing "sed print autoinsert newlines" "sed -e 'p' -" "one\none" "" "one"
+@@ -137,9 +147,11 @@ testing "sed selective matches insert newline" \
+ testing "sed selective matches noinsert newline" \
+ 	"sed -ne 's/woo/bang/p' input -" "a bang\nb bang" "a woo\nb woo" \
+ 	"c no\nd no"
++test x"$SKIP_KNOWN_BUGS" = x"" && {
+ testing "sed clusternewline" \
+ 	"sed -e '/one/a 111' -e '/two/i 222' -e p input -" \
+ 	"one\none\n111\n222\ntwo\ntwo" "one" "two"
++}
+ testing "sed subst+write" \
+ 	"sed -e 's/i/z/' -e 'woutputw' input -; echo -n X; cat outputw" \
+ 	"thzngy\nagaznXthzngy\nagazn" "thingy" "again"
+@@ -175,8 +187,12 @@ testing "sed lie-to-autoconf" "sed --version | grep -o 'GNU sed version '" \
+ 	"GNU sed version \n" "" ""
+ 
+ # Jump to nonexistent label
+-testing "sed nonexistent label" "sed -e 'b walrus' 2> /dev/null || echo yes" \
++test x"$SKIP_KNOWN_BUGS" = x"" && {
++# Incompatibility: illegal jump is not detected if input is ""
++# (that is, no lines at all). GNU sed 4.1.5 complains even in this case
++testing "sed nonexistent label" "sed -e 'b walrus' 2>/dev/null || echo yes" \
+ 	"yes\n" "" ""
++}
+ 
+ testing "sed backref from empty s uses range regex" \
+ 	"sed -e '/woot/s//eep \0 eep/'" "eep woot eep" "" "woot"
+diff --git a/testsuite/sort.tests b/testsuite/sort.tests
+index f700dc0..627ca51 100755
+--- a/testsuite/sort.tests
++++ b/testsuite/sort.tests
+@@ -45,8 +45,8 @@ egg	1	2	papyrus
+ 999	3	0	algebra
+ " "$data" ""
+ 
+-# Busybox is definitely doing this one wrong just now.  FIXME
+-
++test x"$SKIP_KNOWN_BUGS" = x"" && {
++# Busybox is definitely doing these wrong.  FIXME
+ testing "sort key range with numeric option and global reverse" \
+ "sort -k2,3n -r input" \
+ "egg	1	2	papyrus
+@@ -56,8 +56,6 @@ testing "sort key range with numeric option and global reverse" \
+ 7	3	42	soup
+ " "$data" ""
+ 
+-#
+-
+ testing "sort key range with multiple options" "sort -k2,3rn input" \
+ "7	3	42	soup
+ 999	3	0	algebra
+@@ -65,6 +63,7 @@ testing "sort key range with multiple options" "sort -k2,3rn input" \
+ 42	1	3	woot
+ egg	1	2	papyrus
+ " "$data" ""
++}
+ 
+ testing "sort key range with two -k options" "sort -k 2,2n -k 1,1r input" "\
+ d 2
+diff --git a/testsuite/testing.sh b/testsuite/testing.sh
+index a57c4d6..22c640f 100755
+--- a/testsuite/testing.sh
++++ b/testsuite/testing.sh
+@@ -36,6 +36,20 @@
+ export FAILCOUNT=0
+ export SKIP=
+ 
++# Helper for helpers. Oh my...
++
++test x"$ECHO" != x"" || {
++	ECHO="echo"
++	test x"`echo -ne`" = x"" || {
++		# Compile and use a replacement 'echo' which understands -e -n
++		ECHO="$PWD/echo-ne"
++		test -x "$ECHO" || {
++			gcc -Os -o "$ECHO" ../scripts/echo.c || exit 1
++		}
++	}
++	export ECHO
++}
++
+ # Helper functions
+ 
+ optional()
+@@ -73,7 +87,7 @@ testing()
+ 
+   $ECHO -ne "$3" > expected
+   $ECHO -ne "$4" > input
+-  [ -z "$VERBOSE" ] || echo "echo '$5' | $2"
++  [ -z "$VERBOSE" ] || echo "echo -ne '$5' | $2"
+   $ECHO -ne "$5" | eval "$2" > actual
+   RETVAL=$?
+ 
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index ca0b17e..5d1d2af 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -374,7 +374,7 @@ static int ask(const char *string, int def)
+  */
+ static void check_mount(void)
+ {
+-	if (find_mount_point(device_name)) {
++	if (find_mount_point(device_name, 0)) {
+ 		int cont;
+ #if ENABLE_FEATURE_MTAB_SUPPORT
+ 		/*
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 18512a3..cf75761 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -682,7 +682,7 @@ int mkfs_minix_main(int argc UNUSED_PARAM, char **argv)
+ 		G.total_blocks = 65535;
+ 
+ 	/* Check if it is mounted */
+-	if (find_mount_point(G.device_name))
++	if (find_mount_point(G.device_name, 0))
+ 		bb_error_msg_and_die("can't format mounted filesystem");
+ 
+ 	xmove_fd(xopen(G.device_name, O_RDWR), dev_fd);
+diff --git a/util-linux/mkfs_vfat.c b/util-linux/mkfs_vfat.c
+index dff10f9..bdd4dd8 100644
+--- a/util-linux/mkfs_vfat.c
++++ b/util-linux/mkfs_vfat.c
+@@ -279,7 +279,7 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 		)
+ 			bb_error_msg_and_die("will not try to make filesystem on full-disk device (use -I if wanted)");
+ 		// can't work on mounted filesystems
+-		if (find_mount_point(device_name))
++		if (find_mount_point(device_name, 0))
+ 			bb_error_msg_and_die("can't format mounted filesystem");
+ #endif
+ 		// get true sector size

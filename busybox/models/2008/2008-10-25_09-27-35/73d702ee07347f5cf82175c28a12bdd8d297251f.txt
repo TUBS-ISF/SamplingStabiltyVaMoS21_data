@@ -1,0 +1,14 @@
+2008-10-25 09:27:35 +0000
+diff --git a/archival/tar.c b/archival/tar.c
+index 503db5f..deb5c89 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -818,7 +818,7 @@ int tar_main(int argc UNUSED_PARAM, char **argv)
+ 	                     | ARCHIVE_PRESERVE_DATE
+ 	                     | ARCHIVE_EXTRACT_UNCONDITIONAL;
+ 
+-	/* Apparently only root's tar preserves parms (see bug 3844) */
++	/* Apparently only root's tar preserves perms (see bug 3844) */
+ 	if (getuid() != 0)
+ 		tar_handle->ah_flags |= ARCHIVE_NOPRESERVE_PERM;
+ 

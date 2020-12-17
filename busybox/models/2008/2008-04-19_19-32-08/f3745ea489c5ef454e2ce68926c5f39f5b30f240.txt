@@ -1,0 +1,97 @@
+2008-04-19 19:32:08 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 1c54a32..f9f28f9 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -556,7 +556,10 @@ extern char *reads(int fd, char *buf, size_t count);
+ extern char *xmalloc_reads(int fd, char *pfx, size_t *maxsz_p);
+ extern ssize_t read_close(int fd, void *buf, size_t maxsz);
+ extern ssize_t open_read_close(const char *filename, void *buf, size_t maxsz);
++/* Returns NULL if file can't be opened */
+ extern void *xmalloc_open_read_close(const char *filename, size_t *maxsz_p);
++/* Never returns NULL */
++extern void *xmalloc_xopen_read_close(const char *filename, size_t *maxsz_p);
+ 
+ extern ssize_t safe_write(int fd, const void *buf, size_t count);
+ // NB: will return short write on error, not -1,
+@@ -568,9 +571,9 @@ extern void xwrite(int fd, const void *buf, size_t count);
+ extern void xprint_and_close_file(FILE *file);
+ /* Reads up to (and including) TERMINATING_STRING: */
+ extern char *xmalloc_fgets_str(FILE *file, const char *terminating_string);
+-/* Chops off TERMINATING_STRING: from the end: */
++/* Chops off TERMINATING_STRING from the end: */
+ extern char *xmalloc_fgetline_str(FILE *file, const char *terminating_string);
+-/* Reads up to (and including) "\n" or NUL byte */
++/* Reads up to (and including) "\n" or NUL byte: */
+ extern char *xmalloc_fgets(FILE *file);
+ /* Chops off '\n' from the end, unlike fgets: */
+ extern char *xmalloc_fgetline(FILE *file);
+diff --git a/libbb/read.c b/libbb/read.c
+index 1d31fb0..ba366cb 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -212,7 +212,9 @@ void *xmalloc_open_read_close(const char *filename, size_t *sizep)
+ 	int fd;
+ 	off_t len;
+ 
+-	fd = xopen(filename, O_RDONLY);
++	fd = open(filename, O_RDONLY);
++	if (fd < 0)
++		return NULL;
+ 	/* /proc/N/stat files report len 0 here */
+ 	/* In order to make such files readable, we add small const */
+ 	len = xlseek(fd, 0, SEEK_END) | 0x3ff; /* + up to 1k */
+@@ -229,3 +231,11 @@ void *xmalloc_open_read_close(const char *filename, size_t *sizep)
+ 		*sizep = size;
+ 	return buf;
+ }
++
++void *xmalloc_xopen_read_close(const char *filename, size_t *sizep)
++{
++	void *buf = xmalloc_open_read_close(filename, sizep);
++	if (!buf)
++		bb_perror_msg_and_die("can't read '%s'", filename);
++	return buf;
++}
+diff --git a/miscutils/chat.c b/miscutils/chat.c
+index 64d4ba4..5bbbb68 100644
+--- a/miscutils/chat.c
++++ b/miscutils/chat.c
+@@ -363,7 +363,7 @@ int chat_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				if ('@' == *buf) {
+ 					// skip the @ and any following white-space
+ 					trim(++buf);
+-					buf = loaded = xmalloc_open_read_close(buf, NULL);
++					buf = loaded = xmalloc_xopen_read_close(buf, NULL);
+ 				}
+ 
+ 				// expand escape sequences in command
+diff --git a/printutils/lpd.c b/printutils/lpd.c
+index 9533244..11920d2 100644
+--- a/printutils/lpd.c
++++ b/printutils/lpd.c
+@@ -160,7 +160,7 @@ int lpd_main(int argc ATTRIBUTE_UNUSED, char *argv[])
+ 			// (we exit 127 if helper cannot be executed)
+ 			var[1] = '\0';
+ 			// read and delete ctrlfile
+-			q = xmalloc_open_read_close(filenames[0], NULL);
++			q = xmalloc_xopen_read_close(filenames[0], NULL);
+ 			unlink(filenames[0]);
+ 			// provide datafile name
+ 			// we can use leaky setenv since we are about to exec or exit
+diff --git a/util-linux/readprofile.c b/util-linux/readprofile.c
+index e25d07d..cac5fa4 100644
+--- a/util-linux/readprofile.c
++++ b/util-linux/readprofile.c
+@@ -109,9 +109,9 @@ int readprofile_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	 * Use an fd for the profiling buffer, to skip stdio overhead
+ 	 */
+ 	len = MAXINT(ssize_t);
+-	buf = xmalloc_open_read_close(proFile, &len);
++	buf = xmalloc_xopen_read_close(proFile, &len);
+ 	if (!optNative) {
+-		int entries = len/sizeof(*buf);
++		int entries = len / sizeof(*buf);
+ 		int big = 0, small = 0, i;
+ 		unsigned *p;
+ 

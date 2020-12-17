@@ -1,0 +1,315 @@
+2009-07-08 02:58:38 +0200
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index 5506fdb..e02fe7c 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -68,10 +68,6 @@
+ # define CSWTCH _POSIX_VDISABLE
+ #endif
+ 
+-#ifndef IUCLC
+-# define IUCLC 0
+-#endif
+-
+ /* SunOS 5.3 loses (^Z doesn't work) if 'swtch' is the same as 'susp'.
+    So the default is to disable 'swtch.'  */
+ #if defined(__sparc__) && defined(__svr4__)
+diff --git a/include/platform.h b/include/platform.h
+index 99e747f..7c88d1b 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -342,49 +342,5 @@ static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+ 
+ #endif
+ 
+-#if defined(__linux__)
+-# include <sys/mount.h>
+-/* Make sure we have all the new mount flags we actually try to use. */
+-# ifndef MS_BIND
+-#  define MS_BIND        (1 << 12)
+-# endif
+-# ifndef MS_MOVE
+-#  define MS_MOVE        (1 << 13)
+-# endif
+-# ifndef MS_RECURSIVE
+-#  define MS_RECURSIVE   (1 << 14)
+-# endif
+-# ifndef MS_SILENT
+-#  define MS_SILENT      (1 << 15)
+-# endif
+-/* The shared subtree stuff, which went in around 2.6.15. */
+-# ifndef MS_UNBINDABLE
+-#  define MS_UNBINDABLE  (1 << 17)
+-# endif
+-# ifndef MS_PRIVATE
+-#  define MS_PRIVATE     (1 << 18)
+-# endif
+-# ifndef MS_SLAVE
+-#  define MS_SLAVE       (1 << 19)
+-# endif
+-# ifndef MS_SHARED
+-#  define MS_SHARED      (1 << 20)
+-# endif
+-# ifndef MS_RELATIME
+-#  define MS_RELATIME    (1 << 21)
+-# endif
+-
+-# if !defined(BLKSSZGET)
+-#  define BLKSSZGET _IO(0x12, 104)
+-# endif
+-# if !defined(BLKGETSIZE64)
+-#  define BLKGETSIZE64 _IOR(0x12,114,size_t)
+-# endif
+-#endif
+-
+-/* The field domainname of struct utsname is Linux specific. */
+-#if !defined(__linux__)
+-# define HAVE_NO_UTSNAME_DOMAINNAME
+-#endif
+ 
+ #endif
+diff --git a/libbb/login.c b/libbb/login.c
+index 98e641c..ba9f4d2 100644
+--- a/libbb/login.c
++++ b/libbb/login.c
+@@ -62,7 +62,8 @@ void FAST_FUNC print_login_issue(const char *issue_file, const char *tty)
+ 			case 'm':
+ 				outbuf = uts.machine;
+ 				break;
+-#ifndef HAVE_NO_UTSNAME_DOMAINNAME
++/* The field domainname of struct utsname is Linux specific. */
++#if defined(__linux__)
+ 			case 'D':
+ 			case 'o':
+ 				outbuf = uts.domainname;
+diff --git a/miscutils/eject.c b/miscutils/eject.c
+index 94a36c0..75618be 100644
+--- a/miscutils/eject.c
++++ b/miscutils/eject.c
+@@ -13,7 +13,11 @@
+  * Most of the dirty work blatantly ripped off from cat.c =)
+  */
+ 
++#include <sys/mount.h>
+ #include "libbb.h"
++/* Must be after libbb.h: they need size_t */
++#include <scsi/sg.h>
++#include <scsi/scsi.h>
+ 
+ /* various defines swiped from linux/cdrom.h */
+ #define CDROMCLOSETRAY            0x5319  /* pendant of CDROMEJECT  */
+@@ -27,9 +31,6 @@
+ /* Code taken from the original eject (http://eject.sourceforge.net/),
+  * refactored it a bit for busybox (ne-bb@nicoerfurth.de) */
+ 
+-#include <scsi/sg.h>
+-#include <scsi/scsi.h>
+-
+ static void eject_scsi(const char *dev)
+ {
+ 	static const char sg_commands[3][6] = {
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index e8a4838..362b212 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -11,8 +11,9 @@
+  * hdparm.c - Command line interface to get/set hard disk parameters
+  *          - by Mark Lord (C) 1994-2002 -- freely distributable
+  */
+-#include "libbb.h"
+ #include <linux/hdreg.h>
++#include <sys/mount.h>
++#include "libbb.h"
+ 
+ /* device types */
+ /* ------------ */
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 514b5d7..4416408 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -12,6 +12,10 @@
+ #define _LARGEFILE64_SOURCE
+ #endif
+ #include <assert.h>             /* assert */
++#include <sys/mount.h>
++#if !defined(BLKSSZGET)
++# define BLKSSZGET _IO(0x12, 104)
++#endif
+ #include "libbb.h"
+ 
+ /* Looks like someone forgot to add this to config system */
+diff --git a/util-linux/freeramdisk.c b/util-linux/freeramdisk.c
+index bde6afc..6b9d95e 100644
+--- a/util-linux/freeramdisk.c
++++ b/util-linux/freeramdisk.c
+@@ -8,7 +8,7 @@
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+-
++#include <sys/mount.h>
+ #include "libbb.h"
+ 
+ /* From <linux/fd.h> */
+diff --git a/util-linux/mkfs_vfat.c b/util-linux/mkfs_vfat.c
+index 8c6078d..8d12bab 100644
+--- a/util-linux/mkfs_vfat.c
++++ b/util-linux/mkfs_vfat.c
+@@ -7,12 +7,15 @@
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+-#include "libbb.h"
+-#include "volume_id/volume_id_internal.h"
+-
+ #include <linux/hdreg.h> /* HDIO_GETGEO */
+ #include <linux/fd.h>    /* FDGETPRM */
++#include <sys/mount.h>   /* BLKSSZGET */
++#if !defined(BLKSSZGET)
++# define BLKSSZGET _IO(0x12, 104)
++#endif
+ //#include <linux/msdos_fs.h>
++#include "libbb.h"
++#include "volume_id/volume_id_internal.h"
+ 
+ #define SECTOR_SIZE             512
+ 
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 72dabd8..56c32e1 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -8,7 +8,6 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+ // Design notes: There is no spec for mount.  Remind me to write one.
+ //
+ // mount_main() calls singlemount() which calls mount_it_now().
+@@ -17,9 +16,37 @@
+ // singlemount() can loop through /etc/filesystems for fstype detection.
+ // mount_it_now() does the actual mount.
+ //
+-
+ #include <mntent.h>
+ #include <syslog.h>
++#include <sys/mount.h>
++#ifndef MS_BIND
++# define MS_BIND        (1 << 12)
++#endif
++#ifndef MS_MOVE
++# define MS_MOVE        (1 << 13)
++#endif
++#ifndef MS_RECURSIVE
++# define MS_RECURSIVE   (1 << 14)
++#endif
++#ifndef MS_SILENT
++# define MS_SILENT      (1 << 15)
++#endif
++/* The shared subtree stuff, which went in around 2.6.15. */
++#ifndef MS_UNBINDABLE
++# define MS_UNBINDABLE  (1 << 17)
++#endif
++#ifndef MS_PRIVATE
++# define MS_PRIVATE     (1 << 18)
++#endif
++#ifndef MS_SLAVE
++# define MS_SLAVE       (1 << 19)
++#endif
++#ifndef MS_SHARED
++# define MS_SHARED      (1 << 20)
++#endif
++#ifndef MS_RELATIME
++# define MS_RELATIME    (1 << 21)
++#endif
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_MOUNT_LABEL
+diff --git a/util-linux/switch_root.c b/util-linux/switch_root.c
+index 0f00b60..ff05518 100644
+--- a/util-linux/switch_root.c
++++ b/util-linux/switch_root.c
+@@ -5,18 +5,16 @@
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+-#include "libbb.h"
+ #include <sys/vfs.h>
+-
++#include <sys/mount.h>
++#include "libbb.h"
+ // Make up for header deficiencies
+ #ifndef RAMFS_MAGIC
+ # define RAMFS_MAGIC ((unsigned)0x858458f6)
+ #endif
+-
+ #ifndef TMPFS_MAGIC
+ # define TMPFS_MAGIC ((unsigned)0x01021994)
+ #endif
+-
+ #ifndef MS_MOVE
+ # define MS_MOVE     8192
+ #endif
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index 5b22bfa..a4b2bd0 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -7,8 +7,37 @@
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+-
+ #include <mntent.h>
++#include <sys/mount.h>
++/* Make sure we have all the new mount flags we actually try to use. */
++#ifndef MS_BIND
++# define MS_BIND        (1 << 12)
++#endif
++#ifndef MS_MOVE
++# define MS_MOVE        (1 << 13)
++#endif
++#ifndef MS_RECURSIVE
++# define MS_RECURSIVE   (1 << 14)
++#endif
++#ifndef MS_SILENT
++# define MS_SILENT      (1 << 15)
++#endif
++/* The shared subtree stuff, which went in around 2.6.15. */
++#ifndef MS_UNBINDABLE
++# define MS_UNBINDABLE  (1 << 17)
++#endif
++#ifndef MS_PRIVATE
++# define MS_PRIVATE     (1 << 18)
++#endif
++#ifndef MS_SLAVE
++# define MS_SLAVE       (1 << 19)
++#endif
++#ifndef MS_SHARED
++# define MS_SHARED      (1 << 20)
++#endif
++#ifndef MS_RELATIME
++# define MS_RELATIME    (1 << 21)
++#endif
+ #include "libbb.h"
+ 
+ #if defined(__dietlibc__)
+diff --git a/util-linux/volume_id/get_devname.c b/util-linux/volume_id/get_devname.c
+index a1786df..0686a07 100644
+--- a/util-linux/volume_id/get_devname.c
++++ b/util-linux/volume_id/get_devname.c
+@@ -7,11 +7,12 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
++#include <sys/mount.h> /* BLKGETSIZE64 */
++#if !defined(BLKGETSIZE64)
++# define BLKGETSIZE64 _IOR(0x12,114,size_t)
++#endif
+ #include "volume_id_internal.h"
+ 
+-//#define BLKGETSIZE64 _IOR(0x12,114,size_t)
+-
+ static struct uuidCache_s {
+ 	struct uuidCache_s *next;
+ //	int major, minor;

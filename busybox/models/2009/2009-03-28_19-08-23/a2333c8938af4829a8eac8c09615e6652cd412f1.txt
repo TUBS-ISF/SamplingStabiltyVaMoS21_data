@@ -1,0 +1,85 @@
+2009-03-28 19:08:23 +0000
+diff --git a/libbb/sha1.c b/libbb/sha1.c
+index a074359..9fa095e 100644
+--- a/libbb/sha1.c
++++ b/libbb/sha1.c
+@@ -196,12 +196,11 @@ static void FAST_FUNC sha256_process_block64(sha256_ctx_t *ctx)
+ 
+ 	/* The actual computation according to FIPS 180-2:6.2.2 step 3.  */
+ 	for (t = 0; t < 64; ++t) {
+-		/* Need to fetch upper half of sha_K[t] */
+-#if BB_BIG_ENDIAN
+-		uint32_t K_t = ((uint32_t*)(sha_K + t))[0];
+-#else
+-		uint32_t K_t = ((uint32_t*)(sha_K + t))[1];
+-#endif
++		/* Need to fetch upper half of sha_K[t]
++		 * (I hope compiler is clever enough to just fetch
++		 * upper half)
++		 */
++		uint32_t K_t = sha_K[t] >> 32;
+ 		uint32_t T1 = h + S1(e) + Ch(e, f, g) + K_t + W[t];
+ 		uint32_t T2 = S0(a) + Maj(a, b, c);
+ 		h = g;
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index 17b5088..b94bb3a 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -89,7 +89,9 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ 	struct passwd pw;
+ 	const char *usegroup = NULL;
+ 	FILE *file;
++#if ENABLE_FEATURE_SHADOWPASSWDS
+ 	int fd;
++#endif
+ 
+ #if ENABLE_FEATURE_ADDUSER_LONG_OPTIONS
+ 	applet_long_options = adduser_longopts;
+diff --git a/scripts/randomtest b/scripts/randomtest
+index d9d3959..7b80f4a 100755
+--- a/scripts/randomtest
++++ b/scripts/randomtest
+@@ -90,7 +90,7 @@ mv .config.new .config
+ # Regenerate .config with default answers for yanked-off options
+ { yes "" | make oldconfig >/dev/null; } || exit 1
+ 
+-nice -n 10 make
++nice -n 10 make 2>&1 | tee -a make.log
+ 
+ test -x busybox && {
+     cd ..
+@@ -99,5 +99,5 @@ test -x busybox && {
+ }
+ 
+ cd ..
+-mv "$dir" failed."$dir"
++mv "$dir" "failed.$dir"
+ exit 1
+diff --git a/util-linux/mkfs_vfat.c b/util-linux/mkfs_vfat.c
+index 705c75c..72c2058 100644
+--- a/util-linux/mkfs_vfat.c
++++ b/util-linux/mkfs_vfat.c
+@@ -323,9 +323,20 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 			 * fs size <=  16G: 8k clusters
+ 			 * fs size >   16G: 16k clusters
+ 			 */
+-			sect_per_clust = volume_size_bytes >= ((off_t)16)*1024*1024*1024 ? 32 :
+-					volume_size_bytes >= ((off_t)8)*1024*1024*1024 ? 16 :
+-					volume_size_bytes >=        260*1024*1024 ? 8 : 1;
++			sect_per_clust = 1;
++			if (volume_size_bytes >= 260*1024*1024) {
++				sect_per_clust = 8;
++				/* fight gcc: */
++				/* "error: integer overflow in expression" */
++				/* "error: right shift count >= width of type" */
++				if (sizeof(off_t) > 4) {
++					unsigned t = (volume_size_bytes >> 31 >> 1);
++					if (t >= 8/4)
++						sect_per_clust = 16;
++					if (t >= 16/4)
++						sect_per_clust = 32;
++				}
++			}
+ 		} else {
+ 			// floppy, loop, or regular file
+ 			int not_floppy = ioctl(dev, FDGETPRM, &param);

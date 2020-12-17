@@ -1,0 +1,14 @@
+2009-10-17 23:41:15 +0200
+diff --git a/include/usage.h b/include/usage.h
+index 0215fa5..b906d8d 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2735,7 +2735,7 @@
+ /*   "\n	-j		Create a journal (ext3)" */ \
+ /*   "\n	-J opts		Set journal options (size/device)" */ \
+ /*   "\n	-l file		Read bad blocks list from file" */ \
+-     "\n	-L LABEL	Set the volume label" \
++     "\n	-L LBL		Volume label" \
+      "\n	-m PERCENT	Percent of blocks to reserve for admin" \
+ /*   "\n	-M dir		Set last mounted directory" */ \
+ /*   "\n	-n		Don't actually create anything" */ \

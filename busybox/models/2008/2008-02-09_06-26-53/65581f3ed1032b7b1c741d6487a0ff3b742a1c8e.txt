@@ -1,0 +1,71 @@
+2008-02-09 06:26:53 +0000
+diff --git a/debianutils/mktemp.c b/debianutils/mktemp.c
+index 5772ad9..7ed6245 100644
+--- a/debianutils/mktemp.c
++++ b/debianutils/mktemp.c
+@@ -14,23 +14,29 @@
+ int mktemp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mktemp_main(int argc, char **argv)
+ {
+-	unsigned long flags = getopt32(argv, "dqt");
++	// -d      Make a directory instead of a file
++	// -q      Fail silently if an error occurs [bbox: ignored]
++	// -t      Generate a path rooted in temporary directory
++	// -p DIR  Use DIR as a temporary directory (implies -t)
++	const char *path;
+ 	char *chp;
++	unsigned flags;
+ 
+-	if (optind + 1 != argc)
+-		bb_show_usage();
+-
++	opt_complementary = "=1"; /* exactly one arg */
++	flags = getopt32(argv, "dqtp:", &path);
+ 	chp = argv[optind];
+ 
+-	if (flags & 4) {
+-		char *dir = getenv("TMPDIR");
++	if (flags & (4|8)) { /* -t and/or -p */
++		const char *dir = getenv("TMPDIR");
+ 		if (dir && *dir != '\0')
+-			chp = concat_path_file(dir, chp);
+-		else
+-			chp = concat_path_file("/tmp/", chp);
++			path = dir;
++		else if (!(flags & 8)) /* No -p */
++			path = "/tmp/";
++		/* else path comes from -p DIR */
++		chp = concat_path_file(path, chp);
+ 	}
+ 
+-	if (flags & 1) {
++	if (flags & 1) { /* -d */
+ 		if (mkdtemp(chp) == NULL)
+ 			return EXIT_FAILURE;
+ 	} else {
+diff --git a/include/usage.h b/include/usage.h
+index 77a8607..a65e249 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2339,13 +2339,19 @@ USE_FEATURE_BRCTL_FANCY("\n" \
+        "	block-count	Number of block to use (default is entire partition)"
+ 
+ #define mktemp_trivial_usage \
+-       "[-dq] TEMPLATE"
++       "[-dqt] [-p dir] TEMPLATE"
+ #define mktemp_full_usage \
+        "Create a temporary file with its name based on TEMPLATE.\n" \
+        "TEMPLATE is any name with six 'Xs' (i.e., /tmp/temp.XXXXXX)." \
+        "\n\nOptions:\n" \
+        "	-d	Make a directory instead of a file\n" \
+-       "	-q	Fail silently if an error occurs"
++       /* "	-q	Fail silently if an error occurs\n" - we ignore it */ \
++       "	-t	Generate a path rooted in temporary directory\n" \
++       "	-p DIR	Use DIR as a temporary directory (implies -t)\n" \
++       "\n" \
++       "For -t or -p, directory is chosen as follows:\n" \
++       "$TMPDIR if set, else -p DIR, else /tmp"
++
+ #define mktemp_example_usage \
+        "$ mktemp /tmp/temp.XXXXXX\n" \
+        "/tmp/temp.mWiLjM\n" \

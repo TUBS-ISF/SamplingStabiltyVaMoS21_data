@@ -1,0 +1,75 @@
+2007-11-25 03:15:24 +0000
+diff --git a/networking/udhcp/Config.in b/networking/udhcp/Config.in
+index 734db65..1aef69b 100644
+--- a/networking/udhcp/Config.in
++++ b/networking/udhcp/Config.in
+@@ -82,3 +82,25 @@ config FEATURE_RFC3397
+ 	help
+ 	  If selected, both client and server will support passing of domain
+ 	  search lists via option 119, specified in RFC3397.
++
++config UDHCPC_SLACK_FOR_BUGGY_SERVERS
++	int "DHCP options slack buffer size"
++	default 80
++	range 0 924
++	depends on APP_UDHCPD || APP_UDHCPC
++	help
++	  Some buggy DHCP servers will send DHCP offer packets with option
++	  field larger than we expect (which might also be considered a
++	  buffer overflow attempt). These packets are normally discarded.
++	  If circumstances beyond your control force you to support such
++	  servers, this may help. The upper limit (924) makes dhcpc accept
++	  even 1500 byte packets (maximum-sized ethernet packets).
++
++	  This options does not make dhcp[cd] emit non-standard
++	  sized packets.
++
++	  Known buggy DHCP servers:
++	  3Com OfficeConnect Remote 812 ADSL Router:
++	    seems to confuse maximum allowed UDP packet size with
++	    maximum size of entire IP packet, and sends packets which are
++	    28 bytes too large.
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 4f2d31c..eecb72c 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -21,6 +21,8 @@ extern const uint8_t MAC_BCAST_ADDR[6]; /* six all-ones */
+ #include <netinet/udp.h>
+ #include <netinet/ip.h>
+ 
++#define DHCP_OPTIONS_BUFSIZE 308
++
+ struct dhcpMessage {
+ 	uint8_t op;
+ 	uint8_t htype;
+@@ -37,7 +39,7 @@ struct dhcpMessage {
+ 	uint8_t sname[64];
+ 	uint8_t file[128];
+ 	uint32_t cookie;
+-	uint8_t options[308]; /* 312 - cookie */
++	uint8_t options[DHCP_OPTIONS_BUFSIZE + CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS];
+ } ATTRIBUTE_PACKED;
+ 
+ struct udp_dhcp_packet {
+@@ -49,7 +51,7 @@ struct udp_dhcp_packet {
+ /* Let's see whether compiler understood us right */
+ struct BUG_bad_sizeof_struct_udp_dhcp_packet {
+ 	char BUG_bad_sizeof_struct_udp_dhcp_packet
+-                [sizeof(struct udp_dhcp_packet) != 576 ? -1 : 1];
++		[(sizeof(struct udp_dhcp_packet) != 576 + CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS) ? -1 : 1];
+ };
+ 
+ void udhcp_init_header(struct dhcpMessage *packet, char type);
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index 2b4f164..6744e2a 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -145,7 +145,7 @@ int add_option_string(uint8_t *optionptr, uint8_t *string)
+ 	int end = end_option(optionptr);
+ 
+ 	/* end position + string length + option code/length + end option */
+-	if (end + string[OPT_LEN] + 2 + 1 >= 308) {
++	if (end + string[OPT_LEN] + 2 + 1 >= DHCP_OPTIONS_BUFSIZE) {
+ 		bb_error_msg("option 0x%02x did not fit into the packet",
+ 				string[OPT_CODE]);
+ 		return 0;

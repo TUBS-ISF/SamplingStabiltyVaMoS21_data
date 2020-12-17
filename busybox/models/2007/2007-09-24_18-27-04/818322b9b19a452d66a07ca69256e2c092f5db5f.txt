@@ -1,0 +1,313 @@
+2007-09-24 18:27:04 +0000
+diff --git a/applets/applets.c b/applets/applets.c
+index a1a399c..5b7b88a 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -601,7 +601,7 @@ static int busybox_main(char **argv)
+ 	}
+ 	/* We support "busybox /a/path/to/applet args..." too. Allows for
+ 	 * "#!/bin/busybox"-style wrappers */
+-	applet_name = bb_get_last_path_component(argv[0]);
++	applet_name = bb_get_last_path_component_nostrip(argv[0]);
+ 	run_applet_and_exit(applet_name, argv);
+ 	bb_error_msg_and_die("applet not found");
+ }
+diff --git a/coreutils/basename.c b/coreutils/basename.c
+index f59d7a8..ec1f85b 100644
+--- a/coreutils/basename.c
++++ b/coreutils/basename.c
+@@ -34,7 +34,8 @@ int basename_main(int argc, char **argv)
+ 		bb_show_usage();
+ 	}
+ 
+-	s = bb_get_last_path_component(*++argv);
++	/* It should strip slash: /abc/def/ -> def */
++	s = bb_get_last_path_component_strip(*++argv);
+ 
+ 	if (*++argv) {
+ 		n = strlen(*argv);
+diff --git a/coreutils/cp.c b/coreutils/cp.c
+index 76dc566..889e460 100644
+--- a/coreutils/cp.c
++++ b/coreutils/cp.c
+@@ -87,7 +87,7 @@ int cp_main(int argc, char **argv)
+ 	}
+ 
+ 	while (1) {
+-		dest = concat_path_file(last, bb_get_last_path_component(*argv));
++		dest = concat_path_file(last, bb_get_last_path_component_strip(*argv));
+  DO_COPY:
+ 		if (copy_file(*argv, dest, flags) < 0) {
+ 			status = 1;
+diff --git a/coreutils/ln.c b/coreutils/ln.c
+index a649903..f3c67aa 100644
+--- a/coreutils/ln.c
++++ b/coreutils/ln.c
+@@ -45,7 +45,7 @@ int ln_main(int argc, char **argv)
+ 
+ 	if (argc == optind + 1) {
+ 		*--argv = last;
+-		last = bb_get_last_path_component(xstrdup(last));
++		last = bb_get_last_path_component_strip(xstrdup(last));
+ 	}
+ 
+ 	do {
+@@ -57,7 +57,7 @@ int ln_main(int argc, char **argv)
+ 		                NULL)
+ 		) {
+ 			src_name = xstrdup(*argv);
+-			src = concat_path_file(src, bb_get_last_path_component(src_name));
++			src = concat_path_file(src, bb_get_last_path_component_strip(src_name));
+ 			free(src_name);
+ 			src_name = src;
+ 		}
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index 1d29770..d13f4d5 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -68,7 +68,7 @@ int mv_main(int argc, char **argv)
+ 	}
+ 
+ 	do {
+-		dest = concat_path_file(last, bb_get_last_path_component(*argv));
++		dest = concat_path_file(last, bb_get_last_path_component_strip(*argv));
+ 		dest_exists = cp_mv_stat(dest, &dest_stat);
+ 		if (dest_exists < 0) {
+ 			goto RET_1;
+diff --git a/coreutils/rm.c b/coreutils/rm.c
+index ba37762..a686fc4 100644
+--- a/coreutils/rm.c
++++ b/coreutils/rm.c
+@@ -38,7 +38,7 @@ int rm_main(int argc, char **argv)
+ 
+ 	if (*argv != NULL) {
+ 		do {
+-			const char *base = bb_get_last_path_component(*argv);
++			const char *base = bb_get_last_path_component_strip(*argv);
+ 
+ 			if (DOT_OR_DOTDOT(base)) {
+ 				bb_error_msg("cannot remove '.' or '..'");
+diff --git a/include/libbb.h b/include/libbb.h
+index e5f0351..25b2e44 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -236,9 +236,15 @@ extern void bb_copyfd_exact_size(int fd1, int fd2, off_t size);
+ /* this helper yells "short read!" if param is not -1 */
+ extern void complain_copyfd_and_die(off_t sz) ATTRIBUTE_NORETURN;
+ extern char bb_process_escape_sequence(const char **ptr);
+-/* TODO: sometimes modifies its parameter, which
+- * makes it rather inconvenient at times: */
+-extern char *bb_get_last_path_component(char *path);
++/* xxxx_strip version can modify its parameter:
++ * "/"        -> "/"
++ * "abc"      -> "abc"
++ * "abc/def"  -> "def"
++ * "abc/def/" -> "def" !!
++ */
++extern char *bb_get_last_path_component_strip(char *path);
++/* "abc/def/" -> "" and it never modifies 'path' */
++extern char *bb_get_last_path_component_nostrip(const char *path);
+ 
+ int ndelay_on(int fd);
+ int ndelay_off(int fd);
+diff --git a/init/init.c b/init/init.c
+index a196ab3..543ec2e 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -436,10 +436,11 @@ static pid_t run(const struct init_action *a)
+ 		++cmdpath;
+ 
+ 		/* find the last component in the command pathname */
+-		s = bb_get_last_path_component(cmdpath);
++		s = bb_get_last_path_component_nostrip(cmdpath);
+ 
+ 		/* make a new argv[0] */
+-		if ((cmd[0] = malloc(strlen(s) + 2)) == NULL) {
++		cmd[0] = malloc(strlen(s) + 2);
++		if (cmd[0] == NULL) {
+ 			message(L_LOG | L_CONSOLE, bb_msg_memory_exhausted);
+ 			cmd[0] = cmdpath;
+ 		} else {
+diff --git a/libbb/get_last_path_component.c b/libbb/get_last_path_component.c
+index b7bc0e6..0f60215 100644
+--- a/libbb/get_last_path_component.c
++++ b/libbb/get_last_path_component.c
+@@ -8,25 +8,35 @@
+  */
+ 
+ #include "libbb.h"
+-
+-char *bb_get_last_path_component(char *path)
++/*
++ * "/"        -> "/"
++ * "abc"      -> "abc"
++ * "abc/def"  -> "def"
++ * "abc/def/" -> ""
++ */
++char *bb_get_last_path_component_nostrip(const char *path)
+ {
+-	char *first = path;
+-	char *last;
++	char *slash = strrchr(path, '/');
++
++	if (!slash || (slash == path && !slash[1]))
++		return (char*)path;
+ 
+-	last = path - 1;
++	return slash + 1;
++}
+ 
+-	while (*path) {
+-		if ((*path != '/') && (path > ++last)) {
+-			last = first = path;
+-		}
+-		++path;
+-	}
++/*
++ * "/"        -> "/"
++ * "abc"      -> "abc"
++ * "abc/def"  -> "def"
++ * "abc/def/" -> "def" !!
++ */
++char *bb_get_last_path_component_strip(char *path)
++{
++	char *slash = last_char_is(path, '/');
+ 
+-	if (*first == '/') {
+-		last = first;
+-	}
+-	last[1] = '\0';
++	if (slash)
++		while (*slash == '/' && slash != path)
++			*slash-- = '\0';
+ 
+-	return first;
++	return bb_get_last_path_component_nostrip(path);
+ }
+diff --git a/libbb/run_shell.c b/libbb/run_shell.c
+index b2b4216..239887d 100644
+--- a/libbb/run_shell.c
++++ b/libbb/run_shell.c
+@@ -67,7 +67,7 @@ void run_shell(const char *shell, int loginshell, const char *command, const cha
+ 
+ 	args = xmalloc(sizeof(char*) * (4 + additional_args_cnt));
+ 
+-	args[0] = bb_get_last_path_component(xstrdup(shell));
++	args[0] = bb_get_last_path_component_nostrip(xstrdup(shell));
+ 
+ 	if (loginshell)
+ 		args[0] = xasprintf("-%s", args[0]);
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 5033672..0baf5d7 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -806,7 +806,7 @@ static int check_module_name_match(const char *filename, struct stat *statbuf,
+ 		return FALSE;
+ 	else {
+ 		char *tmp, *tmp1 = xstrdup(filename);
+-		tmp = bb_get_last_path_component(tmp1);
++		tmp = bb_get_last_path_component_nostrip(tmp1);
+ 		if (strcmp(tmp, fullname) == 0) {
+ 			free(tmp1);
+ 			/* Stop searching if we find a match */
+diff --git a/networking/wget.c b/networking/wget.c
+index 5feb539..86d6f00 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -12,11 +12,11 @@
+ struct host_info {
+ 	// May be used if we ever will want to free() all xstrdup()s...
+ 	/* char *allocated; */
+-	char    *path;
+-	char    *user;
+-	char    *host;
+-	int      port;
+-	smallint is_ftp;
++	const char *path;
++	const char *user;
++	char       *host;
++	int         port;
++	smallint    is_ftp;
+ };
+ 
+ 
+@@ -318,9 +318,7 @@ static void parse_url(char *src_url, struct host_info *h)
+ 	p = strchr(h->host, '?'); if (!sp || (p && sp > p)) sp = p;
+ 	p = strchr(h->host, '#'); if (!sp || (p && sp > p)) sp = p;
+ 	if (!sp) {
+-		/* must be writable because of bb_get_last_path_component() */
+-		static char nullstr[] ALIGN1 = "";
+-		h->path = nullstr;
++		h->path = "";
+ 	} else if (*sp == '/') {
+ 		*sp = '\0';
+ 		h->path = sp + 1;
+@@ -328,7 +326,7 @@ static void parse_url(char *src_url, struct host_info *h)
+ 		// http://busybox.net?login=john@doe is a valid URL
+ 		// memmove converts to:
+ 		// http:/busybox.nett?login=john@doe...
+-		memmove(h->host-1, h->host, sp - h->host);
++		memmove(h->host - 1, h->host, sp - h->host);
+ 		h->host--;
+ 		sp[-1] = '\0';
+ 		h->path = sp;
+@@ -497,31 +495,20 @@ int wget_main(int argc, char **argv)
+ 		}
+ 	}
+ 
+-	/* Guess an output filename */
++	/* Guess an output filename, if there was no -O FILE */
+ 	if (!fname_out) {
+-		// Dirty hack. Needed because bb_get_last_path_component
+-		// will destroy trailing / by storing '\0' in last byte!
+-		if (!last_char_is(target.path, '/')) {
+-			fname_out = bb_get_last_path_component(target.path);
+-#if ENABLE_FEATURE_WGET_STATUSBAR
+-			curfile = fname_out;
+-#endif
+-		}
+-		if (!fname_out || !fname_out[0]) {
+-			/* bb_get_last_path_component writes
+-			 * to last '/' only. We don't have one here... */
++		fname_out = bb_get_last_path_component_nostrip(target.path);
++		/* handle "wget http://kernel.org//" */
++		if (fname_out[0] == '/' || !fname_out[0])
+ 			fname_out = (char*)"index.html";
+-#if ENABLE_FEATURE_WGET_STATUSBAR
+-			curfile = fname_out;
+-#endif
+-		}
+-		if (dir_prefix != NULL)
++		/* -P DIR is considered only if there was no -O FILE */
++		if (dir_prefix)
+ 			fname_out = concat_path_file(dir_prefix, fname_out);
++	}
+ #if ENABLE_FEATURE_WGET_STATUSBAR
+-	} else {
+-		curfile = bb_get_last_path_component(fname_out);
++	curfile = bb_get_last_path_component_nostrip(fname_out);
+ #endif
+-	}
++
+ 	/* Impossible?
+ 	if ((opt & WGET_OPT_CONTINUE) && !fname_out)
+ 		bb_error_msg_and_die("cannot specify continue (-c) without a filename (-O)"); */
+diff --git a/shell/lash.c b/shell/lash.c
+index d4dba8e..889fe49 100644
+--- a/shell/lash.c
++++ b/shell/lash.c
+@@ -1141,12 +1141,11 @@ static int pseudo_exec(struct child_prog *child)
+ 		}
+ 	}
+ 
+-
+ 	/* Check if the command matches any busybox internal
+ 	 * commands ("applets") here.  Following discussions from
+ 	 * November 2000 on busybox@busybox.net, don't use
+-	 * bb_get_last_path_component().  This way explicit (with
+-	 * slashes) filenames will never be interpreted as an
++	 * bb_get_last_path_component_nostrip().  This way explicit
++	 * (with slashes) filenames will never be interpreted as an
+ 	 * applet, just like with builtins.  This way the user can
+ 	 * override an applet with an explicit filename reference.
+ 	 * The only downside to this change is that an explicit

@@ -1,0 +1,48 @@
+2009-04-20 10:52:31 +0000
+diff --git a/shell/hush_test/hush-bugs/env_and_func.right b/shell/hush_test/hush-bugs/env_and_func.right
+new file mode 100644
+index 0000000..4a15450
+--- /dev/null
++++ b/shell/hush_test/hush-bugs/env_and_func.right
+@@ -0,0 +1,2 @@
++var=val
++var=old
+diff --git a/shell/hush_test/hush-bugs/env_and_func.tests b/shell/hush_test/hush-bugs/env_and_func.tests
+new file mode 100755
+index 0000000..d62c1af
+--- /dev/null
++++ b/shell/hush_test/hush-bugs/env_and_func.tests
+@@ -0,0 +1,6 @@
++# UNFIXED BUG
++
++var=old
++f() { echo "var=$var"; }
++var=val f
++echo "var=$var"
+diff --git a/shell/hush_test/hush-misc/func_args1.right b/shell/hush_test/hush-misc/func_args1.right
+new file mode 100644
+index 0000000..2dfb962
+--- /dev/null
++++ b/shell/hush_test/hush-misc/func_args1.right
+@@ -0,0 +1,5 @@
++params: a b c
++'f 1 2 3' called
++params: a b c
++'f 1 2 3' called
++params: a b c
+diff --git a/shell/hush_test/hush-misc/func_args1.tests b/shell/hush_test/hush-misc/func_args1.tests
+new file mode 100755
+index 0000000..157921f
+--- /dev/null
++++ b/shell/hush_test/hush-misc/func_args1.tests
+@@ -0,0 +1,10 @@
++# UNFIXED BUG
++
++f() { echo "'f $1 $2 $3' called"; }
++
++set -- a b c
++echo "params: $1 $2 $3"
++f 1 2 3
++echo "params: $1 $2 $3"
++true | f 1 2 3
++echo "params: $1 $2 $3"

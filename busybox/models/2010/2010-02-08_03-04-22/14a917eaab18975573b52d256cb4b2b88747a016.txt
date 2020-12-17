@@ -1,0 +1,13 @@
+2010-02-08 03:04:22 +0100
+diff --git a/shell/hush.c b/shell/hush.c
+index 0a25967..0310b02 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -4109,6 +4109,7 @@ static NOINLINE int run_pipe(struct pipe *pi)
+ 			/* Assignments, but no command */
+ 			/* Ensure redirects take effect. Try "a=t >file" */
+ 			rcode = setup_redirects(command, squirrel);
++//FIXME: "false; q=`false`; echo $?" should print 1
+ 			restore_redirects(squirrel);
+ 			/* Set shell variables */
+ 			while (*argv) {

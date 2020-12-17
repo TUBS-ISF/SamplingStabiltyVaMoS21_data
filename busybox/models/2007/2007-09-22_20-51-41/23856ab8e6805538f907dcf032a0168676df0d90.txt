@@ -1,0 +1,56 @@
+2007-09-22 20:51:41 +0000
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 3dd2674..e6c6504 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -276,6 +276,12 @@ config FEATURE_MAKEDEVS_TABLE
+ 
+ endchoice
+ 
++config MICROCOM
++	bool "microcom"
++	default n
++	help
++	  The poor man's minicom utility for chatting with serial port devices.
++
+ config MOUNTPOINT
+ 	bool "mountpoint"
+ 	default n
+diff --git a/miscutils/Kbuild b/miscutils/Kbuild
+index b420d68..a9dc833 100644
+--- a/miscutils/Kbuild
++++ b/miscutils/Kbuild
+@@ -17,6 +17,7 @@ lib-$(CONFIG_HDPARM)      += hdparm.o
+ lib-$(CONFIG_LAST)        += last.o
+ lib-$(CONFIG_LESS)        += less.o
+ lib-$(CONFIG_MAKEDEVS)    += makedevs.o
++lib-$(CONFIG_MICROCOM)    += microcom.o
+ lib-$(CONFIG_MOUNTPOINT)  += mountpoint.o
+ lib-$(CONFIG_MT)          += mt.o
+ lib-$(CONFIG_RAIDAUTORUN) += raidautorun.o
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 7d8e948..107382f 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -305,12 +305,6 @@ config FEATURE_MDEV_LOAD_FIRMWARE
+ 	  /lib/firmware/ and if it exists, send it to the kernel for
+ 	  loading into the hardware.
+ 
+-config MICROCOM
+-	bool "microcom"
+-	default n
+-	help
+-	  The poor man's minicom utility for chatting with serial port devices.
+-
+ config MKSWAP
+ 	bool "mkswap"
+ 	default n
+diff --git a/util-linux/Kbuild b/util-linux/Kbuild
+index 8f3138a..cc1d0e0 100644
+--- a/util-linux/Kbuild
++++ b/util-linux/Kbuild
+@@ -30,4 +30,3 @@ lib-$(CONFIG_SETARCH)		+=setarch.o
+ lib-$(CONFIG_SWAPONOFF)		+=swaponoff.o
+ lib-$(CONFIG_SWITCH_ROOT)	+=switch_root.o
+ lib-$(CONFIG_UMOUNT)		+=umount.o
+-lib-$(CONFIG_MICROCOM)		+=microcom.o

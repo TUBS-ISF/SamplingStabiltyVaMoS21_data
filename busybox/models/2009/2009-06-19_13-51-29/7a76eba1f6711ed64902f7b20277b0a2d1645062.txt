@@ -1,0 +1,30 @@
+2009-06-19 13:51:29 +0200
+diff --git a/networking/udhcp/Config.in b/networking/udhcp/Config.in
+index a31240a..5f76dd8 100644
+--- a/networking/udhcp/Config.in
++++ b/networking/udhcp/Config.in
+@@ -75,9 +75,9 @@ config FEATURE_UDHCP_PORT
+ 	  This feature is typically not needed.
+ 
+ config UDHCP_DEBUG
+-	int "Maximum verbosity level for udhcp applets (0..3)"
++	int "Maximum verbosity level for udhcp applets (0..9)"
+ 	default 0
+-	range 0 3
++	range 0 9
+ 	depends on APP_UDHCPD || APP_UDHCPC || APP_DHCPRELAY
+ 	help
+ 	  Verbosity can be increased with multiple -v options.
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index d53c02d..4c72d7a 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -36,7 +36,7 @@ void FAST_FUNC udhcp_init_header(struct dhcp_packet *packet, char type)
+ 	add_simple_option(packet->options, DHCP_MESSAGE_TYPE, type);
+ }
+ 
+-#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 2
+ void FAST_FUNC udhcp_dump_packet(struct dhcp_packet *packet)
+ {
+ 	char buf[sizeof(packet->chaddr)*2 + 1];

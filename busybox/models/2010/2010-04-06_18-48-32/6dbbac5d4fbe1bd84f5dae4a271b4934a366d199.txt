@@ -1,0 +1,85 @@
+2010-04-06 18:48:32 +0200
+diff --git a/Config.in b/Config.in
+index bb7dd6d..323b96c 100644
+--- a/Config.in
++++ b/Config.in
+@@ -252,6 +252,26 @@ config FEATURE_CLEAN_UP
+ 	  Don't enable this unless you have a really good reason to clean
+ 	  things up manually.
+ 
++config FEATURE_UTMP
++	bool "Support utmp file"
++	default n
++	help
++	  The file /var/run/utmp is used to track who is currently logged in.
++	  With this option on, certain applets (getty, login, telnetd etc)
++	  will create and delete entries there.
++	  "who" apples requires this option.
++
++config FEATURE_WTMP
++	bool "Support wtmp file"
++	default n
++	select FEATURE_UTMP
++	help
++	  The file /var/run/wtmp is used to track when users have logged into
++	  and logged out of the system.
++	  With this option on, certain applets (getty, login, telnetd etc)
++	  will append new entries there.
++	  "last" apples requires this option.
++
+ config FEATURE_PIDFILE
+ 	bool "Support writing pidfiles"
+ 	default n
+diff --git a/coreutils/Config.in b/coreutils/Config.in
+index 297f465..ead632a 100644
+--- a/coreutils/Config.in
++++ b/coreutils/Config.in
+@@ -825,7 +825,7 @@ config FEATURE_WC_LARGE
+ config WHO
+ 	bool "who"
+ 	default n
+-	select FEATURE_UTMP
++	depends on FEATURE_UTMP
+ 	help
+ 	  who is used to show who is logged on.
+ 
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index f6c0e2e..a9b5f5a 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -181,22 +181,6 @@ config GETTY
+ 	help
+ 	  getty lets you log in on a tty, it is normally invoked by init.
+ 
+-config FEATURE_UTMP
+-	bool "Support utmp file"
+-	depends on GETTY || LOGIN || SU || WHO
+-	default n
+-	help
+-	  The file /var/run/utmp is used to track who is currently logged in.
+-
+-config FEATURE_WTMP
+-	bool "Support wtmp file"
+-	depends on GETTY || LOGIN || SU || LAST
+-	default n
+-	select FEATURE_UTMP
+-	help
+-	  The file /var/run/wtmp is used to track when user's have logged into
+-	  and logged out of the system.
+-
+ config LOGIN
+ 	bool "login"
+ 	default n
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index ebf98f9..0469b63 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -317,7 +317,7 @@ config INOTIFYD
+ config LAST
+ 	bool "last"
+ 	default n
+-	select FEATURE_WTMP
++	depends on FEATURE_WTMP
+ 	help
+ 	  'last' displays a list of the last users that logged into the system.
+ 

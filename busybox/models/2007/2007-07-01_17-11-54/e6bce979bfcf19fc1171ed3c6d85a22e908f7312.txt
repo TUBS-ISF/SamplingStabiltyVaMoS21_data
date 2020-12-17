@@ -1,0 +1,15 @@
+2007-07-01 17:11:54 +0000
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 6be3c0e..9dbd35d 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -214,7 +214,8 @@ int udhcpd_main(int argc, char **argv)
+ 					) {
+ 						sendNAK(&packet);
+ 					}
+-				} /* else remain silent */
++					/* else remain silent */
++				}
+ 
+ 			} else {
+ 				/* RENEWING or REBINDING State */

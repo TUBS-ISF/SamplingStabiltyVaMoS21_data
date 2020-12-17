@@ -1,0 +1,722 @@
+2008-12-07 00:52:58 +0000
+diff --git a/applets/usage.c b/applets/usage.c
+index a35817f..1e038b3 100644
+--- a/applets/usage.c
++++ b/applets/usage.c
+@@ -1,4 +1,9 @@
+ /* vi: set sw=4 ts=4: */
++/*
++ * Copyright (C) 2008 Denys Vlasenko.
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
+ #include <unistd.h>
+ 
+ /* Just #include "autoconf.h" doesn't work for builds in separate
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index 863c6ef..3364180 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -6,6 +6,8 @@
+  *
+  * Loads the console font, and possibly the corresponding screen map(s).
+  * (Adapted for busybox by Matej Vela.)
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ #include "libbb.h"
+ #include <sys/kd.h>
+diff --git a/coreutils/length.c b/coreutils/length.c
+index c7523a0..43a0f59 100644
+--- a/coreutils/length.c
++++ b/coreutils/length.c
+@@ -1,4 +1,7 @@
+ /* vi: set sw=4 ts=4: */
++/*
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
+ 
+ /* BB_AUDIT SUSv3 N/A -- Apparently a busybox (obsolete?) extension. */
+ 
+diff --git a/e2fsprogs/e2fs_lib.c b/e2fsprogs/e2fs_lib.c
+index 839109e..3e8d956 100644
+--- a/e2fsprogs/e2fs_lib.c
++++ b/e2fsprogs/e2fs_lib.c
+@@ -2,8 +2,7 @@
+ /*
+  * See README for additional information
+  *
+- * This file can be redistributed under the terms of the GNU Library General
+- * Public License
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index cb45456..3c6cafb 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -20,10 +20,7 @@
+  * Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
+  *      2001, 2002, 2003, 2004, 2005 by  Theodore Ts'o.
+  *
+- * %Begin-Header%
+- * This file may be redistributed under the terms of the GNU Public
+- * License.
+- * %End-Header%
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ /* All filesystem specific hooks have been removed.
+diff --git a/e2fsprogs/old_e2fsprogs/fsck.c b/e2fsprogs/old_e2fsprogs/fsck.c
+index cc27353..98e4e38 100644
+--- a/e2fsprogs/old_e2fsprogs/fsck.c
++++ b/e2fsprogs/old_e2fsprogs/fsck.c
+@@ -20,10 +20,7 @@
+  * Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
+  *      2001, 2002, 2003, 2004, 2005 by  Theodore Ts'o.
+  *
+- * %Begin-Header%
+- * This file may be redistributed under the terms of the GNU Public
+- * License.
+- * %End-Header%
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include <sys/types.h>
+diff --git a/e2fsprogs/old_e2fsprogs/mke2fs.c b/e2fsprogs/old_e2fsprogs/mke2fs.c
+index 6ffad35..a132743 100644
+--- a/e2fsprogs/old_e2fsprogs/mke2fs.c
++++ b/e2fsprogs/old_e2fsprogs/mke2fs.c
+@@ -5,8 +5,7 @@
+  * Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+  *	2003, 2004, 2005 by Theodore Ts'o.
+  *
+- * This file may be redistributed under the terms of the GNU Public
+- * License.
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ /* Usage: mke2fs [options] device
+diff --git a/e2fsprogs/old_e2fsprogs/tune2fs.c b/e2fsprogs/old_e2fsprogs/tune2fs.c
+index b7a1b21..1d39ed1 100644
+--- a/e2fsprogs/old_e2fsprogs/tune2fs.c
++++ b/e2fsprogs/old_e2fsprogs/tune2fs.c
+@@ -8,10 +8,7 @@
+  *
+  * Copyright 1995, 1996, 1997, 1998, 1999, 2000 by Theodore Ts'o.
+  *
+- * %Begin-Header%
+- * This file may be redistributed under the terms of the GNU Public
+- * License.
+- * %End-Header%
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ /*
+diff --git a/e2fsprogs/old_e2fsprogs/util.c b/e2fsprogs/old_e2fsprogs/util.c
+index ce49db9..7ab6591 100644
+--- a/e2fsprogs/old_e2fsprogs/util.c
++++ b/e2fsprogs/old_e2fsprogs/util.c
+@@ -4,10 +4,7 @@
+  *
+  * Copyright 1995, 1996, 1997, 1998, 1999, 2000 by Theodore Ts'o.
+  *
+- * %Begin-Header%
+- * This file may be redistributed under the terms of the GNU Public
+- * License.
+- * %End-Header%
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include <stdio.h>
+diff --git a/libbb/crc32.c b/libbb/crc32.c
+index 42079b9..36ac860 100644
+--- a/libbb/crc32.c
++++ b/libbb/crc32.c
+@@ -12,6 +12,8 @@
+  *
+  * endian = 1: big-endian
+  * endian = 0: little-endian
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/libbb/create_icmp6_socket.c b/libbb/create_icmp6_socket.c
+index 2065517..91e478e 100644
+--- a/libbb/create_icmp6_socket.c
++++ b/libbb/create_icmp6_socket.c
+@@ -4,6 +4,8 @@
+  *
+  * create raw socket for icmp (IPv6 version) protocol
+  * and drop root privileges if running setuid
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/libbb/create_icmp_socket.c b/libbb/create_icmp_socket.c
+index 1fa016a..d75f845 100644
+--- a/libbb/create_icmp_socket.c
++++ b/libbb/create_icmp_socket.c
+@@ -4,6 +4,8 @@
+  *
+  * create raw socket for icmp protocol
+  * and drop root privileges if running setuid
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/libbb/crypt_make_salt.c b/libbb/crypt_make_salt.c
+index 393eba5..14bb0dd 100644
+--- a/libbb/crypt_make_salt.c
++++ b/libbb/crypt_make_salt.c
+@@ -6,6 +6,7 @@
+  *
+  * Lifted from loginutils/passwd.c by Thomas Lundquist <thomasez@zelow.no>
+  *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/libbb/human_readable.c b/libbb/human_readable.c
+index 61c8567..05e7d86 100644
+--- a/libbb/human_readable.c
++++ b/libbb/human_readable.c
+@@ -24,6 +24,8 @@
+  *
+  *      Some code to omit the decimal point and tenths digit is sketched out
+  *      and "#if 0"'d below.
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/libbb/inet_common.c b/libbb/inet_common.c
+index 966a021..fa4d867 100644
+--- a/libbb/inet_common.c
++++ b/libbb/inet_common.c
+@@ -5,7 +5,7 @@
+  *
+  * Heavily modified by Manuel Novoa III       Mar 12, 2001
+  *
+- *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/libbb/rtc.c b/libbb/rtc.c
+index 222d977..51834f8 100644
+--- a/libbb/rtc.c
++++ b/libbb/rtc.c
+@@ -1,5 +1,7 @@
+ /*
+  * Common RTC functions
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/libbb/selinux_common.c b/libbb/selinux_common.c
+index 5fdbe9d..275a761 100644
+--- a/libbb/selinux_common.c
++++ b/libbb/selinux_common.c
+@@ -3,6 +3,8 @@
+  *   -- common SELinux utility functions
+  *
+  * Copyright 2007 KaiGai Kohei <kaigai@kaigai.gr.jp>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ #include "libbb.h"
+ #include <selinux/context.h>
+diff --git a/libbb/update_passwd.c b/libbb/update_passwd.c
+index 88bc28c..565dd37 100644
+--- a/libbb/update_passwd.c
++++ b/libbb/update_passwd.c
+@@ -7,6 +7,8 @@
+  * /etc/shadow) for a given user and password.
+  *
+  * Moved from loginutils/passwd.c by Alexander Shishkin <virtuoso@slind.org>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/libbb/xatonum_template.c b/libbb/xatonum_template.c
+index 2360ae8..5e0bb59 100644
+--- a/libbb/xatonum_template.c
++++ b/libbb/xatonum_template.c
+@@ -1,4 +1,8 @@
+ /*
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
++/*
+ You need to define the following (example):
+ 
+ #define type long
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index d48c503..5be8324 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -4,6 +4,7 @@
+  *
+  * Connect to host at port using address resolution from getaddrinfo
+  *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include <netinet/in.h>
+diff --git a/libbb/xgetcwd.c b/libbb/xgetcwd.c
+index eefe1d6..10febe3 100644
+--- a/libbb/xgetcwd.c
++++ b/libbb/xgetcwd.c
+@@ -5,7 +5,9 @@
+  * Written by David MacKenzie <djm@gnu.ai.mit.edu>.
+  *
+  * Special function for busybox written by Vladimir Oleynik <dzo@simtreas.ru>
+-*/
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
+ 
+ #include "libbb.h"
+ 
+diff --git a/libbb/xreadlink.c b/libbb/xreadlink.c
+index 2cfc575..6bff4be 100644
+--- a/libbb/xreadlink.c
++++ b/libbb/xreadlink.c
+@@ -1,7 +1,9 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+- *  xreadlink.c - safe implementation of readlink.
+- *  Returns a NULL on failure...
++ * xreadlink.c - safe implementation of readlink.
++ * Returns a NULL on failure...
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index 4eec02b..47212e1 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -6,6 +6,8 @@
+  *
+  * Cooked from passwd.c by Thomas Lundquist <thomasez@zelow.no>
+  * mkpasswd compatible options added by Bernhard Reutner-Fischer
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/networking/udhcp/arpping.c b/networking/udhcp/arpping.c
+index e0710dc..b10bff6 100644
+--- a/networking/udhcp/arpping.c
++++ b/networking/udhcp/arpping.c
+@@ -4,6 +4,8 @@
+  *
+  * Mostly stolen from: dhcpcd - DHCP client daemon
+  * by Yoichi Hariguchi <yoichi@fore.com>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include <netinet/if_ether.h>
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 0b97d76..4f7b520 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -2,6 +2,8 @@
+ /*
+  * files.c -- DHCP server file manipulation *
+  * Rewrite by Russ Dill <Russ.Dill@asu.edu> July 2001
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include <netinet/ether.h>
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index ff52da9..a981db0 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -2,6 +2,8 @@
+ /*
+  * leases.c -- tools to manage DHCP leases
+  * Russ Dill <Russ.Dill@asu.edu> July 2001
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "common.h"
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index 6bf99e2..2c27e70 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -2,6 +2,8 @@
+ /*
+  * options.c -- DHCP server option packet tools
+  * Rewrite by Russ Dill <Russ.Dill@asu.edu> July 2001
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "common.h"
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index 1a6f7e6..e2c8e6e 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -1,4 +1,10 @@
+ /* vi: set sw=4 ts=4: */
++/*
++ * packet.c -- packet ops
++ * Rewrite by Russ Dill <Russ.Dill@asu.edu> July 2001
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
+ 
+ #include <netinet/in.h>
+ #if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined _NEWLIB_VERSION
+diff --git a/networking/udhcp/static_leases.c b/networking/udhcp/static_leases.c
+index 43f1c98..7540f7f 100644
+--- a/networking/udhcp/static_leases.c
++++ b/networking/udhcp/static_leases.c
+@@ -5,6 +5,7 @@
+  *
+  * Wade Berrier <wberrier@myrealbox.com> September 2004
+  *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "common.h"
+diff --git a/networking/wget.c b/networking/wget.c
+index 3f80d61..b40a1ac 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -4,6 +4,7 @@
+  *
+  * Chip Rosenthal Covad Communications <chip@laserlink.net>
+  *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/procps/fuser.c b/procps/fuser.c
+index d2ac9eb..7297bfe 100644
+--- a/procps/fuser.c
++++ b/procps/fuser.c
+@@ -4,8 +4,7 @@
+  *
+  * Copyright 2004 Tony J. White
+  *
+- * May be distributed under the conditions of the
+- * GNU Library General Public License
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/procps/top.c b/procps/top.c
+index c8a9539..8c58b90 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -4,7 +4,7 @@
+  *
+  * This is written specifically for the linux /proc/<PID>/stat(m)
+  * files format.
+-
++ *
+  * This reads the PIDs of all processes and their status and shows
+  * the status of processes (first ones that fit to screen) at given
+  * intervals.
+@@ -22,16 +22,13 @@
+  * - CPU where Process was last seen running
+  *   (to see effect of sched_setaffinity() etc)
+  * - CPU Time Split (idle/IO/wait etc) PER CPU
+- */
+-
+-/* Original code Copyrights */
+-/*
++ *
+  * Copyright (c) 1992 Branko Lankester
+  * Copyright (c) 1992 Roger Binns
+  * Copyright (C) 1994-1996 Charles L. Blake.
+  * Copyright (C) 1992-1998 Michael K. Johnson
+- * May be distributed under the conditions of the
+- * GNU Library General Public License
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/selinux/chcon.c b/selinux/chcon.c
+index 80a030f..55c2522 100644
+--- a/selinux/chcon.c
++++ b/selinux/chcon.c
+@@ -4,6 +4,8 @@
+  * Port to busybox: KaiGai Kohei <kaigai@kaigai.gr.jp>
+  *
+  * Copyright (C) 2006 - 2007 KaiGai Kohei <kaigai@kaigai.gr.jp>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ #include <getopt.h>
+ #include <selinux/context.h>
+diff --git a/selinux/getenforce.c b/selinux/getenforce.c
+index 21075cf..3d3eef1 100644
+--- a/selinux/getenforce.c
++++ b/selinux/getenforce.c
+@@ -4,6 +4,7 @@
+  * Based on libselinux 1.33.1
+  * Port to BusyBox  Hiroshi Shinji <shiroshi@my.email.ne.jp>
+  *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/selinux/getsebool.c b/selinux/getsebool.c
+index ea080d4..b761b72 100644
+--- a/selinux/getsebool.c
++++ b/selinux/getsebool.c
+@@ -4,6 +4,7 @@
+  * Based on libselinux 1.33.1
+  * Port to BusyBox  Hiroshi Shinji <shiroshi@my.email.ne.jp>
+  *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/selinux/load_policy.c b/selinux/load_policy.c
+index b7a5c6e..4bc873e 100644
+--- a/selinux/load_policy.c
++++ b/selinux/load_policy.c
+@@ -1,6 +1,8 @@
+ /*
+  * load_policy
+  * Author: Yuichi Nakamura <ynakam@hitachisoft.jp>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ #include "libbb.h"
+ 
+diff --git a/selinux/matchpathcon.c b/selinux/matchpathcon.c
+index 5cfd52a..1532429 100644
+--- a/selinux/matchpathcon.c
++++ b/selinux/matchpathcon.c
+@@ -3,6 +3,7 @@
+  *                  based on libselinux-1.32
+  * Port to busybox: KaiGai Kohei <kaigai@kaigai.gr.jp>
+  *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ #include "libbb.h"
+ 
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index a9471ef..e94ff14 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -25,6 +25,8 @@
+  *
+  * Port to busybox: KaiGai Kohei <kaigai@kaigai.gr.jp>
+  *                  - based on coreutils-5.97 (in Fedora Core 6)
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ #include <getopt.h>
+ #include <selinux/context.h>
+diff --git a/selinux/selinuxenabled.c b/selinux/selinuxenabled.c
+index ea233d8..1cf93c3 100644
+--- a/selinux/selinuxenabled.c
++++ b/selinux/selinuxenabled.c
+@@ -4,6 +4,7 @@
+  * Based on libselinux 1.33.1
+  * Port to BusyBox  Hiroshi Shinji <shiroshi@my.email.ne.jp>
+  *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ #include "libbb.h"
+ 
+diff --git a/selinux/sestatus.c b/selinux/sestatus.c
+index eca557e..2166296 100644
+--- a/selinux/sestatus.c
++++ b/selinux/sestatus.c
+@@ -4,6 +4,8 @@
+  * Ported to busybox: KaiGai Kohei <kaigai@ak.jp.nec.com>
+  *
+  * Copyright (C) KaiGai Kohei <kaigai@ak.jp.nec.com>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/selinux/setenforce.c b/selinux/setenforce.c
+index 198324c..a2d0428 100644
+--- a/selinux/setenforce.c
++++ b/selinux/setenforce.c
+@@ -4,6 +4,7 @@
+  * Based on libselinux 1.33.1
+  * Port to BusyBox  Hiroshi Shinji <shiroshi@my.email.ne.jp>
+  *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/selinux/setsebool.c b/selinux/setsebool.c
+index 83e70e2..b615ce7 100644
+--- a/selinux/setsebool.c
++++ b/selinux/setsebool.c
+@@ -4,6 +4,8 @@
+  * NOTE: -P option requires libsemanage, so this feature is
+  * omitted in this version
+  * Yuichi Nakamura <ynakam@hitachisoft.jp>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/util-linux/fdformat.c b/util-linux/fdformat.c
+index 094d620..3831ab4 100644
+--- a/util-linux/fdformat.c
++++ b/util-linux/fdformat.c
+@@ -1,7 +1,8 @@
+ /* vi: set sw=4 ts=4: */
+-/* fdformat.c  -  Low-level formats a floppy disk - Werner Almesberger */
+-
+-/* 5 July 2003 -- modified for Busybox by Erik Andersen
++/* fdformat.c  -  Low-level formats a floppy disk - Werner Almesberger
++ * 5 July 2003 -- modified for Busybox by Erik Andersen
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ #include "libbb.h"
+diff --git a/util-linux/fdisk_aix.c b/util-linux/fdisk_aix.c
+index 83be8a8..2c0d2a6 100644
+--- a/util-linux/fdisk_aix.c
++++ b/util-linux/fdisk_aix.c
+@@ -1,8 +1,8 @@
+ #if ENABLE_FEATURE_AIX_LABEL
+ /*
+  * Copyright (C) Andreas Neuper, Sep 1998.
+- *      This file may be redistributed under
+- *      the terms of the GNU Public License.
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ typedef struct {
+diff --git a/util-linux/fdisk_osf.c b/util-linux/fdisk_osf.c
+index c50ee9b..ea5cd3c 100644
+--- a/util-linux/fdisk_osf.c
++++ b/util-linux/fdisk_osf.c
+@@ -1,4 +1,3 @@
+-#if ENABLE_FEATURE_OSF_LABEL
+ /*
+  * Copyright (c) 1987, 1988 Regents of the University of California.
+  * All rights reserved.
+@@ -32,6 +31,7 @@
+  * SUCH DAMAGE.
+  */
+ 
++#if ENABLE_FEATURE_OSF_LABEL
+ 
+ #ifndef BSD_DISKMAGIC
+ #define BSD_DISKMAGIC     ((uint32_t) 0x82564557)
+diff --git a/util-linux/fdisk_sgi.c b/util-linux/fdisk_sgi.c
+index 5a86a68..51cf30c 100644
+--- a/util-linux/fdisk_sgi.c
++++ b/util-linux/fdisk_sgi.c
+@@ -1,13 +1,13 @@
+-#if ENABLE_FEATURE_SGI_LABEL
+-
+-#define SGI_DEBUG 0
+-
+ /*
+  * Copyright (C) Andreas Neuper, Sep 1998.
+- *      This file may be modified and redistributed under
+- *      the terms of the GNU Public License.
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
++#if ENABLE_FEATURE_SGI_LABEL
++
++#define SGI_DEBUG 0
++
+ #define SGI_VOLHDR      0x00
+ /* 1 and 2 were used for drive types no longer supported by SGI */
+ #define SGI_SWAP        0x03
+diff --git a/util-linux/fdisk_sun.c b/util-linux/fdisk_sun.c
+index d1a436b..9cdf869 100644
+--- a/util-linux/fdisk_sun.c
++++ b/util-linux/fdisk_sun.c
+@@ -1,3 +1,17 @@
++/*
++ * fdisk_sun.c
++ *
++ * I think this is mostly, or entirely, due to
++ *      Jakub Jelinek (jj@sunsite.mff.cuni.cz), July 1996
++ *
++ * Merged with fdisk for other architectures, aeb, June 1998.
++ *
++ * Sat Mar 20 EST 1999 Arnaldo Carvalho de Melo <acme@conectiva.com.br>
++ *      Internationalization
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
++
+ #if ENABLE_FEATURE_SUN_LABEL
+ 
+ #define SUNOS_SWAP 3
+@@ -13,19 +27,6 @@
+ 
+ #define SCSI_IOCTL_GET_IDLUN 0x5382
+ 
+-/*
+- * fdisksunlabel.c
+- *
+- * I think this is mostly, or entirely, due to
+- *      Jakub Jelinek (jj@sunsite.mff.cuni.cz), July 1996
+- *
+- * Merged with fdisk for other architectures, aeb, June 1998.
+- *
+- * Sat Mar 20 EST 1999 Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+- *      Internationalization
+- */
+-
+-
+ static int sun_other_endian;
+ static int scsi_disk;
+ static int floppy;
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 3f7fb4b..2666132 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -2,8 +2,9 @@
+ /*
+  * mkfs.c - make a linux (minix) file-system.
+  *
+- * (C) 1991 Linus Torvalds. This file may be redistributed as per
+- * the Linux copyright.
++ * (C) 1991 Linus Torvalds.
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
+ /*
+diff --git a/util-linux/rtcwake.c b/util-linux/rtcwake.c
+index a9766ca..6c399c7 100644
+--- a/util-linux/rtcwake.c
++++ b/util-linux/rtcwake.c
+@@ -3,6 +3,8 @@
+  *
+  * This version was taken from util-linux and scrubbed down for busybox.
+  *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ *
+  * This uses cross-platform Linux interfaces to enter a system sleep state,
+  * and leave it no later than a specified time.  It uses any RTC framework
+  * driver that supports standard driver model wakeup flags.

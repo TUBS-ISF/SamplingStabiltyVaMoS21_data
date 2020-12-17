@@ -1,0 +1,13 @@
+2010-03-30 16:20:34 +0200
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 7caccef..219512b 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -1739,7 +1739,6 @@ int dpkg_main(int argc UNUSED_PARAM, char **argv)
+ 	//if (opt & OPT_unpack) ... // -u (--unpack in official dpkg)
+ 	if (!(opt & OPTMASK_cmd) /* no cmd */
+ 	 || ((opt & OPTMASK_cmd) & ((opt & OPTMASK_cmd)-1)) /* more than one cmd */
+-	 || (!(opt & OPT_list_installed) && !argv[0]) /* - all except -l require argument */
+ 	) {
+ 		bb_show_usage();
+ 	}

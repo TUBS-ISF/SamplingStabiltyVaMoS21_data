@@ -1,0 +1,108 @@
+2008-02-15 07:19:03 +0000
+diff --git a/include/rtc_.h b/include/rtc_.h
+index 50b60dd..df359da 100644
+--- a/include/rtc_.h
++++ b/include/rtc_.h
+@@ -10,7 +10,7 @@
+ #include "libbb.h"
+ 
+ extern int rtc_adjtime_is_utc(void);
+-extern int rtc_xopen(const char *default_rtc, int flags);
++extern int rtc_xopen(const char **default_rtc, int flags);
+ extern time_t rtc_read_time(int fd, int utc);
+ 
+ 
+diff --git a/libbb/rtc.c b/libbb/rtc.c
+index 4cbf322..78f10c6 100644
+--- a/libbb/rtc.c
++++ b/libbb/rtc.c
+@@ -40,21 +40,23 @@ int rtc_adjtime_is_utc(void)
+ 	return utc;
+ }
+ 
+-int rtc_xopen(const char *default_rtc, int flags)
++int rtc_xopen(const char **default_rtc, int flags)
+ {
+ 	int rtc;
+ 
+-	if (!default_rtc) {
+-		rtc = open("/dev/rtc", flags);
++	if (!*default_rtc) {
++		*default_rtc = "/dev/rtc";
++		rtc = open(*default_rtc, flags);
+ 		if (rtc >= 0)
+ 			return rtc;
+-		rtc = open("/dev/rtc0", flags);
++		*default_rtc = "/dev/rtc0";
++		rtc = open(*default_rtc, flags);
+ 		if (rtc >= 0)
+ 			return rtc;
+-		default_rtc = "/dev/misc/rtc";
++		*default_rtc = "/dev/misc/rtc";
+ 	}
+ 
+-	return xopen(default_rtc, flags);
++	return xopen(*default_rtc, flags);
+ }
+ 
+ time_t rtc_read_time(int fd, int utc)
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index b581d26..f226535 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -25,7 +25,7 @@ static time_t read_rtc(int utc)
+ 	time_t ret;
+ 	int fd;
+ 
+-	fd = rtc_xopen(rtcname, O_RDONLY);
++	fd = rtc_xopen(&rtcname, O_RDONLY);
+ 	ret = rtc_read_time(fd, utc);
+ 	close(fd);
+ 
+@@ -35,7 +35,7 @@ static time_t read_rtc(int utc)
+ static void write_rtc(time_t t, int utc)
+ {
+ 	struct tm tm;
+-	int rtc = rtc_xopen(rtcname, O_WRONLY);
++	int rtc = rtc_xopen(&rtcname, O_WRONLY);
+ 
+ 	tm = *(utc ? gmtime(&t) : localtime(&t));
+ 	tm.tm_isdst = 0;
+diff --git a/util-linux/rtcwake.c b/util-linux/rtcwake.c
+index c7d5a4c..2b1ab1f 100644
+--- a/util-linux/rtcwake.c
++++ b/util-linux/rtcwake.c
+@@ -45,7 +45,7 @@ static int may_wakeup(const char *rtcname)
+ 		return 0;
+ 
+ 	/* wakeup events could be disabled or not supported */
+-	return strcmp(buf, "enabled\n") == 0;
++	return strncmp(buf, "enabled\n", 8) == 0;
+ }
+ 
+ static void setup_alarm(int fd, time_t *wakeup)
+@@ -159,11 +159,11 @@ int rtcwake_main(int argc, char **argv)
+ 	/* the rtcname is relative to /dev */
+ 	xchdir("/dev");
+ 
+-	if (strcmp(suspend, "on") != 0 && !may_wakeup(rtcname))
+-		bb_error_msg_and_die("%s not enabled for wakeup events", rtcname);
+-
+ 	/* this RTC must exist and (if we'll sleep) be wakeup-enabled */
+-	fd = rtc_xopen(rtcname, O_RDONLY);
++	fd = rtc_xopen(&rtcname, O_RDONLY);
++
++	if (strcmp(suspend, "on") && !may_wakeup(rtcname))
++		bb_error_msg_and_die("%s not enabled for wakeup events", rtcname);
+ 
+ 	/* relative or absolute alarm time, normalized to time_t */
+ 	sys_time = time(0);
+@@ -184,7 +184,7 @@ int rtcwake_main(int argc, char **argv)
+ 	fflush(stdout);
+ 	usleep(10 * 1000);
+ 
+-	if (!strcmp(suspend, "on"))
++	if (strcmp(suspend, "on"))
+ 		suspend_system(suspend);
+ 	else {
+ 		/* "fake" suspend ... we'll do the delay ourselves */

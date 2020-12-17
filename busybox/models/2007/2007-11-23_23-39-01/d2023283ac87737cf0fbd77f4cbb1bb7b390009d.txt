@@ -1,0 +1,29 @@
+2007-11-23 23:39:01 +0000
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index 60eac6a..970b05d 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -39,9 +39,9 @@
+  *
+  * Original copyright notice is retained at the end of this file.
+  */
+-static int decode(char *name, CODE * codetab)
++static int decode(char *name, const CODE *codetab)
+ {
+-	CODE *c;
++	const CODE *c;
+ 
+ 	if (isdigit(*name))
+ 		return atoi(name);
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 8b0bbd6..8ec466b 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -213,6 +213,7 @@ config HEXDUMP
+ config HD
+ 	bool "hd"
+ 	default n
++	select HEXDUMP
+ 	help
+ 	  hd is an alias to hexdump -C.
+ 

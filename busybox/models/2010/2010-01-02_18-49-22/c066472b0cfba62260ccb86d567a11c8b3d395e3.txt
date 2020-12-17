@@ -1,0 +1,48 @@
+2010-01-02 18:49:22 +0100
+diff --git a/archival/cpio.c b/archival/cpio.c
+index 41aeef1..f139f31 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -354,10 +354,7 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 		if (*cpio_fmt != 'n') /* we _require_ "-H newc" */
+ 			bb_show_usage();
+ 		if (opt & CPIO_OPT_FILE) {
+-			fclose(stdout);
+-			stdout = fopen_for_write(cpio_filename);
+-			/* Paranoia: I don't trust libc that much */
+-			xdup2(fileno(stdout), STDOUT_FILENO);
++			xmove_fd(xopen3(cpio_filename, O_WRONLY | O_CREAT | O_TRUNC, 0666), STDOUT_FILENO);
+ 		}
+  dump:
+ 		return cpio_o();
+diff --git a/libbb/xfuncs_printf.c b/libbb/xfuncs_printf.c
+index d362841..7207ec5 100644
+--- a/libbb/xfuncs_printf.c
++++ b/libbb/xfuncs_printf.c
+@@ -263,10 +263,7 @@ int FAST_FUNC fflush_all(void)
+ 
+ int FAST_FUNC bb_putchar(int ch)
+ {
+-	/* time.c needs putc(ch, stdout), not putchar(ch).
+-	 * it does "stdout = stderr;", but then glibc's putchar()
+-	 * doesn't work as expected. bad glibc, bad */
+-	return putc(ch, stdout);
++	return putchar(ch);
+ }
+ 
+ /* Die with an error message if we can't copy an entire FILE* to stdout,
+diff --git a/miscutils/time.c b/miscutils/time.c
+index 42c812a..3421736 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -414,9 +414,7 @@ int time_main(int argc UNUSED_PARAM, char **argv)
+ 	run_command(argv, &res);
+ 
+ 	/* Cheat. printf's are shorter :) */
+-	/* (but see bb_putchar() body for additional wrinkle!) */
+-	xdup2(2, 1); /* just in case libc does something silly :( */
+-	stdout = stderr;
++	xdup2(STDERR_FILENO, STDOUT_FILENO);
+ 	summarize(output_format, argv, &res);
+ 
+ 	if (WIFSTOPPED(res.waitstatus))

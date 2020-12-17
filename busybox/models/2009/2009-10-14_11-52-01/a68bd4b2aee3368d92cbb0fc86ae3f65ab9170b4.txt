@@ -1,0 +1,28 @@
+2009-10-14 11:52:01 +0200
+diff --git a/libbb/Config.in b/libbb/Config.in
+index bdb6dfa..60ae0ff 100644
+--- a/libbb/Config.in
++++ b/libbb/Config.in
+@@ -134,9 +134,8 @@ config FEATURE_VERBOSE_CP_MESSAGE
+ 	    $ cp file /vmlinuz/file
+ 	    cp: cannot stat '/vmlinuz/file': Path has non-directory component
+ 	  If this feature is not enabled, they will be, respectively:
+-	    cp: cannot remove '/does_not_exist/file': No such file or directory
++	    cp: cannot create '/does_not_exist/file': No such file or directory
+ 	    cp: cannot stat '/vmlinuz/file': Not a directory
+-	  respectively.
+ 	  This will cost you ~60 bytes.
+ 
+ config FEATURE_COPYBUF_KB
+diff --git a/libbb/read_key.c b/libbb/read_key.c
+index 6f6c39e..d3832fa 100644
+--- a/libbb/read_key.c
++++ b/libbb/read_key.c
+@@ -22,6 +22,7 @@ int64_t FAST_FUNC read_key(int fd, char *buffer)
+ 		'O','B'        |0x80,KEYCODE_DOWN    ,
+ 		'O','C'        |0x80,KEYCODE_RIGHT   ,
+ 		'O','D'        |0x80,KEYCODE_LEFT    ,
++		/* Ctrl-<arrow>: ESC [ 1 ; 5 x, where x = A/B/C/D  */
+ 		'O','H'        |0x80,KEYCODE_HOME    ,
+ 		'O','F'        |0x80,KEYCODE_END     ,
+ #if 0

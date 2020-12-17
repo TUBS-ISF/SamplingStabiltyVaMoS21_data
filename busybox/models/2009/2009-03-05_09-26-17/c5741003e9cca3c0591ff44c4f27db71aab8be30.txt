@@ -1,0 +1,101 @@
+2009-03-05 09:26:17 +0000
+diff --git a/modutils/Config.in b/modutils/Config.in
+index ce3bce1..ef8d969 100644
+--- a/modutils/Config.in
++++ b/modutils/Config.in
+@@ -44,7 +44,6 @@ config FEATURE_MODPROBE_SMALL_OPTIONS_ON_CMDLINE
+ 	depends on MODPROBE_SMALL
+ 	help
+ 	  Allow insmod and modprobe take module options from command line.
+-	  N.B. Very bloaty.
+ 
+ config FEATURE_MODPROBE_SMALL_CHECK_ALREADY_LOADED
+ 	bool "Skip loading of already loaded modules"
+@@ -52,7 +51,6 @@ config FEATURE_MODPROBE_SMALL_CHECK_ALREADY_LOADED
+ 	depends on MODPROBE_SMALL
+ 	help
+ 	  Check if the module is already loaded.
+-	  N.B. It's racy.
+ 
+ config INSMOD
+ 	bool "insmod"
+@@ -92,9 +90,6 @@ config MODPROBE
+ 	  Handle the loading of modules, and their dependencies on a high
+ 	  level.
+ 
+-	  Note that in the state, modprobe does not understand multiple
+-	  module options from the configuration file. See option below.
+-
+ config FEATURE_MODPROBE_BLACKLIST
+ 	bool
+ 	prompt "Blacklist support"
+@@ -143,7 +138,7 @@ config FEATURE_INSMOD_KSYMOOPS_SYMBOLS
+ 	  By adding module symbols to the kernel symbol table, Oops messages
+ 	  occuring within kernel modules can be properly debugged. By enabling
+ 	  this feature, module symbols will always be added to the kernel symbol
+-	  table for properly debugging support. If you are not interested in
++	  table for proper debugging support. If you are not interested in
+ 	  Oops messages from kernel modules, say N.
+ 
+ config FEATURE_INSMOD_LOADINKMEM
+diff --git a/modutils/modutils.c b/modutils/modutils.c
+index 8836f7c..5a4ba84 100644
+--- a/modutils/modutils.c
++++ b/modutils/modutils.c
+@@ -17,8 +17,6 @@ extern int delete_module(const char *module, unsigned int flags);
+ # define delete_module(mod, flags) syscall(__NR_delete_module, mod, flags)
+ #endif
+ 
+-USE_FEATURE_2_4_MODULES(char *insmod_outputname);
+-
+ /*
+  a libbb candidate from ice age!
+ */
+diff --git a/modutils/modutils.h b/modutils/modutils.h
+index cc7c653..0a29ff2 100644
+--- a/modutils/modutils.h
++++ b/modutils/modutils.h
+@@ -27,9 +27,12 @@ int string_to_llist(char *string, llist_t **llist, const char *delim) FAST_FUNC;
+ char *filename2modname(const char *filename, char *modname) FAST_FUNC;
+ char *parse_cmdline_module_options(char **argv) FAST_FUNC;
+ 
+-#define INSMOD_OPTS "vq" USE_FEATURE_2_4_MODULES("sLo:fkx") \
++#define INSMOD_OPTS \
++	"vq" \
++	USE_FEATURE_2_4_MODULES("sLo:fkx") \
+ 	USE_FEATURE_INSMOD_LOAD_MAP("m")
+-#define INSMOD_ARGS USE_FEATURE_2_4_MODULES(, &insmod_outputname)
++
++#define INSMOD_ARGS USE_FEATURE_2_4_MODULES(, NULL)
+ 
+ enum {
+ 	INSMOD_OPT_VERBOSE	= 0x0001,
+@@ -42,13 +45,13 @@ enum {
+ 	INSMOD_OPT_NO_EXPORT	= 0x0080 * ENABLE_FEATURE_2_4_MODULES,
+ 	INSMOD_OPT_PRINT_MAP	= 0x0100 * ENABLE_FEATURE_INSMOD_LOAD_MAP,
+ #if ENABLE_FEATURE_2_4_MODULES
+-#if ENABLE_FEATURE_INSMOD_LOAD_MAP
++# if ENABLE_FEATURE_INSMOD_LOAD_MAP
+ 	INSMOD_OPT_UNUSED	= 0x0200,
+-#else /* ENABLE_FEATURE_INSMOD_LOAD_MAP */
+-	INSMOD_OPT_UNUSED	= 0x0100
+-#endif
+-#else /* ENABLE_FEATURE_2_4_MODULES */
+-	INSMOD_OPT_UNUSED	= 0x0004
++# else
++	INSMOD_OPT_UNUSED	= 0x0100,
++# endif
++#else
++	INSMOD_OPT_UNUSED	= 0x0004,
+ #endif
+ };
+ 
+@@ -56,8 +59,6 @@ int FAST_FUNC bb_init_module(const char *module, const char *options);
+ int FAST_FUNC bb_delete_module(const char *module, unsigned int flags);
+ 
+ #if ENABLE_FEATURE_2_4_MODULES
+-extern char *insmod_outputname;
+-
+ int FAST_FUNC bb_init_module_24(const char *module, const char *options);
+ #endif
+ 

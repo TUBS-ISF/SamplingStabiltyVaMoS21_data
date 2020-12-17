@@ -1,0 +1,14 @@
+2007-06-08 07:59:54 +0000
+diff --git a/coreutils/test.c b/coreutils/test.c
+index f861761..92f94b4 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -194,7 +194,7 @@ int bb_test(int argc, char **argv)
+ 				return 2;
+ 			}
+ 			argv[argc] = NULL;
+-		} else if (LONE_CHAR(arg0, '[') == 0) { /* "[[" ? */
++		} else if (LONE_CHAR(arg0+1, '[') == 0) { /* "[[" ? */
+ 			--argc;
+ 			if (strcmp(argv[argc], "]]") != 0) {
+ 				bb_error_msg("missing ]]");

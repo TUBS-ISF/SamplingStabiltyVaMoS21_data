@@ -1,0 +1,14 @@
+2008-05-19 08:25:23 +0000
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 3b7630e..833a41f 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -744,7 +744,7 @@ config SWAPONOFF
+ 	  option disabled.
+ 
+ config FEATURE_SWAPON_PRI
+-	bool "Support option -p in swapon"
++	bool "Support priority option -p"
+ 	default n
+ 	depends on SWAPONOFF
+ 	help

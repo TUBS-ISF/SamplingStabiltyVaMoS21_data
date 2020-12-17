@@ -1,0 +1,13 @@
+2009-04-06 18:10:20 +0000
+diff --git a/shell/hush_test/hush-misc/continue2.tests b/shell/hush_test/hush-misc/continue2.tests
+old mode 100644
+new mode 100755
+diff --git a/shell/hush_test/hush-misc/continue3.tests b/shell/hush_test/hush-misc/continue3.tests
+old mode 100644
+new mode 100755
+diff --git a/shell/hush_test/hush-misc/until1.tests b/shell/hush_test/hush-misc/until1.tests
+old mode 100644
+new mode 100755
+diff --git a/shell/hush_test/hush-misc/while2.tests b/shell/hush_test/hush-misc/while2.tests
+old mode 100644
+new mode 100755

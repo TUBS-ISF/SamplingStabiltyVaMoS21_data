@@ -1,0 +1,311 @@
+2009-09-17 02:43:14 +0200
+diff --git a/archival/ar.c b/archival/ar.c
+index dbff677..a1bcb1f 100644
+--- a/archival/ar.c
++++ b/archival/ar.c
+@@ -62,7 +62,7 @@ int ar_main(int argc, char **argv)
+ 		archive_handle->action_data = data_extract_all;
+ 	}
+ 	if (opt & AR_OPT_PRESERVE_DATE) {
+-		archive_handle->ah_flags |= ARCHIVE_PRESERVE_DATE;
++		archive_handle->ah_flags |= ARCHIVE_RESTORE_DATE;
+ 	}
+ 	if (opt & AR_OPT_VERBOSE) {
+ 		archive_handle->action_header = header_verbose_list_ar;
+diff --git a/archival/cpio.c b/archival/cpio.c
+index 5b4135f..bb57857 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -387,7 +387,7 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 			archive_handle->action_data = data_extract_to_stdout;
+ 	}
+ 	if (opt & CPIO_OPT_UNCONDITIONAL) {
+-		archive_handle->ah_flags |= ARCHIVE_EXTRACT_UNCONDITIONAL;
++		archive_handle->ah_flags |= ARCHIVE_UNLINK_OLD;
+ 		archive_handle->ah_flags &= ~ARCHIVE_EXTRACT_NEWER;
+ 	}
+ 	if (opt & CPIO_OPT_VERBOSE) {
+@@ -405,7 +405,7 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 		archive_handle->ah_flags |= ARCHIVE_CREATE_LEADING_DIRS;
+ 	}
+ 	if (opt & CPIO_OPT_PRESERVE_MTIME) {
+-		archive_handle->ah_flags |= ARCHIVE_PRESERVE_DATE;
++		archive_handle->ah_flags |= ARCHIVE_RESTORE_DATE;
+ 	}
+ 
+ 	while (*argv) {
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 781f1bb..a9334df 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -1531,7 +1531,7 @@ static void unpack_package(deb_file_t *deb_file)
+ 	archive_handle->sub_archive->filter = filter_accept_list;
+ 	archive_handle->sub_archive->action_data = data_extract_all_prefix;
+ 	archive_handle->sub_archive->buffer = info_prefix;
+-	archive_handle->sub_archive->ah_flags |= ARCHIVE_EXTRACT_UNCONDITIONAL;
++	archive_handle->sub_archive->ah_flags |= ARCHIVE_UNLINK_OLD;
+ 	unpack_ar_archive(archive_handle);
+ 
+ 	/* Run the preinst prior to extracting */
+@@ -1542,7 +1542,7 @@ static void unpack_package(deb_file_t *deb_file)
+ 	init_archive_deb_data(archive_handle);
+ 	archive_handle->sub_archive->action_data = data_extract_all_prefix;
+ 	archive_handle->sub_archive->buffer = (char*)"/"; /* huh? */
+-	archive_handle->sub_archive->ah_flags |= ARCHIVE_EXTRACT_UNCONDITIONAL;
++	archive_handle->sub_archive->ah_flags |= ARCHIVE_UNLINK_OLD;
+ 	unpack_ar_archive(archive_handle);
+ 
+ 	/* Create the list file */
+diff --git a/archival/libunarchive/data_extract_all.c b/archival/libunarchive/data_extract_all.c
+index d79ef7c..3e4a77d 100644
+--- a/archival/libunarchive/data_extract_all.c
++++ b/archival/libunarchive/data_extract_all.c
+@@ -18,14 +18,13 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 		free(name);
+ 	}
+ 
+-	/* Check if the file already exists */
+-	if (archive_handle->ah_flags & ARCHIVE_EXTRACT_UNCONDITIONAL) {
++	if (archive_handle->ah_flags & ARCHIVE_UNLINK_OLD) {
+ 		/* Remove the entry if it exists */
+ 		if ((!S_ISDIR(file_header->mode))
+ 		 && (unlink(file_header->name) == -1)
+ 		 && (errno != ENOENT)
+ 		) {
+-			bb_perror_msg_and_die("cannot remove old file %s",
++			bb_perror_msg_and_die("can't remove old file %s",
+ 					file_header->name);
+ 		}
+ 	}
+@@ -34,7 +33,7 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 		struct stat statbuf;
+ 		if (lstat(file_header->name, &statbuf) == -1) {
+ 			if (errno != ENOENT) {
+-				bb_perror_msg_and_die("cannot stat old file");
++				bb_perror_msg_and_die("can't stat old file");
+ 			}
+ 		}
+ 		else if (statbuf.st_mtime <= file_header->mtime) {
+@@ -46,7 +45,7 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 			return;
+ 		}
+ 		else if ((unlink(file_header->name) == -1) && (errno != EISDIR)) {
+-			bb_perror_msg_and_die("cannot remove old file %s",
++			bb_perror_msg_and_die("can't remove old file %s",
+ 					file_header->name);
+ 		}
+ 	}
+@@ -59,7 +58,7 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 		/* hard link */
+ 		res = link(file_header->link_target, file_header->name);
+ 		if ((res == -1) && !(archive_handle->ah_flags & ARCHIVE_EXTRACT_QUIET)) {
+-			bb_perror_msg("cannot create %slink "
++			bb_perror_msg("can't create %slink "
+ 					"from %s to %s", "hard",
+ 					file_header->name,
+ 					file_header->link_target);
+@@ -69,8 +68,10 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 		switch (file_header->mode & S_IFMT) {
+ 		case S_IFREG: {
+ 			/* Regular file */
+-			dst_fd = xopen3(file_header->name, O_WRONLY | O_CREAT | O_EXCL,
+-							file_header->mode);
++			dst_fd = xopen3(file_header->name,
++				O_WRONLY | O_CREAT | O_EXCL,
++				file_header->mode
++				);
+ 			bb_copyfd_exact_size(archive_handle->src_fd, dst_fd, file_header->size);
+ 			close(dst_fd);
+ 			break;
+@@ -82,7 +83,7 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 			 && (errno != EEXIST)
+ 			 && !(archive_handle->ah_flags & ARCHIVE_EXTRACT_QUIET)
+ 			) {
+-				bb_perror_msg("cannot make dir %s", file_header->name);
++				bb_perror_msg("can't make dir %s", file_header->name);
+ 			}
+ 			break;
+ 		case S_IFLNK:
+@@ -91,7 +92,7 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 			if ((res == -1)
+ 			 && !(archive_handle->ah_flags & ARCHIVE_EXTRACT_QUIET)
+ 			) {
+-				bb_perror_msg("cannot create %slink "
++				bb_perror_msg("can't create %slink "
+ 					"from %s to %s", "sym",
+ 					file_header->name,
+ 					file_header->link_target);
+@@ -105,7 +106,7 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 			if ((res == -1)
+ 			 && !(archive_handle->ah_flags & ARCHIVE_EXTRACT_QUIET)
+ 			) {
+-				bb_perror_msg("cannot create node %s", file_header->name);
++				bb_perror_msg("can't create node %s", file_header->name);
+ 			}
+ 			break;
+ 		default:
+@@ -113,7 +114,7 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 		}
+ 	}
+ 
+-	if (!(archive_handle->ah_flags & ARCHIVE_NOPRESERVE_OWN)) {
++	if (!(archive_handle->ah_flags & ARCHIVE_DONT_RESTORE_OWNER)) {
+ #if ENABLE_FEATURE_TAR_UNAME_GNAME
+ 		if (!(archive_handle->ah_flags & ARCHIVE_NUMERIC_OWNER)) {
+ 			uid_t uid = file_header->uid;
+@@ -136,11 +137,11 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 		/* uclibc has no lchmod, glibc is even stranger -
+ 		 * it has lchmod which seems to do nothing!
+ 		 * so we use chmod... */
+-		if (!(archive_handle->ah_flags & ARCHIVE_NOPRESERVE_PERM)) {
++		if (!(archive_handle->ah_flags & ARCHIVE_DONT_RESTORE_PERM)) {
+ 			chmod(file_header->name, file_header->mode);
+ 		}
+ 		/* same for utime */
+-		if (archive_handle->ah_flags & ARCHIVE_PRESERVE_DATE) {
++		if (archive_handle->ah_flags & ARCHIVE_RESTORE_DATE) {
+ 			struct utimbuf t;
+ 			t.actime = t.modtime = file_header->mtime;
+ 			utime(file_header->name, &t);
+diff --git a/archival/rpm.c b/archival/rpm.c
+index 569bcdd..309b55a 100644
+--- a/archival/rpm.c
++++ b/archival/rpm.c
+@@ -202,12 +202,12 @@ static void extract_cpio_gz(int fd)
+ 	archive_handle->seek = seek_by_read;
+ 	//archive_handle->action_header = header_list;
+ 	archive_handle->action_data = data_extract_all;
+-	archive_handle->ah_flags = ARCHIVE_PRESERVE_DATE | ARCHIVE_CREATE_LEADING_DIRS
++	archive_handle->ah_flags = ARCHIVE_RESTORE_DATE | ARCHIVE_CREATE_LEADING_DIRS
+ 		/* compat: overwrite existing files.
+ 		 * try "rpm -i foo.src.rpm" few times in a row -
+ 		 * standard rpm will not complain.
+ 		 * (TODO? real rpm creates "file;1234" and then renames it) */
+-		| ARCHIVE_EXTRACT_UNCONDITIONAL;
++		| ARCHIVE_UNLINK_OLD;
+ 	archive_handle->src_fd = fd;
+ 	/*archive_handle->offset = 0; - init_handle() did it */
+ 
+diff --git a/archival/tar.c b/archival/tar.c
+index 9b7a42a..bd8e5dc 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -735,10 +735,10 @@ enum {
+ 	IF_FEATURE_TAR_FROM(     OPTBIT_INCLUDE_FROM,)
+ 	IF_FEATURE_TAR_FROM(     OPTBIT_EXCLUDE_FROM,)
+ 	IF_FEATURE_SEAMLESS_GZ(  OPTBIT_GZIP        ,)
+-	IF_FEATURE_SEAMLESS_Z(   OPTBIT_COMPRESS    ,)
+-	OPTBIT_NOPRESERVE_OWN,
+-	OPTBIT_NOPRESERVE_PERM,
++	IF_FEATURE_SEAMLESS_Z(   OPTBIT_COMPRESS    ,) /* 15th bit */
+ 	OPTBIT_NUMERIC_OWNER,
++	OPTBIT_NOPRESERVE_OWNER,
++	OPTBIT_NOPRESERVE_PERM,
+ 	OPT_TEST         = 1 << 0, // t
+ 	OPT_EXTRACT      = 1 << 1, // x
+ 	OPT_BASEDIR      = 1 << 2, // C
+@@ -755,9 +755,9 @@ enum {
+ 	OPT_EXCLUDE_FROM = IF_FEATURE_TAR_FROM(     (1 << OPTBIT_EXCLUDE_FROM)) + 0, // X
+ 	OPT_GZIP         = IF_FEATURE_SEAMLESS_GZ(  (1 << OPTBIT_GZIP        )) + 0, // z
+ 	OPT_COMPRESS     = IF_FEATURE_SEAMLESS_Z(   (1 << OPTBIT_COMPRESS    )) + 0, // Z
+-	OPT_NOPRESERVE_OWN  = 1 << OPTBIT_NOPRESERVE_OWN , // no-same-owner
+-	OPT_NOPRESERVE_PERM = 1 << OPTBIT_NOPRESERVE_PERM, // no-same-permissions
+ 	OPT_NUMERIC_OWNER = 1 << OPTBIT_NUMERIC_OWNER,
++	OPT_NOPRESERVE_OWNER = 1 << OPTBIT_NOPRESERVE_OWNER , // no-same-owner
++	OPT_NOPRESERVE_PERM = 1 << OPTBIT_NOPRESERVE_PERM, // no-same-permissions
+ };
+ #if ENABLE_FEATURE_TAR_LONG_OPTIONS
+ static const char tar_longopts[] ALIGN1 =
+@@ -789,12 +789,15 @@ static const char tar_longopts[] ALIGN1 =
+ # if ENABLE_FEATURE_SEAMLESS_Z
+ 	"compress\0"            No_argument       "Z"
+ # endif
++	/* use numeric uid/gid from tar header, not textual */
+ 	"numeric-owner\0"       No_argument       "\xfc"
++	/* do not restore owner */
+ 	"no-same-owner\0"       No_argument       "\xfd"
++	/* do not restore mode */
+ 	"no-same-permissions\0" No_argument       "\xfe"
+ 	/* --exclude takes next bit position in option mask, */
+ 	/* therefore we have to either put it _after_ --no-same-perm */
+-	/* or add OPT[BIT]_EXCLUDE before OPT[BIT]_NOPRESERVE_OWN */
++	/* or add OPT[BIT]_EXCLUDE before OPT[BIT]_NOPRESERVE_OWNER */
+ # if ENABLE_FEATURE_TAR_FROM
+ 	"exclude\0"             Required_argument "\xff"
+ # endif
+@@ -817,12 +820,12 @@ int tar_main(int argc UNUSED_PARAM, char **argv)
+ 	/* Initialise default values */
+ 	tar_handle = init_handle();
+ 	tar_handle->ah_flags = ARCHIVE_CREATE_LEADING_DIRS
+-	                     | ARCHIVE_PRESERVE_DATE
+-	                     | ARCHIVE_EXTRACT_UNCONDITIONAL;
++	                     | ARCHIVE_RESTORE_DATE
++	                     | ARCHIVE_UNLINK_OLD;
+ 
+ 	/* Apparently only root's tar preserves perms (see bug 3844) */
+ 	if (getuid() != 0)
+-		tar_handle->ah_flags |= ARCHIVE_NOPRESERVE_PERM;
++		tar_handle->ah_flags |= ARCHIVE_DONT_RESTORE_PERM;
+ 
+ 	/* Prepend '-' to the first argument if required */
+ 	opt_complementary = "--:" // first arg is options
+@@ -856,6 +859,7 @@ int tar_main(int argc UNUSED_PARAM, char **argv)
+ 		, &verboseFlag // combined count for -t and -v
+ 		, &verboseFlag // combined count for -t and -v
+ 		);
++	//bb_error_msg("opt:%08x", opt);
+ 	argv += optind;
+ 
+ 	if (verboseFlag) tar_handle->action_header = header_verbose_list;
+@@ -868,17 +872,17 @@ int tar_main(int argc UNUSED_PARAM, char **argv)
+ 		tar_handle->action_data = data_extract_to_stdout;
+ 
+ 	if (opt & OPT_KEEP_OLD)
+-		tar_handle->ah_flags &= ~ARCHIVE_EXTRACT_UNCONDITIONAL;
+-
+-	if (opt & OPT_NOPRESERVE_OWN)
+-		tar_handle->ah_flags |= ARCHIVE_NOPRESERVE_OWN;
+-
+-	if (opt & OPT_NOPRESERVE_PERM)
+-		tar_handle->ah_flags |= ARCHIVE_NOPRESERVE_PERM;
++		tar_handle->ah_flags &= ~ARCHIVE_UNLINK_OLD;
+ 
+ 	if (opt & OPT_NUMERIC_OWNER)
+ 		tar_handle->ah_flags |= ARCHIVE_NUMERIC_OWNER;
+ 
++	if (opt & OPT_NOPRESERVE_OWNER)
++		tar_handle->ah_flags |= ARCHIVE_DONT_RESTORE_OWNER;
++
++	if (opt & OPT_NOPRESERVE_PERM)
++		tar_handle->ah_flags |= ARCHIVE_DONT_RESTORE_PERM;
++
+ 	if (opt & OPT_GZIP)
+ 		get_header_ptr = get_header_tar_gz;
+ 
+diff --git a/include/unarchive.h b/include/unarchive.h
+index d8cb2a0..26d79e1 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -4,14 +4,14 @@
+ 
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+-#define ARCHIVE_PRESERVE_DATE           1
+-#define ARCHIVE_CREATE_LEADING_DIRS     2
+-#define ARCHIVE_EXTRACT_UNCONDITIONAL   4
+-#define ARCHIVE_EXTRACT_QUIET           8
+-#define ARCHIVE_EXTRACT_NEWER           16
+-#define ARCHIVE_NOPRESERVE_OWN          32
+-#define ARCHIVE_NOPRESERVE_PERM         64
+-#define ARCHIVE_NUMERIC_OWNER           128
++#define ARCHIVE_RESTORE_DATE        (1 << 0)
++#define ARCHIVE_CREATE_LEADING_DIRS (1 << 1)
++#define ARCHIVE_UNLINK_OLD          (1 << 2)
++#define ARCHIVE_EXTRACT_QUIET       (1 << 3)
++#define ARCHIVE_EXTRACT_NEWER       (1 << 4)
++#define ARCHIVE_DONT_RESTORE_OWNER  (1 << 5)
++#define ARCHIVE_DONT_RESTORE_PERM   (1 << 6)
++#define ARCHIVE_NUMERIC_OWNER       (1 << 7)
+ 
+ typedef struct file_header_t {
+ 	char *name;

@@ -1,0 +1,211 @@
+2009-11-01 04:01:30 +0100
+diff --git a/TODO b/TODO
+index 493932a..9be1b07 100644
+--- a/TODO
++++ b/TODO
+@@ -6,11 +6,8 @@ do one of these bounce an email off the person it's listed under to see if they
+ have any suggestions how they plan to go about it, and to minimize conflicts
+ between your work and theirs.  But otherwise, all of these are fair game.
+ 
+-Rob Landley suggested these:
+-  Add a libbb/platform.c
+-    Implement fdprintf() for platforms that haven't got one.
+-    Implement bb_realpath() that can handle NULL on non-glibc.
+-    Cleanup bb_asprintf()
++Rob Landley suggested this:
++  Implement bb_realpath() that can handle NULL on non-glibc.
+ 
+   Remove obsolete _() wrapper crud for internationalization we don't do.
+   Figure out where we need utf8 support, and add it.
+diff --git a/include/platform.h b/include/platform.h
+index 1fa2ece..67b04f8 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -11,7 +11,12 @@
+  * true will #undef them below.
+  */
+ #define HAVE_FDPRINTF 1
++#define HAVE_MEMRCHR 1
++#define HAVE_MKDTEMP 1
++#define HAVE_SETBIT 1
++#define HAVE_STRCASESTR 1
+ #define HAVE_STRCHRNUL 1
++#define HAVE_STRSIGNAL 1
+ #define HAVE_VASPRINTF 1
+ 
+ /* Convenience macros to test the version of gcc. */
+@@ -335,17 +340,22 @@ typedef unsigned smalluint;
+ #endif
+ 
+ #if defined(__dietlibc__)
+-#undef HAVE_STRCHRNUL
++# undef HAVE_STRCHRNUL
+ #endif
+ 
+ #if defined(__WATCOMC__)
+-#undef HAVE_FDPRINTF
+-#undef HAVE_STRCHRNUL
+-#undef HAVE_VASPRINTF
++# undef HAVE_FDPRINTF
++# undef HAVE_MEMRCHR
++# undef HAVE_MKDTEMP
++# undef HAVE_SETBIT
++# undef HAVE_STRCASESTR
++# undef HAVE_STRCHRNUL
++# undef HAVE_STRSIGNAL
++# undef HAVE_VASPRINTF
+ #endif
+ 
+ #if defined(__FreeBSD__)
+-#undef HAVE_STRCHRNUL
++# undef HAVE_STRCHRNUL
+ #endif
+ 
+ /*
+@@ -353,16 +363,38 @@ typedef unsigned smalluint;
+  * These must come after all the HAVE_* macros are defined (or not)
+  */
+ 
++#ifndef HAVE_FDPRINTF
++extern int fdprintf(int fd, const char *format, ...);
++#endif
++
++#ifndef HAVE_MEMRCHR
++extern void *memrchr(const void *s, int c, size_t n) FAST_FUNC;
++#endif
++
++#ifndef HAVE_MKDTEMP
++extern char *mkdtemp(char *template) FAST_FUNC;
++#endif
++
++#ifndef HAVE_SETBIT
++# define setbit(a, b)  ((a)[(b) >> 3] |= 1 << ((b) & 7))
++# define clrbit(a, b)  ((a)[(b) >> 3] &= ~(1 << ((b) & 7)))
++#endif
++
++#ifndef HAVE_STRCASESTR
++extern char *strcasestr(const char *s, const char *pattern) FAST_FUNC;
++#endif
++
+ #ifndef HAVE_STRCHRNUL
+ extern char *strchrnul(const char *s, int c) FAST_FUNC;
+ #endif
+ 
+-#ifndef HAVE_VASPRINTF
+-extern int vasprintf(char **string_ptr, const char *format, va_list p) FAST_FUNC;
++#ifndef HAVE_STRSIGNAL
++/* Not exactly the same: instead of "Stopped" it shows "STOP" etc */
++# define strsignal(sig) get_signame(sig)
+ #endif
+ 
+-#ifndef HAVE_FDPRINTF
+-extern int fdprintf(int fd, const char *format, ...);
++#ifndef HAVE_VASPRINTF
++extern int vasprintf(char **string_ptr, const char *format, va_list p) FAST_FUNC;
+ #endif
+ 
+ #endif
+diff --git a/libbb/platform.c b/libbb/platform.c
+index 470185a..fdd3882 100644
+--- a/libbb/platform.c
++++ b/libbb/platform.c
+@@ -6,13 +6,13 @@
+  *
+  * Licensed under the GPL version 2, see the file LICENSE in this tarball.
+  */
+-
+ #include "libbb.h"
+ 
+ #ifndef HAVE_STRCHRNUL
+-char * FAST_FUNC strchrnul(const char *s, int c)
++char* FAST_FUNC strchrnul(const char *s, int c)
+ {
+-	while (*s && *s != c) ++s;
++	while (*s != '\0' && *s != c)
++		s++;
+ 	return (char*)s;
+ }
+ #endif
+@@ -22,15 +22,19 @@ int FAST_FUNC vasprintf(char **string_ptr, const char *format, va_list p)
+ {
+ 	int r;
+ 	va_list p2;
++	char buf[128];
+ 
+ 	va_copy(p2, p);
+-	r = vsnprintf(NULL, 0, format, p);
++	r = vsnprintf(buf, 128, format, p);
+ 	va_end(p);
++
++	if (r < 128) {
++		va_end(p2);
++		return xstrdup(buf);
++	}
++
+ 	*string_ptr = xmalloc(r+1);
+-	if (!*string_ptr)
+-		r = -1;
+-	else
+-		r = vsnprintf(*string_ptr, r+1, format, p2);
++	r = vsnprintf(*string_ptr, r+1, format, p2);
+ 	va_end(p2);
+ 
+ 	return r;
+@@ -38,6 +42,7 @@ int FAST_FUNC vasprintf(char **string_ptr, const char *format, va_list p)
+ #endif
+ 
+ #ifndef HAVE_FDPRINTF
++/* dprintf is now actually part of POSIX.1, but was only added in 2008 */
+ int fdprintf(int fd, const char *format, ...)
+ {
+ 	va_list p;
+@@ -55,3 +60,49 @@ int fdprintf(int fd, const char *format, ...)
+ }
+ #endif
+ 
++#ifndef HAVE_MEMRCHR
++/* Copyright (C) 2005 Free Software Foundation, Inc.
++ * memrchr() is a GNU function that might not be available everywhere.
++ * It's basically the inverse of memchr() - search backwards in a
++ * memory block for a particular character.
++ */
++void* FAST_FUNC memrchr(const void *s, int c, size_t n)
++{
++	const char *start = s, *end = s;
++
++	end += n - 1;
++
++	while (end >= start) {
++		if (*end == (char)c)
++			return (void *) end;
++		end--;
++	}
++
++	return NULL;
++}
++#endif
++
++#ifndef HAVE_MKDTEMP
++/* This is now actually part of POSIX.1, but was only added in 2008 */
++char* FAST_FUNC mkdtemp(char *template)
++{
++	if (mktemp(template) == NULL || mkdir(template, 0700) != 0)
++		return NULL;
++	return template;
++}
++#endif
++
++#ifndef HAVE_STRCASESTR
++/* Copyright (c) 1999, 2000 The ht://Dig Group */
++char* FAST_FUNC strcasestr(const char *s, const char *pattern)
++{
++	int length = strlen(pattern);
++
++	while (*s) {
++		if (strncasecmp(s, pattern, length) == 0)
++			return (char *)s;
++		s++;
++	}
++	return 0;
++}
++#endif

@@ -1,0 +1,26 @@
+2009-08-29 20:37:09 +0200
+diff --git a/shell/ash_test/ash-redir/redir7.right b/shell/ash_test/ash-redir/redir7.right
+new file mode 100644
+index 0000000..6430b02
+--- /dev/null
++++ b/shell/ash_test/ash-redir/redir7.right
+@@ -0,0 +1,3 @@
++Ok
++Ok
++Done
+diff --git a/shell/ash_test/ash-redir/redir7.tests b/shell/ash_test/ash-redir/redir7.tests
+new file mode 100755
+index 0000000..e9bedd0
+--- /dev/null
++++ b/shell/ash_test/ash-redir/redir7.tests
+@@ -0,0 +1,10 @@
++# Chars above 0x7f are used as special codes.
++# 0x81 is CTLESC (see ash.c).
++# The bug was that quoting and unquoting of them
++# was out of sync for redirect filenames.
++echo -e 'echo Ok >uni\x81code' >unicode.sh
++echo -e 'cat uni\x81code' >>unicode.sh
++echo -e 'cat uni?code' >>unicode.sh
++. unicode.sh
++rm uni*code*
++echo Done

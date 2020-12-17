@@ -1,0 +1,336 @@
+2010-01-30 23:16:21 +0100
+diff --git a/TODO_unicode b/TODO_unicode
+new file mode 100644
+index 0000000..c29fd93
+--- /dev/null
++++ b/TODO_unicode
+@@ -0,0 +1,45 @@
++Already fixed applets:
++cal
++lsmod
++df
++dumpleases
++
++Applets which may need unicode handling (more extensive than sanitizing
++of filenames in error messages):
++
++ls - uses unicode_strlen, not scrlen
++expand, unexpand - uses unicode_strlen, not scrlen
++ash, hush through lineedit - uses unicode_strlen, not scrlen
++top - need to sanitize process args
++ps - need to sanitize process args
++less
++more
++vi
++ed
++cut
++awk
++sed
++tr
++grep egrep fgrep
++fold
++sort
++head, tail
++catv - "display nonprinting chars" - what this could mean for unicode?
++wc
++chat
++dumpkmap
++last - just line up columns
++man
++microcom
++strings
++watch
++
++Unsure, may need fixing:
++
++hostname - do we really want to protect against bad chars in it?
++patch
++addgroup, adduser, delgroup, deluser
++telnet
++telnetd
++od
++printf
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index 5ecb913..207fa96 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -135,7 +135,7 @@ int cal_main(int argc UNUSED_PARAM, char **argv)
+ 			if (julian)
+ 				*hp++ = ' ';
+ 			{
+-				char *two_wchars = unicode_cut_nchars(2, buf);
++				char *two_wchars = unicode_conv_to_printable_fixedwidth(NULL, buf, 2);
+ 				strcpy(hp, two_wchars);
+ 				free(two_wchars);
+ 			}
+diff --git a/coreutils/df.c b/coreutils/df.c
+index ae68f08..4b23faa 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -114,9 +114,6 @@ int df_main(int argc UNUSED_PARAM, char **argv)
+ 	while (1) {
+ 		const char *device;
+ 		const char *mount_point;
+-#if ENABLE_FEATURE_ASSUME_UNICODE
+-		size_t dev_len;
+-#endif
+ 
+ 		if (mount_table) {
+ 			mount_entry = getmntent(mount_table);
+@@ -178,11 +175,15 @@ int df_main(int argc UNUSED_PARAM, char **argv)
+ #endif
+ 
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+-			dev_len = unicode_strlen(device);
+-			if (dev_len > 20) {
+-				printf("%s\n%20s", device, "");
+-			} else {
+-				printf("%s%*s", device, 20 - (int)dev_len, "");
++			{
++				uni_stat_t uni_stat;
++				char *uni_dev = unicode_conv_to_printable(&uni_stat, device);
++				if (uni_stat.unicode_width > 20) {
++					printf("%s\n%20s", uni_dev, "");
++				} else {
++					printf("%s%*s", uni_dev, 20 - (int)uni_stat.unicode_width, "");
++				}
++				free(uni_dev);
+ 			}
+ #else
+ 			if (printf("\n%-20s" + 1, device) > 20)
+diff --git a/include/unicode.h b/include/unicode.h
+index f1a252c..f32e565 100644
+--- a/include/unicode.h
++++ b/include/unicode.h
+@@ -14,15 +14,25 @@ enum {
+ #if !ENABLE_FEATURE_ASSUME_UNICODE
+ 
+ # define unicode_strlen(string) strlen(string)
+-# define unicode_scrlen(string) TODO
+ # define unicode_status UNICODE_OFF
+ # define init_unicode() ((void)0)
+ 
+ #else
+ 
+ size_t FAST_FUNC unicode_strlen(const char *string);
+-char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src);
+-unsigned FAST_FUNC unicode_padding_to_width(unsigned width, const char *src);
++enum {
++	UNI_FLAG_PAD = (1 << 0),
++};
++typedef struct uni_stat_t {
++	unsigned byte_count;
++	unsigned unicode_count;
++	unsigned unicode_width;
++} uni_stat_t;
++//UNUSED: unsigned FAST_FUNC unicode_padding_to_width(unsigned width, const char *src);
++//UNUSED: char* FAST_FUNC unicode_conv_to_printable2(uni_stat_t *stats, const char *src, unsigned width, int flags);
++char* FAST_FUNC unicode_conv_to_printable(uni_stat_t *stats, const char *src);
++char* FAST_FUNC unicode_conv_to_printable_maxwidth(uni_stat_t *stats, const char *src, unsigned maxwidth);
++char* FAST_FUNC unicode_conv_to_printable_fixedwidth(uni_stat_t *stats, const char *src, unsigned width);
+ 
+ # if ENABLE_LOCALE_SUPPORT
+ 
+diff --git a/libbb/unicode.c b/libbb/unicode.c
+index 878af84..4e7e3a9 100644
+--- a/libbb/unicode.c
++++ b/libbb/unicode.c
+@@ -246,29 +246,45 @@ size_t FAST_FUNC unicode_strlen(const char *string)
+ 	return width;
+ }
+ 
+-char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src)
++static char* FAST_FUNC unicode_conv_to_printable2(uni_stat_t *stats, const char *src, unsigned width, int flags)
+ {
+ 	char *dst;
+ 	unsigned dst_len;
++	unsigned uni_count;
++	unsigned uni_width;
+ 
+ 	if (unicode_status != UNICODE_ON) {
+-		char *d = dst = xmalloc(width + 1);
+-		while ((int)--width >= 0) {
+-			unsigned char c = *src;
+-			if (c == '\0') {
+-				do
+-					*d++ = ' ';
+-				while ((int)--width >= 0);
+-				break;
++		char *d;
++		if (flags & UNI_FLAG_PAD) {
++			d = dst = xmalloc(width + 1);
++			while ((int)--width >= 0) {
++				unsigned char c = *src;
++				if (c == '\0') {
++					do
++						*d++ = ' ';
++					while ((int)--width >= 0);
++					break;
++				}
++				*d++ = (c >= ' ' && c < 0x7f) ? c : '?';
++				src++;
++			}
++			*d = '\0';
++		} else {
++			d = dst = xstrndup(src, width);
++			while (*d) {
++				unsigned char c = *d;
++				if (c < ' ' || c >= 0x7f)
++					*d = '?';
++				d++;
+ 			}
+-			*d++ = (c >= ' ' && c < 0x7f) ? c : '?';
+-			src++;
+ 		}
+-		*d = '\0';
++		if (stats)
++			stats->byte_count = stats->unicode_count = (d - dst);
+ 		return dst;
+ 	}
+ 
+ 	dst = NULL;
++	uni_count = uni_width = 0;
+ 	dst_len = 0;
+ 	while (1) {
+ 		int w;
+@@ -301,7 +317,7 @@ char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src)
+ 			/* src = NULL: invalid sequence is seen,
+ 			 * else: wc is set, src is advanced to next mb char
+ 			 */
+-			if (src1) {/* no error */
++			if (src1) { /* no error */
+ 				if (wc == 0) /* end-of-string */
+ 					break;
+ 				src = src1;
+@@ -315,8 +331,8 @@ char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src)
+ 			goto subst;
+ 		w = wcwidth(wc);
+ 		if ((ENABLE_UNICODE_COMBINING_WCHARS && w < 0) /* non-printable wchar */
+-		 || (!ENABLE_UNICODE_COMBINING_WCHARS && wc <= 0)
+-		 || (!ENABLE_UNICODE_WIDE_WCHARS && wc > 1)
++		 || (!ENABLE_UNICODE_COMBINING_WCHARS && w <= 0)
++		 || (!ENABLE_UNICODE_WIDE_WCHARS && w > 1)
+ 		) {
+  subst:
+ 			wc = CONFIG_SUBST_WCHAR;
+@@ -331,6 +347,8 @@ char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src)
+ 			break;
+ 		}
+ 
++		uni_count++;
++		uni_width += w;
+ 		dst = xrealloc(dst, dst_len + MB_CUR_MAX);
+ #if ENABLE_LOCALE_SUPPORT
+ 		{
+@@ -343,15 +361,37 @@ char* FAST_FUNC unicode_cut_nchars(unsigned width, const char *src)
+ 	}
+ 
+ 	/* Pad to remaining width */
+-	dst = xrealloc(dst, dst_len + width + 1);
+-	while ((int)--width >= 0) {
+-		dst[dst_len++] = ' ';
++	if (flags & UNI_FLAG_PAD) {
++		dst = xrealloc(dst, dst_len + width + 1);
++		uni_count += width;
++		uni_width += width;
++		while ((int)--width >= 0) {
++			dst[dst_len++] = ' ';
++		}
+ 	}
+ 	dst[dst_len] = '\0';
++	if (stats) {
++		stats->byte_count = dst_len;
++		stats->unicode_count = uni_count;
++		stats->unicode_width = uni_width;
++	}
+ 
+ 	return dst;
+ }
++char* FAST_FUNC unicode_conv_to_printable(uni_stat_t *stats, const char *src)
++{
++	return unicode_conv_to_printable2(stats, src, INT_MAX, 0);
++}
++char* FAST_FUNC unicode_conv_to_printable_maxwidth(uni_stat_t *stats, const char *src, unsigned maxwidth)
++{
++	return unicode_conv_to_printable2(stats, src, maxwidth, 0);
++}
++char* FAST_FUNC unicode_conv_to_printable_fixedwidth(uni_stat_t *stats, const char *src, unsigned width)
++{
++	return unicode_conv_to_printable2(stats, src, width, UNI_FLAG_PAD);
++}
+ 
++#ifdef UNUSED
+ unsigned FAST_FUNC unicode_padding_to_width(unsigned width, const char *src)
+ {
+ 	if (unicode_status != UNICODE_ON) {
+@@ -382,3 +422,4 @@ unsigned FAST_FUNC unicode_padding_to_width(unsigned width, const char *src)
+ 			return 0;
+ 	}
+ }
++#endif
+diff --git a/modutils/lsmod.c b/modutils/lsmod.c
+index cc6b616..50621c2 100644
+--- a/modutils/lsmod.c
++++ b/modutils/lsmod.c
+@@ -46,9 +46,6 @@ int lsmod_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ #if ENABLE_FEATURE_LSMOD_PRETTY_2_6_OUTPUT
+ 	char *token[4];
+ 	parser_t *parser = config_open("/proc/modules");
+-# if ENABLE_FEATURE_ASSUME_UNICODE
+-	size_t name_len;
+-# endif
+ 	init_unicode();
+ 
+ 	printf("%-24sSize  Used by", "Module");
+@@ -64,9 +61,13 @@ int lsmod_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 			} else
+ 				token[3] = (char *) "";
+ # if ENABLE_FEATURE_ASSUME_UNICODE
+-			name_len = unicode_strlen(token[0]);
+-			name_len = (name_len > 19) ? 0 : 19 - name_len;
+-			printf("%s%*s %8s %2s %s\n", token[0], name_len, "", token[1], token[2], token[3]);
++			{
++				uni_stat_t uni_stat;
++				char *uni_name = unicode_conv_to_printable(&uni_stat, token[0]);
++				unsigned pad_len = (uni_stat.unicode_width > 19) ? 0 : 19 - uni_stat.unicode_width;
++				printf("%s%*s %8s %2s %s\n", uni_name, pad_len, "", token[1], token[2], token[3]);
++				free(uni_name);
++			}
+ # else
+ 			printf("%-19s %8s %2s %s\n", token[0], token[1], token[2], token[3]);
+ # endif
+@@ -78,9 +79,13 @@ int lsmod_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 			// so trimming the trailing char is just what we need!
+ 			token[3][strlen(token[3])-1] = '\0';
+ # if ENABLE_FEATURE_ASSUME_UNICODE
+-			name_len = unicode_strlen(token[0]);
+-			name_len = (name_len > 19) ? 0 : 19 - name_len;
+-			printf("%s%*s %8s %2s %s\n", token[0], name_len, "", token[1], token[2], token[3]);
++			{
++				uni_stat_t uni_stat;
++				char *uni_name = unicode_conv_to_printable(&uni_stat, token[0]);
++				unsigned pad_len = (uni_stat.unicode_width > 19) ? 0 : 19 - uni_stat.unicode_width;
++				printf("%s%*s %8s %2s %s\n", uni_name, pad_len, "", token[1], token[2], token[3]);
++				free(uni_name);
++			}
+ # else
+ 			printf("%-19s %8s %2s %s\n", token[0], token[1], token[2], token[3]);
+ # endif
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index d8f5da7..eab9713 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -71,8 +71,11 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 		/* actually, 15+1 and 19+1, +1 is a space between columns */
+ 		/* lease.hostname is char[20] and is always NUL terminated */
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+-		printf(" %-16s%s%*s", inet_ntoa(addr), lease.hostname,
+-			20 - (int)unicode_strlen(lease.hostname), "");
++		{
++			char *uni_name = unicode_conv_to_printable_fixedwidth(NULL, lease.hostname, 20);
++			printf(" %-16s%s", inet_ntoa(addr), uni_name);
++			free(uni_name);
++		}
+ #else
+ 		printf(" %-16s%-20s", inet_ntoa(addr), lease.hostname);
+ #endif

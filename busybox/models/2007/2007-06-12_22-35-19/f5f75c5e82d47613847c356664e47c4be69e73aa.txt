@@ -1,0 +1,138 @@
+2007-06-12 22:35:19 +0000
+diff --git a/debianutils/which.c b/debianutils/which.c
+index 2c71ed3..b556a9f 100644
+--- a/debianutils/which.c
++++ b/debianutils/which.c
+@@ -22,9 +22,11 @@ int which_main(int argc, char **argv)
+ 		bb_show_usage();
+ 	}
+ 
++/* We shouldn't do this. Ever. Not our business.
+ 	if (!getenv("PATH")) {
+-		setenv("PATH", "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 1);
++		putenv((char*)bb_PATH_root_path);
+ 	}
++*/
+ 
+ 	while (--argc > 0) {
+ 		argv++;
+diff --git a/include/libbb.h b/include/libbb.h
+index 4f418e7..ce62f45 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -953,8 +953,9 @@ extern const char bb_dev_null[];
+ extern const char bb_busybox_exec_path[];
+ /* util-linux manpage says /sbin:/bin:/usr/sbin:/usr/bin,
+  * but I want to save a few bytes here */
+-extern const char bb_default_root_login_path[]; /* "/sbin:/usr/sbin:/bin:/usr/bin" */
+-#define bb_default_login_path (bb_default_root_login_path + sizeof("/sbin:/usr/sbin"))
++extern const char bb_PATH_root_path[]; /* "PATH=/sbin:/usr/sbin:/bin:/usr/bin" */
++#define bb_default_root_path (bb_PATH_root_path + sizeof("PATH"))
++#define bb_default_path      (bb_PATH_root_path + sizeof("PATH=/sbin:/usr/sbin"))
+ 
+ extern const int const_int_0;
+ extern const int const_int_1;
+diff --git a/init/init.c b/init/init.c
+index cb83b08..6fcdc03 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -24,10 +24,6 @@
+ #define CONSOLE_NAME_SIZE 32
+ #define MAXENV	16		/* Number of env. vars */
+ 
+-#ifndef _PATH_STDPATH
+-#define _PATH_STDPATH	"/usr/bin:/bin:/usr/sbin:/sbin"
+-#endif
+-
+ #if ENABLE_FEATURE_INIT_COREDUMPS
+ /*
+  * When a file named CORE_ENABLE_FLAG_FILE exists, setrlimit is called
+@@ -112,7 +108,7 @@ enum {
+ 
+ static const char * const environment[] = {
+ 	"HOME=/",
+-	"PATH=" _PATH_STDPATH,
++	bb_PATH_root_path,
+ 	"SHELL=/bin/sh",
+ 	"USER=root",
+ 	NULL
+diff --git a/libbb/messages.c b/libbb/messages.c
+index 27d2cc1..56cccaf 100644
+--- a/libbb/messages.c
++++ b/libbb/messages.c
+@@ -40,7 +40,7 @@ const char bb_busybox_exec_path[] = CONFIG_BUSYBOX_EXEC_PATH;
+ const char bb_default_login_shell[] = LIBBB_DEFAULT_LOGIN_SHELL;
+ /* util-linux manpage says /sbin:/bin:/usr/sbin:/usr/bin,
+  * but I want to save a few bytes here. Check libbb.h before changing! */
+-const char bb_default_root_login_path[] = "/sbin:/usr/sbin:/bin:/usr/bin";
++const char bb_PATH_root_path[] = "PATH=/sbin:/usr/sbin:/bin:/usr/bin";
+ 
+ 
+ const int const_int_0;
+diff --git a/libbb/setup_environment.c b/libbb/setup_environment.c
+index a98b9a5..a6f44f7 100644
+--- a/libbb/setup_environment.c
++++ b/libbb/setup_environment.c
+@@ -56,7 +56,7 @@ void setup_environment(const char *shell, int loginshell, int changeenv, const s
+ 		xsetenv("SHELL",   shell);
+ 		xsetenv("USER",    pw->pw_name);
+ 		xsetenv("LOGNAME", pw->pw_name);
+-		xsetenv("PATH",   (pw->pw_uid ? bb_default_login_path : bb_default_root_login_path));
++		xsetenv("PATH",   (pw->pw_uid ? bb_default_path : bb_default_root_path));
+ 	}
+ 	else if (changeenv) {
+ 		/* Set HOME, SHELL, and if not becoming a super-user,
+diff --git a/shell/ash.c b/shell/ash.c
+index 29d8713..ae078e6 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -1581,7 +1581,6 @@ static unsigned long rseed;
+ # define VDYNAMIC       0
+ #endif
+ 
+-static const char defpathvar[] = "PATH=/usr/local/bin:/usr/bin:/sbin:/bin";
+ #ifdef IFS_BROKEN
+ static const char defifsvar[] = "IFS= \t\n";
+ #define defifs (defifsvar + 4)
+@@ -1674,7 +1673,7 @@ static struct var varinit[] = {
+ 	{ NULL, VSTRFIXED|VTEXTFIXED|VUNSET,    "MAIL\0",       changemail },
+ 	{ NULL, VSTRFIXED|VTEXTFIXED|VUNSET,    "MAILPATH\0",   changemail },
+ #endif
+-	{ NULL, VSTRFIXED|VTEXTFIXED,           defpathvar,     changepath },
++	{ NULL, VSTRFIXED|VTEXTFIXED,           bb_PATH_root_path, changepath },
+ 	{ NULL, VSTRFIXED|VTEXTFIXED,           "PS1=$ ",       NULL },
+ 	{ NULL, VSTRFIXED|VTEXTFIXED,           "PS2=> ",       NULL },
+ 	{ NULL, VSTRFIXED|VTEXTFIXED,           "PS4=+ ",       NULL },
+@@ -1710,7 +1709,6 @@ static struct var varinit[] = {
+ #else
+ #define vrandom (&vps4)[1]
+ #endif
+-#define defpath (defpathvar + 5)
+ 
+ /*
+  * The following macros access the values of the above variables.
+@@ -7874,7 +7872,7 @@ parse_command_args(char **argv, const char **path)
+ 		do {
+ 			switch (c) {
+ 			case 'p':
+-				*path = defpath;
++				*path = bb_default_path;
+ 				break;
+ 			default:
+ 				/* run 'typecmd' for other options */
+diff --git a/shell/msh.c b/shell/msh.c
+index 2ee5256..dc2fa9c 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -5213,9 +5213,9 @@ int msh_main(int argc, char **argv)
+ 	if (path->value == null) {
+ 		/* Can be merged with same string elsewhere in bbox */
+ 		if (geteuid() == 0)
+-			setval(path, bb_default_root_login_path);
++			setval(path, bb_default_root_path);
+ 		else
+-			setval(path, bb_default_login_path);
++			setval(path, bb_default_path);
+ 	}
+ 	export(path);
+ 

@@ -1,0 +1,268 @@
+2009-04-21 20:40:51 +0000
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index fae589e..47c13e6 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -52,7 +52,7 @@ void FAST_FUNC open_transformer(int fd,
+ 			argv[2] = (char*)"-";
+ 			argv[3] = NULL;
+ 			BB_EXECVP(transform_prog, argv);
+-			bb_perror_msg_and_die("can't exec %s", transform_prog);
++			bb_perror_msg_and_die("can't execute '%s'", transform_prog);
+ 		}
+ #endif
+ 		/* notreached */
+diff --git a/archival/tar.c b/archival/tar.c
+index 379028b..9b7a42a 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -577,7 +577,7 @@ static void NOINLINE vfork_compressor(int tar_fd, int gzip)
+ #endif
+ 	if (vfork_exec_errno) {
+ 		errno = vfork_exec_errno;
+-		bb_perror_msg_and_die("cannot exec %s", zip_exec);
++		bb_perror_msg_and_die("can't execute '%s'", zip_exec);
+ 	}
+ }
+ #endif /* ENABLE_FEATURE_SEAMLESS_GZ || ENABLE_FEATURE_SEAMLESS_BZ2 */
+diff --git a/coreutils/chroot.c b/coreutils/chroot.c
+index 1198a41..9b3d700 100644
+--- a/coreutils/chroot.c
++++ b/coreutils/chroot.c
+@@ -33,5 +33,5 @@ int chroot_main(int argc, char **argv)
+ 	}
+ 
+ 	BB_EXECVP(*argv, argv);
+-	bb_perror_msg_and_die("cannot execute %s", *argv);
++	bb_perror_msg_and_die("can't execute '%s'", *argv);
+ }
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index 77fdccc..ea019c2 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -164,7 +164,7 @@ int run_parts_main(int argc UNUSED_PARAM, char **argv)
+ 			continue;
+ 		n = 1;
+ 		if (ret < 0)
+-			bb_perror_msg("can't exec %s", name);
++			bb_perror_msg("can't execute '%s'", name);
+ 		else /* ret > 0 */
+ 			bb_error_msg("%s exited with code %d", name, ret);
+ 	}
+diff --git a/include/usage.h b/include/usage.h
+index bfb07a4..84da445 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4125,12 +4125,13 @@
+ 	) \
+ 
+ #define switch_root_trivial_usage \
+-       "[-c /dev/console] NEW_ROOT NEW_INIT [ARGUMENTS_TO_INIT]"
++       "[-c /dev/console] NEW_ROOT NEW_INIT [ARG...]"
+ #define switch_root_full_usage "\n\n" \
+-       "Use from PID 1 under initramfs to free initramfs, chroot to NEW_ROOT,\n" \
+-       "and exec NEW_INIT\n" \
++       "Free initramfs and switch to another root fs:\n" \
++       "chroot to NEW_ROOT, delete all in /, move NEW_ROOT to /,\n" \
++       "execute NEW_INIT. PID must be 1. NEW_ROOT must be a mountpoint.\n" \
+      "\nOptions:" \
+-     "\n	-c	Redirect console to device on new root" \
++     "\n	-c DEV	Reopen stdio to DEV after switch" \
+ 
+ #define sync_trivial_usage \
+        ""
+@@ -4142,7 +4143,7 @@
+ #define sysctl_full_usage "\n\n" \
+        "Configure kernel parameters at runtime\n" \
+      "\nOptions:" \
+-     "\n	-n	Disable printing of key names" \
++     "\n	-n	Don't print key names" \
+      "\n	-e	Don't warn about unknown keys" \
+      "\n	-w	Change sysctl setting" \
+      "\n	-p FILE	Load sysctl settings from FILE (default /etc/sysctl.conf)" \
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index 8a5d902..df4fad6 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -60,7 +60,7 @@ static void passwd_wrapper(const char *login)
+ 	static const char prog[] ALIGN1 = "passwd";
+ 
+ 	BB_EXECLP(prog, prog, login, NULL);
+-	bb_error_msg_and_die("cannot execute %s, you must set password manually", prog);
++	bb_error_msg_and_die("can't execute %s, you must set password manually", prog);
+ }
+ 
+ #if ENABLE_FEATURE_ADDUSER_LONG_OPTIONS
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index e94ff14..6ecd789 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -129,10 +129,10 @@ int runcon_main(int argc UNUSED_PARAM, char **argv)
+ 				     context_str(con));
+ 
+ 	if (setexeccon(context_str(con)))
+-		bb_error_msg_and_die("cannot set up security context '%s'",
++		bb_error_msg_and_die("can't set up security context '%s'",
+ 				     context_str(con));
+ 
+ 	execvp(argv[0], argv);
+ 
+-	bb_perror_msg_and_die("cannot execute '%s'", argv[0]);
++	bb_perror_msg_and_die("can't execute '%s'", argv[0]);
+ }
+diff --git a/shell/cttyhack.c b/shell/cttyhack.c
+index 0aa4b8a..572a3af 100644
+--- a/shell/cttyhack.c
++++ b/shell/cttyhack.c
+@@ -73,5 +73,5 @@ int cttyhack_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	BB_EXECVP(argv[0], argv);
+-	bb_perror_msg_and_die("cannot exec '%s'", argv[0]);
++	bb_perror_msg_and_die("can't execute '%s'", argv[0]);
+ }
+diff --git a/shell/hush.c b/shell/hush.c
+index 53b1f3f..56b12ce 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3048,7 +3048,7 @@ static void pseudo_exec_argv(nommu_save_t *nommu_save,
+ 	debug_printf_exec("execing '%s'\n", argv[0]);
+ 	sigprocmask(SIG_SETMASK, &G.inherited_set, NULL);
+ 	execvp(argv[0], argv);
+-	bb_perror_msg("can't exec '%s'", argv[0]);
++	bb_perror_msg("can't execute '%s'", argv[0]);
+ 	_exit(EXIT_FAILURE);
+ }
+ 
+diff --git a/util-linux/switch_root.c b/util-linux/switch_root.c
+index 08aa725..f9e3444 100644
+--- a/util-linux/switch_root.c
++++ b/util-linux/switch_root.c
+@@ -5,11 +5,10 @@
+  *
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+-
+ #include "libbb.h"
+ #include <sys/vfs.h>
+ 
+-// Make up for header deficiencies.
++// Make up for header deficiencies
+ #ifndef RAMFS_MAGIC
+ #define RAMFS_MAGIC ((unsigned)0x858458f6)
+ #endif
+@@ -22,7 +21,7 @@
+ #define MS_MOVE     8192
+ #endif
+ 
+-// Recursively delete contents of rootfs.
++// Recursively delete contents of rootfs
+ static void delete_contents(const char *directory, dev_t rootdev)
+ {
+ 	DIR *dir;
+@@ -33,7 +32,7 @@ static void delete_contents(const char *directory, dev_t rootdev)
+ 	if (lstat(directory, &st) || st.st_dev != rootdev)
+ 		return;
+ 
+-	// Recursively delete the contents of directories.
++	// Recursively delete the contents of directories
+ 	if (S_ISDIR(st.st_mode)) {
+ 		dir = opendir(directory);
+ 		if (dir) {
+@@ -51,42 +50,47 @@ static void delete_contents(const char *directory, dev_t rootdev)
+ 			}
+ 			closedir(dir);
+ 
+-			// Directory should now be empty.  Zap it.
++			// Directory should now be empty, zap it
+ 			rmdir(directory);
+ 		}
+-
+-	// It wasn't a directory.  Zap it.
+-	} else unlink(directory);
++	} else {
++		// It wasn't a directory, zap it
++		unlink(directory);
++	}
+ }
+ 
+ int switch_root_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int switch_root_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	char *newroot, *console = NULL;
+-	struct stat st1, st2;
++	struct stat st;
+ 	struct statfs stfs;
+ 	dev_t rootdev;
+ 
+ 	// Parse args (-c console)
+ 	opt_complementary = "-2"; // minimum 2 params
+-	getopt32(argv, "+c:", &console); // '+': stop parsing at first non-option
++	getopt32(argv, "+c:", &console); // '+': stop at first non-option
+ 	argv += optind;
+-
+-	// Change to new root directory and verify it's a different fs.
+ 	newroot = *argv++;
+ 
++	// Change to new root directory and verify it's a different fs
+ 	xchdir(newroot);
+-	if (lstat(".", &st1) || lstat("/", &st2) || st1.st_dev == st2.st_dev) {
+-		bb_error_msg_and_die("bad newroot %s", newroot);
++	xstat("/", &st);
++	rootdev = st.st_dev;
++	xstat(".", &st);
++	if (st.st_dev == rootdev || getpid() != 1) {
++		// Show usage, it says new root must be a mountpoint
++		// and we must be PID 1
++		bb_show_usage();
+ 	}
+-	rootdev = st2.st_dev;
+-
+-	// Additional sanity checks: we're about to rm -rf /,  so be REALLY SURE
+-	// we mean it.  (I could make this a CONFIG option, but I would get email
+-	// from all the people who WILL eat their filesystems.)
+-	if (lstat("/init", &st1) || !S_ISREG(st1.st_mode) || statfs("/", &stfs)
+-	 || (((unsigned)stfs.f_type != RAMFS_MAGIC) && ((unsigned)stfs.f_type != TMPFS_MAGIC))
+-	 || (getpid() != 1)
++
++	// Additional sanity checks: we're about to rm -rf /, so be REALLY SURE
++	// we mean it. I could make this a CONFIG option, but I would get email
++	// from all the people who WILL destroy their filesystems.
++	statfs("/", &stfs); // this never fails
++	if (lstat("/init", &st) != 0 || !S_ISREG(st.st_mode)
++	 || ((unsigned)stfs.f_type != RAMFS_MAGIC
++	     && (unsigned)stfs.f_type != TMPFS_MAGIC)
+ 	) {
+ 		bb_error_msg_and_die("not rootfs");
+ 	}
+@@ -94,14 +98,16 @@ int switch_root_main(int argc UNUSED_PARAM, char **argv)
+ 	// Zap everything out of rootdev
+ 	delete_contents("/", rootdev);
+ 
+-	// Overmount / with newdir and chroot into it.  The chdir is needed to
+-	// recalculate "." and ".." links.
+-	if (mount(".", "/", NULL, MS_MOVE, NULL))
++	// Overmount / with newdir and chroot into it
++	if (mount(".", "/", NULL, MS_MOVE, NULL)) {
++		// For example, fails when newroot is not a mountpoint
+ 		bb_perror_msg_and_die("error moving root");
++	}
++	// The chdir is needed to recalculate "." and ".." links
+ 	xchroot(".");
+ 	xchdir("/");
+ 
+-	// If a new console specified, redirect stdin/stdout/stderr to that.
++	// If a new console specified, redirect stdin/stdout/stderr to it
+ 	if (console) {
+ 		close(0);
+ 		xopen(console, O_RDWR);
+@@ -109,7 +115,7 @@ int switch_root_main(int argc UNUSED_PARAM, char **argv)
+ 		xdup2(0, 2);
+ 	}
+ 
+-	// Exec real init.  (This is why we must be pid 1.)
++	// Exec real init
+ 	execv(argv[0], argv);
+-	bb_perror_msg_and_die("bad init %s", argv[0]);
++	bb_perror_msg_and_die("can't execute '%s'", argv[0]);
+ }

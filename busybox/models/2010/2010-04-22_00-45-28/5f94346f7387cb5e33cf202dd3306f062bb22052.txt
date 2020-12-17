@@ -1,0 +1,22 @@
+2010-04-22 00:45:28 -0400
+diff --git a/libbb/time.c b/libbb/time.c
+index 5cd0426..8d176e5 100644
+--- a/libbb/time.c
++++ b/libbb/time.c
+@@ -68,6 +68,16 @@ void FAST_FUNC parse_datestr(const char *date_str, struct tm *ptm)
+ 				end = '\0';
+ 			/* else end != NUL and we error out */
+ 		}
++	} else if (date_str[0] == '@') {
++		time_t t = bb_strtol(date_str + 1, NULL, 10);
++		if (!errno) {
++			struct tm *lt = localtime(&t);
++			if (lt) {
++				*ptm = *lt;
++				return;
++			}
++		}
++		end = '1';
+ 	} else {
+ 		/* Googled the following on an old date manpage:
+ 		 *

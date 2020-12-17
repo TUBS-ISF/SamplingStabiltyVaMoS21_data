@@ -1,0 +1,14 @@
+2008-03-17 12:58:19 +0000
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 522e7ee..620e680 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1977,7 +1977,7 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
+ 				 && prequest != request_HEAD
+ #endif
+ 				) {
+-					tptr = iobuf + sizeof("Content-length:") - 1;
++					tptr = skip_whitespace(iobuf + sizeof("Content-length:") - 1);
+ 					if (!tptr[0])
+ 						send_headers_and_exit(HTTP_BAD_REQUEST);
+ 					/* not using strtoul: it ignores leading minus! */

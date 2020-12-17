@@ -1,0 +1,13 @@
+2007-11-12 01:44:49 +0000
+diff --git a/archival/libunarchive/decompress_unzip.c b/archival/libunarchive/decompress_unzip.c
+index 0572bee..04d6f15 100644
+--- a/archival/libunarchive/decompress_unzip.c
++++ b/archival/libunarchive/decompress_unzip.c
+@@ -1178,6 +1178,7 @@ unpack_gz_stream(int in, int out)
+ 	ALLOC_STATE;
+ 	bytebuffer_max = 0x8000;
+ 	bytebuffer = xmalloc(bytebuffer_max);
++	gunzip_src_fd = in;
+ 
+  again:
+ 	if (!check_header_gzip(PASS_STATE_ONLY)) {

@@ -1,0 +1,14 @@
+2008-08-21 14:14:36 +0000
+diff --git a/docs/busybox.net/tinyutils.html b/docs/busybox.net/tinyutils.html
+index 1c03d4c..bf6dafd 100644
+--- a/docs/busybox.net/tinyutils.html
++++ b/docs/busybox.net/tinyutils.html
+@@ -58,7 +58,7 @@ dded system, this is where to start.
+ <tr>
+ 
+ <td><a href="http://www.lua.org/pil/">Lua</a></td>
+-<td>If you just want a small embedded scripting language to write <em>new</en>
++<td>If you just want a small embedded scripting language to write <em>new</em>
+ code in, this Brazilian import is lightweight, fairly popular, and has
+ a complete book about it online.</td>
+ </tr>

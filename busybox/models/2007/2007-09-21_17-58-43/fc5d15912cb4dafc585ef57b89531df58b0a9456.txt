@@ -1,0 +1,14 @@
+2007-09-21 17:58:43 +0000
+diff --git a/coreutils/test.c b/coreutils/test.c
+index 82d2664..3c57cf4 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -156,7 +156,7 @@ typedef int arith_t;
+ /* Cannot eliminate these static data (do the G trick)
+  * because of test_main usage from other applets */
+ static char **t_wp;
+-static struct t_op const *t_wp_op;
++static const struct t_op *t_wp_op;
+ static gid_t *group_array;
+ static int ngroups;
+ static jmp_buf leaving;

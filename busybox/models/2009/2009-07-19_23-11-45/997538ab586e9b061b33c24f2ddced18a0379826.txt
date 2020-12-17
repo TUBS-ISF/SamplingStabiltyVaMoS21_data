@@ -1,0 +1,15 @@
+2009-07-19 23:11:45 +0200
+diff --git a/util-linux/scriptreplay.c b/util-linux/scriptreplay.c
+index 6474d38..d7e1933 100644
+--- a/util-linux/scriptreplay.c
++++ b/util-linux/scriptreplay.c
+@@ -18,6 +18,9 @@ int scriptreplay_main(int argc UNUSED_PARAM, char **argv)
+ 	unsigned long count;
+ 	FILE *tfp;
+ 
++	if (!argv[1])
++		bb_show_usage();
++
+ 	if (argv[2]) {
+ 		script = argv[2];
+ 		if (argv[3])

@@ -1,0 +1,260 @@
+2009-09-06 02:58:59 +0200
+diff --git a/README b/README
+index 4049044..318d447 100644
+--- a/README
++++ b/README
+@@ -68,9 +68,9 @@ Downloading the current source code:
+ 
+     http://www.busybox.net/cgi-bin/viewcvs.cgi/trunk/busybox/
+ 
+-  Anonymous SVN access is available.  For instructions, check out:
++  Anonymous GIT access is available.  For instructions, check out:
+ 
+-    http://busybox.net/subversion.html
++    http://www.busybox.net/source.html
+ 
+   For those that are actively contributing and would like to check files in,
+   see:
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index abeb162..781f1bb 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -493,7 +493,7 @@ static void free_package(common_node_t *node)
+ }
+ 
+ /*
+- * Gets the next package field from package_buffer, seperated into the field name
++ * Gets the next package field from package_buffer, separated into the field name
+  * and field value, it returns the int offset to the first character of the next field
+  */
+ static int read_package_field(const char *package_buffer, char **field_name, char **field_value)
+@@ -806,7 +806,7 @@ static void write_status_file(deb_file_t **deb_file)
+ 		write_flag = FALSE;
+ 		tmp_string = strstr(control_buffer, "Status:");
+ 		if (tmp_string != NULL) {
+-			/* Seperate the status value from the control buffer */
++			/* Separate the status value from the control buffer */
+ 			tmp_string += 7;
+ 			tmp_string += strspn(tmp_string, " \n\t");
+ 			status_from_file = xstrndup(tmp_string, strcspn(tmp_string, "\n"));
+diff --git a/docs/Serial-Programming-HOWTO.txt b/docs/Serial-Programming-HOWTO.txt
+index 0dfc8aa..8a3954b 100644
+--- a/docs/Serial-Programming-HOWTO.txt
++++ b/docs/Serial-Programming-HOWTO.txt
+@@ -133,7 +133,7 @@ Seems to be somewhat old, but contains useful bits for getty.c hacking
+   characters will operate on the incoming data before it is delivered to
+   the user.
+ 
+-  In non-canonical mode, incoming data is quanitified by use of the
++  In non-canonical mode, incoming data is quantified by use of the
+   c_cc[VMIN and c_cc[VTIME] values in termios.c_cc[].
+ 
+   Some programmers use the select() call to detect the completion of a
+diff --git a/docs/busybox_footer.pod b/docs/busybox_footer.pod
+index 74575bd..faf7d9f 100644
+--- a/docs/busybox_footer.pod
++++ b/docs/busybox_footer.pod
+@@ -33,7 +33,7 @@ The following people have contributed code to BusyBox whether they know it or
+ not.  If you have written code included in BusyBox, you should probably be
+ listed here so you can obtain your bit of eternal glory.  If you should be
+ listed here, or the description of what you have done needs more detail, or is
+-incorect, please send in an update.
++incorrect, please send in an update.
+ 
+ 
+ =for html <br>
+@@ -158,7 +158,7 @@ John Lombardo <john@deltanet.com>
+ 
+ Glenn McGrath <bug1@iinet.net.au>
+ 
+-    Common unarchving code and unarchiving applets, ifupdown, ftpgetput,
++    Common unarchiving code and unarchiving applets, ifupdown, ftpgetput,
+     nameif, sed, patch, fold, install, uudecode.
+     Various bugfixes, review and apply numerous patches.
+ 
+diff --git a/docs/contributing.txt b/docs/contributing.txt
+index 54cba75..cc16574 100644
+--- a/docs/contributing.txt
++++ b/docs/contributing.txt
+@@ -124,7 +124,7 @@ an example:
+     But when I use BusyBox date I get this instead:
+ 
+ 	$ date
+-	llegal instruction
++	Illegal instruction
+ 
+     I am using Debian unstable, kernel version 2.4.19-rmk1 on an Netwinder,
+     and the latest uClibc from CVS.
+diff --git a/docs/logging_and_backgrounding.txt b/docs/logging_and_backgrounding.txt
+index 62a6d15..7e68855 100644
+--- a/docs/logging_and_backgrounding.txt
++++ b/docs/logging_and_backgrounding.txt
+@@ -21,7 +21,7 @@ To help with that, busybox applets should have options to override
+ default behavior, whatever that is for a given applet.
+ 
+ 
+-Current sutiation is a bit of a mess:
++Current situation is a bit of a mess:
+ 
+ acpid - auto-backgrounds unless -d
+ crond - auto-backgrounds unless -f, logs to syslog unless -d or -L.
+@@ -51,7 +51,7 @@ Total: 13 applets (+1 obsolete),
+  5 never log to syslog (acpid httpd telnetd klogd syslogd, last two
+  - for obviously correct reasons),
+  there are no daemons which always log to syslog,
+- 12 auto-background if not run as inetd servies (all except dnsd.
++ 12 auto-background if not run as inetd services (all except dnsd.
+  Note that there is no "standard" dnsd AFAIKS). But see below
+  for daemons (tcpsvd etc) which don't auto-background.
+ 
+diff --git a/docs/mdev.txt b/docs/mdev.txt
+index a8a816c..61a6f45 100644
+--- a/docs/mdev.txt
++++ b/docs/mdev.txt
+@@ -122,6 +122,6 @@ IOW: this will serialize concurrent mdev invocations.
+ 
+ If you want to activate this feature, execute "echo >/dev/mdev.seq" prior to
+ setting mdev to be the hotplug handler. This writes single '\n' to the file.
+-NB: mdev recognizes /dev/mdev.seq consisting of single '\n' characher
++NB: mdev recognizes /dev/mdev.seq consisting of single '\n' character
+ as a special case. IOW: this will not make your first hotplug event
+ to stall for two seconds.
+diff --git a/docs/new-applet-HOWTO.txt b/docs/new-applet-HOWTO.txt
+index e7c3077..0646e72 100644
+--- a/docs/new-applet-HOWTO.txt
++++ b/docs/new-applet-HOWTO.txt
+@@ -9,7 +9,7 @@ Mark Whitley - the remix
+ Thomas Lundquist - Trying to keep it updated.
+ 
+ When doing this you should consider using the latest svn trunk.
+-This is a good thing if you plan to getting it commited into mainline.
++This is a good thing if you plan to getting it committed into mainline.
+ 
+ Initial Write
+ -------------
+@@ -107,7 +107,7 @@ the function declaration. If not, add it somewhere anyway, with or without
+ ifdefs to include or not.
+ 
+ You can look at libbb/Config.in and try to find out if the function is
+-tuneable and add it there if it is.
++tunable and add it there if it is.
+ 
+ 
+ Placement / Directory
+diff --git a/docs/posix_conformance.txt b/docs/posix_conformance.txt
+index 474465e..d9fa116 100644
+--- a/docs/posix_conformance.txt
++++ b/docs/posix_conformance.txt
+@@ -7,7 +7,7 @@ And the complete list of all utilities that POSIX covers:
+ http://www.opengroup.org/onlinepubs/9699919799/idx/utilities.html
+ 
+ This listing is a work in progress, and currently only covers
+-tool options (not operands, enviroment variables, return codes, etc..).
++tool options (not operands, environment variables, return codes, etc..).
+ For each option it is set if it (a) exists and (b) compliant to POSIX 2008.
+ Some options exist but there is no value in the 'compliant' column: that
+ means no one has yet bothered to make sure that the option does what it is
+diff --git a/docs/style-guide.txt b/docs/style-guide.txt
+index 7560d69..a58931a 100644
+--- a/docs/style-guide.txt
++++ b/docs/style-guide.txt
+@@ -252,7 +252,7 @@ because it looks like whitespace; using lower-case is easy on the eyes.
+ Exceptions:
+ 
+  - Enums, macros, and constant variables are occasionally written in all
+-   upper-case with words optionally seperatedy by underscores (i.e. FIFO_TYPE,
++   upper-case with words optionally separated by underscores (i.e. FIFO_TYPE,
+    ISBLKDEV()).
+ 
+  - Nobody is going to get mad at you for using 'pvar' as the name of a
+diff --git a/include/libbb.h b/include/libbb.h
+index 9f7c260..14a1667 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1174,7 +1174,7 @@ unsigned long long bb_makedev(unsigned int major, unsigned int minor) FAST_FUNC;
+ 
+ /* "Keycodes" that report an escape sequence.
+  * We use something which fits into signed char,
+- * yet doesn't represent any valid Unicode characher.
++ * yet doesn't represent any valid Unicode character.
+  * Also, -1 is reserved for error indication and we don't use it. */
+ enum {
+ 	KEYCODE_UP       =  -2,
+diff --git a/include/usage.h b/include/usage.h
+index 9fa1b9e..e571d2b 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2001,8 +2001,8 @@
+      "\n	a	File is accessed" \
+      "\n	c	File is modified" \
+      "\n	e	Metadata changed" \
+-     "\n	w	Writtable file is closed" \
+-     "\n	0	Unwrittable file is closed" \
++     "\n	w	Writable file is closed" \
++     "\n	0	Unwritable file is closed" \
+      "\n	r	File is opened" \
+      "\n	D	File is deleted" \
+      "\n	M	File is moved" \
+@@ -3860,7 +3860,7 @@
+      "\n	-l	Log changes in file labels to syslog" \
+      "\n	-n	Don't change any file labels" \
+      "\n	-q	Suppress warnings" \
+-     "\n	-r dir	Use an altenate root path" \
++     "\n	-r dir	Use an alternate root path" \
+      "\n	-e dir	Exclude directory" \
+      "\n	-F	Force reset of context to match file_context for customizable files" \
+      "\n	-o file	Save list of files with incorrect context" \
+diff --git a/libbb/parse_config.c b/libbb/parse_config.c
+index b6c720d..c511d97 100644
+--- a/libbb/parse_config.c
++++ b/libbb/parse_config.c
+@@ -102,7 +102,7 @@ void FAST_FUNC config_close(parser_t *parser)
+ 0. If parser is NULL return 0.
+ 1. Read a line from config file. If nothing to read then return 0.
+    Handle continuation character. Advance lineno for each physical line.
+-   Discard everything past comment characher.
++   Discard everything past comment character.
+ 2. if PARSE_TRIM is set (default), remove leading and trailing delimiters.
+ 3. If resulting line is empty goto 1.
+ 4. Look for first delimiter. If !PARSE_COLLAPSE or !PARSE_TRIM is set then
+diff --git a/miscutils/inotifyd.c b/miscutils/inotifyd.c
+index d6b5d24..999b5e3 100644
+--- a/miscutils/inotifyd.c
++++ b/miscutils/inotifyd.c
+@@ -34,8 +34,8 @@ static const char mask_names[] ALIGN1 =
+ 	"a"	// 0x00000001	File was accessed
+ 	"c"	// 0x00000002	File was modified
+ 	"e"	// 0x00000004	Metadata changed
+-	"w"	// 0x00000008	Writtable file was closed
+-	"0"	// 0x00000010	Unwrittable file closed
++	"w"	// 0x00000008	Writable file was closed
++	"0"	// 0x00000010	Unwritable file closed
+ 	"r"	// 0x00000020	File was opened
+ 	"m"	// 0x00000040	File was moved from X
+ 	"y"	// 0x00000080	File was moved to Y
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 094c3ba..e4c31ee 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -187,7 +187,7 @@ static int tftp_protocol(
+ 	/* Can't use RESERVE_CONFIG_BUFFER here since the allocation
+ 	 * size varies meaning BUFFERS_GO_ON_STACK would fail.
+ 	 *
+-	 * We must keep the transmit and receive buffers seperate
++	 * We must keep the transmit and receive buffers separate
+ 	 * in case we rcv a garbage pkt - we need to rexmit the last pkt.
+ 	 */
+ 	char *xbuf = xmalloc(io_bufsize);
+diff --git a/testsuite/README b/testsuite/README
+index 2ead8e9..b943a12 100644
+--- a/testsuite/README
++++ b/testsuite/README
+@@ -15,7 +15,7 @@ internet connection.
+ Common causes of false positives:
+ 
+ For busybox built against uclibc, /etc/TZ does not exist or does not match
+-host system timezone setting. For glibc based host systems, timezona settings
++host system timezone setting. For glibc based host systems, timezone settings
+ are in /etc/localtime.
+ 
+ LANG and LC_xxx environment variables set to non-C locale.

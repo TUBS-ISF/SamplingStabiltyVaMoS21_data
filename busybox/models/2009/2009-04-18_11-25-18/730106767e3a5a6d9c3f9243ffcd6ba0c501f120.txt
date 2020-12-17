@@ -1,0 +1,13 @@
+2009-04-18 11:25:18 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 1da9707..0f93ae6 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2863,6 +2863,7 @@ static void unset_func(const char *name)
+ 			free(funcp);
+ 			break;
+ 		}
++		funcpp = &funcp->next;
+ 	}
+ }
+ 

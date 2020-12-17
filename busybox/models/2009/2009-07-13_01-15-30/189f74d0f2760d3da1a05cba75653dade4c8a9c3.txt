@@ -1,0 +1,72 @@
+2009-07-13 01:15:30 +0200
+diff --git a/libbb/update_passwd.c b/libbb/update_passwd.c
+index aa1e2ed..3aab401 100644
+--- a/libbb/update_passwd.c
++++ b/libbb/update_passwd.c
+@@ -87,6 +87,12 @@ int FAST_FUNC update_passwd(const char *filename,
+ 	int i;
+ 	int changed_lines;
+ 	int ret = -1; /* failure */
++	/* used as a bool: "are we modifying /etc/shadow?" */
++#if ENABLE_FEATURE_SHADOWPASSWDS
++	const char *shadow = strstr(filename, "shadow");
++#else
++# define shadow NULL
++#endif
+ 
+ 	filename = xmalloc_follow_symlinks(filename);
+ 	if (filename == NULL)
+@@ -100,7 +106,7 @@ int FAST_FUNC update_passwd(const char *filename,
+ 	name = xasprintf("%s:", name);
+ 	user_len = strlen(name);
+ 
+-	if (ENABLE_FEATURE_SHADOWPASSWDS && strstr(filename, "shadow"))
++	if (shadow)
+ 		old_fp = fopen(filename, "r+");
+ 	else
+ 		old_fp = fopen_or_warn(filename, "r+");
+@@ -215,8 +221,18 @@ int FAST_FUNC update_passwd(const char *filename,
+ 		) {
+ 			/* Change passwd */
+ 			cp = strchrnul(cp, ':'); /* move past old passwd */
+-			/* name: + new_passwd + :rest of line */
+-			fprintf(new_fp, "%s%s%s\n", name, new_passwd, cp);
++
++			if (shadow && *cp == ':') {
++				/* /etc/shadow's field 3 (passwd change date) needs updating */
++				/* move past old change date */
++				cp = strchrnul(cp + 1, ':');
++				/* "name:" + "new_passwd" + ":" + "change date" + ":rest of line" */
++				fprintf(new_fp, "%s%s:%u%s\n", name, new_passwd,
++					(unsigned)(time(NULL)) / (24*60*60), cp);
++			} else {
++				/* "name:" + "new_passwd" + ":rest of line" */
++				fprintf(new_fp, "%s%s%s\n", name, new_passwd, cp);
++			}
+ 			changed_lines++;
+ 		} /* else delete user or group: skip the line */
+  next:
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index 0023237..136dcdf 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -169,7 +169,18 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ 		free(p);
+ 
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+-	p = xasprintf("!:%u:0:99999:7:::", (unsigned)(time(NULL) / 86400)); /* sp->sp_lstchg */
++	/* /etc/shadow fields:
++	 * 1. username
++	 * 2. encrypted password
++	 * 3. last password change (unix date (unix time/24*60*60))
++	 * 4. minimum days required between password changes
++	 * 5. maximum days password is valid
++	 * 6. days before password is to expire that user is warned
++	 * 7. days after password expires that account is disabled
++	 * 8. unix date when login expires (may no longer be used)
++	 */
++	/* fields:     2 3  4 5     6 78 */
++	p = xasprintf("!:%u:0:99999:7:::", (unsigned)(time(NULL)) / (24*60*60));
+ 	/* ignore errors: if file is missing we suppose admin doesn't want it */
+ 	update_passwd(bb_path_shadow_file, pw.pw_name, p, NULL);
+ 	if (ENABLE_FEATURE_CLEAN_UP)

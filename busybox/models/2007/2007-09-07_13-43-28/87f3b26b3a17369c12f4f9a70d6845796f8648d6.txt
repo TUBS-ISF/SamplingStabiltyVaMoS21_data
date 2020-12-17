@@ -1,0 +1,339 @@
+2007-09-07 13:43:28 +0000
+diff --git a/editors/vi.c b/editors/vi.c
+index afbddc2..f7f8480 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -237,7 +237,8 @@ static char *yank_delete(char *, char *, int, int);	// yank text[] into register
+ static void show_help(void);	// display some help info
+ static void rawmode(void);	// set "raw" mode on tty
+ static void cookmode(void);	// return to "cooked" mode on tty
+-static int mysleep(int);	// sleep for 'h' 1/100 seconds
++// sleep for 'h' 1/100 seconds, return 1/0 if stdin is (ready for read)/(not ready)
++static int mysleep(int);
+ static char readit(void);	// read (maybe cursor) key from stdin
+ static char get_one_char(void);	// read 1 char from stdin
+ static int file_size(const char *);   // what is the byte size of "fn"
+@@ -2134,17 +2135,11 @@ static void catch_sig(int sig)
+ 
+ static int mysleep(int hund)	// sleep for 'h' 1/100 seconds
+ {
+-	fd_set rfds;
+-	struct timeval tv;
++	struct pollfd pfd[1];
+ 
+-	// Don't hang- Wait 5/100 seconds-  1 Sec= 1000000
+-	fflush(stdout);
+-	FD_ZERO(&rfds);
+-	FD_SET(0, &rfds);
+-	tv.tv_sec = 0;
+-	tv.tv_usec = hund * 10000;
+-	select(1, &rfds, NULL, NULL, &tv);
+-	return FD_ISSET(0, &rfds);
++	pfd[0].fd = 0;
++	pfd[0].events = POLLIN;
++	return poll(pfd, 1, hund*10) > 0;
+ }
+ 
+ #define readbuffer bb_common_bufsiz1
+@@ -2217,25 +2212,20 @@ static char readit(void)	// read (maybe cursor) key from stdin
+ 		if (n <= 0)
+ 			return 0;       // error
+ 		if (readbuffer[0] == 27) {
+-			fd_set rfds;
+-			struct timeval tv;
+-
+ 			// This is an ESC char. Is this Esc sequence?
+ 			// Could be bare Esc key. See if there are any
+ 			// more chars to read after the ESC. This would
+ 			// be a Function or Cursor Key sequence.
+-			FD_ZERO(&rfds);
+-			FD_SET(0, &rfds);
+-			tv.tv_sec = 0;
+-			tv.tv_usec = 50000;	// Wait 5/100 seconds- 1 Sec=1000000
+-
++			struct pollfd pfd[1];
++			pfd[0].fd = 0;
++			pfd[0].events = POLLIN;
++			// Wait 50 ms
+ 			// keep reading while there are input chars and room in buffer
+-			while (select(1, &rfds, NULL, NULL, &tv) > 0 && n <= (MAX_LINELEN - 5)) {
++			while (poll(pfd, 1, 50) > 0 && n <= (MAX_LINELEN - 5)) {
+ 				// read the rest of the ESC string
+-				int r = read(0, (void *) (readbuffer + n), MAX_LINELEN - n);
+-				if (r > 0) {
++				int r = read(0, readbuffer + n, MAX_LINELEN - n);
++				if (r > 0)
+ 					n += r;
+-				}
+ 			}
+ 		}
+ 		readed_for_parse = n;
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 0b25f75..ac3a86a 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -23,10 +23,10 @@
+ 
+ #if ENABLE_FEATURE_TFTP_GET || ENABLE_FEATURE_TFTP_PUT
+ 
+-#define TFTP_BLOCKSIZE_DEFAULT 512	/* according to RFC 1350, don't change */
+-#define TFTP_TIMEOUT 50000		/* 50ms, in microseconds */
+-#define TFTP_MAXTIMEOUT 999000		/* about 1 second, in microseconds */
+-#define TFTP_NUM_RETRIES 12 		/* number of backed-off retries */
++#define TFTP_BLOCKSIZE_DEFAULT 512      /* according to RFC 1350, don't change */
++#define TFTP_TIMEOUT_MS         50
++#define TFTP_MAXTIMEOUT_MS    2000
++#define TFTP_NUM_RETRIES        12      /* number of backed-off retries */
+ 
+ /* opcodes we support */
+ #define TFTP_RRQ   1
+@@ -114,9 +114,8 @@ static int tftp( USE_GETPUT(const int cmd,)
+ 		const char *remotefile, const int localfd,
+ 		unsigned port, int tftp_bufsize)
+ {
+-	struct timeval tv;
+-	fd_set rfds;
+-	int socketfd;
++	struct pollfd pfd[1];
++#define socketfd (pfd[0].fd)
+ 	int len;
+ 	int send_len;
+ 	USE_FEATURE_TFTP_BLOCKSIZE(smallint want_option_ack = 0;)
+@@ -124,7 +123,7 @@ static int tftp( USE_GETPUT(const int cmd,)
+ 	uint16_t opcode;
+ 	uint16_t block_nr = 1;
+ 	uint16_t recv_blk;
+-	int retries, waittime;
++	int retries, waittime_ms;
+ 	char *cp;
+ 
+ 	unsigned org_port;
+@@ -208,7 +207,7 @@ static int tftp( USE_GETPUT(const int cmd,)
+ 		 * for potential resend */
+ 
+ 		retries = TFTP_NUM_RETRIES;	/* re-initialize */
+-		waittime = TFTP_TIMEOUT;
++		waittime_ms = TFTP_TIMEOUT_MS;
+ 
+  send_again:
+ #if ENABLE_DEBUG_TFTP
+@@ -224,11 +223,9 @@ static int tftp( USE_GETPUT(const int cmd,)
+ 
+  recv_again:
+ 		/* Receive packet */
+-		tv.tv_sec = 0;
+-		tv.tv_usec = waittime;
+-		FD_ZERO(&rfds);
+-		FD_SET(socketfd, &rfds);
+-		switch (select(socketfd + 1, &rfds, NULL, NULL, &tv)) {
++		/*pfd[0].fd = socketfd;*/
++		pfd[0].events = POLLIN;
++		switch (poll(pfd, 1, waittime_ms)) {
+ 			unsigned from_port;
+ 		case 1:
+ 			from->len = peer_lsa->len;
+@@ -258,14 +255,14 @@ static int tftp( USE_GETPUT(const int cmd,)
+ 			}
+ 
+ 			/* exponential backoff with limit */
+-			waittime += waittime/2;
+-			if (waittime > TFTP_MAXTIMEOUT) {
+-				waittime = TFTP_MAXTIMEOUT;
++			waittime_ms += waittime_ms/2;
++			if (waittime_ms > TFTP_MAXTIMEOUT_MS) {
++				waittime_ms = TFTP_MAXTIMEOUT_MS;
+ 			}
+ 
+ 			goto send_again; /* resend last sent pkt */
+ 		default:
+-			bb_perror_msg("select");
++			bb_perror_msg("poll");
+ 			goto ret;
+ 		}
+  process_pkt:
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 236ddbd..21921e5 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -346,10 +346,10 @@ static int optlen;                     /* length of ip options */
+ 
+ 
+ struct globals {
+-	/* last inbound (icmp) packet */
+-	unsigned char packet[512];
+ 	struct sockaddr_storage whereto;        /* Who to try to reach */
+ 	struct sockaddr_storage wherefrom;      /* Who we are */
++	/* last inbound (icmp) packet */
++	unsigned char packet[512];
+ #if ENABLE_FEATURE_TRACEROUTE_SOURCE_ROUTE
+ 	/* Maximum number of gateways (include room for one noop) */
+ #define NGATEWAYS ((int)((MAX_IPOPTLEN - IPOPT_MINOFF - 1) / sizeof(uint32_t)))
+@@ -359,7 +359,7 @@ struct globals {
+ };
+ 
+ #define G (*ptr_to_globals)
+-
++#define INIT_G() PTR_TO_GLOBALS = xzalloc(sizeof(G))
+ #define packet    (G.packet   )
+ #define whereto   (G.whereto  )
+ #define wherefrom (G.wherefrom)
+@@ -537,21 +537,15 @@ findsaddr(const struct sockaddr_in *to, struct sockaddr_in *from)
+ static int
+ wait_for_reply(int sock, struct sockaddr_in *fromp)
+ {
+-	fd_set fds;
+-	struct timeval tvwait;
++	struct pollfd pfd[1];
+ 	int cc = 0;
+ 	socklen_t fromlen = sizeof(*fromp);
+ 
+-	FD_ZERO(&fds);
+-	FD_SET(sock, &fds);
+-
+-	tvwait.tv_sec = waittime;
+-	tvwait.tv_usec = 0;
+-
+-	if (select(sock + 1, &fds, NULL, NULL, &tvwait) > 0)
+-		cc = recvfrom(sock, (char *)packet, sizeof(packet), 0,
++	pfd[0].fd = sock;
++	pfd[0].events = POLLIN;
++	if (poll(pfd, 1, waittime * 1000) > 0)
++		cc = recvfrom(sock, packet, sizeof(packet), 0,
+ 			    (struct sockaddr *)fromp, &fromlen);
+-
+ 	return cc;
+ }
+ 
+@@ -930,7 +924,7 @@ int traceroute_main(int argc, char **argv)
+ 	llist_t *source_route_list = NULL;
+ #endif
+ 
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G));
++	INIT_G();
+ 	from = (struct sockaddr_in *)&wherefrom;
+ 	to = (struct sockaddr_in *)&whereto;
+ 
+diff --git a/networking/udhcp/arpping.c b/networking/udhcp/arpping.c
+index 4ac52c6..3351807 100644
+--- a/networking/udhcp/arpping.c
++++ b/networking/udhcp/arpping.c
+@@ -37,14 +37,12 @@ struct arpMsg {
+ 
+ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *interface)
+ {
+-	int timeout = 2;
+-	int s;                  /* socket */
++	int timeout_ms = 2000;
++	struct pollfd pfd[1];
++#define s (pfd[0].fd)           /* socket */
+ 	int rv = 1;             /* "no reply received" yet */
+ 	struct sockaddr addr;   /* for interface name */
+ 	struct arpMsg arp;
+-	fd_set fdset;
+-	struct timeval tm;
+-	unsigned prevTime;
+ 
+ 	s = socket(PF_PACKET, SOCK_PACKET, htons(ETH_P_ARP));
+ 	if (s == -1) {
+@@ -80,18 +78,17 @@ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *i
+ 	/* wait for arp reply, and check it */
+ 	do {
+ 		int r;
+-		prevTime = monotonic_sec();
+-		FD_ZERO(&fdset);
+-		FD_SET(s, &fdset);
+-		tm.tv_sec = timeout;
+-		tm.tv_usec = 0;
+-		r = select(s + 1, &fdset, NULL, NULL, &tm);
++		unsigned prevTime = monotonic_us();
++
++		pfd[0].events = POLLIN;
++		r = poll(pfd, 1, timeout_ms);
+ 		if (r < 0) {
+-			bb_perror_msg("error on ARPING request");
+-			if (errno != EINTR)
++			if (errno != EINTR) {
++				bb_perror_msg("poll");
+ 				break;
++			}
+ 		} else if (r) {
+-			if (recv(s, &arp, sizeof(arp), 0) < 0)
++			if (read(s, &arp, sizeof(arp)) < 0)
+ 				break;
+ 			if (arp.operation == htons(ARPOP_REPLY)
+ 			 && memcmp(arp.tHaddr, from_mac, 6) == 0
+@@ -101,8 +98,8 @@ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *i
+ 				break;
+ 			}
+ 		}
+-		timeout -= monotonic_sec() - prevTime;
+-	} while (timeout > 0);
++		timeout_ms -= (monotonic_us() - prevTime) / 1000;
++	} while (timeout_ms > 0);
+ 
+  ret:
+ 	close(s);
+diff --git a/shell/ash.c b/shell/ash.c
+index 46f00dd..ec3e176 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -11589,6 +11589,7 @@ readcmd(int argc, char **argv)
+ #endif
+ #if ENABLE_ASH_READ_TIMEOUT
+ 	if (ts.tv_sec || ts.tv_usec) {
++// TODO: replace with poll, it is smaller
+ 		FD_ZERO(&set);
+ 		FD_SET(0, &set);
+ 
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 5b153f5..ae3f1a2 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -471,8 +471,8 @@ static void do_syslogd(void) ATTRIBUTE_NORETURN;
+ static void do_syslogd(void)
+ {
+ 	struct sockaddr_un sunx;
+-	int sock_fd;
+-	fd_set fds;
++	struct pollfd pfd[1];
++#define sock_fd (pfd[0].fd)
+ 	char *dev_log_name;
+ 
+ 	/* Set up signal handlers */
+@@ -526,20 +526,20 @@ static void do_syslogd(void)
+ 			(char*)"syslogd started: BusyBox v" BB_VER, 0);
+ 
+ 	for (;;) {
+-		FD_ZERO(&fds);
+-		FD_SET(sock_fd, &fds);
+-
+-		if (select(sock_fd + 1, &fds, NULL, NULL, NULL) < 0) {
++		/*pfd[0].fd = sock_fd;*/
++		pfd[0].events = POLLIN;
++		pfd[0].revents = 0;
++		if (poll(pfd, 1, -1) < 0) { /* -1: no timeout */
+ 			if (errno == EINTR) {
+ 				/* alarm may have happened */
+ 				continue;
+ 			}
+-			bb_perror_msg_and_die("select");
++			bb_perror_msg_and_die("poll");
+ 		}
+ 
+-		if (FD_ISSET(sock_fd, &fds)) {
++		if (pfd[0].revents) {
+ 			int i;
+-			i = recv(sock_fd, G.recvbuf, MAX_READ - 1, 0);
++			i = read(sock_fd, G.recvbuf, MAX_READ - 1);
+ 			if (i <= 0)
+ 				bb_perror_msg_and_die("UNIX socket error");
+ 			/* TODO: maybe suppress duplicates? */
+@@ -559,7 +559,7 @@ static void do_syslogd(void)
+ #endif
+ 			G.recvbuf[i] = '\0';
+ 			split_escape_and_log(G.recvbuf, i);
+-		} /* FD_ISSET() */
++		}
+ 	} /* for */
+ }
+ 

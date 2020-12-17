@@ -1,0 +1,315 @@
+2010-03-18 18:35:37 +0100
+diff --git a/Config.in b/Config.in
+index e7bb05d..e0c01f3 100644
+--- a/Config.in
++++ b/Config.in
+@@ -196,6 +196,14 @@ config UNICODE_WIDE_WCHARS
+ 	  With this option off, any Unicode char with width > 1
+ 	  is substituted on output.
+ 
++config UNICODE_BIDI_SUPPORT
++	bool "Bidirectional character-aware line input"
++	default y
++	depends on FEATURE_ASSUME_UNICODE && !LOCALE_SUPPORT
++	help
++	  With this option on, right-to-left Unicode characters
++	  are treated differently on input (e.g. cursor movement).
++
+ config LONG_OPTS
+ 	bool "Support for --long-options"
+ 	default y
+diff --git a/include/unicode.h b/include/unicode.h
+index 857aab1..05bdbca 100644
+--- a/include/unicode.h
++++ b/include/unicode.h
+@@ -18,6 +18,8 @@ enum {
+ 	UNICODE_ON = 2,
+ };
+ 
++#define unicode_isrtl(wc) 0
++
+ #if !ENABLE_FEATURE_ASSUME_UNICODE
+ 
+ # define unicode_strlen(string) strlen(string)
+@@ -26,6 +28,17 @@ enum {
+ 
+ #else
+ 
++# if CONFIG_LAST_SUPPORTED_WCHAR < 126 || CONFIG_LAST_SUPPORTED_WCHAR >= 0x30000
++#  define LAST_SUPPORTED_WCHAR 0x2ffff
++# else
++#  define LAST_SUPPORTED_WCHAR CONFIG_LAST_SUPPORTED_WCHAR
++# endif
++
++# if LAST_SUPPORTED_WCHAR < 0x590
++#  undef  ENABLE_UNICODE_BIDI_SUPPORT
++#  define ENABLE_UNICODE_BIDI_SUPPORT 0
++# endif
++
+ size_t FAST_FUNC unicode_strlen(const char *string);
+ enum {
+ 	UNI_FLAG_PAD = (1 << 0),
+@@ -78,6 +91,10 @@ size_t wcrtomb(char *s, wchar_t wc, mbstate_t *ps) FAST_FUNC;
+ int iswspace(wint_t wc) FAST_FUNC;
+ int iswalnum(wint_t wc) FAST_FUNC;
+ int iswpunct(wint_t wc) FAST_FUNC;
++#  if ENABLE_UNICODE_BIDI_SUPPORT
++#   undef unicode_isrtl
++int unicode_isrtl(wint_t wc) FAST_FUNC;
++#  endif
+ 
+ 
+ # endif /* !LOCALE_SUPPORT */
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 7c0eef9..be022e8 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1738,6 +1738,18 @@ static int lineedit_read_key(char *read_key_buffer)
+ 	return ic;
+ }
+ 
++#if ENABLE_UNICODE_BIDI_SUPPORT
++static int isrtl_str(void)
++{
++	int idx = cursor;
++	while (command_ps[idx] >= ' ' && command_ps[idx] < 127 && !isalpha(command_ps[idx]))
++		idx++;
++	return unicode_isrtl(command_ps[idx]);
++}
++#else
++# define isrtl_str() 0
++#endif
++
+ /* leave out the "vi-mode"-only case labels if vi editing isn't
+  * configured. */
+ #define vi_case(caselabel) IF_FEATURE_EDITING_VI(case caselabel)
+@@ -1895,10 +1907,9 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ 			break;
+ 		case CTRL('B'):
+ 		vi_case('h'|VI_CMDMODE_BIT:)
+-		vi_case('\b'|VI_CMDMODE_BIT:)
++		vi_case('\b'|VI_CMDMODE_BIT:) /* ^H */
+ 		vi_case('\x7f'|VI_CMDMODE_BIT:) /* DEL */
+-			/* Control-b -- Move back one character */
+-			input_backward(1);
++			input_backward(1); /* Move back one character */
+ 			break;
+ 		case CTRL('E'):
+ 		vi_case('$'|VI_CMDMODE_BIT:)
+@@ -1908,13 +1919,20 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ 		case CTRL('F'):
+ 		vi_case('l'|VI_CMDMODE_BIT:)
+ 		vi_case(' '|VI_CMDMODE_BIT:)
+-			/* Control-f -- Move forward one character */
+-			input_forward();
++			input_forward(); /* Move forward one character */
+ 			break;
+-		case '\b':
++		case '\b':   /* ^H */
+ 		case '\x7f': /* DEL */
+-			/* Control-h and DEL */
+-			input_backspace();
++			if (!isrtl_str())
++				input_backspace();
++			else
++				input_delete(0);
++			break;
++		case KEYCODE_DELETE:
++			if (!isrtl_str())
++				input_delete(0);
++			else
++				input_backspace();
+ 			break;
+ #if ENABLE_FEATURE_TAB_COMPLETION
+ 		case '\t':
+@@ -2137,9 +2155,6 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ 		case KEYCODE_CTRL_RIGHT:
+ 			ctrl_right();
+ 			break;
+-		case KEYCODE_DELETE:
+-			input_delete(0);
+-			break;
+ 		case KEYCODE_HOME:
+ 			input_backward(cursor);
+ 			break;
+@@ -2205,14 +2220,19 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ 				command_ps[cursor] = ic;
+ 				command_ps[cursor + 1] = BB_NUL;
+ 				cmdedit_set_out_char(' ');
++				if (unicode_isrtl(ic))
++					input_backward(1);
+ 			} else {
+ 				/* In the middle, insert */
++				/* is char right-to-left, or "neutral" one (e.g. comma) added to rtl text? */
++				int rtl = ENABLE_UNICODE_BIDI_SUPPORT ? (unicode_isrtl(ic) || (ic < 127 && !isalpha(ic) && isrtl_str())) : 0;
+ 				int sc = cursor;
+ 
+ 				memmove(command_ps + sc + 1, command_ps + sc,
+ 					(command_len - sc) * sizeof(command_ps[0]));
+ 				command_ps[sc] = ic;
+-				sc++;
++				if (!rtl)
++					sc++;
+ 				/* rewrite from cursor */
+ 				input_end();
+ 				/* to prev x pos + 1 */
+diff --git a/libbb/unicode.c b/libbb/unicode.c
+index 7c41ef3..91667ea 100644
+--- a/libbb/unicode.c
++++ b/libbb/unicode.c
+@@ -241,6 +241,138 @@ int FAST_FUNC iswpunct(wint_t wc)
+ 
+ #include "unicode_wcwidth.c"
+ 
++# if ENABLE_UNICODE_BIDI_SUPPORT
++int FAST_FUNC unicode_isrtl(wint_t wc)
++{
++	/* ranges taken from
++	 * http://www.unicode.org/Public/5.2.0/ucd/extracted/DerivedBidiClass.txt
++	 * Bidi_Class=Left_To_Right | Bidi_Class=Arabic_Letter
++	 */
++	static const struct interval rtl_b[] = {
++#  define BIG_(a,b) { a, b },
++#  define PAIR(a,b)
++		PAIR(0x0590, 0x0590)
++		PAIR(0x05BE, 0x05BE)
++		PAIR(0x05C0, 0x05C0)
++		PAIR(0x05C3, 0x05C3)
++		PAIR(0x05C6, 0x05C6)
++		BIG_(0x05C8, 0x05FF)
++		PAIR(0x0604, 0x0605)
++		PAIR(0x0608, 0x0608)
++		PAIR(0x060B, 0x060B)
++		PAIR(0x060D, 0x060D)
++		BIG_(0x061B, 0x064A)
++		PAIR(0x065F, 0x065F)
++		PAIR(0x066D, 0x066F)
++		BIG_(0x0671, 0x06D5)
++		PAIR(0x06E5, 0x06E6)
++		PAIR(0x06EE, 0x06EF)
++		BIG_(0x06FA, 0x070E)
++		PAIR(0x0710, 0x0710)
++		BIG_(0x0712, 0x072F)
++		BIG_(0x074B, 0x07A5)
++		BIG_(0x07B1, 0x07EA)
++		PAIR(0x07F4, 0x07F5)
++		BIG_(0x07FA, 0x0815)
++		PAIR(0x081A, 0x081A)
++		PAIR(0x0824, 0x0824)
++		PAIR(0x0828, 0x0828)
++		BIG_(0x082E, 0x08FF)
++		PAIR(0x200F, 0x200F)
++		PAIR(0x202B, 0x202B)
++		PAIR(0x202E, 0x202E)
++		BIG_(0xFB1D, 0xFB1D)
++		BIG_(0xFB1F, 0xFB28)
++		BIG_(0xFB2A, 0xFD3D)
++		BIG_(0xFD40, 0xFDCF)
++		BIG_(0xFDC8, 0xFDCF)
++		BIG_(0xFDF0, 0xFDFC)
++		BIG_(0xFDFE, 0xFDFF)
++		BIG_(0xFE70, 0xFEFE)
++		/* Probably not necessary
++		{0x10800, 0x1091E},
++		{0x10920, 0x10A00},
++		{0x10A04, 0x10A04},
++		{0x10A07, 0x10A0B},
++		{0x10A10, 0x10A37},
++		{0x10A3B, 0x10A3E},
++		{0x10A40, 0x10A7F},
++		{0x10B36, 0x10B38},
++		{0x10B40, 0x10E5F},
++		{0x10E7F, 0x10FFF},
++		{0x1E800, 0x1EFFF}
++		*/
++#  undef BIG_
++#  undef PAIR
++	};
++
++	static const uint16_t rtl_p[] = {
++#  define BIG_(a,b)
++#  define PAIR(a,b) (a << 2) | (b-a),
++		/* Exact copy-n-paste of the above: */
++		PAIR(0x0590, 0x0590)
++		PAIR(0x05BE, 0x05BE)
++		PAIR(0x05C0, 0x05C0)
++		PAIR(0x05C3, 0x05C3)
++		PAIR(0x05C6, 0x05C6)
++		BIG_(0x05C8, 0x05FF)
++		PAIR(0x0604, 0x0605)
++		PAIR(0x0608, 0x0608)
++		PAIR(0x060B, 0x060B)
++		PAIR(0x060D, 0x060D)
++		BIG_(0x061B, 0x064A)
++		PAIR(0x065F, 0x065F)
++		PAIR(0x066D, 0x066F)
++		BIG_(0x0671, 0x06D5)
++		PAIR(0x06E5, 0x06E6)
++		PAIR(0x06EE, 0x06EF)
++		BIG_(0x06FA, 0x070E)
++		PAIR(0x0710, 0x0710)
++		BIG_(0x0712, 0x072F)
++		BIG_(0x074B, 0x07A5)
++		BIG_(0x07B1, 0x07EA)
++		PAIR(0x07F4, 0x07F5)
++		BIG_(0x07FA, 0x0815)
++		PAIR(0x081A, 0x081A)
++		PAIR(0x0824, 0x0824)
++		PAIR(0x0828, 0x0828)
++		BIG_(0x082E, 0x08FF)
++		PAIR(0x200F, 0x200F)
++		PAIR(0x202B, 0x202B)
++		PAIR(0x202E, 0x202E)
++		BIG_(0xFB1D, 0xFB1D)
++		BIG_(0xFB1F, 0xFB28)
++		BIG_(0xFB2A, 0xFD3D)
++		BIG_(0xFD40, 0xFDCF)
++		BIG_(0xFDC8, 0xFDCF)
++		BIG_(0xFDF0, 0xFDFC)
++		BIG_(0xFDFE, 0xFDFF)
++		BIG_(0xFE70, 0xFEFE)
++		/* Probably not necessary
++		{0x10800, 0x1091E},
++		{0x10920, 0x10A00},
++		{0x10A04, 0x10A04},
++		{0x10A07, 0x10A0B},
++		{0x10A10, 0x10A37},
++		{0x10A3B, 0x10A3E},
++		{0x10A40, 0x10A7F},
++		{0x10B36, 0x10B38},
++		{0x10B40, 0x10E5F},
++		{0x10E7F, 0x10FFF},
++		{0x1E800, 0x1EFFF}
++		*/
++#  undef BIG_
++#  undef PAIR
++	};
++
++	if (in_interval_table(wc, rtl_b, ARRAY_SIZE(rtl_b) - 1))
++		return 1;
++	if (in_uint16_table(wc, rtl_p, ARRAY_SIZE(rtl_p) - 1))
++		return 1;
++	return 0;
++}
++# endif /* UNICODE_BIDI_SUPPORT */
++
+ #endif /* Homegrown Unicode support */
+ 
+ 
+diff --git a/libbb/unicode_wcwidth.c b/libbb/unicode_wcwidth.c
+index a81a980..7eccc39 100644
+--- a/libbb/unicode_wcwidth.c
++++ b/libbb/unicode_wcwidth.c
+@@ -90,12 +90,6 @@
+  * until Unicode committee assigns something there.
+  */
+ 
+-#if CONFIG_LAST_SUPPORTED_WCHAR < 126 || CONFIG_LAST_SUPPORTED_WCHAR >= 0x30000
+-# define LAST_SUPPORTED_WCHAR 0x2ffff
+-#else
+-# define LAST_SUPPORTED_WCHAR CONFIG_LAST_SUPPORTED_WCHAR
+-#endif
+-
+ #if LAST_SUPPORTED_WCHAR >= 0x300
+ struct interval {
+ 	uint16_t first;

@@ -1,0 +1,41 @@
+2008-06-24 16:08:22 +0000
+diff --git a/libbb/read.c b/libbb/read.c
+index fb903c1..fa9874d 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -203,8 +203,8 @@ ssize_t open_read_close(const char *filename, void *buf, size_t size)
+ 	return read_close(fd, buf, size);
+ }
+ 
+-// Read (potentially big) files in one go. File size is estimated by
+-// lseek to end.
++// Read (potentially big) files in one go. File size is estimated
++// by stat.
+ void *xmalloc_open_read_close(const char *filename, size_t *sizep)
+ {
+ 	char *buf;
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index f45a594..3fbb02b 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -4235,12 +4235,15 @@ static int insmod_ng_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	}
+ 
+ #if 0
+-	/* Any special reason why mmap? It isn't performace critical... */
+-
+-	/* yes, xmalloc'ing can use *alot* of RAM. Don't forget that there are
++	/* Any special reason why mmap? It isn't performance critical. -vda */
++	/* Yes, xmalloc'ing can use *alot* of RAM. Don't forget that there are
+ 	 * modules out there that are half a megabyte! mmap()ing is way nicer
+-	 * for small mem boxes, i guess.
+-	 */
++	 * for small mem boxes, i guess. */
++	/* But after load, these modules will take up that 0.5mb in kernel
++	 * anyway. Using malloc here causes only a transient spike to 1mb,
++	 * after module is loaded, we go back to normal 0.5mb usage
++	 * (in kernel). Also, mmap isn't magic - when we touch mapped data,
++	 * we use memory. -vda */
+ 	int fd;
+ 	struct stat st;
+ 	unsigned long len;

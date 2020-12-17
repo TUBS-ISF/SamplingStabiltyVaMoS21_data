@@ -1,0 +1,87 @@
+2007-06-18 10:35:06 +0000
+diff --git a/libbb/bb_askpass.c b/libbb/bb_askpass.c
+index 0f1f686..5ad2349 100644
+--- a/libbb/bb_askpass.c
++++ b/libbb/bb_askpass.c
+@@ -9,7 +9,6 @@
+  */
+ 
+ #include <termios.h>
+-//#include <sys/ioctl.h>
+ 
+ #include "libbb.h"
+ 
+@@ -20,18 +19,22 @@ static void askpass_timeout(int ATTRIBUTE_UNUSED ignore)
+ 
+ char *bb_askpass(int timeout, const char * prompt)
+ {
+-	static char passwd[64];
++	/* Was static char[BIGNUM] */
++	enum { sizeof_passwd = 128 };
++	static char *passwd;
+ 
+ 	char *ret;
+ 	int i;
+ 	struct sigaction sa;
+ 	struct termios old, new;
+ 
++	if (!passwd)
++		passwd = xmalloc(sizeof_passwd);
++	memset(passwd, 0, sizeof_passwd);
++
+ 	tcgetattr(STDIN_FILENO, &old);
+ 	tcflush(STDIN_FILENO, TCIFLUSH);
+ 
+-	memset(passwd, 0, sizeof(passwd));
+-
+ 	fputs(prompt, stdout);
+ 	fflush(stdout);
+ 
+@@ -48,7 +51,9 @@ char *bb_askpass(int timeout, const char * prompt)
+ 	}
+ 
+ 	ret = NULL;
+-	if (read(STDIN_FILENO, passwd, sizeof(passwd)-1) > 0) {
++	/* On timeout, read will hopefully be interrupted by SIGALRM,
++	 * and we return NULL */
++	if (read(STDIN_FILENO, passwd, sizeof_passwd-1) > 0) {
+ 		ret = passwd;
+ 		i = 0;
+ 		/* Last byte is guaranteed to be 0
+@@ -64,7 +69,7 @@ char *bb_askpass(int timeout, const char * prompt)
+ 	}
+ 
+ 	tcsetattr(STDIN_FILENO, TCSANOW, &old);
+-	puts("");
++	putchar('\n');
+ 	fflush(stdout);
+ 	return ret;
+ }
+diff --git a/libbb/pw_encrypt.c b/libbb/pw_encrypt.c
+index d546bc8..e9cf4e3 100644
+--- a/libbb/pw_encrypt.c
++++ b/libbb/pw_encrypt.c
+@@ -12,18 +12,16 @@
+ 
+ char *pw_encrypt(const char *clear, const char *salt)
+ {
+-	static char cipher[128];
+-	char *cp;
++	/* Was static char[BIGNUM]. Malloced thing works as well */
++	static char *cipher;
+ 
+ #if 0 /* was CONFIG_FEATURE_SHA1_PASSWORDS, but there is no such thing??? */
+ 	if (strncmp(salt, "$2$", 3) == 0) {
+ 		return sha1_crypt(clear);
+ 	}
+ #endif
+-	cp = (char *) crypt(clear, salt);
+-	/* if crypt (a nonstandard crypt) returns a string too large,
+-	   truncate it so we don't overrun buffers and hope there is
+-	   enough security in what's left */
+-	safe_strncpy(cipher, cp, sizeof(cipher));
++
++	free(cipher);
++	cipher = xstrdup(crypt(clear, salt));
+ 	return cipher;
+ }

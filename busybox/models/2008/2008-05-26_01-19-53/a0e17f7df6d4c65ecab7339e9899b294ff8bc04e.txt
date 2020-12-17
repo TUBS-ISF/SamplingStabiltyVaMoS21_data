@@ -1,0 +1,42 @@
+2008-05-26 01:19:53 +0000
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 3cfbc56..2efa776 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -46,11 +46,11 @@
+ #if defined(__dietlibc__)
+ /* 16.12.2006, Sampo Kellomaki (sampo@iki.fi)
+  * dietlibc-0.30 does not have implementation of getmntent_r() */
+-static struct mntent *getmntent_r(FILE* stream, struct mntent* result, char* buffer, int bufsize)
++static struct mntent *getmntent_r(FILE* stream, struct mntent* result,
++		char* buffer ATTRIBUTE_UNUSED, int bufsize ATTRIBUTE_UNUSED)
+ {
+ 	struct mntent* ment = getmntent(stream);
+-	memcpy(result, ment, sizeof(struct mntent));
+-	return result;
++	return memcpy(result, ment, sizeof(*ment));
+ }
+ #endif
+ 
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index 34c979e..9fa3cd2 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -11,6 +11,17 @@
+ #include <mntent.h>
+ #include "libbb.h"
+ 
++#if defined(__dietlibc__)
++/* 16.12.2006, Sampo Kellomaki (sampo@iki.fi)
++ * dietlibc-0.30 does not have implementation of getmntent_r() */
++static struct mntent *getmntent_r(FILE* stream, struct mntent* result,
++		char* buffer ATTRIBUTE_UNUSED, int bufsize ATTRIBUTE_UNUSED)
++{
++	struct mntent* ment = getmntent(stream);
++	return memcpy(result, ment, sizeof(*ment));
++}
++#endif
++
+ /* ignored: -v -d -t -i */
+ #define OPTION_STRING           "fldnra" "vdt:i"
+ #define OPT_FORCE               (1 << 0)

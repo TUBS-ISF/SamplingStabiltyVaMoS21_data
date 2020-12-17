@@ -1,0 +1,14 @@
+2008-07-29 11:47:46 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index eb70c9d..a2649d0 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -4571,7 +4571,7 @@ static int builtin_break(char **argv)
+ 			depth_break_continue = UINT_MAX;
+ 		}
+ 	}
+-	if (depth_of_loop > depth_break_continue)
++	if (depth_of_loop < depth_break_continue)
+ 		depth_break_continue = depth_of_loop;
+ 	return EXIT_SUCCESS;
+ }

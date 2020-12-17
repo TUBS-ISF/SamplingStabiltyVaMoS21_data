@@ -1,0 +1,33 @@
+2008-04-24 19:37:11 +0000
+diff --git a/testsuite/date/date-R-works b/testsuite/date/date-R-works
+index ec3a067..34cd735 100644
+--- a/testsuite/date/date-R-works
++++ b/testsuite/date/date-R-works
+@@ -1,2 +1 @@
+ test x"`date -R`" = x"`busybox date -R`"
+-
+diff --git a/testsuite/date/date-format-works b/testsuite/date/date-format-works
+index f28d06c..f2a2091 100644
+--- a/testsuite/date/date-format-works
++++ b/testsuite/date/date-format-works
+@@ -1 +1,4 @@
+-test x"`date +%d/%m/%y`" = x"`busybox date +%d/%m/%y`"
++# TODO: gnu date doesn't accept '2000.11.22-11:22:33' format,
++# but accepts '2000-11-22 11:22:33'. We must follow.
++test x"01/01/99" = x"`busybox date -d 1999.01.01-11:22:33 '+%d/%m/%y'`"
++test x"22/11/00" = x"`busybox date -d 2000.11.22-11:22:33 '+%d/%m/%y'`"
+diff --git a/testsuite/date/date-u-works b/testsuite/date/date-u-works
+index 665e4ea..eea6e5a 100644
+--- a/testsuite/date/date-u-works
++++ b/testsuite/date/date-u-works
+@@ -1,2 +1 @@
+-test x"Wed Apr 23 11:22:33 UTC 2008" = x"`busybox date -u -d 11:22:33`"
+-
++test x"Sat Jan  1 11:22:33 UTC 2000" = x"`TZ=CET-1CEST-2 busybox date -u -d 2000.01.01-11:22:33`"
+diff --git a/testsuite/date/date-works b/testsuite/date/date-works
+index 2f6dd1e..3ecaeea 100644
+--- a/testsuite/date/date-works
++++ b/testsuite/date/date-works
+@@ -1,2 +1 @@
+ test x"`date`" = x"`busybox date`"
+-

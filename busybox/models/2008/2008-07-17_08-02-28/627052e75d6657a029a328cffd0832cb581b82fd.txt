@@ -1,0 +1,32 @@
+2008-07-17 08:02:28 +0000
+diff --git a/scripts/kconfig/lex.zconf.c_shipped b/scripts/kconfig/lex.zconf.c_shipped
+index b4792d3..5fc323d 100644
+--- a/scripts/kconfig/lex.zconf.c_shipped
++++ b/scripts/kconfig/lex.zconf.c_shipped
+@@ -784,6 +784,11 @@ void new_string(void)
+ void append_string(const char *str, int size)
+ {
+ 	int new_size = text_size + size + 1;
++	if (size > 70) {
++		fprintf (stderr, "%s:%d error: Overlong line\n",
++		current_file->name, current_file->lineno);
++	}
++
+ 	if (new_size > text_asize) {
+ 		new_size += START_STRSIZE - 1;
+ 		new_size &= -START_STRSIZE;
+diff --git a/scripts/kconfig/zconf.l b/scripts/kconfig/zconf.l
+index cfa4607..d839577 100644
+--- a/scripts/kconfig/zconf.l
++++ b/scripts/kconfig/zconf.l
+@@ -49,6 +49,10 @@ void new_string(void)
+ void append_string(const char *str, int size)
+ {
+ 	int new_size = text_size + size + 1;
++	if (size > 70) {
++	        fprintf (stderr, "%s:%d error: Overlong line\n",
++			 current_file->name, current_file->lineno);
++	}
+ 	if (new_size > text_asize) {
+ 		new_size += START_STRSIZE - 1;
+ 		new_size &= -START_STRSIZE;

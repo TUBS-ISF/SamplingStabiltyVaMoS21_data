@@ -1,0 +1,240 @@
+2008-01-07 16:13:14 +0000
+diff --git a/libbb/compare_string_array.c b/libbb/compare_string_array.c
+index 7b5ce85..151b508 100644
+--- a/libbb/compare_string_array.c
++++ b/libbb/compare_string_array.c
+@@ -70,9 +70,9 @@ int index_in_substrings(const char *strings, const char *key)
+ 
+ const char *nth_string(const char *strings, int n)
+ {
+-        while (n) {
+-                n--;
+-                strings += strlen(strings) + 1;
+-        }
+-        return strings;
++	while (n) {
++		n--;
++		strings += strlen(strings) + 1;
++	}
++	return strings;
+ }
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 69768da..3ccddbc 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -65,7 +65,7 @@
+ enum {
+ 	/* We use int16_t for positions, need to limit line len */
+ 	MAX_LINELEN = CONFIG_FEATURE_EDITING_MAX_LEN < 0x7ff0
+-                      ? CONFIG_FEATURE_EDITING_MAX_LEN
++	              ? CONFIG_FEATURE_EDITING_MAX_LEN
+ 	              : 0x7ff0
+ };
+ 
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 6d50bf9..25c36bd 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -166,7 +166,7 @@ int ndelay_on(int fd)
+ 
+ int close_on_exec_on(int fd)
+ {
+-        return fcntl(fd, F_SETFD, FD_CLOEXEC);
++	return fcntl(fd, F_SETFD, FD_CLOEXEC);
+ }
+ 
+ int ndelay_off(int fd)
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 03a30e6..33bff70 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -1155,10 +1155,10 @@ static void identify(uint16_t *val)
+ 
+ #if ENABLE_FEATURE_HDPARM_GET_IDENTITY
+ static const char cfg_str[] ALIGN1 =
+-        """\0"            "HardSect""\0"   "SoftSect""\0"  "NotMFM""\0"
+-        "HdSw>15uSec""\0" "SpinMotCtl""\0" "Fixed""\0"     "Removeable""\0"
+-        "DTR<=5Mbs""\0"   "DTR>5Mbs""\0"   "DTR>10Mbs""\0" "RotSpdTol>.5%""\0"
+-        "dStbOff""\0"     "TrkOff""\0"     "FmtGapReq""\0" "nonMagnetic"
++	"""\0"            "HardSect""\0"   "SoftSect""\0"  "NotMFM""\0"
++	"HdSw>15uSec""\0" "SpinMotCtl""\0" "Fixed""\0"     "Removeable""\0"
++	"DTR<=5Mbs""\0"   "DTR>5Mbs""\0"   "DTR>10Mbs""\0" "RotSpdTol>.5%""\0"
++	"dStbOff""\0"     "TrkOff""\0"     "FmtGapReq""\0" "nonMagnetic"
+ ;
+ 
+ static const char BuffType[] ALIGN1 =
+diff --git a/networking/nameif.c b/networking/nameif.c
+index f0b8d11..43388ab 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -55,7 +55,7 @@ struct ethtool_drvinfo {
+ 	char  version[32];  /* driver version string */
+ 	char  fw_version[32]; /* firmware version string, if applicable */
+ 	char  bus_info[ETHTOOL_BUSINFO_LEN];  /* Bus info for this IF. */
+-        /* For PCI devices, use pci_dev->slot_name. */
++	/* For PCI devices, use pci_dev->slot_name. */
+ 	char  reserved1[32];
+ 	char  reserved2[16];
+ 	uint32_t n_stats;  /* number of u64's from ETHTOOL_GSTATS */
+diff --git a/networking/ping.c b/networking/ping.c
+index 0de1b33..0b33abf 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -277,8 +277,8 @@ struct globals {
+ #define rcvd_tbl     (G.rcvd_tbl    )
+ void BUG_ping_globals_too_big(void);
+ #define INIT_G() do { \
+-        if (sizeof(G) > COMMON_BUFSIZE) \
+-                BUG_ping_globals_too_big(); \
++	if (sizeof(G) > COMMON_BUFSIZE) \
++		BUG_ping_globals_too_big(); \
+ 	pingsock = -1; \
+ 	tmin = UINT_MAX; \
+ } while (0)
+diff --git a/networking/wget.c b/networking/wget.c
+index b12d19a..1147077 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -36,7 +36,7 @@ struct globals {
+ };
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ struct BUG_G_too_big {
+-        char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
++	char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
+ };
+ #define content_len     (G.content_len    )
+ #define beg_range       (G.beg_range      )
+diff --git a/procps/pgrep.c b/procps/pgrep.c
+index f5d4cfc..2ebcca1 100644
+--- a/procps/pgrep.c
++++ b/procps/pgrep.c
+@@ -116,7 +116,7 @@ int pgrep_main(int argc, char **argv)
+ 			cmd = proc->comm;
+ 		/* NB: OPT_INVERT is always 0 or 1 */
+ 		if ((regexec(&re_buffer, cmd, 1, re_match, 0) == 0 /* match found */
+-                     && (!OPT_ANCHOR || (re_match[0].rm_so == 0 && re_match[0].rm_eo == strlen(cmd)))) ^ OPT_INVERT
++		     && (!OPT_ANCHOR || (re_match[0].rm_so == 0 && re_match[0].rm_eo == strlen(cmd)))) ^ OPT_INVERT
+ 		) {
+ 			matched_pid = proc->pid;
+ 			if (OPT_LAST) {
+diff --git a/procps/ps.c b/procps/ps.c
+index 6a6a9e6..a46e92a 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -66,60 +66,60 @@ struct globals {
+ /* for ELF executables, notes are pushed before environment and args */
+ static ptrdiff_t find_elf_note(ptrdiff_t findme)
+ {
+-        ptrdiff_t *ep = (ptrdiff_t *) environ;
+-
+-        while (*ep++);
+-        while (*ep) {
+-                if (ep[0] == findme) {
+-                        return ep[1];
+-                }
+-                ep += 2;
+-        }
+-        return -1;
++	ptrdiff_t *ep = (ptrdiff_t *) environ;
++
++	while (*ep++);
++	while (*ep) {
++		if (ep[0] == findme) {
++			return ep[1];
++		}
++		ep += 2;
++	}
++	return -1;
+ }
+ 
+ #if ENABLE_FEATURE_PS_UNUSUAL_SYSTEMS
+ static unsigned get_HZ_by_waiting(void)
+ {
+-        struct timeval tv1, tv2;
+-        unsigned t1, t2, r, hz;
+-        unsigned cnt = cnt; /* for compiler */
+-        int diff;
+-
+-        r = 0;
+-
+-        /* Wait for times() to reach new tick */
+-        t1 = times(NULL);
+-        do {
+-                t2 = times(NULL);
+-        } while (t2 == t1);
+-        gettimeofday(&tv2, NULL);
+-
+-        do {
+-                t1 = t2;
+-                tv1.tv_usec = tv2.tv_usec;
+-
+-                /* Wait exactly one times() tick */
+-                do {
+-                        t2 = times(NULL);
+-                } while (t2 == t1);
+-                gettimeofday(&tv2, NULL);
+-
+-                /* Calculate ticks per sec, rounding up to even */
+-                diff = tv2.tv_usec - tv1.tv_usec;
+-                if (diff <= 0) diff += 1000000;
+-                hz = 1000000u / (unsigned)diff;
+-                hz = (hz+1) & ~1;
++	struct timeval tv1, tv2;
++	unsigned t1, t2, r, hz;
++	unsigned cnt = cnt; /* for compiler */
++	int diff;
++
++	r = 0;
++
++	/* Wait for times() to reach new tick */
++	t1 = times(NULL);
++	do {
++		t2 = times(NULL);
++	} while (t2 == t1);
++	gettimeofday(&tv2, NULL);
++
++	do {
++		t1 = t2;
++		tv1.tv_usec = tv2.tv_usec;
++
++		/* Wait exactly one times() tick */
++		do {
++			t2 = times(NULL);
++		} while (t2 == t1);
++		gettimeofday(&tv2, NULL);
++
++		/* Calculate ticks per sec, rounding up to even */
++		diff = tv2.tv_usec - tv1.tv_usec;
++		if (diff <= 0) diff += 1000000;
++		hz = 1000000u / (unsigned)diff;
++		hz = (hz+1) & ~1;
+ 
+ 		/* Count how many same hz values we saw */
+-                if (r != hz) {
+-                        r = hz;
+-                        cnt = 0;
+-                }
+-                cnt++;
+-        } while (cnt < 3); /* exit if saw 3 same values */
+-
+-        return r;
++		if (r != hz) {
++			r = hz;
++			cnt = 0;
++		}
++		cnt++;
++	} while (cnt < 3); /* exit if saw 3 same values */
++
++	return r;
+ }
+ #else
+ static inline unsigned get_HZ_by_waiting(void)
+@@ -190,7 +190,7 @@ static void put_lu(char *buf, int size, unsigned long u)
+ 	char buf5[5];
+ 
+ 	/* see http://en.wikipedia.org/wiki/Tera */
+-	smart_ulltoa4( (u, buf5, " mgtpezy");
++	smart_ulltoa4(u, buf5, " mgtpezy");
+ 	buf5[5] = '\0';
+ 	sprintf(buf, "%.*s", size, buf5);
+ }

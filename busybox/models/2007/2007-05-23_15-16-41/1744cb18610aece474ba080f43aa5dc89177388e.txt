@@ -1,0 +1,8 @@
+2007-05-23 15:16:41 +0000
+diff --git a/shell/hush_test/hush-bugs/noeol3.right b/shell/hush_test/hush-bugs/noeol3.right
+index a0ce47f..56f8515 100644
+--- a/shell/hush_test/hush-bugs/noeol3.right
++++ b/shell/hush_test/hush-bugs/noeol3.right
+@@ -1 +1 @@
+-hush: syntax error hush.c:3370
++hush: syntax error: unterminated "

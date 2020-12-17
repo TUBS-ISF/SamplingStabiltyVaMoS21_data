@@ -1,0 +1,326 @@
+2010-03-23 16:25:17 +0100
+diff --git a/coreutils/chmod.c b/coreutils/chmod.c
+index 9c1c760..c04201e 100644
+--- a/coreutils/chmod.c
++++ b/coreutils/chmod.c
+@@ -50,7 +50,7 @@ static int FAST_FUNC fileAction(const char *fileName, struct stat *statbuf, void
+ 	newmode = statbuf->st_mode;
+ 
+ 	if (!bb_parse_mode((char *)param, &newmode))
+-		bb_error_msg_and_die("invalid mode: %s", (char *)param);
++		bb_error_msg_and_die("invalid mode '%s'", (char *)param);
+ 
+ 	if (chmod(fileName, newmode) == 0) {
+ 		if (OPT_VERBOSE
+diff --git a/coreutils/install.c b/coreutils/install.c
+index 803afe6..ab9feff 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -50,7 +50,7 @@ static void setdefaultfilecon(const char *path)
+ 
+ 	if (lsetfilecon(path, scontext) < 0) {
+ 		if (errno != ENOTSUP) {
+-			bb_perror_msg("warning: failed to change context"
++			bb_perror_msg("warning: can't change context"
+ 					" of %s to %s", path, scontext);
+ 		}
+ 	}
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 3ec5b36..0192f3c 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -307,7 +307,7 @@ static void load_fs_info(const char *filename)
+ 
+ 	fstab = setmntent(filename, "r");
+ 	if (!fstab) {
+-		bb_perror_msg("can't read %s", filename);
++		bb_perror_msg("can't read '%s'", filename);
+ 		return;
+ 	}
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/util.c b/e2fsprogs/old_e2fsprogs/util.c
+index 326492d..64cca05 100644
+--- a/e2fsprogs/old_e2fsprogs/util.c
++++ b/e2fsprogs/old_e2fsprogs/util.c
+@@ -35,7 +35,7 @@ void check_plausibility(const char *device, int force)
+ 	if (force)
+ 		return;
+ 	if (val == -1)
+-		bb_perror_msg_and_die("can't stat %s", device);
++		bb_perror_msg_and_die("can't stat '%s'", device);
+ 	if (!S_ISBLK(s.st_mode)) {
+ 		printf("%s is not a block special device.\n", device);
+ 		proceed_question();
+diff --git a/findutils/find.c b/findutils/find.c
+index f45abbe..0b06938 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -756,7 +756,7 @@ static action*** parse_params(char **argv)
+ 			arg1 = plus_minus_num(arg1);
+ 			ap->perm_mask = 0;
+ 			if (!bb_parse_mode(arg1, &ap->perm_mask))
+-				bb_error_msg_and_die("invalid mode: %s", arg1);
++				bb_error_msg_and_die("invalid mode '%s'", arg1);
+ 		}
+ #endif
+ #if ENABLE_FEATURE_FIND_MTIME
+diff --git a/libbb/run_shell.c b/libbb/run_shell.c
+index de7b92a..6f98bd6 100644
+--- a/libbb/run_shell.c
++++ b/libbb/run_shell.c
+@@ -86,5 +86,5 @@ void FAST_FUNC run_shell(const char *shell, int loginshell, const char *command,
+ 		freecon(current_sid);
+ #endif
+ 	execv(shell, (char **) args);
+-	bb_perror_msg_and_die("can't run %s", shell);
++	bb_perror_msg_and_die("can't run '%s'", shell);
+ }
+diff --git a/miscutils/makedevs.c b/miscutils/makedevs.c
+index be08055..abf5057 100644
+--- a/miscutils/makedevs.c
++++ b/miscutils/makedevs.c
+@@ -63,7 +63,7 @@ int makedevs_main(int argc, char **argv)
+ 		/* if mode != S_IFCHR and != S_IFBLK,
+ 		 * third param in mknod() ignored */
+ 		if (mknod(nodname, mode, makedev(Smajor, Sminor)))
+-			bb_perror_msg("can't create %s", nodname);
++			bb_perror_msg("can't create '%s'", nodname);
+ 
+ 		/*if (nodname == basedev)*/ /* ex. /dev/hda - to /dev/hda1 ... */
+ 			nodname = buf;
+diff --git a/miscutils/microcom.c b/miscutils/microcom.c
+index 0fb51d2..78863d4 100644
+--- a/miscutils/microcom.c
++++ b/miscutils/microcom.c
+@@ -64,7 +64,7 @@ int microcom_main(int argc UNUSED_PARAM, char **argv)
+ 	if (sfd < 0) {
+ 		// device already locked -> bail out
+ 		if (errno == EEXIST)
+-			bb_perror_msg_and_die("can't create %s", device_lock_file);
++			bb_perror_msg_and_die("can't create '%s'", device_lock_file);
+ 		// can't create lock -> don't care
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			free(device_lock_file);
+diff --git a/miscutils/time.c b/miscutils/time.c
+index 5ea0f06..6946c86 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -380,7 +380,7 @@ static void run_command(char *const *cmd, resource_t *resp)
+ 		   versus merely warnings if the cast is left off.  */
+ 		BB_EXECVP(cmd[0], cmd);
+ 		xfunc_error_retval = (errno == ENOENT ? 127 : 126);
+-		bb_error_msg_and_die("can't run %s", cmd[0]);
++		bb_error_msg_and_die("can't run '%s'", cmd[0]);
+ 	}
+ 
+ 	/* Have signals kill the child but not self (if possible).  */
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index 53b7c94..cf22b94 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -402,7 +402,7 @@ static void write_out_dep_bb(int fd)
+ 
+ 	if (rename(DEPFILE_BB".new", DEPFILE_BB) != 0) {
+  err:
+-		bb_perror_msg("can't create %s", DEPFILE_BB);
++		bb_perror_msg("can't create '%s'", DEPFILE_BB);
+ 		unlink(DEPFILE_BB".new");
+ 	} else {
+  ok:
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index f511bc2..69b9e46 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -298,7 +298,7 @@ static int do_modprobe(struct module_entry *m)
+ 				rc = bb_delete_module(m2->modname, O_EXCL);
+ 				if (rc) {
+ 					if (first) {
+-						bb_error_msg("failed to unload module %s: %s",
++						bb_error_msg("can't unload module %s: %s",
+ 							humanly_readable_name(m2),
+ 							moderror(rc));
+ 						break;
+@@ -328,7 +328,7 @@ static int do_modprobe(struct module_entry *m)
+ 			rc = 0;
+ 		free(options);
+ 		if (rc) {
+-			bb_error_msg("failed to load module %s (%s): %s",
++			bb_error_msg("can't load module %s (%s): %s",
+ 				humanly_readable_name(m2),
+ 				fn,
+ 				moderror(rc)
+diff --git a/networking/ifplugd.c b/networking/ifplugd.c
+index 62b1355..3567dea 100644
+--- a/networking/ifplugd.c
++++ b/networking/ifplugd.c
+@@ -486,7 +486,7 @@ static smallint detect_link(void)
+ 	if (status == IFSTATUS_ERR
+ 	 && G.detect_link_func == detect_link_auto
+ 	) {
+-		bb_error_msg("failed to detect link status");
++		bb_error_msg("can't detect link status");
+ 	}
+ 
+ 	if (status != G.iface_last_status) {
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index af29dd3..daea9dd 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -194,7 +194,7 @@ static NOINLINE int print_linkinfo(const struct nlmsghdr *n)
+ static int flush_update(void)
+ {
+ 	if (rtnl_send(G_filter.rth, G_filter.flushb, G_filter.flushp) < 0) {
+-		bb_perror_msg("failed to send flush request");
++		bb_perror_msg("can't send flush request");
+ 		return -1;
+ 	}
+ 	G_filter.flushp = 0;
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index 68e3c36..d771a60 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -51,7 +51,7 @@ typedef struct filter_t filter_t;
+ static int flush_update(void)
+ {
+ 	if (rtnl_send(G_filter.rth, G_filter.flushb, G_filter.flushp) < 0) {
+-		bb_perror_msg("failed to send flush request");
++		bb_perror_msg("can't send flush request");
+ 		return -1;
+ 	}
+ 	G_filter.flushp = 0;
+@@ -846,7 +846,7 @@ static int iproute_get(char **argv)
+ 			tb[RTA_PREFSRC]->rta_type = RTA_SRC;
+ 			r->rtm_src_len = 8*RTA_PAYLOAD(tb[RTA_PREFSRC]);
+ 		} else if (!tb[RTA_SRC]) {
+-			bb_error_msg_and_die("failed to connect the route");
++			bb_error_msg_and_die("can't connect the route");
+ 		}
+ 		if (!odev && tb[RTA_OIF]) {
+ 			tb[RTA_OIF]->rta_type = 0;
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 93e06b2..795ac48 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -389,13 +389,13 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 		switch (udhcp_sp_read(&rfds)) {
+ 		case SIGUSR1:
+-			bb_info_msg("Received a SIGUSR1");
++			bb_info_msg("Received SIGUSR1");
+ 			write_leases();
+ 			/* why not just reset the timeout, eh */
+ 			timeout_end = monotonic_sec() + server_config.auto_time;
+ 			continue;
+ 		case SIGTERM:
+-			bb_info_msg("Received a SIGTERM");
++			bb_info_msg("Received SIGTERM");
+ 			goto ret0;
+ 		case 0:	/* no signal: read a packet */
+ 			break;
+diff --git a/procps/kill.c b/procps/kill.c
+index e418046..1d343ed 100644
+--- a/procps/kill.c
++++ b/procps/kill.c
+@@ -195,7 +195,7 @@ int kill_main(int argc, char **argv)
+ 						continue;
+ 					errors++;
+ 					if (!quiet)
+-						bb_perror_msg("can't kill pid %u", (unsigned)*pl);
++						bb_perror_msg("can't kill pid %d", (int)*pl);
+ 				}
+ 			}
+ 			free(pidList);
+diff --git a/selinux/chcon.c b/selinux/chcon.c
+index 4395a7e..c6be37f 100644
+--- a/selinux/chcon.c
++++ b/selinux/chcon.c
+@@ -90,13 +90,13 @@ static int FAST_FUNC change_filedir_context(
+ 		if ((option_mask32 & OPT_VERBOSE) || ((option_mask32 & OPT_CHANHES) && !fail)) {
+ 			printf(!fail
+ 			       ? "context of %s changed to %s\n"
+-			       : "failed to change context of %s to %s\n",
++			       : "can't change context of %s to %s\n",
+ 			       fname, context_string);
+ 		}
+ 		if (!fail) {
+ 			rc = TRUE;
+ 		} else if ((option_mask32 & OPT_QUIET) == 0) {
+-			bb_error_msg("failed to change context of %s to %s",
++			bb_error_msg("can't change context of %s to %s",
+ 				     fname, context_string);
+ 		}
+ 	} else if (option_mask32 & OPT_VERBOSE) {
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index 8472b70..4afd111 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -59,13 +59,13 @@ static context_t runcon_compute_new_context(char *user, char *role, char *type,
+ 	if (!con)
+ 		bb_error_msg_and_die("'%s' is not a valid context", cur_context);
+ 	if (user && context_user_set(con, user))
+-		bb_error_msg_and_die("failed to set new user '%s'", user);
++		bb_error_msg_and_die("can't set new user '%s'", user);
+ 	if (type && context_type_set(con, type))
+-		bb_error_msg_and_die("failed to set new type '%s'", type);
++		bb_error_msg_and_die("can't set new type '%s'", type);
+ 	if (range && context_range_set(con, range))
+-		bb_error_msg_and_die("failed to set new range '%s'", range);
++		bb_error_msg_and_die("can't set new range '%s'", range);
+ 	if (role && context_role_set(con, role))
+-		bb_error_msg_and_die("failed to set new role '%s'", role);
++		bb_error_msg_and_die("can't set new role '%s'", role);
+ 
+ 	return con;
+ }
+diff --git a/shell/hush.c b/shell/hush.c
+index 048085b..9b15efb 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -674,7 +674,7 @@ static const struct built_in_command bltins1[] = {
+ 	BLTIN("set"      , builtin_set     , "Set/unset positional parameters"),
+ 	BLTIN("shift"    , builtin_shift   , "Shift positional parameters"),
+ 	BLTIN("trap"     , builtin_trap    , "Trap signals"),
+-	BLTIN("type"     , builtin_type    , "Write a description of command type"),
++	BLTIN("type"     , builtin_type    , "Show command type"),
+ 	BLTIN("ulimit"   , shell_builtin_ulimit  , "Control resource limits"),
+ 	BLTIN("umask"    , builtin_umask   , "Set file creation mask"),
+ 	BLTIN("unset"    , builtin_unset   , "Unset variables"),
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 3cee3a6..b0efd98 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -340,7 +340,7 @@ static void make_device(char *path, int delete)
+ 
+ 			if (!delete && major >= 0) {
+ 				if (mknod(node_name, mode | type, makedev(major, minor)) && errno != EEXIST)
+-					bb_perror_msg("can't create %s", node_name);
++					bb_perror_msg("can't create '%s'", node_name);
+ 				if (major == G.root_major && minor == G.root_minor)
+ 					symlink(node_name, "root");
+ 				if (ENABLE_FEATURE_MDEV_CONF) {
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index c6c2036..abfb942 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -687,7 +687,7 @@ int mkfs_minix_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	xmove_fd(xopen(G.device_name, O_RDWR), dev_fd);
+ 	if (fstat(dev_fd, &statbuf) < 0)
+-		bb_error_msg_and_die("can't stat %s", G.device_name);
++		bb_error_msg_and_die("can't stat '%s'", G.device_name);
+ 	if (!S_ISBLK(statbuf.st_mode))
+ 		opt &= ~1; // clear -c (check)
+ 
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index e24fc40..8ec3071 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -1921,7 +1921,7 @@ int mount_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 	fstab = setmntent(fstabname, "r");
+ 	if (!fstab)
+-		bb_perror_msg_and_die("can't read %s", fstabname);
++		bb_perror_msg_and_die("can't read '%s'", fstabname);
+ 
+ 	// Loop through entries until we find what we're looking for
+ 	memset(mtpair, 0, sizeof(mtpair));

@@ -1,0 +1,769 @@
+2007-10-01 11:58:38 +0000
+diff --git a/applets/applets.c b/applets/applets.c
+index 5b7b88a..f91884b 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -526,7 +526,7 @@ static void install_links(const char *busybox, int use_symbolic_links)
+ 				applets[i].name);
+ 		rc = lf(busybox, fpc);
+ 		if (rc != 0 && errno != EEXIST) {
+-			bb_perror_msg("%s", fpc);
++			bb_simple_perror_msg(fpc);
+ 		}
+ 		free(fpc);
+ 	}
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index c5a5337..bccc8f8 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -49,7 +49,7 @@ int bbunpack(char **argv,
+ 		/* Open src */
+ 		if (filename) {
+ 			if (stat(filename, &stat_buf) != 0) {
+-				bb_perror_msg("%s", filename);
++				bb_simple_perror_msg(filename);
+  err:
+ 				exitcode = 1;
+ 				goto free_name;
+diff --git a/coreutils/chmod.c b/coreutils/chmod.c
+index 8b21499..dd7b784 100644
+--- a/coreutils/chmod.c
++++ b/coreutils/chmod.c
+@@ -63,7 +63,7 @@ static int fileAction(const char *fileName, struct stat *statbuf, void* param, i
+ 	}
+  err:
+ 	if (!OPT_QUIET)
+-		bb_perror_msg("%s", fileName);
++		bb_simple_perror_msg(fileName);
+ 	return FALSE;
+ }
+ 
+diff --git a/coreutils/chown.c b/coreutils/chown.c
+index cfd3734..d974493 100644
+--- a/coreutils/chown.c
++++ b/coreutils/chown.c
+@@ -57,7 +57,7 @@ static int fileAction(const char *fileName, struct stat *statbuf,
+ 		return TRUE;
+ 	}
+ 	if (!OPT_QUIET)
+-		bb_perror_msg("%s", fileName);	/* A filename can have % in it... */
++		bb_simple_perror_msg(fileName);	/* A filename can have % in it... */
+ 	return FALSE;
+ }
+ 
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index b17bb59..b9f5b4c 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -278,7 +278,7 @@ int dd_main(int argc, char **argv)
+ 		if (n < 0) {
+ 			if (flags & FLAG_NOERROR) {
+ 				n = ibs;
+-				bb_perror_msg("%s", infile);
++				bb_simple_perror_msg(infile);
+ 			} else
+ 				goto die_infile;
+ 		}
+@@ -320,12 +320,12 @@ int dd_main(int argc, char **argv)
+ 	}
+ 	if (close(ifd) < 0) {
+  die_infile:
+-		bb_perror_msg_and_die("%s", infile);
++		bb_simple_perror_msg_and_die(infile);
+ 	}
+ 
+ 	if (close(ofd) < 0) {
+  die_outfile:
+-		bb_perror_msg_and_die("%s", outfile);
++		bb_simple_perror_msg_and_die(outfile);
+ 	}
+  out_status:
+ 	dd_output_status(0);
+diff --git a/coreutils/df.c b/coreutils/df.c
+index 7eb82cd..6fe8e2f 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -100,7 +100,7 @@ int df_main(int argc, char **argv)
+ 		mount_point = mount_entry->mnt_dir;
+ 
+ 		if (statfs(mount_point, &s) != 0) {
+-			bb_perror_msg("%s", mount_point);
++			bb_simple_perror_msg(mount_point);
+ 			goto SET_ERROR;
+ 		}
+ 
+diff --git a/coreutils/du.c b/coreutils/du.c
+index b5e68d8..2697acf 100644
+--- a/coreutils/du.c
++++ b/coreutils/du.c
+@@ -67,7 +67,7 @@ static unsigned long du(const char *filename)
+ 	unsigned long sum;
+ 
+ 	if (lstat(filename, &statbuf) != 0) {
+-		bb_perror_msg("%s", filename);
++		bb_simple_perror_msg(filename);
+ 		G.status = EXIT_FAILURE;
+ 		return 0;
+ 	}
+@@ -85,7 +85,7 @@ static unsigned long du(const char *filename)
+ 	if (S_ISLNK(statbuf.st_mode)) {
+ 		if (G.slink_depth > G.du_depth) {	/* -H or -L */
+ 			if (stat(filename, &statbuf) != 0) {
+-				bb_perror_msg("%s", filename);
++				bb_simple_perror_msg(filename);
+ 				G.status = EXIT_FAILURE;
+ 				return 0;
+ 			}
+diff --git a/coreutils/env.c b/coreutils/env.c
+index 8d2d881..5d0cd82 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -81,7 +81,7 @@ int env_main(int argc, char** argv)
+ 		BB_EXECVP(*argv, argv);
+ 		/* SUSv3-mandated exit codes. */
+ 		xfunc_error_retval = (errno == ENOENT) ? 127 : 126;
+-		bb_perror_msg_and_die("%s", *argv);
++		bb_simple_perror_msg_and_die(*argv);
+ 	}
+ 
+ 	for (ep = environ; *ep; ep++) {
+diff --git a/coreutils/expand.c b/coreutils/expand.c
+index 274753f..0ef106d 100644
+--- a/coreutils/expand.c
++++ b/coreutils/expand.c
+@@ -192,7 +192,7 @@ int expand_main(int argc, char **argv)
+ 		/* Check and close the file */
+ 		/* We do want all of them to execute, thus | instead of || */
+ 		if (ferror(file) | fclose_if_not_stdin(file)) {
+-			bb_perror_msg("%s", *argv);
++			bb_simple_perror_msg(*argv);
+ 			exit_status = EXIT_FAILURE;
+ 		}
+ 		/* If stdin also clear EOF */
+diff --git a/coreutils/fold.c b/coreutils/fold.c
+index a75f466..bf4b198 100644
+--- a/coreutils/fold.c
++++ b/coreutils/fold.c
+@@ -145,7 +145,7 @@ int fold_main(int argc, char **argv)
+ 		}
+ 
+ 		if (ferror(istream) || fclose_if_not_stdin(istream)) {
+-			bb_perror_msg("%s", *argv);	/* Avoid multibyte problems. */
++			bb_simple_perror_msg(*argv);	/* Avoid multibyte problems. */
+ 			errs |= EXIT_FAILURE;
+ 		}
+ 	} while (*++argv);
+diff --git a/coreutils/head.c b/coreutils/head.c
+index a48f147..af9e9f4 100644
+--- a/coreutils/head.c
++++ b/coreutils/head.c
+@@ -128,7 +128,7 @@ int head_main(int argc, char **argv)
+ 				putchar(c);
+ 			}
+ 			if (fclose_if_not_stdin(fp)) {
+-				bb_perror_msg("%s", *argv);	/* Avoid multibyte problems. */
++				bb_simple_perror_msg(*argv);	/* Avoid multibyte problems. */
+ 				retval = EXIT_FAILURE;
+ 			}
+ 			die_if_ferror_stdout();
+diff --git a/coreutils/ln.c b/coreutils/ln.c
+index f3c67aa..658e32e 100644
+--- a/coreutils/ln.c
++++ b/coreutils/ln.c
+@@ -64,7 +64,7 @@ int ln_main(int argc, char **argv)
+ 		if (!(flag & LN_SYMLINK) && stat(*argv, &statbuf)) {
+ 			// coreutils: "ln dangling_symlink new_hardlink" works
+ 			if (lstat(*argv, &statbuf) || !S_ISLNK(statbuf.st_mode)) {
+-				bb_perror_msg("%s", *argv);
++				bb_simple_perror_msg(*argv);
+ 				status = EXIT_FAILURE;
+ 				free(src_name);
+ 				continue;
+@@ -75,7 +75,7 @@ int ln_main(int argc, char **argv)
+ 			char *backup;
+ 			backup = xasprintf("%s%s", src, suffix);
+ 			if (rename(src, backup) < 0 && errno != ENOENT) {
+-				bb_perror_msg("%s", src);
++				bb_simple_perror_msg(src);
+ 				status = EXIT_FAILURE;
+ 				free(backup);
+ 				continue;
+@@ -97,7 +97,7 @@ int ln_main(int argc, char **argv)
+ 		}
+ 
+ 		if (link_func(*argv, src) != 0) {
+-			bb_perror_msg("%s", src);
++			bb_simple_perror_msg(src);
+ 			status = EXIT_FAILURE;
+ 		}
+ 
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index a4acc98..92a9a28 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -171,7 +171,7 @@ static struct dnode *my_stat(const char *fullname, const char *name, int force_f
+ 		}
+ #endif
+ 		if (stat(fullname, &dstat)) {
+-			bb_perror_msg("%s", fullname);
++			bb_simple_perror_msg(fullname);
+ 			status = EXIT_FAILURE;
+ 			return 0;
+ 		}
+@@ -182,7 +182,7 @@ static struct dnode *my_stat(const char *fullname, const char *name, int force_f
+ 		}
+ #endif
+ 		if (lstat(fullname, &dstat)) {
+-			bb_perror_msg("%s", fullname);
++			bb_simple_perror_msg(fullname);
+ 			status = EXIT_FAILURE;
+ 			return 0;
+ 		}
+diff --git a/coreutils/mkfifo.c b/coreutils/mkfifo.c
+index 030c9d2..e66f817 100644
+--- a/coreutils/mkfifo.c
++++ b/coreutils/mkfifo.c
+@@ -28,7 +28,7 @@ int mkfifo_main(int argc, char **argv)
+ 
+ 	do {
+ 		if (mkfifo(*argv, mode) < 0) {
+-			bb_perror_msg("%s", *argv);	/* Avoid multibyte problems. */
++			bb_simple_perror_msg(*argv);	/* Avoid multibyte problems. */
+ 			retval = EXIT_FAILURE;
+ 		}
+ 	} while (*++argv);
+diff --git a/coreutils/mknod.c b/coreutils/mknod.c
+index ea6f24a..a876daa 100644
+--- a/coreutils/mknod.c
++++ b/coreutils/mknod.c
+@@ -44,7 +44,7 @@ int mknod_main(int argc, char **argv)
+ 			if (mknod(name, mode, dev) == 0) {
+ 				return EXIT_SUCCESS;
+ 			}
+-			bb_perror_msg_and_die("%s", name);
++			bb_simple_perror_msg_and_die(name);
+ 		}
+ 	}
+ 	bb_show_usage();
+diff --git a/coreutils/nice.c b/coreutils/nice.c
+index 8d77ae4..0cb31e4 100644
+--- a/coreutils/nice.c
++++ b/coreutils/nice.c
+@@ -51,5 +51,5 @@ int nice_main(int argc, char **argv)
+ 
+ 	/* The exec failed... */
+ 	xfunc_error_retval = (errno == ENOENT) ? 127 : 126; /* SUSv3 */
+-	bb_perror_msg_and_die("%s", *argv);
++	bb_simple_perror_msg_and_die(*argv);
+ }
+diff --git a/coreutils/nohup.c b/coreutils/nohup.c
+index 22419b8..e27bd2e 100644
+--- a/coreutils/nohup.c
++++ b/coreutils/nohup.c
+@@ -56,5 +56,5 @@ int nohup_main(int argc, char **argv)
+ 	BB_EXECVP(argv[1], argv+1);
+ 	if (ENABLE_FEATURE_CLEAN_UP && home)
+ 		free((char*)nohupout);
+-	bb_perror_msg_and_die("%s", argv[1]);
++	bb_simple_perror_msg_and_die(argv[1]);
+ }
+diff --git a/coreutils/realpath.c b/coreutils/realpath.c
+index 7c5dc3b..9c42987 100644
+--- a/coreutils/realpath.c
++++ b/coreutils/realpath.c
+@@ -35,7 +35,7 @@ int realpath_main(int argc, char **argv)
+ 			puts(resolved_path);
+ 		} else {
+ 			retval = EXIT_FAILURE;
+-			bb_perror_msg("%s", *argv);
++			bb_simple_perror_msg(*argv);
+ 		}
+ 	} while (--argc);
+ 
+diff --git a/coreutils/split.c b/coreutils/split.c
+index 3ec539a..6d8924a 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -104,7 +104,7 @@ int split_main(int argc, char **argv)
+ 		if (!bytes_read)
+ 			break;
+ 		if (bytes_read < 0)
+-			bb_perror_msg_and_die("%s", argv[0]);
++			bb_simple_perror_msg_and_die(argv[0]);
+ 		src = read_buffer;
+ 		do {
+ 			if (!remaining) {
+diff --git a/coreutils/touch.c b/coreutils/touch.c
+index 7a1dd35..d8498d8 100644
+--- a/coreutils/touch.c
++++ b/coreutils/touch.c
+@@ -49,7 +49,7 @@ int touch_main(int argc, char **argv)
+ 				}
+ 			}
+ 			status = EXIT_FAILURE;
+-			bb_perror_msg("%s", *argv);
++			bb_simple_perror_msg(*argv);
+ 		}
+ 	} while (*++argv);
+ 
+diff --git a/coreutils/wc.c b/coreutils/wc.c
+index e86b7d4..c8a4865 100644
+--- a/coreutils/wc.c
++++ b/coreutils/wc.c
+@@ -150,7 +150,7 @@ int wc_main(int argc, char **argv)
+ 				}
+ 			} else if (c == EOF) {
+ 				if (ferror(fp)) {
+-					bb_perror_msg("%s", arg);
++					bb_simple_perror_msg(arg);
+ 					status = EXIT_FAILURE;
+ 				}
+ 				--counts[WC_CHARS];
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 3717781..110b3d2 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -659,7 +659,7 @@ static void execute(const char *type, const char *device, const char *mntpt,
+ 	if (!noexecute) {
+ 		pid = spawn(argv);
+ 		if (pid < 0)
+-			bb_perror_msg("%s", argv[0]);
++			bb_simple_perror_msg(argv[0]);
+ 	}
+ 
+ 	for (i = num_args+1; i < argc; i++)
+diff --git a/e2fsprogs/old_e2fsprogs/fsck.c b/e2fsprogs/old_e2fsprogs/fsck.c
+index aad85cf..7e73838 100644
+--- a/e2fsprogs/old_e2fsprogs/fsck.c
++++ b/e2fsprogs/old_e2fsprogs/fsck.c
+@@ -626,7 +626,7 @@ static int execute(const char *type, const char *device, const char *mntpt,
+ 		if (!interactive)
+ 			close(0);
+ 		(void) execv(s, argv);
+-		bb_perror_msg_and_die("%s", argv[0]);
++		bb_simple_perror_msg_and_die(argv[0]);
+ 	}
+ 
+ 	for (i = 1; i < argc; i++)
+diff --git a/findutils/find.c b/findutils/find.c
+index f3167a0..b618814 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -277,7 +277,7 @@ ACTF(exec)
+ 
+ 	rc = spawn_and_wait(argv);
+ 	if (rc < 0)
+-		bb_perror_msg("%s", argv[0]);
++		bb_simple_perror_msg(argv[0]);
+ 
+ 	i = 0;
+ 	while (argv[i])
+@@ -347,7 +347,7 @@ ACTF(delete)
+ 		rc = unlink(fileName);
+ 	}
+ 	if (rc < 0)
+-		bb_perror_msg("%s", fileName);
++		bb_simple_perror_msg(fileName);
+ 	return TRUE;
+ }
+ #endif
+@@ -780,7 +780,7 @@ static action*** parse_params(char **argv)
+ 			ap->context = NULL;
+ 			/* SELinux headers erroneously declare non-const parameter */
+ 			if (selinux_raw_to_trans_context((char*)arg1, &ap->context))
+-				bb_perror_msg("%s", arg1);
++				bb_simple_perror_msg(arg1);
+ 		}
+ #endif
+ 		else {
+diff --git a/findutils/grep.c b/findutils/grep.c
+index 3a9c740..2d886a0 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -369,7 +369,7 @@ static int file_action_grep(const char *filename, struct stat *statbuf, void* ma
+ 	FILE *file = fopen(filename, "r");
+ 	if (file == NULL) {
+ 		if (!SUPPRESS_ERR_MSGS)
+-			bb_perror_msg("%s", cur_file);
++			bb_simple_perror_msg(cur_file);
+ 		open_errors = 1;
+ 		return 0;
+ 	}
+@@ -517,7 +517,7 @@ int grep_main(int argc, char **argv)
+ 			file = fopen(cur_file, "r");
+ 			if (file == NULL) {
+ 				if (!SUPPRESS_ERR_MSGS)
+-					bb_perror_msg("%s", cur_file);
++					bb_simple_perror_msg(cur_file);
+ 				open_errors = 1;
+ 				continue;
+ 			}
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index 7a88996..f7c7832 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -57,7 +57,7 @@ static int xargs_exec(char **args)
+ 
+ 	status = spawn_and_wait(args);
+ 	if (status < 0) {
+-		bb_perror_msg("%s", args[0]);
++		bb_simple_perror_msg(args[0]);
+ 		return errno == ENOENT ? 127 : 126;
+ 	}
+ 	if (status == 255) {
+diff --git a/include/libbb.h b/include/libbb.h
+index a8463ae..d76571b 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -677,7 +677,9 @@ extern void bb_show_usage(void) ATTRIBUTE_NORETURN ATTRIBUTE_EXTERNALLY_VISIBLE;
+ extern void bb_error_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2)));
+ extern void bb_error_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
+ extern void bb_perror_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2)));
++extern void bb_simple_perror_msg(const char *s);
+ extern void bb_perror_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
++extern void bb_simple_perror_msg_and_die(const char *s) __attribute__ ((noreturn));
+ extern void bb_herror_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2)));
+ extern void bb_herror_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
+ extern void bb_perror_nomsg_and_die(void) ATTRIBUTE_NORETURN;
+@@ -1185,7 +1187,6 @@ extern const char bb_default_login_shell[];
+ #include <dmalloc.h>
+ #endif
+ 
+-
+ #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+ 
+ #endif /* __LIBBUSYBOX_H__ */
+diff --git a/init/mesg.c b/init/mesg.c
+index e182b41..1a576cb 100644
+--- a/init/mesg.c
++++ b/init/mesg.c
+@@ -40,7 +40,7 @@ int mesg_main(int argc, char **argv)
+ 				return EXIT_SUCCESS;
+ 			}
+ 		}
+-		bb_perror_msg_and_die("%s", tty);
++		bb_simple_perror_msg_and_die(tty);
+ 	}
+ 	bb_show_usage();
+ }
+diff --git a/libbb/change_identity.c b/libbb/change_identity.c
+index 3f888f5..b2274e0 100644
+--- a/libbb/change_identity.c
++++ b/libbb/change_identity.c
+@@ -47,5 +47,5 @@ void change_identity(const struct passwd *pw)
+ 	const char *err_msg = change_identity_e2str(pw);
+ 
+ 	if (err_msg)
+-		bb_perror_msg_and_die("%s", err_msg);
++		bb_simple_perror_msg_and_die(err_msg);
+ }
+diff --git a/libbb/dump.c b/libbb/dump.c
+index 0d1bb18..829050d 100644
+--- a/libbb/dump.c
++++ b/libbb/dump.c
+@@ -297,7 +297,7 @@ static void do_skip(const char *fname, int statok)
+ 
+ 	if (statok) {
+ 		if (fstat(STDIN_FILENO, &sbuf)) {
+-			bb_perror_msg_and_die("%s", fname);
++			bb_simple_perror_msg_and_die(fname);
+ 		}
+ 		if ((!(S_ISCHR(sbuf.st_mode) ||
+ 			   S_ISBLK(sbuf.st_mode) ||
+@@ -309,7 +309,7 @@ static void do_skip(const char *fname, int statok)
+ 		}
+ 	}
+ 	if (fseek(stdin, bb_dump_skip, SEEK_SET)) {
+-		bb_perror_msg_and_die("%s", fname);
++		bb_simple_perror_msg_and_die(fname);
+ 	}
+ 	savaddress = address += bb_dump_skip;
+ 	bb_dump_skip = 0;
+@@ -328,7 +328,7 @@ static int next(char **argv)
+ 	for (;;) {
+ 		if (*_argv) {
+ 			if (!(freopen(*_argv, "r", stdin))) {
+-				bb_perror_msg("%s", *_argv);
++				bb_simple_perror_msg(*_argv);
+ 				exitval = 1;
+ 				++_argv;
+ 				continue;
+@@ -393,7 +393,7 @@ static unsigned char *get(void)
+ 				  bb_dump_length == -1 ? need : MIN(bb_dump_length, need), stdin);
+ 		if (!n) {
+ 			if (ferror(stdin)) {
+-				bb_perror_msg("%s", _argv[-1]);
++				bb_simple_perror_msg(_argv[-1]);
+ 			}
+ 			ateof = 1;
+ 			continue;
+diff --git a/libbb/perror_msg.c b/libbb/perror_msg.c
+index a958cff..af9ff59 100644
+--- a/libbb/perror_msg.c
++++ b/libbb/perror_msg.c
+@@ -18,3 +18,8 @@ void bb_perror_msg(const char *s, ...)
+ 	bb_verror_msg(s, p, errno ? strerror(errno) : NULL);
+ 	va_end(p);
+ }
++
++void bb_simple_perror_msg(const char *s)
++{
++	bb_perror_msg("%s", s);
++}
+diff --git a/libbb/perror_msg_and_die.c b/libbb/perror_msg_and_die.c
+index 15f46fc..7b50073 100644
+--- a/libbb/perror_msg_and_die.c
++++ b/libbb/perror_msg_and_die.c
+@@ -19,3 +19,8 @@ void bb_perror_msg_and_die(const char *s, ...)
+ 	va_end(p);
+ 	xfunc_die();
+ }
++
++void bb_simple_perror_msg_and_die(const char *s)
++{
++	bb_perror_msg_and_die("%s", s);
++}
+diff --git a/libbb/recursive_action.c b/libbb/recursive_action.c
+index cb3b88d..37363bb 100644
+--- a/libbb/recursive_action.c
++++ b/libbb/recursive_action.c
+@@ -120,6 +120,6 @@ int recursive_action(const char *fileName,
+ 	return TRUE;
+ 
+  done_nak_warn:
+-	bb_perror_msg("%s", fileName);
++	bb_simple_perror_msg(fileName);
+ 	return FALSE;
+ }
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 558510b..80c72f1 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -62,7 +62,7 @@ pid_t xspawn(char **argv)
+ {
+ 	pid_t pid = spawn(argv);
+ 	if (pid < 0)
+-		bb_perror_msg_and_die("%s", *argv);
++		bb_simple_perror_msg_and_die(*argv);
+ 	return pid;
+ }
+ 
+diff --git a/libbb/wfopen.c b/libbb/wfopen.c
+index 26e6a13..9248874 100644
+--- a/libbb/wfopen.c
++++ b/libbb/wfopen.c
+@@ -13,7 +13,7 @@ FILE *fopen_or_warn(const char *path, const char *mode)
+ {
+ 	FILE *fp = fopen(path, mode);
+ 	if (!fp) {
+-		bb_perror_msg("%s", path);
++		bb_simple_perror_msg(path);
+ 		errno = 0;
+ 	}
+ 	return fp;
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 2bf20f3..6d8eac4 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -704,13 +704,13 @@ int bb_ioctl_or_warn(int fd, int request, void *argp, const char *ioctl_name)
+ 
+ 	ret = ioctl(fd, request, argp);
+ 	if (ret < 0)
+-		bb_perror_msg("%s", ioctl_name);
++		bb_simple_perror_msg(ioctl_name);
+ 	return ret;
+ }
+ void bb_xioctl(int fd, int request, void *argp, const char *ioctl_name)
+ {
+ 	if (ioctl(fd, request, argp) < 0)
+-		bb_perror_msg_and_die("%s", ioctl_name);
++		bb_simple_perror_msg_and_die(ioctl_name);
+ }
+ #else
+ int bb_ioctl_or_warn(int fd, int request, void *argp)
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index eee4a00..149ea9c 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -144,7 +144,7 @@ static int adduser(struct passwd *p)
+ 		if (mkdir(p->pw_dir, 0755)
+ 		|| chown(p->pw_dir, p->pw_uid, p->pw_gid)
+ 		|| chmod(p->pw_dir, 02755)) {
+-			bb_perror_msg("%s", p->pw_dir);
++			bb_simple_perror_msg(p->pw_dir);
+ 		}
+ 	}
+ 
+diff --git a/miscutils/chrt.c b/miscutils/chrt.c
+index 98399ce..1f5465c 100644
+--- a/miscutils/chrt.c
++++ b/miscutils/chrt.c
+@@ -115,7 +115,7 @@ print_rt_info:
+ 	}
+ 	++argv;
+ 	BB_EXECVP(*argv, argv);
+-	bb_perror_msg_and_die("%s", *argv);
++	bb_simple_perror_msg_and_die(*argv);
+ }
+ #undef OPT_p
+ #undef OPT_r
+diff --git a/miscutils/mountpoint.c b/miscutils/mountpoint.c
+index 0f1e155..376bd95 100644
+--- a/miscutils/mountpoint.c
++++ b/miscutils/mountpoint.c
+@@ -61,6 +61,6 @@ int mountpoint_main(int argc, char **argv)
+ 		}
+ 	}
+ 	if (!(opt & OPT_q))
+-		bb_perror_msg("%s", arg);
++		bb_simple_perror_msg(arg);
+ 	return EXIT_FAILURE;
+ }
+diff --git a/miscutils/setsid.c b/miscutils/setsid.c
+index a976fe9..8d738ed 100644
+--- a/miscutils/setsid.c
++++ b/miscutils/setsid.c
+@@ -29,5 +29,5 @@ int setsid_main(int argc, char **argv)
+ 	setsid();  /* no error possible */
+ 
+ 	BB_EXECVP(argv[1], argv + 1);
+-	bb_perror_msg_and_die("%s", argv[1]);
++	bb_simple_perror_msg_and_die(argv[1]);
+ }
+diff --git a/miscutils/taskset.c b/miscutils/taskset.c
+index 0c4bad7..3c117da 100644
+--- a/miscutils/taskset.c
++++ b/miscutils/taskset.c
+@@ -92,7 +92,7 @@ int taskset_main(int argc, char** argv)
+ 	}
+ 	++argv;
+ 	BB_EXECVP(*argv, argv);
+-	bb_perror_msg_and_die("%s", *argv);
++	bb_simple_perror_msg_and_die(*argv);
+ }
+ #undef OPT_p
+ #undef TASKSET_PRINTF_MASK
+diff --git a/modutils/rmmod.c b/modutils/rmmod.c
+index 4a38e35..ba3e88c 100644
+--- a/modutils/rmmod.c
++++ b/modutils/rmmod.c
+@@ -85,7 +85,7 @@ int rmmod_main(int argc, char **argv)
+ 		}
+ 
+ 		if (syscall(__NR_delete_module, ENABLE_FEATURE_2_6_MODULES ? misc_buf : argv[n], flags)) {
+-			bb_perror_msg("%s", argv[n]);
++			bb_simple_perror_msg(argv[n]);
+ 			ret = EXIT_FAILURE;
+ 		}
+ 	}
+diff --git a/networking/httpd.c b/networking/httpd.c
+index c8fbefd..06a5a56 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -504,7 +504,7 @@ static void parse_conf(const char *path, int flag)
+ 			return;
+ 		}
+ 		if (configFile && flag == FIRST_PARSE) /* if -c option given */
+-			bb_perror_msg_and_die("%s", cf);
++			bb_simple_perror_msg_and_die(cf);
+ 		flag = FIND_FROM_HTTPD_ROOT;
+ 		cf = httpd_conf;
+ 	}
+diff --git a/networking/inetd.c b/networking/inetd.c
+index b164278..6d72e13 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -983,7 +983,7 @@ static void config(int sig ATTRIBUTE_UNUSED)
+ 	char protoname[10];
+ 
+ 	if (!setconfig()) {
+-		bb_perror_msg("%s", config_filename);
++		bb_simple_perror_msg(config_filename);
+ 		return;
+ 	}
+ 	for (sep = servtab; sep; sep = sep->se_next)
+diff --git a/networking/netstat.c b/networking/netstat.c
+index 5bacb47..e5ed10e 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -464,7 +464,7 @@ static void do_info(const char *file, const char *name, void (*proc)(int, const
+ 	procinfo = fopen(file, "r");
+ 	if (procinfo == NULL) {
+ 		if (errno != ENOENT) {
+-			bb_perror_msg("%s", file);
++			bb_simple_perror_msg(file);
+ 		} else {
+ 			bb_error_msg("no support for '%s' on this system", name);
+ 		}
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index 0f7996f..5ae482e 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -595,7 +595,7 @@ int setfiles_main(int argc, char **argv)
+ 		if (argc == 1)
+ 			bb_show_usage();
+ 		if (stat(argv[optind], &sb) < 0) {
+-			bb_perror_msg_and_die("%s", argv[optind]);
++			bb_simple_perror_msg_and_die(argv[optind]);
+ 		}
+ 		if (!S_ISREG(sb.st_mode)) {
+ 			bb_error_msg_and_die("spec file %s is not a regular file", argv[optind]);
+@@ -603,7 +603,7 @@ int setfiles_main(int argc, char **argv)
+ 		/* Load the file contexts configuration and check it. */
+ 		rc = matchpathcon_init(argv[optind]);
+ 		if (rc < 0) {
+-			bb_perror_msg_and_die("%s", argv[optind]);
++			bb_simple_perror_msg_and_die(argv[optind]);
+ 		}
+ 
+ 		optind++;
+diff --git a/shell/lash.c b/shell/lash.c
+index af3a8f8..b7a0a6a 100644
+--- a/shell/lash.c
++++ b/shell/lash.c
+@@ -1159,7 +1159,7 @@ static int pseudo_exec(struct child_prog *child)
+ 
+ 	/* Do not use bb_perror_msg_and_die() here, since we must not
+ 	 * call exit() but should call _exit() instead */
+-	bb_perror_msg("%s", child->argv[0]);
++	bb_simple_perror_msg(child->argv[0]);
+ 	_exit(EXIT_FAILURE);
+ }
+ 
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index ea33001..10ada54 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -1655,7 +1655,7 @@ int mount_main(int argc, char **argv)
+ 	 && (i & (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE))
+ 	) {
+ 		rc = mount("", argv[0], "", i, "");
+-		if (rc) bb_perror_msg_and_die("%s", argv[0]);
++		if (rc) bb_simple_perror_msg_and_die(argv[0]);
+ 		goto clean_up;
+ 	}
+ 
+diff --git a/util-linux/setarch.c b/util-linux/setarch.c
+index 2fb47f9..08294e5 100644
+--- a/util-linux/setarch.c
++++ b/util-linux/setarch.c
+@@ -44,5 +44,5 @@ retry:
+ 		BB_EXECVP(argv[0], argv);
+ 	}
+ 
+-	bb_perror_msg_and_die("%s", argv[0]);
++	bb_simple_perror_msg_and_die(argv[0]);
+ }
+diff --git a/util-linux/swaponoff.c b/util-linux/swaponoff.c
+index 73fe105..db43aa5 100644
+--- a/util-linux/swaponoff.c
++++ b/util-linux/swaponoff.c
+@@ -31,7 +31,7 @@ static int swap_enable_disable(char *device)
+ 		status = swapoff(device);
+ 
+ 	if (status != 0) {
+-		bb_perror_msg("%s", device);
++		bb_simple_perror_msg(device);
+ 		return 1;
+ 	}
+ 

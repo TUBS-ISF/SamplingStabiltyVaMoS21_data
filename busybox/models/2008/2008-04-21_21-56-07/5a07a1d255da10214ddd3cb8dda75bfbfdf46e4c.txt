@@ -1,0 +1,371 @@
+2008-04-21 21:56:07 +0000
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index 7fdec69..3cbe7f4 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -1,7 +1,7 @@
+ #
+ # Automatically generated make config: don't edit
+-# Busybox version: 1.10.0.svn
+-# Thu Mar 20 14:54:21 2008
++# Busybox version: 1.11.0.svn
++# Mon Apr 21 23:20:35 2008
+ #
+ CONFIG_HAVE_DOT_CONFIG=y
+ 
+@@ -100,6 +100,7 @@ CONFIG_FEATURE_AR_LONG_FILENAMES=y
+ CONFIG_BUNZIP2=y
+ CONFIG_BZIP2=y
+ CONFIG_CPIO=y
++CONFIG_FEATURE_CPIO_O=y
+ CONFIG_DPKG=y
+ CONFIG_DPKG_DEB=y
+ CONFIG_FEATURE_DPKG_DEB_EXTRACT_ONLY=y
+@@ -485,6 +486,7 @@ CONFIG_LOSETUP=y
+ CONFIG_MDEV=y
+ CONFIG_FEATURE_MDEV_CONF=y
+ CONFIG_FEATURE_MDEV_RENAME=y
++CONFIG_FEATURE_MDEV_RENAME_REGEXP=y
+ CONFIG_FEATURE_MDEV_EXEC=y
+ CONFIG_FEATURE_MDEV_LOAD_FIRMWARE=y
+ CONFIG_MKSWAP=y
+@@ -521,6 +523,7 @@ CONFIG_PIVOT_ROOT=y
+ CONFIG_RDATE=y
+ CONFIG_READPROFILE=y
+ CONFIG_RTCWAKE=y
++CONFIG_SCRIPT=y
+ CONFIG_SETARCH=y
+ CONFIG_SWAPONOFF=y
+ CONFIG_SWITCH_ROOT=y
+@@ -559,6 +562,7 @@ CONFIG_DC=y
+ # CONFIG_FEATURE_DEVFS is not set
+ CONFIG_EJECT=y
+ CONFIG_FEATURE_EJECT_SCSI=y
++CONFIG_FBSPLASH=y
+ CONFIG_LAST=y
+ CONFIG_LESS=y
+ CONFIG_FEATURE_LESS_MAXLINES=9999999
+@@ -577,6 +581,7 @@ CONFIG_FEATURE_HDPARM_HDIO_GETSET_DMA=y
+ CONFIG_MAKEDEVS=y
+ # CONFIG_FEATURE_MAKEDEVS_LEAF is not set
+ CONFIG_FEATURE_MAKEDEVS_TABLE=y
++CONFIG_MAN=y
+ CONFIG_MICROCOM=y
+ CONFIG_MOUNTPOINT=y
+ CONFIG_MT=y
+@@ -584,9 +589,9 @@ CONFIG_RAIDAUTORUN=y
+ CONFIG_READAHEAD=y
+ CONFIG_RUNLEVEL=y
+ CONFIG_RX=y
+-CONFIG_SCRIPT=y
+-CONFIG_STRINGS=y
+ CONFIG_SETSID=y
++CONFIG_STRINGS=y
++CONFIG_SYMLINKS=y
+ CONFIG_TASKSET=y
+ CONFIG_FEATURE_TASKSET_FANCY=y
+ CONFIG_TIME=y
+@@ -603,6 +608,7 @@ CONFIG_ARP=y
+ CONFIG_ARPING=y
+ CONFIG_BRCTL=y
+ CONFIG_FEATURE_BRCTL_FANCY=y
++CONFIG_FEATURE_BRCTL_SHOW=y
+ CONFIG_DNSD=y
+ CONFIG_ETHER_WAKE=y
+ CONFIG_FAKEIDENTD=y
+@@ -751,6 +757,7 @@ CONFIG_WATCH=y
+ # CONFIG_FEATURE_SH_IS_MSH is not set
+ CONFIG_FEATURE_SH_IS_NONE=y
+ # CONFIG_ASH is not set
++# CONFIG_ASH_BASH_COMPAT is not set
+ # CONFIG_ASH_JOB_CONTROL is not set
+ # CONFIG_ASH_READ_NCHARS is not set
+ # CONFIG_ASH_READ_TIMEOUT is not set
+@@ -780,6 +787,7 @@ CONFIG_MSH=y
+ #
+ CONFIG_FEATURE_SH_EXTRA_QUIET=y
+ CONFIG_FEATURE_SH_STANDALONE=y
++CONFIG_FEATURE_SH_NOFORK=y
+ CONFIG_CTTYHACK=y
+ 
+ #
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index 3c551de..8fb8602 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -22,11 +22,13 @@ int open_transformer(int src_fd,
+ 
+ #if BB_MMU
+ 	pid = fork();
++	if (pid == -1)
++		bb_perror_msg_and_die("can't fork");
+ #else
+ 	pid = vfork();
+-#endif
+ 	if (pid == -1)
+-		bb_perror_msg_and_die("fork failed");
++		bb_perror_msg_and_die("can't vfork");
++#endif
+ 
+ 	if (pid == 0) {
+ 		/* child process */
+@@ -49,7 +51,7 @@ int open_transformer(int src_fd,
+ 			argv[2] = (char*)"-";
+ 			argv[3] = NULL;
+ 			BB_EXECVP(transform_prog, argv);
+-			bb_perror_msg_and_die("exec failed");
++			bb_perror_msg_and_die("can't exec %s", transform_prog);
+ 		}
+ #endif
+ 		/* notreached */
+diff --git a/archival/tar.c b/archival/tar.c
+index 0c90ac0..0aa216c 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -84,26 +84,26 @@ struct TarHeader {		  /* byte offset */
+ */
+ typedef struct HardLinkInfo HardLinkInfo;
+ struct HardLinkInfo {
+-	HardLinkInfo *next;	/* Next entry in list */
+-	dev_t dev;			/* Device number */
+-	ino_t ino;			/* Inode number */
+-	short linkCount;	/* (Hard) Link Count */
+-	char name[1];		/* Start of filename (must be last) */
++	HardLinkInfo *next;     /* Next entry in list */
++	dev_t dev;              /* Device number */
++	ino_t ino;              /* Inode number */
++	short linkCount;        /* (Hard) Link Count */
++	char name[1];           /* Start of filename (must be last) */
+ };
+ 
+ /* Some info to be carried along when creating a new tarball */
+ typedef struct TarBallInfo TarBallInfo;
+ struct TarBallInfo {
+-	int tarFd;				/* Open-for-write file descriptor
+-							   for the tarball */
+-	struct stat statBuf;	/* Stat info for the tarball, letting
+-							   us know the inode and device that the
+-							   tarball lives, so we can avoid trying
+-							   to include the tarball into itself */
+-	int verboseFlag;		/* Whether to print extra stuff or not */
+-	const llist_t *excludeList;	/* List of files to not include */
+-	HardLinkInfo *hlInfoHead;	/* Hard Link Tracking Information */
+-	HardLinkInfo *hlInfo;	/* Hard Link Info for the current file */
++	int tarFd;                      /* Open-for-write file descriptor
++	                                 * for the tarball */
++	struct stat statBuf;            /* Stat info for the tarball, letting
++	                                 * us know the inode and device that the
++	                                 * tarball lives, so we can avoid trying
++	                                 * to include the tarball into itself */
++	int verboseFlag;                /* Whether to print extra stuff or not */
++	const llist_t *excludeList;     /* List of files to not include */
++	HardLinkInfo *hlInfoHead;       /* Hard Link Tracking Information */
++	HardLinkInfo *hlInfo;           /* Hard Link Info for the current file */
+ };
+ 
+ /* A nice enum with all the possible tar file content types */
+@@ -503,100 +503,104 @@ static int writeFileToTarball(const char *fileName, struct stat *statbuf,
+ 	return TRUE;
+ }
+ 
+-static int writeTarFile(const int tar_fd, const int verboseFlag,
+-	const unsigned long dereferenceFlag, const llist_t *include,
+-	const llist_t *exclude, const int gzip)
+-{
+-	pid_t gzipPid = 0;
+-	int errorFlag = FALSE;
+-	struct TarBallInfo tbInfo;
+-
+-	tbInfo.hlInfoHead = NULL;
+-
+-	fchmod(tar_fd, 0644);
+-	tbInfo.tarFd = tar_fd;
+-	tbInfo.verboseFlag = verboseFlag;
+-
+-	/* Store the stat info for the tarball's file, so
+-	 * can avoid including the tarball into itself....  */
+-	if (fstat(tbInfo.tarFd, &tbInfo.statBuf) < 0)
+-		bb_perror_msg_and_die("cannot stat tar file");
+-
+ #if ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2
+-	if (gzip) {
++/* Don't inline: vfork scares gcc and pessimizes code */
++static void NOINLINE vfork_compressor(int tar_fd, int gzip)
++{
++	pid_t gzipPid;
+ #if ENABLE_FEATURE_TAR_GZIP && ENABLE_FEATURE_TAR_BZIP2
+-		const char *zip_exec = (gzip == 1) ? "gzip" : "bzip2";
++	const char *zip_exec = (gzip == 1) ? "gzip" : "bzip2";
+ #elif ENABLE_FEATURE_TAR_GZIP
+-		const char *zip_exec = "gzip";
++	const char *zip_exec = "gzip";
+ #else /* only ENABLE_FEATURE_TAR_BZIP2 */
+-		const char *zip_exec = "bzip2";
++	const char *zip_exec = "bzip2";
+ #endif
+ 	// On Linux, vfork never unpauses parent early, although standard
+ 	// allows for that. Do we want to waste bytes checking for it?
+ #define WAIT_FOR_CHILD 0
+-		volatile int vfork_exec_errno = 0;
+-#if WAIT_FOR_CHILD
+-		struct fd_pair gzipStatusPipe;
+-#endif
+-		struct fd_pair gzipDataPipe;
+-		xpiped_pair(gzipDataPipe);
++	volatile int vfork_exec_errno = 0;
++	struct fd_pair gzipDataPipe;
+ #if WAIT_FOR_CHILD
+-		xpiped_pair(gzipStatusPipe);
++	struct fd_pair gzipStatusPipe;
++	xpiped_pair(gzipStatusPipe);
+ #endif
++	xpiped_pair(gzipDataPipe);
+ 
+-		signal(SIGPIPE, SIG_IGN); /* we only want EPIPE on errors */
++	signal(SIGPIPE, SIG_IGN); /* we only want EPIPE on errors */
+ 
+ #if defined(__GNUC__) && __GNUC__
+-		/* Avoid vfork clobbering */
+-		(void) &include;
+-		(void) &errorFlag;
+-		(void) &zip_exec;
++	/* Avoid vfork clobbering */
++	(void) &zip_exec;
+ #endif
+ 
+-		gzipPid = vfork();
+-		if (gzipPid < 0)
+-			bb_perror_msg_and_die("vfork gzip");
++	gzipPid = vfork();
++	if (gzipPid < 0)
++		bb_perror_msg_and_die("can't vfork");
+ 
+-		if (gzipPid == 0) {
+-			/* child */
+-			/* NB: close _first_, then move fds! */
+-			close(gzipDataPipe.wr);
++	if (gzipPid == 0) {
++		/* child */
++		/* NB: close _first_, then move fds! */
++		close(gzipDataPipe.wr);
+ #if WAIT_FOR_CHILD
+-			close(gzipStatusPipe.rd);
+-			/* gzipStatusPipe.wr will close only on exec -
+-			 * parent waits for this close to happen */
+-			fcntl(gzipStatusPipe.wr, F_SETFD, FD_CLOEXEC);
++		close(gzipStatusPipe.rd);
++		/* gzipStatusPipe.wr will close only on exec -
++		 * parent waits for this close to happen */
++		fcntl(gzipStatusPipe.wr, F_SETFD, FD_CLOEXEC);
+ #endif
+-			xmove_fd(gzipDataPipe.rd, 0);
+-			xmove_fd(tbInfo.tarFd, 1);
+-			/* exec gzip/bzip2 program/applet */
+-			BB_EXECLP(zip_exec, zip_exec, "-f", NULL);
+-			vfork_exec_errno = errno;
+-			_exit(1);
+-		}
++		xmove_fd(gzipDataPipe.rd, 0);
++		xmove_fd(tar_fd, 1);
++		/* exec gzip/bzip2 program/applet */
++		BB_EXECLP(zip_exec, zip_exec, "-f", NULL);
++		vfork_exec_errno = errno;
++		_exit(1);
++	}
+ 
+-		/* parent */
+-		xmove_fd(gzipDataPipe.wr, tbInfo.tarFd);
+-		close(gzipDataPipe.rd);
++	/* parent */
++	xmove_fd(gzipDataPipe.wr, tar_fd);
++	close(gzipDataPipe.rd);
+ #if WAIT_FOR_CHILD
+-		close(gzipStatusPipe.wr);
+-		while (1) {
+-			char buf;
+-			int n;
+-
+-			/* Wait until child execs (or fails to) */
+-			n = full_read(gzipStatusPipe.rd, &buf, 1);
+-			if (n < 0 /* && errno == EAGAIN */)
+-				continue;	/* try it again */
+-
+-		}
+-		close(gzipStatusPipe.rd);
++	close(gzipStatusPipe.wr);
++	while (1) {
++		char buf;
++		int n;
++
++		/* Wait until child execs (or fails to) */
++		n = full_read(gzipStatusPipe.rd, &buf, 1);
++		if (n < 0 /* && errno == EAGAIN */)
++			continue;	/* try it again */
++	}
++	close(gzipStatusPipe.rd);
+ #endif
+-		if (vfork_exec_errno) {
+-			errno = vfork_exec_errno;
+-			bb_perror_msg_and_die("cannot exec %s", zip_exec);
+-		}
++	if (vfork_exec_errno) {
++		errno = vfork_exec_errno;
++		bb_perror_msg_and_die("cannot exec %s", zip_exec);
+ 	}
++}
++#endif /* ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2 */
++
++
++/* gcc 4.2.1 inlines it, making code bigger */
++static NOINLINE int writeTarFile(int tar_fd, int verboseFlag,
++	int dereferenceFlag, const llist_t *include,
++	const llist_t *exclude, int gzip)
++{
++	int errorFlag = FALSE;
++	struct TarBallInfo tbInfo;
++
++	tbInfo.hlInfoHead = NULL;
++
++	fchmod(tar_fd, 0644);
++	tbInfo.tarFd = tar_fd;
++	tbInfo.verboseFlag = verboseFlag;
++
++	/* Store the stat info for the tarball's file, so
++	 * can avoid including the tarball into itself....  */
++	if (fstat(tbInfo.tarFd, &tbInfo.statBuf) < 0)
++		bb_perror_msg_and_die("cannot stat tar file");
++
++#if ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2
++	if (gzip)
++		vfork_compressor(tbInfo.tarFd, gzip);
+ #endif
+ 
+ 	tbInfo.excludeList = exclude;
+@@ -630,20 +634,22 @@ static int writeTarFile(const int tar_fd, const int verboseFlag,
+ 	if (errorFlag)
+ 		bb_error_msg("error exit delayed from previous errors");
+ 
+-	if (gzipPid) {
++#if ENABLE_FEATURE_TAR_GZIP || ENABLE_FEATURE_TAR_BZIP2
++	if (gzip) {
+ 		int status;
+-		if (safe_waitpid(gzipPid, &status, 0) == -1)
++		if (safe_waitpid(-1, &status, 0) == -1)
+ 			bb_perror_msg("waitpid");
+ 		else if (!WIFEXITED(status) || WEXITSTATUS(status))
+ 			/* gzip was killed or has exited with nonzero! */
+ 			errorFlag = TRUE;
+ 	}
++#endif
+ 	return errorFlag;
+ }
+ #else
+-int writeTarFile(const int tar_fd, const int verboseFlag,
+-	const unsigned long dereferenceFlag, const llist_t *include,
+-	const llist_t *exclude, const int gzip);
++int writeTarFile(int tar_fd, int verboseFlag,
++	int dereferenceFlag, const llist_t *include,
++	const llist_t *exclude, int gzip);
+ #endif /* FEATURE_TAR_CREATE */
+ 
+ #if ENABLE_FEATURE_TAR_FROM

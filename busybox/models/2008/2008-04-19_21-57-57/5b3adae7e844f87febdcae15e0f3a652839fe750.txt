@@ -1,0 +1,14 @@
+2008-04-19 21:57:57 +0000
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index 8578893..d8fa5f3 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -181,7 +181,7 @@ int ipcalc_main(int argc, char **argv)
+ 				bb_herror_msg_and_die("cannot find hostname for %s", argv[0]);
+ 			}
+ 			str_tolower(hostinfo->h_name);
+-			
++
+ 			printf("HOSTNAME=%s\n", hostinfo->h_name);
+ 		}
+ 	}

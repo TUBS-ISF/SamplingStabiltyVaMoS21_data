@@ -1,0 +1,271 @@
+2009-03-28 18:55:34 +0000
+diff --git a/shell/hush_test/hush-vars/param_expand_alt.right b/shell/hush_test/hush-vars/param_expand_alt.right
+new file mode 100644
+index 0000000..4d2197a
+--- /dev/null
++++ b/shell/hush_test/hush-vars/param_expand_alt.right
+@@ -0,0 +1,8 @@
++hush: syntax error: unterminated ${name}
++hush: syntax error: unterminated ${name}
++_0 _0
++_ _ _ _ _
++_aaaa _ _ _word _word
++_ _ _ _ _
++_ _ _ _word _
++_fff _ _ _word _word
+diff --git a/shell/hush_test/hush-vars/param_expand_alt.tests b/shell/hush_test/hush-vars/param_expand_alt.tests
+new file mode 100755
+index 0000000..c46075b
+--- /dev/null
++++ b/shell/hush_test/hush-vars/param_expand_alt.tests
+@@ -0,0 +1,22 @@
++# first try some invalid patterns (do in subshell due to parsing error)
++hush -c 'echo ${+}  ; echo moo'
++hush -c 'echo ${:+} ; echo moo'
++
++# now some funky ones
++echo _${#+} _${#:+}
++
++# now some valid ones
++set --
++echo _$1 _${1+} _${1:+} _${1+word} _${1:+word}
++
++set -- aaaa
++echo _$1 _${1+} _${1:+} _${1+word} _${1:+word}
++
++unset f
++echo _$f _${f+} _${f:+} _${f+word} _${f:+word}
++
++f=
++echo _$f _${f+} _${f:+} _${f+word} _${f:+word}
++
++f=fff
++echo _$f _${f+} _${f:+} _${f+word} _${f:+word}
+diff --git a/shell/hush_test/hush-vars/param_expand_assign.right b/shell/hush_test/hush-vars/param_expand_assign.right
+new file mode 100644
+index 0000000..fff4ead
+--- /dev/null
++++ b/shell/hush_test/hush-vars/param_expand_assign.right
+@@ -0,0 +1,27 @@
++hush: syntax error: unterminated ${name}
++hush: syntax error: unterminated ${name}
++0
++0
++hush: 1: special vars cannot assign in this way
++hush: 1: special vars cannot assign in this way
++hush: 1: special vars cannot assign in this way
++hush: 1: special vars cannot assign in this way
++_aa
++_aa
++_aa
++_aa
++_
++_
++_
++_word
++_word
++_
++_
++_
++_
++_word
++_fff
++_fff
++_fff
++_fff
++_fff
+diff --git a/shell/hush_test/hush-vars/param_expand_assign.tests b/shell/hush_test/hush-vars/param_expand_assign.tests
+new file mode 100755
+index 0000000..1fba556
+--- /dev/null
++++ b/shell/hush_test/hush-vars/param_expand_assign.tests
+@@ -0,0 +1,38 @@
++# first try some invalid patterns (do in subshell due to parsing error)
++hush -c 'echo ${=}'
++hush -c 'echo ${:=}'
++
++# now some funky ones
++hush -c 'echo ${#=}'
++hush -c 'echo ${#:=}'
++
++# should error out
++hush -c 'set --; echo _${1=}'
++hush -c 'set --; echo _${1:=}'
++hush -c 'set --; echo _${1=word}'
++hush -c 'set --; echo _${1:=word}'
++
++# should not error
++hush -c 'set aa; echo _${1=}'
++hush -c 'set aa; echo _${1:=}'
++hush -c 'set aa; echo _${1=word}'
++hush -c 'set aa; echo _${1:=word}'
++
++# should work fine
++unset f; echo _$f
++unset f; echo _${f=}
++unset f; echo _${f:=}
++unset f; echo _${f=word}
++unset f; echo _${f:=word}
++
++f=; echo _$f
++f=; echo _${f=}
++f=; echo _${f:=}
++f=; echo _${f=word}
++f=; echo _${f:=word}
++
++f=fff; echo _$f
++f=fff; echo _${f=}
++f=fff; echo _${f:=}
++f=fff; echo _${f=word}
++f=fff; echo _${f:=word}
+diff --git a/shell/hush_test/hush-vars/param_expand_default.right b/shell/hush_test/hush-vars/param_expand_default.right
+new file mode 100644
+index 0000000..acc7172
+--- /dev/null
++++ b/shell/hush_test/hush-vars/param_expand_default.right
+@@ -0,0 +1,8 @@
++hush: syntax error: unterminated ${name}
++hush: syntax error: unterminated ${name}
++_0 _0
++_ _ _ _word _word
++_aaaa _aaaa _aaaa _aaaa _aaaa
++_ _ _ _word _word
++_ _ _ _ _word
++_fff _fff _fff _fff _fff
+diff --git a/shell/hush_test/hush-vars/param_expand_default.tests b/shell/hush_test/hush-vars/param_expand_default.tests
+new file mode 100755
+index 0000000..2320ece
+--- /dev/null
++++ b/shell/hush_test/hush-vars/param_expand_default.tests
+@@ -0,0 +1,22 @@
++# first try some invalid patterns (do in subshell due to parsing error)
++hush -c 'echo ${-}'
++hush -c 'echo ${:-}'
++
++# now some funky ones
++echo _${#-} _${#:-}
++
++# now some valid ones
++set --
++echo _$1 _${1-} _${1:-} _${1-word} _${1:-word}
++
++set -- aaaa
++echo _$1 _${1-} _${1:-} _${1-word} _${1:-word}
++
++unset f
++echo _$f _${f-} _${f:-} _${f-word} _${f:-word}
++
++f=
++echo _$f _${f-} _${f:-} _${f-word} _${f:-word}
++
++f=fff
++echo _$f _${f-} _${f:-} _${f-word} _${f:-word}
+diff --git a/shell/hush_test/hush-vars/param_expand_indicate_error.right b/shell/hush_test/hush-vars/param_expand_indicate_error.right
+new file mode 100644
+index 0000000..f440f6f
+--- /dev/null
++++ b/shell/hush_test/hush-vars/param_expand_indicate_error.right
+@@ -0,0 +1,29 @@
++hush: syntax error: unterminated ${name}
++hush: syntax error: unterminated ${name}
++0
++0
++_
++hush: 1: parameter null or not set
++hush: 1: parameter null or not set
++hush: 1: word
++hush: 1: word
++_aaaa
++_aaaa
++_aaaa
++_aaaa
++_aaaa
++_
++hush: f: parameter null or not set
++hush: f: parameter null or not set
++hush: f: word
++hush: f: word
++_
++_
++hush: f: parameter null or not set
++_
++hush: f: word
++_fff
++_fff
++_fff
++_fff
++_fff
+diff --git a/shell/hush_test/hush-vars/param_expand_indicate_error.tests b/shell/hush_test/hush-vars/param_expand_indicate_error.tests
+new file mode 100755
+index 0000000..6b431d3
+--- /dev/null
++++ b/shell/hush_test/hush-vars/param_expand_indicate_error.tests
+@@ -0,0 +1,40 @@
++# do all of these in subshells since it's supposed to error out
++
++# first try some invalid patterns
++hush -c 'echo ${?}'
++hush -c 'echo ${:?}'
++
++# then some funky ones
++hush -c 'echo ${#?}'
++hush -c 'echo ${#:?}'
++
++# now some valid ones
++hush -c 'set --; echo _$1'
++hush -c 'set --; echo _${1?}'
++hush -c 'set --; echo _${1:?}'
++hush -c 'set --; echo _${1?word}'
++hush -c 'set --; echo _${1:?word}'
++
++hush -c 'set -- aaaa; echo _$1'
++hush -c 'set -- aaaa; echo _${1?}'
++hush -c 'set -- aaaa; echo _${1:?}'
++hush -c 'set -- aaaa; echo _${1?word}'
++hush -c 'set -- aaaa; echo _${1:?word}'
++
++hush -c 'unset f; echo _$f'
++hush -c 'unset f; echo _${f?}'
++hush -c 'unset f; echo _${f:?}'
++hush -c 'unset f; echo _${f?word}'
++hush -c 'unset f; echo _${f:?word}'
++
++hush -c 'f=; echo _$f'
++hush -c 'f=; echo _${f?}'
++hush -c 'f=; echo _${f:?}'
++hush -c 'f=; echo _${f?word}'
++hush -c 'f=; echo _${f:?word}'
++
++hush -c 'f=fff; echo _$f'
++hush -c 'f=fff; echo _${f?}'
++hush -c 'f=fff; echo _${f:?}'
++hush -c 'f=fff; echo _${f?word}'
++hush -c 'f=fff; echo _${f:?word}'
+diff --git a/shell/hush_test/hush-vars/param_expand_len.right b/shell/hush_test/hush-vars/param_expand_len.right
+new file mode 100644
+index 0000000..2d633a1
+--- /dev/null
++++ b/shell/hush_test/hush-vars/param_expand_len.right
+@@ -0,0 +1,4 @@
++0 0
++4 4
++4 3 2 1 0 0
++0 3 0
+diff --git a/shell/hush_test/hush-vars/param_expand_len.tests b/shell/hush_test/hush-vars/param_expand_len.tests
+new file mode 100755
+index 0000000..90f47d2
+--- /dev/null
++++ b/shell/hush_test/hush-vars/param_expand_len.tests
+@@ -0,0 +1,12 @@
++# make sure len parsing doesnt break arg count
++set --
++echo $# ${#}
++set -- aaaa bbb cc d
++echo $# ${#}
++
++echo ${#1} ${#2} ${#3} ${#4} ${#5} ${#6}
++
++unset e
++f=abc
++g=
++echo ${#e} ${#f} ${#g}

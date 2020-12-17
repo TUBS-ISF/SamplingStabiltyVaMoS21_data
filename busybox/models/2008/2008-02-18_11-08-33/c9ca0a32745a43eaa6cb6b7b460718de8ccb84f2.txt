@@ -1,0 +1,202 @@
+2008-02-18 11:08:33 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 2af89df..a91eac4 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -684,8 +684,8 @@ enum {
+ #endif
+ void bb_daemonize_or_rexec(int flags, char **argv);
+ void bb_sanitize_stdio(void);
+-/* Clear dangerous stuff, set PATH */
+-void sanitize_env_for_suid(void);
++/* Clear dangerous stuff, set PATH. Return 1 if was run by different user. */
++int sanitize_env_if_suid(void);
+ 
+ 
+ extern const char *opt_complementary;
+diff --git a/libbb/login.c b/libbb/login.c
+index 1af3165..d1f5d64 100644
+--- a/libbb/login.c
++++ b/libbb/login.c
+@@ -116,12 +116,19 @@ static const char forbid[] ALIGN1 =
+ 	"LD_NOWARN" "\0"
+ 	"LD_KEEPDIR" "\0";
+ 
+-void sanitize_env_for_suid(void)
++int sanitize_env_if_suid(void)
+ {
+-	const char *p = forbid;
++	const char *p;
++
++	if (getuid() == geteuid())
++		return 0;
++
++	p = forbid;
+ 	do {
+ 		unsetenv(p);
+ 		p += strlen(p) + 1;
+ 	} while (*p);
+ 	putenv((char*)bb_PATH_root_path);
++
++	return 1; /* we indeed were run by different user! */
+ }
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 55cbfa7..a5b6369 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -254,20 +254,17 @@ int login_main(int argc, char **argv)
+ 
+ 	short_tty = full_tty;
+ 	username[0] = '\0';
+-	amroot = (getuid() == 0);
+ 	signal(SIGALRM, alarm_handler);
+ 	alarm(TIMEOUT);
+ 
++	/* More of suid paranoia if called by non-root */
++	amroot = !sanitize_env_if_suid(); /* Clear dangerous stuff, set PATH */
++
+ 	/* Mandatory paranoia for suid applet:
+ 	 * ensure that fd# 0,1,2 are opened (at least to /dev/null)
+ 	 * and any extra open fd's are closed.
+ 	 * (The name of the function is misleading. Not daemonizing here.) */
+ 	bb_daemonize_or_rexec(DAEMON_ONLY_SANITIZE | DAEMON_CLOSE_EXTRA_FDS, NULL);
+-	/* More of suid paranoia if called by non-root */
+-	if (!amroot) {
+-	        /* Clear dangerous stuff, set PATH */
+-		sanitize_env_for_suid();
+-	}
+ 
+ 	opt = getopt32(argv, "f:h:p", &opt_user, &opt_host);
+ 	if (opt & LOGIN_OPT_f) {
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index faa93ea..3a1a8e9 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -49,7 +49,7 @@ int sulogin_main(int argc, char **argv)
+ 	}
+ 
+ 	/* Clear dangerous stuff, set PATH */
+-	sanitize_env_for_suid();
++	sanitize_env_if_suid();
+ 
+ // bb_askpass() already handles this
+ //	signal(SIGALRM, catchalarm);
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index bc7f56a..6b68964 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -97,7 +97,6 @@ int crontab_main(int argc, char **argv)
+ 	char *user_name;  /* -u USER */
+ 	int fd;
+ 	int opt_ler;
+-	uid_t my_uid;
+ 
+ 	/* file [opts]     Replace crontab from file
+ 	 * - [opts]        Replace crontab from stdin
+@@ -118,25 +117,22 @@ int crontab_main(int argc, char **argv)
+ 		OPT_ler = OPT_l + OPT_e + OPT_r,
+ 	};
+ 
+-	my_uid = getuid();
+-
+ 	opt_complementary = "?1:dr"; /* max one argument; -d implies -r */
+ 	opt_ler = getopt32(argv, "u:c:lerd", &user_name, &crontab_dir);
+ 	argv += optind;
+ 
+-	if (my_uid != geteuid()) { /* run by non-root? */
++	if (sanitize_env_if_suid()) { /* Clears dangerous stuff, sets PATH */
++		/* run by non-root? */
+ 		if (opt_ler & (OPT_u|OPT_c))
+ 			bb_error_msg_and_die("only root can use -c or -u");
+-		/* Clear dangerous stuff, set PATH */
+-		sanitize_env_for_suid();
+ 	}
+ 
+ 	if (opt_ler & OPT_u) {
+ 		pas = getpwnam(user_name);
+ 		if (!pas)
+ 			bb_error_msg_and_die("user %s is not known", user_name);
+-		my_uid = pas->pw_uid;
+ 	} else {
++		uid_t my_uid = getuid();
+ 		pas = getpwuid(my_uid);
+ 		if (!pas)
+ 			bb_perror_msg_and_die("no user record for UID %u",
+@@ -144,7 +140,6 @@ int crontab_main(int argc, char **argv)
+ 	}
+ 
+ #define user_name DONT_USE_ME_BEYOND_THIS_POINT
+-#define my_uid    DONT_USE_ME_BEYOND_THIS_POINT
+ 
+ 	/* From now on, keep only -l, -e, -r bits */
+ 	opt_ler &= OPT_ler;
+diff --git a/networking/nc.c b/networking/nc.c
+index feb9c5d..7c2aafa 100644
+--- a/networking/nc.c
++++ b/networking/nc.c
+@@ -44,14 +44,17 @@ int nc_main(int argc, char **argv)
+ 		while ((opt = getopt(argc, argv,
+ 		        "" USE_NC_SERVER("lp:") USE_NC_EXTRA("w:i:f:e:") )) > 0
+ 		) {
+-			if (ENABLE_NC_SERVER && opt=='l')      USE_NC_SERVER(do_listen++);
+-			else if (ENABLE_NC_SERVER && opt=='p') {
++			if (ENABLE_NC_SERVER && opt=='l')
++				USE_NC_SERVER(do_listen++);
++			else if (ENABLE_NC_SERVER && opt=='p')
+ 				USE_NC_SERVER(lport = bb_lookup_port(optarg, "tcp", 0));
+-			}
+-			else if (ENABLE_NC_EXTRA && opt=='w') USE_NC_EXTRA( wsecs = xatou(optarg));
+-			else if (ENABLE_NC_EXTRA && opt=='i') USE_NC_EXTRA( delay = xatou(optarg));
+-			else if (ENABLE_NC_EXTRA && opt=='f') USE_NC_EXTRA( cfd = xopen(optarg, O_RDWR));
+-			else if (ENABLE_NC_EXTRA && opt=='e' && optind<=argc) {
++			else if (ENABLE_NC_EXTRA && opt=='w')
++				USE_NC_EXTRA( wsecs = xatou(optarg));
++			else if (ENABLE_NC_EXTRA && opt=='i')
++				USE_NC_EXTRA( delay = xatou(optarg));
++			else if (ENABLE_NC_EXTRA && opt=='f')
++				USE_NC_EXTRA( cfd = xopen(optarg, O_RDWR));
++			else if (ENABLE_NC_EXTRA && opt=='e' && optind <= argc) {
+ 				/* We cannot just 'break'. We should let getopt finish.
+ 				** Or else we won't be able to find where
+ 				** 'host' and 'port' params are
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index dd75323..054db57 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -33,6 +33,11 @@
+ #ifndef MS_SILENT
+ #define MS_SILENT	(1 << 15)
+ #endif
++/* Grab more as needed from util-linux's mount/mount_constants.h */
++#ifndef MS_DIRSYNC
++#define MS_DIRSYNC      128     /* Directory modifications are synchronous */
++#endif
++
+ 
+ #if defined(__dietlibc__)
+ /* 16.12.2006, Sampo Kellomaki (sampo@iki.fi)
+@@ -122,6 +127,7 @@ static const int32_t mount_options[] = {
+ 		/* "exec"        */ ~MS_NOEXEC,
+ 		/* "noexec"      */ MS_NOEXEC,
+ 		/* "sync"        */ MS_SYNCHRONOUS,
++		/* "dirsync"     */ MS_DIRSYNC,
+ 		/* "async"       */ ~MS_SYNCHRONOUS,
+ 		/* "atime"       */ ~MS_NOATIME,
+ 		/* "noatime"     */ MS_NOATIME,
+@@ -171,6 +177,7 @@ static const char mount_option_str[] =
+ 		"exec" "\0"
+ 		"noexec" "\0"
+ 		"sync" "\0"
++		"dirsync" "\0"
+ 		"async" "\0"
+ 		"atime" "\0"
+ 		"noatime" "\0"
+@@ -1665,6 +1672,8 @@ int mount_main(int argc, char **argv)
+ 	SKIP_DESKTOP(const int nonroot = 0;)
+ 	USE_DESKTOP( int nonroot = (getuid() != 0);)
+ 
++	sanitize_env_if_suid();
++
+ 	/* parse long options, like --bind and --move.  Note that -o option
+ 	 * and --option are synonymous.  Yes, this means --remount,rw works. */
+ 

@@ -1,0 +1,181 @@
+2007-10-07 17:06:26 +0000
+diff --git a/Config.in b/Config.in
+index 64281f0..b046812 100644
+--- a/Config.in
++++ b/Config.in
+@@ -311,24 +311,32 @@ config BUILD_LIBBUSYBOX
+ ###
+ ###	  Say 'N' if in doubt.
+ 
++config FEATURE_INDIVIDUAL
++	bool "Produce a binary for each applet, linked against libbusybox"
++	default y
++	depends on !STATIC && BUILD_LIBBUSYBOX
++	help
++	  If your CPU architecture doesn't allow for sharing text/rodata
++	  sections of running binaries, but allows for runtime dynamic
++	  libraries, this option will allow you to reduce memory footprint
++	  when you have many different applets running at once.
++
++	  If your CPU architecture allows for sharing text/rodata,
++	  having single binary is more optimal.
++
++	  Each applet will be a tiny program, dynamically linked
++	  against libbusybox.so.N.N.N.
++
++	  You need to have a working dynamic linker.
++
+ config FEATURE_SHARED_BUSYBOX
+ 	bool "Produce additional busybox binary linked against libbusybox"
+-	default y if BUILD_LIBBUSYBOX
++	default y
+ 	depends on !STATIC && BUILD_LIBBUSYBOX
+ 	help
+-	  You need to have a working dynamic linker to use this variant.
++	  Build busybox, dynamically linked against libbusybox.so.N.N.N.
+ 
+-config LFS
+-	bool "Build with Large File Support (for accessing files > 2 GB)"
+-	default n
+-	select FDISK_SUPPORT_LARGE_DISKS
+-	help
+-	  If you want to build BusyBox with large file support, then enable
+-	  this option.  This will have no effect if your kernel or your C
+-	  library lacks large file support for large files.  Some of the
+-	  programs that can benefit from large file support include dd, gzip,
+-	  cp, mount, tar, and many others.  If you want to access files larger
+-	  than 2 Gigabytes, enable this option.  Otherwise, leave it set to 'N'.
++	  You need to have a working dynamic linker.
+ 
+ ### config BUILD_AT_ONCE
+ ###	bool "Compile all sources at once"
+@@ -349,6 +357,18 @@ config LFS
+ ###
+ ###	  Say 'N' unless you know what you are doing.
+ 
++config LFS
++	bool "Build with Large File Support (for accessing files > 2 GB)"
++	default n
++	select FDISK_SUPPORT_LARGE_DISKS
++	help
++	  If you want to build BusyBox with large file support, then enable
++	  this option.  This will have no effect if your kernel or your C
++	  library lacks large file support for large files.  Some of the
++	  programs that can benefit from large file support include dd, gzip,
++	  cp, mount, tar, and many others.  If you want to access files larger
++	  than 2 Gigabytes, enable this option.  Otherwise, leave it set to 'N'.
++
+ endmenu
+ 
+ menu 'Debugging Options'
+diff --git a/include/applets.h b/include/applets.h
+index e88192d..ac3f65f 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -30,6 +30,13 @@ s     - suid type:
+ # define APPLET_NOEXEC(name,main,l,s,name2)  int main##_main(int argc, char **argv);
+ # define APPLET_NOFORK(name,main,l,s,name2)  int main##_main(int argc, char **argv);
+ 
++#elif defined(NAME_MAIN_CNAME)
++# define APPLET(name,l,s)                    name name##_main name
++# define APPLET_NOUSAGE(name,main,l,s)       name main##_main name
++# define APPLET_ODDNAME(name,main,l,s,name2) name main##_main name2
++# define APPLET_NOEXEC(name,main,l,s,name2)  name main##_main name2
++# define APPLET_NOFORK(name,main,l,s,name2)  name main##_main name2
++
+ #elif defined(MAKE_USAGE) && ENABLE_FEATURE_VERBOSE_USAGE
+ # define APPLET(name,l,s)                    name##_trivial_usage "\n\n" name##_full_usage "\0"
+ # define APPLET_NOUSAGE(name,main,l,s)       "\b\0"
+@@ -373,7 +380,7 @@ USE_YES(APPLET_NOFORK(yes, yes, _BB_DIR_USR_BIN, _BB_SUID_NEVER, yes))
+ USE_GUNZIP(APPLET_ODDNAME(zcat, gunzip, _BB_DIR_BIN, _BB_SUID_NEVER, zcat))
+ USE_ZCIP(APPLET(zcip, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ 
+-#if !defined(PROTOTYPES) && !defined(MAKE_USAGE)
++#if !defined(PROTOTYPES) && !defined(NAME_MAIN_CNAME) && !defined(MAKE_USAGE)
+ 	{ NULL }
+ };
+ #endif
+diff --git a/scripts/trylink b/scripts/trylink
+index de60a2c..a87d672 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -137,7 +137,7 @@ if test "$CONFIG_FEATURE_SHARED_BUSYBOX" = y; then
+ 	-o $EXE -Wl,-Map -Wl,$EXE.map \
+ 	-Wl,--warn-common -Wl,--sort-common -Wl,--gc-sections \
+ 	-Wl,--start-group $O_FILES -Wl,--end-group \
+-	$l_list -Wl,--verbose \
++	-Wl,--verbose \
+ 	-L"$sharedlib_dir" -lbusybox \
+ 	>/dev/null \
+     || {
+@@ -148,3 +148,70 @@ if test "$CONFIG_FEATURE_SHARED_BUSYBOX" = y; then
+     strip -s --remove-section=.note --remove-section=.comment $EXE -o "$sharedlib_dir/busybox"
+     echo "busybox linked against libbusybox: $sharedlib_dir/busybox"
+ fi
++
++if test "$CONFIG_FEATURE_INDIVIDUAL" = y; then
++    gcc -DNAME_MAIN_CNAME -E -include include/autoconf.h include/applets.h \
++    | grep -v "^#" \
++    | grep -v "^$" \
++    > applet.lst
++    while read name main cname; do
++
++	test x"$cname" = "x[" && cname=test
++	test x"$cname" = "x[[" && cname=test
++
++	echo "\
++#include <errno.h>
++#include <unistd.h>
++#include <stdlib.h>
++#include <stdio.h>
++#include \"../include/autoconf.h\"
++#include \"../include/usage.h\"
++
++#ifdef __GLIBC__
++/* Make it reside in R/W memory: */
++int *const bb_errno __attribute__ ((section (\".data\")));
++#endif
++
++const char *applet_name = \"$name\";
++
++void bb_show_usage(void)
++{
++	fprintf(stderr, \"Usage: $name \"
++#ifdef ${cname}_trivial_usage
++		${cname}_trivial_usage
++#endif
++#ifdef ${cname}_full_usage
++		\"\\n\\n\" ${cname}_full_usage
++#endif
++		\"\\n\\n\");
++	exit(1);
++}
++
++int $main(int argc, char **argv);
++
++int main(int argc, char **argv)
++{
++#ifdef __GLIBC__
++        (*(int **)&bb_errno) = __errno_location();
++#endif
++        return $main(argc, argv);
++}
++" >"$sharedlib_dir/applet.c"
++
++	EXE="$sharedlib_dir/$name"
++	try $CC $LDFLAGS "$sharedlib_dir/applet.c" \
++	    -o $EXE \
++	    -Wl,--warn-common -Wl,--sort-common -Wl,--gc-sections \
++	    -L"$sharedlib_dir" -lbusybox \
++	    >/dev/null \
++	|| {
++	    echo "Linking $EXE failed"
++	    cat -- $EXE.out
++	    exit 1
++	}
++	rm -- "$sharedlib_dir/applet.c" $EXE.out
++	strip -s --remove-section=.note --remove-section=.comment $EXE
++	echo "applet linked against libbusybox: $EXE"
++
++    done <applet.lst
++fi

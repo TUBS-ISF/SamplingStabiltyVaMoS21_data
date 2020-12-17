@@ -1,0 +1,41 @@
+2008-05-08 10:40:34 +0000
+diff --git a/include/usage.h b/include/usage.h
+index e791ba6..0e56407 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1663,27 +1663,31 @@
+        "   # ifenslave -c bond0 eth0\n" \
+ 
+ #define ifup_trivial_usage \
+-       "[-ahinv] ifaces..."
++       "[-ain"USE_FEATURE_IFUPDOWN_MAPPING("m")"vf] ifaces..."
+ #define ifup_full_usage "\n\n" \
+        "Options:" \
+      "\n	-a	De/configure all interfaces automatically" \
+      "\n	-i FILE	Use FILE for interface definitions" \
+      "\n	-n	Print out what would happen, but don't do it" \
++	USE_FEATURE_IFUPDOWN_MAPPING( \
+      "\n		(note: doesn't disable mappings)" \
+-     "\n	-v	Print out what would happen before doing it" \
+      "\n	-m	Don't run any mappings" \
++	) \
++     "\n	-v	Print out what would happen before doing it" \
+      "\n	-f	Force de/configuration" \
+ 
+ #define ifdown_trivial_usage \
+-       "[-ahinv] ifaces..."
++       "[-ain"USE_FEATURE_IFUPDOWN_MAPPING("m")"vf] ifaces..."
+ #define ifdown_full_usage "\n\n" \
+        "Options:" \
+      "\n	-a	De/configure all interfaces automatically" \
+      "\n	-i FILE	Use FILE for interface definitions" \
+      "\n	-n	Print out what would happen, but don't do it" \
++	USE_FEATURE_IFUPDOWN_MAPPING( \
+      "\n		(note: doesn't disable mappings)" \
+-     "\n	-v	Print out what would happen before doing it" \
+      "\n	-m	Don't run any mappings" \
++	) \
++     "\n	-v	Print out what would happen before doing it" \
+      "\n	-f	Force de/configuration" \
+ 
+ #define inetd_trivial_usage \

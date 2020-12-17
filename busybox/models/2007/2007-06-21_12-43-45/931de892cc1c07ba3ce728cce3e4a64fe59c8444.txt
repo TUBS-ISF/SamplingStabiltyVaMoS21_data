@@ -1,0 +1,153 @@
+2007-06-21 12:43:45 +0000
+diff --git a/Makefile.custom b/Makefile.custom
+index bb59776..a011d53 100644
+--- a/Makefile.custom
++++ b/Makefile.custom
+@@ -67,6 +67,7 @@ sizes: busybox_unstripped
+ .PHONY: bloatcheck
+ bloatcheck: busybox_old busybox_unstripped
+ 	@$(srctree)/scripts/bloat-o-meter busybox_old busybox_unstripped
++	@$(CROSS_COMPILE)size busybox_old busybox_unstripped
+ 
+ .PHONY: baseline
+ baseline: busybox_unstripped
+diff --git a/Makefile.flags b/Makefile.flags
+index e73cf9d..b546790 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -79,6 +79,6 @@ SKIP_STRIP = y
+ endif
+ 
+ # Busybox is a stack-fatty so make sure we increase default size
+-# TODO: use "make stksizes" to find & fix big stack users; should
+-#       just steal scripts/checkstack.pl from the kernel ...
++# TODO: use "make stksizes" to find & fix big stack users
++# (we stole scripts/checkstack.pl from the kernel... thanks guys!)
+ FLTFLAGS += -s 20000
+diff --git a/archival/tar.c b/archival/tar.c
+index adcedf6..bcbb7a9 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -417,11 +417,11 @@ static int writeFileToTarball(const char *fileName, struct stat *statbuf,
+ 
+ 	header_name = fileName;
+ 	while (header_name[0] == '/') {
+-		static int alreadyWarned = FALSE;
++		static smallint warned;
+ 
+-		if (alreadyWarned == FALSE) {
++		if (!warned) {
+ 			bb_error_msg("removing leading '/' from member names");
+-			alreadyWarned = TRUE;
++			warned = 1;
+ 		}
+ 		header_name++;
+ 	}
+diff --git a/coreutils/fold.c b/coreutils/fold.c
+index d5e3a4d..11b8809 100644
+--- a/coreutils/fold.c
++++ b/coreutils/fold.c
+@@ -41,6 +41,8 @@ static int adjust_column(int column, char c)
+ int fold_main(int argc, char **argv);
+ int fold_main(int argc, char **argv)
+ {
++	char *line_out = NULL;
++	int allocated_out = 0;
+ 	char *w_opt;
+ 	int width = 80;
+ 	int i;
+@@ -75,8 +77,6 @@ int fold_main(int argc, char **argv)
+ 		int c;
+ 		int column = 0;		/* Screen column where next char will go. */
+ 		int offset_out = 0;	/* Index in `line_out' for next char. */
+-		static char *line_out = NULL;
+-		static int allocated_out = 0;
+ 
+ 		if (istream == NULL) {
+ 			errs |= EXIT_FAILURE;
+@@ -95,8 +95,7 @@ int fold_main(int argc, char **argv)
+ 				column = offset_out = 0;
+ 				continue;
+ 			}
+-
+-rescan:
++ rescan:
+ 			column = adjust_column(column, c);
+ 
+ 			if (column > width) {
+diff --git a/libbb/dump.c b/libbb/dump.c
+index f078afc..6dbbd9f 100644
+--- a/libbb/dump.c
++++ b/libbb/dump.c
+@@ -317,7 +317,8 @@ static void do_skip(const char *fname, int statok)
+ 
+ static int next(char **argv)
+ {
+-	static int done;
++	static smallint done;
++
+ 	int statok;
+ 
+ 	if (argv) {
+@@ -332,10 +333,11 @@ static int next(char **argv)
+ 				++_argv;
+ 				continue;
+ 			}
+-			statok = done = 1;
++			done = statok = 1;
+ 		} else {
+-			if (done++)
++			if (done)
+ 				return 0;
++			done = 1;
+ 			statok = 0;
+ 		}
+ 		if (bb_dump_skip)
+@@ -350,8 +352,9 @@ static int next(char **argv)
+ 
+ static unsigned char *get(void)
+ {
+-	static int ateof = 1;
+-	static unsigned char *curp=NULL, *savp; /*DBU:[dave@cray.com]initialize curp */
++	static smallint ateof = 1;
++	static unsigned char *curp = NULL, *savp; /*DBU:[dave@cray.com]initialize curp */
++
+ 	int n;
+ 	int need, nread;
+ 	unsigned char *tmpp;
+@@ -399,7 +402,8 @@ static unsigned char *get(void)
+ 		if (bb_dump_length != -1) {
+ 			bb_dump_length -= n;
+ 		}
+-		if (!(need -= n)) {
++		need -= n;
++		if (!need) {
+ 			if (bb_dump_vflag == ALL || bb_dump_vflag == FIRST
+ 				|| memcmp(curp, savp, bb_dump_blocksize)) {
+ 				if (bb_dump_vflag == DUP || bb_dump_vflag == FIRST) {
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index b9d8a02..cba8dc4 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -3656,16 +3656,18 @@ static int obj_gpl_license(struct obj_file *f, const char **license)
+ static void set_tainted(struct obj_file *f, int fd, char *m_name,
+ 		int kernel_has_tainted, int taint, const char *text1, const char *text2)
+ {
++	static smallint printed_info;
++
+ 	char buf[80];
+ 	int oldval;
+-	static int first = 1;
++
+ 	if (fd < 0 && !kernel_has_tainted)
+ 		return;		/* New modutils on old kernel */
+ 	printf("Warning: loading %s will taint the kernel: %s%s\n",
+ 			m_name, text1, text2);
+-	if (first) {
++	if (!printed_info) {
+ 		printf("  See %s for information about tainted modules\n", TAINT_URL);
+-		first = 0;
++		printed_info = 1;
+ 	}
+ 	if (fd >= 0) {
+ 		read(fd, buf, sizeof(buf)-1);

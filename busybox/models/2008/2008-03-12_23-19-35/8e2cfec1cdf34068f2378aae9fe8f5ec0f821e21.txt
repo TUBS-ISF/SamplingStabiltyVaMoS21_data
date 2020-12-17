@@ -1,0 +1,386 @@
+2008-03-12 23:19:35 +0000
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index 961b1ff..f3330e6 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -121,9 +121,6 @@ int dd_main(int argc, char **argv)
+ 		off_t count;
+ 		off_t seek, skip;
+ 		const char *infile, *outfile;
+-#if ENABLE_FEATURE_DD_SIGNAL_HANDLING
+-		struct sigaction sigact;
+-#endif
+ 	} Z;
+ #define flags   (Z.flags  )
+ #define oc      (Z.oc     )
+@@ -132,17 +129,13 @@ int dd_main(int argc, char **argv)
+ #define skip    (Z.skip   )
+ #define infile  (Z.infile )
+ #define outfile (Z.outfile)
+-#define sigact  (Z.sigact )
+ 
+ 	memset(&Z, 0, sizeof(Z));
+ 	INIT_G();
+ 	//fflush(NULL); - is this needed because of NOEXEC?
+ 
+ #if ENABLE_FEATURE_DD_SIGNAL_HANDLING
+-	sigact.sa_handler = dd_output_status;
+-	sigact.sa_flags = SA_RESTART;
+-	/*sigemptyset(&sigact.sa_mask); - memset did it */
+-	sigaction(SIGUSR1, &sigact, NULL);
++	signal_SA_RESTART_empty_mask(SIGUSR1, dd_output_status);
+ #endif
+ 
+ 	for (n = 1; n < argc; n++) {
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index de2d61e..037a563 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -1164,12 +1164,9 @@ int fsck_main(int argc, char **argv)
+ 	int interactive;
+ 	const char *fstab;
+ 	struct fs_info *fs;
+-	struct sigaction sa;
+ 
+-	memset(&sa, 0, sizeof(sa));
+-	sa.sa_handler = signal_cancel;
+-	sigaction(SIGINT, &sa, NULL);
+-	sigaction(SIGTERM, &sa, NULL);
++	signal_no_SA_RESTART_empty_mask(SIGINT, signal_cancel);
++	signal_no_SA_RESTART_empty_mask(SIGTERM, signal_cancel);
+ 
+ 	setbuf(stdout, NULL);
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index 3c53e5e..505396b 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -275,6 +275,7 @@ char *xrealloc_getcwd_or_warn(char *cwd);
+ 
+ char *xmalloc_follow_symlinks(const char *path);
+ 
++
+ enum {
+ 	/* bb_signals(BB_SIGS_FATAL, handler) catches all signals which
+ 	 * otherwise would kill us, except for those resulting from bugs:
+@@ -306,6 +307,12 @@ void bb_signals(int sigs, void (*f)(int));
+  * and in a way that while signal handler is run, no other signals
+  * will be blocked: */
+ void bb_signals_recursive(int sigs, void (*f)(int));
++/* syscalls like read() will be interrupted with EINTR: */
++void signal_no_SA_RESTART_empty_mask(int sig, void (*handler)(int));
++/* syscalls like read() won't be interrupted (though select/poll will be): */
++void signal_SA_RESTART_empty_mask(int sig, void (*handler)(int));
++/* Will do sigaction(signum, act, NULL): */
++int sigaction_set(int signum, const struct sigaction *act);
+ void sig_block(int);
+ void sig_unblock(int);
+ /* UNUSED: void sig_blocknone(void); */
+diff --git a/libbb/bb_askpass.c b/libbb/bb_askpass.c
+index fd12f92..3ad0e97 100644
+--- a/libbb/bb_askpass.c
++++ b/libbb/bb_askpass.c
+@@ -45,7 +45,7 @@ char *bb_askpass(int timeout, const char *prompt)
+ 	sa.sa_handler = askpass_timeout;
+ 	sigaction(SIGINT, &sa, &oldsa);
+ 	if (timeout) {
+-		sigaction(SIGALRM, &sa, NULL);
++		sigaction_set(SIGALRM, &sa);
+ 		alarm(timeout);
+ 	}
+ 
+@@ -68,7 +68,7 @@ char *bb_askpass(int timeout, const char *prompt)
+ 	if (timeout) {
+ 		alarm(0);
+ 	}
+-	sigaction(SIGINT, &oldsa, NULL);
++	sigaction_set(SIGINT, &oldsa);
+ 
+ 	tcsetattr(STDIN_FILENO, TCSANOW, &oldtio);
+ 	bb_putchar('\n');
+diff --git a/libbb/signals.c b/libbb/signals.c
+index a327e87..719beab 100644
+--- a/libbb/signals.c
++++ b/libbb/signals.c
+@@ -11,6 +11,12 @@
+ 
+ #include "libbb.h"
+ 
++/* Saves 2 bytes on x86! Oh my... */
++int sigaction_set(int signum, const struct sigaction *act)
++{
++	return sigaction(signum, act, NULL);
++}
++
+ void bb_signals(int sigs, void (*f)(int))
+ {
+ 	int sig_no = 0;
+@@ -40,7 +46,7 @@ void bb_signals_recursive(int sigs, void (*f)(int))
+ 	while (sigs) {
+ 		if (sigs & bit) {
+ 			sigs &= ~bit;
+-			sigaction(sig_no, &sa, NULL);
++			sigaction_set(sig_no, &sa);
+ 		}
+ 		sig_no++;
+ 		bit <<= 1;
+@@ -87,3 +93,23 @@ void kill_myself_with_sig(int sig)
+ 	raise(sig);
+ 	_exit(1); /* Should not reach it */
+ }
++
++void signal_SA_RESTART_empty_mask(int sig, void (*handler)(int))
++{
++	struct sigaction sa;
++	memset(&sa, 0, sizeof(sa));
++	/*sigemptyset(&sa.sa_mask);*/
++	sa.sa_flags = SA_RESTART;
++	sa.sa_handler = handler;
++	sigaction_set(sig, &sa);
++}
++
++void signal_no_SA_RESTART_empty_mask(int sig, void (*handler)(int))
++{
++	struct sigaction sa;
++	memset(&sa, 0, sizeof(sa));
++	/*sigemptyset(&sa.sa_mask);*/
++	/*sa.sa_flags = 0;*/
++	sa.sa_handler = handler;
++	sigaction_set(sig, &sa);
++}
+diff --git a/loginutils/vlock.c b/loginutils/vlock.c
+index 846733e..ff60d78 100644
+--- a/loginutils/vlock.c
++++ b/loginutils/vlock.c
+@@ -34,7 +34,6 @@ static void acquire_vt(int signo)
+ int vlock_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int vlock_main(int argc, char **argv)
+ {
+-	struct sigaction sa;
+ 	struct vt_mode vtm;
+ 	struct termios term;
+ 	struct termios oterm;
+@@ -63,17 +62,11 @@ int vlock_main(int argc, char **argv)
+ 
+ 	/* We will use SIGUSRx for console switch control: */
+ 	/* 1: set handlers */
+-	sigemptyset(&sa.sa_mask);
+-	sa.sa_flags = SA_RESTART;
+-	sa.sa_handler = release_vt;
+-	sigaction(SIGUSR1, &sa, NULL);
+-	sa.sa_handler = acquire_vt;
+-	sigaction(SIGUSR2, &sa, NULL);
++	signal_SA_RESTART_empty_mask(SIGUSR1, release_vt);
++	signal_SA_RESTART_empty_mask(SIGUSR2, acquire_vt);
+ 	/* 2: unmask them */
+-	sigprocmask(SIG_SETMASK, NULL, &sa.sa_mask);
+-	sigdelset(&sa.sa_mask, SIGUSR1);
+-	sigdelset(&sa.sa_mask, SIGUSR2);
+-	sigprocmask(SIG_SETMASK, &sa.sa_mask, NULL);
++	sig_unblock(SIGUSR1);
++	sig_unblock(SIGUSR2);
+ 
+ 	/* Revert stdin/out to our controlling tty
+ 	 * (or die if we have none) */
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 50c8203..1b88f05 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -390,8 +390,8 @@ int devfsd_main(int argc, char **argv)
+ 	sigemptyset(&new_action.sa_mask);
+ 	new_action.sa_flags = 0;
+ 	new_action.sa_handler = signal_handler;
+-	sigaction(SIGHUP, &new_action, NULL);
+-	sigaction(SIGUSR1, &new_action, NULL);
++	sigaction_set(SIGHUP, &new_action);
++	sigaction_set(SIGUSR1, &new_action);
+ 
+ 	printf("%s v%s started for %s\n", applet_name, DEVFSD_VERSION, mount_point);
+ 
+diff --git a/miscutils/rx.c b/miscutils/rx.c
+index 9a8fcaa..48867b8 100644
+--- a/miscutils/rx.c
++++ b/miscutils/rx.c
+@@ -220,7 +220,6 @@ static void sigalrm_handler(int ATTRIBUTE_UNUSED signum)
+ int rx_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int rx_main(int argc, char **argv)
+ {
+-	struct sigaction act;
+ 	struct termios tty, orig_tty;
+ 	int termios_err;
+ 	int file_fd;
+@@ -243,9 +242,7 @@ int rx_main(int argc, char **argv)
+ 	}
+ 
+ 	/* No SA_RESTART: we want ALRM to interrupt read() */
+-	memset(&act, 0, sizeof(act));
+-	act.sa_handler = sigalrm_handler;
+-	sigaction(SIGALRM, &act, NULL);
++	signal_no_SA_RESTART_empty_mask(SIGALRM, sigalrm_handler);
+ 
+ 	n = receive(file_fd);
+ 
+diff --git a/networking/arping.c b/networking/arping.c
+index c89b975..2277ec5 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -377,18 +377,8 @@ int arping_main(int argc, char **argv)
+ 		printf(" from %s via %s\n", inet_ntoa(src), device);
+ 	}
+ 
+-	{
+-		struct sigaction sa;
+-
+-		memset(&sa, 0, sizeof(sa));
+-		sa.sa_flags = SA_RESTART;
+-
+-		sa.sa_handler = (void (*)(int)) finish;
+-		sigaction(SIGINT, &sa, NULL);
+-
+-		sa.sa_handler = (void (*)(int)) catcher;
+-		sigaction(SIGALRM, &sa, NULL);
+-	}
++	signal_SA_RESTART_empty_mask(SIGINT,  (void (*)(int))finish);
++	signal_SA_RESTART_empty_mask(SIGALRM, (void (*)(int))catcher);
+ 
+ 	catcher();
+ 
+diff --git a/networking/httpd.c b/networking/httpd.c
+index e913728..7b7446e 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1788,7 +1788,6 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
+ 	char *header_ptr = header_ptr;
+ 	Htaccess_Proxy *proxy_entry;
+ #endif
+-	struct sigaction sa;
+ #if ENABLE_FEATURE_HTTPD_BASIC_AUTH
+ 	int credentials = -1;  /* if not required this is Ok */
+ #endif
+@@ -1819,11 +1818,7 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
+ 	}
+ 
+ 	/* Install timeout handler */
+-	memset(&sa, 0, sizeof(sa));
+-	sa.sa_handler = exit_on_signal;
+-	/* sigemptyset(&sa.sa_mask); - memset should be enough */
+-	/*sa.sa_flags = 0; - no SA_RESTART */
+-	sigaction(SIGALRM, &sa, NULL);
++	signal_no_SA_RESTART_empty_mask(SIGALRM, exit_on_signal);
+ 	alarm(HEADER_READ_TIMEOUT);
+ 
+ 	if (!get_line()) /* EOF or error or empty line */
+@@ -2247,15 +2242,9 @@ static void mini_httpd_inetd(void)
+ #if ENABLE_FEATURE_HTTPD_RELOAD_CONFIG_SIGHUP
+ static void sighup_handler(int sig)
+ {
+-	struct sigaction sa;
+-
+ 	parse_conf(default_path_httpd_conf, sig == SIGHUP ? SIGNALED_PARSE : FIRST_PARSE);
+ 
+-	memset(&sa, 0, sizeof(sa));
+-	sa.sa_handler = sighup_handler;
+-	/*sigemptyset(&sa.sa_mask); - memset should be enough */
+-	sa.sa_flags = SA_RESTART;
+-	sigaction(SIGHUP, &sa, NULL);
++	signal_SA_RESTART_empty_mask(SIGHUP, sighup_handler);
+ }
+ #endif
+ 
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 463c7cf..196f6d2 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1179,15 +1179,15 @@ int inetd_main(int argc, char **argv)
+ 	sigaddset(&sa.sa_mask, SIGCHLD);
+ 	sigaddset(&sa.sa_mask, SIGHUP);
+ 	sa.sa_handler = retry_network_setup;
+-	sigaction(SIGALRM, &sa, NULL);
++	sigaction_set(SIGALRM, &sa);
+ 	sa.sa_handler = reread_config_file;
+-	sigaction(SIGHUP, &sa, NULL);
++	sigaction_set(SIGHUP, &sa);
+ 	sa.sa_handler = reap_child;
+-	sigaction(SIGCHLD, &sa, NULL);
++	sigaction_set(SIGCHLD, &sa);
+ 	sa.sa_handler = clean_up_and_exit;
+-	sigaction(SIGTERM, &sa, NULL);
++	sigaction_set(SIGTERM, &sa);
+ 	sa.sa_handler = clean_up_and_exit;
+-	sigaction(SIGINT, &sa, NULL);
++	sigaction_set(SIGINT, &sa);
+ 	sa.sa_handler = SIG_IGN;
+ 	sigaction(SIGPIPE, &sa, &saved_pipe_handler);
+ 
+@@ -1382,7 +1382,7 @@ int inetd_main(int argc, char **argv)
+ 			 * for nowait stream children */
+ 			for (sep2 = serv_list; sep2; sep2 = sep2->se_next)
+ 				maybe_close(sep2->se_fd);
+-			sigaction(SIGPIPE, &saved_pipe_handler, NULL);
++			sigaction_set(SIGPIPE, &saved_pipe_handler);
+ 			unblock_sigs(&omask);
+ 			BB_EXECVP(sep->se_program, sep->se_argv);
+ 			bb_perror_msg("exec %s", sep->se_program);
+diff --git a/networking/wget.c b/networking/wget.c
+index 36a8356..a77a2ad 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -144,13 +144,8 @@ static void progressmeter(int flag)
+ 		transferred = 0;
+ 		fputc('\n', stderr);
+ 	} else {
+-		if (flag == -1) {
+-			/* first call to progressmeter */
+-			struct sigaction sa;
+-			sa.sa_handler = progressmeter;
+-			sigemptyset(&sa.sa_mask);
+-			sa.sa_flags = SA_RESTART;
+-			sigaction(SIGALRM, &sa, NULL);
++		if (flag == -1) { /* first call to progressmeter */
++			signal_SA_RESTART_empty_mask(SIGALRM, progressmeter);
+ 		}
+ 		alarm(1);
+ 	}
+diff --git a/shell/ash.c b/shell/ash.c
+index 9b1a730..6f675ce 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -3340,7 +3340,7 @@ setsignal(int signo)
+ 	*t = action;
+ 	act.sa_flags = 0;
+ 	sigfillset(&act.sa_mask);
+-	sigaction(signo, &act, NULL);
++	sigaction_set(signo, &act);
+ }
+ 
+ /* mode flags for set_curjob */
+diff --git a/shell/hush.c b/shell/hush.c
+index b44f35b..baa2db7 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -699,16 +699,6 @@ static const struct built_in_command bltins[] = {
+ 
+ #if ENABLE_HUSH_JOB
+ 
+-/* move to libbb? */
+-static void signal_SA_RESTART(int sig, void (*handler)(int))
+-{
+-	struct sigaction sa;
+-	sa.sa_handler = handler;
+-	sa.sa_flags = SA_RESTART;
+-	sigemptyset(&sa.sa_mask);
+-	sigaction(sig, &sa, NULL);
+-}
+-
+ /* Signals are grouped, we handle them in batches */
+ static void set_fatal_sighandler(void (*handler)(int))
+ {
+@@ -2115,7 +2105,7 @@ static int run_list(struct pipe *pi)
+ #if ENABLE_FEATURE_SH_STANDALONE
+ 		nofork_save.saved = 0; /* in case we will run a nofork later */
+ #endif
+-		signal_SA_RESTART(SIGTSTP, handler_ctrl_z);
++		signal_SA_RESTART_empty_mask(SIGTSTP, handler_ctrl_z);
+ 		signal(SIGINT, handler_ctrl_c);
+ 	}
+ #endif /* JOB */

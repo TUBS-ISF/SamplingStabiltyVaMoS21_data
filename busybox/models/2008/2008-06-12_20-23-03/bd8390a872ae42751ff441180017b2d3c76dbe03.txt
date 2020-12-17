@@ -1,0 +1,73 @@
+2008-06-12 20:23:03 +0000
+diff --git a/Config.in b/Config.in
+index 3b37496..0a7edf8 100644
+--- a/Config.in
++++ b/Config.in
+@@ -396,6 +396,17 @@ config DEBUG
+ 
+ 	  Most people should answer N.
+ 
++config DEBUG_PESSIMIZE
++	bool "Disable compiler optimizations."
++	default n
++	depends on DEBUG
++	help
++	  The compiler's optimization of source code can eliminate and reorder
++	  code, resulting in an executable that's hard to understand when
++	  stepping through it with a debugger.  This switches it off, resulting
++	  in a much bigger executable that more closely matches the source
++	  code.
++
+ config WERROR
+ 	bool "Abort compilation on any warning"
+ 	default n
+@@ -404,18 +415,6 @@ config WERROR
+ 
+ 	  Most people should answer N.
+ 
+-# Seems to be unused
+-#config DEBUG_PESSIMIZE
+-#	bool "Disable compiler optimizations."
+-#	default n
+-#	depends on DEBUG
+-#	help
+-#	  The compiler's optimization of source code can eliminate and reorder
+-#	  code, resulting in an executable that's hard to understand when
+-#	  stepping through it with a debugger.  This switches it off, resulting
+-#	  in a much bigger executable that more closely matches the source
+-#	  code.
+-
+ choice
+ 	prompt "Additional debugging library"
+ 	default NO_DEBUG_LIB
+diff --git a/Makefile.flags b/Makefile.flags
+index e940547..0ffc05c 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -35,7 +35,7 @@ endif
+ # gcc 3.x emits bogus "old style proto" warning on find.c:alloc_action()
+ CFLAGS += $(call cc-ifversion, -ge, 0400, -Wold-style-definition)
+ 
+-CFLAGS += $(call cc-option,-Os -fno-builtin-strlen -finline-limit=0 -fomit-frame-pointer -ffunction-sections -fdata-sections,)
++CFLAGS += $(call cc-option,-fno-builtin-strlen -finline-limit=0 -fomit-frame-pointer -ffunction-sections -fdata-sections,)
+ # -fno-guess-branch-probability: prohibit pseudo-random guessing
+ # of branch probabilities (hopefully makes bloatcheck more stable):
+ CFLAGS += $(call cc-option,-fno-guess-branch-probability,)
+@@ -46,8 +46,15 @@ CFLAGS += $(call cc-option,-falign-functions=1 -falign-jumps=1 -falign-labels=1
+ # be fixed..
+ #CFLAGS+=$(call cc-option,-Wconversion,)
+ 
+-ifeq ($(CONFIG_DEBUG),y)
+-CFLAGS += $(call cc-option,-g)
++ifneq ($(CONFIG_DEBUG),y)
++CFLAGS += $(call cc-option,-Os,)
++else
++CFLAGS += $(call cc-option,-g,)
++ifeq ($(CONFIG_DEBUG_PESSIMIZE),y)
++CFLAGS += $(call cc-option,-O0,)
++else
++CFLAGS += $(call cc-option,-Os,)
++endif
+ endif
+ 
+ # If arch/$(ARCH)/Makefile did not override it (with, say, -fPIC)...

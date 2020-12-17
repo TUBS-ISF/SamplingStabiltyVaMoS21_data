@@ -1,0 +1,658 @@
+2008-07-26 23:08:31 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 47fcdf0..48cbd90 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -998,15 +998,20 @@ int bb_parse_mode(const char* s, mode_t* theMode) FAST_FUNC;
+  * Config file parser
+  */
+ enum {
+-	PARSE_VANILLA        = 0x00000000, // trim line, collapse delimiters, warn and continue if less than mintokens
+-	PARSE_DONT_REDUCE    = 0x00010000, // do not treat consecutive delimiters as one
+-	PARSE_DONT_TRIM      = 0x00020000, // do not trim line of leading and trailing delimiters
+-	PARSE_LAST_IS_GREEDY = 0x00040000, // last token takes whole remainder of the line
+-//	PARSE_DONT_NULL      = 0x00080000, // do not set tokens[] to NULL
+-	PARSE_MIN_DIE        = 0x00100000, // die if less tokens found
++	PARSE_COLLAPSE  = 0x00010000, // treat consecutive delimiters as one
++	PARSE_TRIM      = 0x00020000, // trim leading and trailing delimiters
++// TODO: COLLAPSE and TRIM seem to always go in pair
++	PARSE_GREEDY    = 0x00040000, // last token takes entire remainder of the line
++	PARSE_MIN_DIE   = 0x00100000, // die if < min tokens found
+ 	// keep a copy of current line
+-	PARSE_KEEP_COPY      = 0x00200000 * ENABLE_DEBUG_CROND_OPTION,
+-	PARSE_ESCAPE         = 0x00400000, // process escape sequences in tokens
++	PARSE_KEEP_COPY = 0x00200000 * ENABLE_DEBUG_CROND_OPTION,
++//	PARSE_ESCAPE    = 0x00400000, // process escape sequences in tokens
++	// NORMAL is:
++	// * remove leading and trailing delimiters and collapse
++	//   multiple delimiters into one
++	// * warn and continue if less than mintokens delimiters found
++	// * grab everything into last token
++	PARSE_NORMAL    = PARSE_COLLAPSE | PARSE_TRIM | PARSE_GREEDY,
+ };
+ typedef struct parser_t {
+ 	FILE *fp;
+diff --git a/init/init.c b/init/init.c
+index 884603a..e02773c 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -701,13 +701,13 @@ static void parse_inittab(void)
+ 		new_init_action(ASKFIRST, bb_default_login_shell, VC_4);
+ 		/* sysinit */
+ 		new_init_action(SYSINIT, INIT_SCRIPT, "");
+-
+ 		return;
+ 	}
+ 	/* optional_tty:ignored_runlevel:action:command
+ 	 * Delims are not to be collapsed and need exactly 4 tokens
+ 	 */
+-	while (config_read(parser, token, 4, 0, "#:", PARSE_DONT_TRIM|PARSE_DONT_REDUCE|PARSE_LAST_IS_GREEDY)) {
++	while (config_read(parser, token, 4, 0, "#:",
++				PARSE_NORMAL & ~(PARSE_TRIM | PARSE_COLLAPSE))) {
+ 		int action;
+ 		char *tty = token[0];
+ 
+diff --git a/libbb/parse_config.c b/libbb/parse_config.c
+index 83dc997..ace6f3a 100644
+--- a/libbb/parse_config.c
++++ b/libbb/parse_config.c
+@@ -14,8 +14,9 @@ int parse_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int parse_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	const char *delims = "# \t";
+-	unsigned flags = 0;
++	unsigned flags = PARSE_NORMAL;
+ 	int mintokens = 0, ntokens = 128;
++
+ 	opt_complementary = "-1:n+:m+:f+";
+ 	getopt32(argv, "n:m:d:f:", &ntokens, &mintokens, &delims, &flags);
+ 	//argc -= optind;
+@@ -61,13 +62,15 @@ Typical usage:
+ 
+ parser_t* FAST_FUNC config_open2(const char *filename, FILE* FAST_FUNC (*fopen_func)(const char *path))
+ {
+-	parser_t *parser = xzalloc(sizeof(parser_t));
+-	/* empty file configures nothing */
+-	parser->fp = fopen_func(filename);
+-	if (parser->fp)
+-		return parser;
+-	free(parser);
+-	return NULL;
++	FILE* fp;
++	parser_t *parser;
++
++	fp = fopen_func(filename);
++	if (!fp)
++		return NULL;
++	parser = xzalloc(sizeof(*parser));
++	parser->fp = fp;
++	return parser;
+ }
+ 
+ parser_t* FAST_FUNC config_open(const char *filename)
+@@ -87,41 +90,53 @@ static void config_free_data(parser_t *const parser)
+ 
+ void FAST_FUNC config_close(parser_t *parser)
+ {
+-	config_free_data(parser);
+-	fclose(parser->fp);
++	if (parser) {
++		config_free_data(parser);
++		fclose(parser->fp);
++		free(parser);
++	}
+ }
+ 
+ /*
+-1. Read a line from config file. If nothing to read then bail out returning 0.
+-   Handle continuation character. Advance lineno for each physical line. Cut comments.
+-2. if PARSE_DONT_TRIM is not set (default) skip leading and cut trailing delimiters, if any.
++0. If parser is NULL return 0.
++1. Read a line from config file. If nothing to read then return 0.
++   Handle continuation character. Advance lineno for each physical line.
++   Discard everything past comment characher.
++2. if PARSE_TRIM is set (default), remove leading and trailing delimiters.
+ 3. If resulting line is empty goto 1.
+-4. Look for first delimiter. If PARSE_DONT_REDUCE or PARSE_DONT_TRIM is set then pin empty token.
+-5. Else (default) if number of seen tokens is equal to max number of tokens (token is the last one)
+-   and PARSE_LAST_IS_GREEDY is set then pin the remainder of the line as the last token.
+-   Else (token is not last or PARSE_LAST_IS_GREEDY is not set) just replace first delimiter with '\0'
+-   thus delimiting token and pin it.
+-6. Advance line pointer past the end of token. If number of seen tokens is less than required number
+-   of tokens then goto 4.
+-7. Control the number of seen tokens is not less the min number of tokens. Die if condition is not met.
++4. Look for first delimiter. If !PARSE_COLLAPSE or !PARSE_TRIM is set then
++   remember the token as empty.
++5. Else (default) if number of seen tokens is equal to max number of tokens
++   (token is the last one) and PARSE_GREEDY is set then the remainder
++   of the line is the last token.
++   Else (token is not last or PARSE_GREEDY is not set) just replace
++   first delimiter with '\0' thus delimiting the token.
++6. Advance line pointer past the end of token. If number of seen tokens
++   is less than required number of tokens then goto 4.
++7. Check the number of seen tokens is not less the min number of tokens.
++   Complain or die otherwise depending on PARSE_MIN_DIE.
+ 8. Return the number of seen tokens.
+ 
+-mintokens > 0 make config_read() exit with error message if less than mintokens
++mintokens > 0 make config_read() print error message if less than mintokens
+ (but more than 0) are found. Empty lines are always skipped (not warned about).
+ */
+ #undef config_read
+ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const char *delims)
+ {
+ 	char *line, *q;
+-	char comment = *delims++;
++	char comment;
+ 	int ii;
+-	int ntokens = flags & 0xFF;
+-	int mintokens = (flags & 0xFF00) >> 8;
++	int ntokens;
++	int mintokens;
++
++	comment = *delims++;
++	ntokens = flags & 0xFF;
++	mintokens = (flags & 0xFF00) >> 8;
+ 
+  again:
+-	// N.B. this could only be used in read-in-one-go version, or when tokens use xstrdup(). TODO
+-	//if (!parser->lineno || !(flags & PARSE_DONT_NULL))
+-		memset(tokens, 0, sizeof(tokens[0]) * ntokens);
++	memset(tokens, 0, sizeof(tokens[0]) * ntokens);
++	if (!parser)
++		return 0;
+ 	config_free_data(parser);
+ 
+ 	while (1) {
+@@ -142,20 +157,20 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 			line[--ii] = '\0';
+ //TODO: add xmalloc_fgetline-like iface but with appending to existing str
+ 			q = xmalloc_fgetline(parser->fp);
+-			if (q) {
+-				parser->lineno++;
+-				line = xasprintf("%s%s", line, q);
+-				free(q);
+-			}
++			if (!q)
++				break;
++			parser->lineno++;
++			line = xasprintf("%s%s", line, q);
++			free(q);
+ 		}
+-		// comments mean EOLs
++		// discard comments
+ 		if (comment) {
+ 			q = strchrnul(line, comment);
+ 			*q = '\0';
+ 			ii = q - line;
+ 		}
+ 		// skip leading and trailing delimiters
+-		if (!(flags & PARSE_DONT_TRIM)) {
++		if (flags & PARSE_TRIM) {
+ 			// skip leading
+ 			int n = strspn(line, delims);
+ 			if (n) {
+@@ -177,7 +192,6 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 		// skip empty line
+ 		free(line);
+ 	}
+-
+ 	// non-empty line found, parse and return the number of tokens
+ 
+ 	// store line
+@@ -190,14 +204,15 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 	ntokens--; // now it's max allowed token no
+ 	// N.B. non-empty remainder is also a token,
+ 	// so if ntokens <= 1, we just return the whole line
+-	// N.B. if PARSE_LAST_IS_GREEDY is set the remainder of the line is stuck to the last token
+-	for (ii = 0; *line && ii <= ntokens; ) {
++	// N.B. if PARSE_GREEDY is set the remainder of the line is stuck to the last token
++	ii = 0;
++	while (*line && ii <= ntokens) {
+ 		//bb_info_msg("L[%s]", line);
+ 		// get next token
+-		// at the last token and need greedy token ->
+-		if ((flags & PARSE_LAST_IS_GREEDY) && (ii == ntokens)) {
++		// at last token and need greedy token ->
++		if ((flags & PARSE_GREEDY) && (ii == ntokens)) {
+ 			// skip possible delimiters
+-			if (!(flags & PARSE_DONT_REDUCE))
++			if (flags & PARSE_COLLAPSE)
+ 				line += strspn(line, delims);
+ 			// don't cut the line
+ 			q = line + strlen(line);
+@@ -208,10 +223,11 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 				*q++ = '\0';
+ 		}
+ 		// pin token
+-		if ((flags & (PARSE_DONT_REDUCE|PARSE_DONT_TRIM)) || *line) {
++		if (!(flags & (PARSE_COLLAPSE | PARSE_TRIM)) || *line) {
+ 			//bb_info_msg("N[%d] T[%s]", ii, line);
+ 			tokens[ii++] = line;
+ 			// process escapes in token
++#if 0 // unused so far
+ 			if (flags & PARSE_ESCAPE) {
+ 				char *s = line;
+ 				while (*s) {
+@@ -224,6 +240,7 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 				}
+ 				*line = '\0';
+ 			}
++#endif
+ 		}
+ 		line = q;
+ 		//bb_info_msg("A[%s]", line);
+@@ -234,6 +251,7 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+  				parser->lineno, ii, mintokens);
+ 		if (flags & PARSE_MIN_DIE)
+ 			xfunc_die();
++		ntokens++;
+ 		goto again;
+ 	}
+ 
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 5a75ed2..8732b99 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -139,20 +139,17 @@ static ALWAYS_INLINE void die_if_nologin(void) {}
+ #if ENABLE_FEATURE_SECURETTY && !ENABLE_PAM
+ static int check_securetty(void)
+ {
+-	char *buf;
+-	int ret = 1;
++	char *buf = (char*)"/etc/securetty"; /* any non-NULL is ok */
+ 	parser_t *parser = config_open2("/etc/securetty", fopen_for_read);
+-	/* N.B. A missing securetty file is not an error. */
+-	if (parser) {
+-		while (config_read(parser, &buf, 1, 1, "# \t", 0)) {
+-			if (strcmp(buf, short_tty) == 0)
+-				break;
+-		}
+-		config_close(parser);
+-		// buf != NULL here iff config file was empty (OK) or buf equals short_tty (OK)
+-		ret = buf != NULL;
++	while (config_read(parser, &buf, 1, 1, "# \t", PARSE_NORMAL)) {
++		if (strcmp(buf, short_tty) == 0)
++			break;
++		buf = NULL;
+ 	}
+-	return ret;
++	config_close(parser);
++	/* buf != NULL here if config file was not found, empty
++	 * or line was found which equals short_tty */
++	return buf != NULL;
+ }
+ #else
+ static ALWAYS_INLINE int check_securetty(void) { return 1; }
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index b3a06a3..2f0bf6e 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -469,11 +469,15 @@ static void SynchronizeFile(const char *fileName)
+ 		file->cf_User = xstrdup(fileName);
+ 		pline = &file->cf_LineBase;
+ 
+-		while (--maxLines
+-		 && (n = config_read(parser, tokens, 6, 1, "# \t", PARSE_LAST_IS_GREEDY|PARSE_KEEP_COPY))
+-		) {
++		while (1) {
+ 			CronLine *line;
+ 
++			if (!--maxLines)
++				break;
++			n = config_read(parser, tokens, 6, 1, "# \t", PARSE_NORMAL | PARSE_KEEP_COPY);
++			if (!n)
++				break;
++
+ 			if (DebugOpt)
+ 				crondlog(LVL5 "user:%s entry:%s", fileName, parser->data);
+ 
+@@ -488,7 +492,7 @@ static void SynchronizeFile(const char *fileName)
+ 			/* check if a minimum of tokens is specified */
+ 			if (n < 6)
+ 				continue;
+-			*pline = line = xzalloc(sizeof(CronLine));
++			*pline = line = xzalloc(sizeof(*line));
+ 			/* parse date ranges */
+ 			ParseField(file->cf_User, line->cl_Mins, 60, 0, NULL, tokens[0]);
+ 			ParseField(file->cf_User, line->cl_Hrs, 24, 0, NULL, tokens[1]);
+diff --git a/miscutils/fbsplash.c b/miscutils/fbsplash.c
+index 6357f78..f8289c3 100644
+--- a/miscutils/fbsplash.c
++++ b/miscutils/fbsplash.c
+@@ -288,10 +288,10 @@ static void init(const char *cfg_filename)
+ 		"DEBUG\0"
+ #endif
+ 		;
+-
+ 	char *token[2];
+ 	parser_t *parser = config_open2(cfg_filename, xfopen_stdin);
+-	while (config_read(parser, token, 2, 2, "#=", PARSE_MIN_DIE)) {
++	while (config_read(parser, token, 2, 2, "#=",
++				    (PARSE_NORMAL | PARSE_MIN_DIE) & ~(PARSE_TRIM | PARSE_COLLAPSE))) {
+ 		unsigned val = xatoi_u(token[1]);
+ 		int i = index_in_strings(param_names, token[0]);
+ 		if (i < 0)
+diff --git a/miscutils/man.c b/miscutils/man.c
+index 7ef5941..adb85b8 100644
+--- a/miscutils/man.c
++++ b/miscutils/man.c
+@@ -82,6 +82,7 @@ int man_main(int argc UNUSED_PARAM, char **argv)
+ 	char *cur_path, *cur_sect;
+ 	int count_mp, cur_mp;
+ 	int opt, not_found;
++	char *token[2];
+ 
+ 	opt_complementary = "-1"; /* at least one argument */
+ 	opt = getopt32(argv, "+aw");
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index 1654cc5..63be9aa 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -491,7 +491,7 @@ static int already_loaded(const char *name)
+ 	int ret = 0;
+ 	char *s;
+ 	parser_t *parser = config_open2("/proc/modules", xfopen_for_read);
+-	while (config_read(parser, &s, 1, 1, "# \t", 0)) {
++	while (config_read(parser, &s, 1, 1, "# \t", PARSE_NORMAL & ~PARSE_GREEDY)) {
+ 		if (strcmp(s, name) == 0) {
+ 			ret = 1;
+ 			break;
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index efb5cfb..e8dcb40 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -106,43 +106,41 @@ static void undot(uint8_t * rip)
+  */
+ static void dnsentryinit(void)
+ {
++	char *token[2];
+ 	parser_t *parser;
+ 	struct dns_entry *m, *prev;
+ 
+ 	prev = dnsentry = NULL;
+ 	parser = config_open(fileconf);
+-	if (parser) {
+-		char *token[2];
+-		while (config_read(parser, token, 2, 2, "# \t", 0)) {
+-			unsigned int a,b,c,d;
+-			/*
+-			 * Assumes all host names are lower case only
+-			 * Hostnames with more than one label are not handled correctly.
+-			 * Presently the dot is copied into name without
+-			 * converting to a length/string substring for that label.
+-			 */
+-//			if (!token[1] || sscanf(token[1], ".%u.%u.%u.%u"+1, &a, &b, &c, &d) != 4)
+-			if (sscanf(token[1], ".%u.%u.%u.%u"+1, &a, &b, &c, &d) != 4)
+-				continue;
+-
+-			m = xzalloc(sizeof(*m));
+-			/*m->next = NULL;*/
+-			sprintf(m->ip, ".%u.%u.%u.%u"+1, a, b, c, d);
+-			sprintf(m->rip, ".%u.%u.%u.%u", d, c, b, a);
+-			undot((uint8_t*)m->rip);
+-			convname(m->name, (uint8_t*)token[0]);
+-
+-			if (OPT_verbose)
+-				fprintf(stderr, "\tname:%s, ip:%s\n", &(m->name[1]), m->ip);
+-
+-			if (prev == NULL)
+-				dnsentry = m;
+-			else
+-				prev->next = m;
+-			prev = m;
+-		}
+-		config_close(parser);
++	while (config_read(parser, token, 2, 2, "# \t", PARSE_NORMAL)) {
++		unsigned a, b, c, d;
++		/*
++		 * Assumes all host names are lower case only
++		 * Hostnames with more than one label are not handled correctly.
++		 * Presently the dot is copied into name without
++		 * converting to a length/string substring for that label.
++		 */
++//		if (!token[1] || sscanf(token[1], ".%u.%u.%u.%u"+1, &a, &b, &c, &d) != 4)
++		if (sscanf(token[1], ".%u.%u.%u.%u"+1, &a, &b, &c, &d) != 4)
++			continue;
++
++		m = xzalloc(sizeof(*m));
++		/*m->next = NULL;*/
++		sprintf(m->ip, ".%u.%u.%u.%u"+1, a, b, c, d);
++		sprintf(m->rip, ".%u.%u.%u.%u", d, c, b, a);
++		undot((uint8_t*)m->rip);
++		convname(m->name, (uint8_t*)token[0]);
++
++		if (OPT_verbose)
++			fprintf(stderr, "\tname:%s, ip:%s\n", &(m->name[1]), m->ip);
++
++		if (prev == NULL)
++			dnsentry = m;
++		else
++			prev->next = m;
++		prev = m;
+ 	}
++	config_close(parser);
+ }
+ 
+ /*
+diff --git a/networking/hostname.c b/networking/hostname.c
+index dd2a206..48e70db 100644
+--- a/networking/hostname.c
++++ b/networking/hostname.c
+@@ -20,7 +20,7 @@ static void do_sethostname(char *s, int isfile)
+ 		return;
+ 	if (isfile) {
+ 		parser_t *parser = config_open2(s, xfopen_for_read);
+-		while (config_read(parser, &s, 1, 1, "# \t", 0)) {
++		while (config_read(parser, &s, 1, 1, "# \t", PARSE_NORMAL & ~PARSE_GREEDY)) {
+ 			do_sethostname(s, 0);
+ 		}
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+diff --git a/networking/libiproute/rt_names.c b/networking/libiproute/rt_names.c
+index 1a2d52e..e4d1061 100644
+--- a/networking/libiproute/rt_names.c
++++ b/networking/libiproute/rt_names.c
+@@ -20,9 +20,7 @@ static void rtnl_tab_initialize(const char *file, const char **tab, int size)
+ {
+ 	char *token[2];
+ 	parser_t *parser = config_open2(file, fopen_for_read);
+-	if (!parser)
+-		return;
+-	while (config_read(parser, token, 2, 2, "# \t", 0)) {
++	while (config_read(parser, token, 2, 2, "# \t", PARSE_NORMAL)) {
+ 		int id = bb_strtou(token[0], NULL, 0);
+ 		if (id < 0 || id > size) {
+ 			bb_error_msg("database %s is corrupted at line %d",
+diff --git a/networking/nameif.c b/networking/nameif.c
+index 5a3bd60..12c08f1 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -160,13 +160,11 @@ int nameif_main(int argc, char **argv)
+ 			prepend_new_eth_table(&clist, ifname, *argv++);
+ 		}
+ 	} else {
++		char *tokens[2];
+ 		struct parser_t *parser = config_open(fname);
+-		if (parser) {
+-			char *tokens[2];
+-			while (config_read(parser, tokens, 2, 2, "# \t", 0))
+-				prepend_new_eth_table(&clist, tokens[0], tokens[1]);
+-			config_close(parser);
+-		}
++		while (config_read(parser, tokens, 2, 2, "# \t", PARSE_NORMAL))
++			prepend_new_eth_table(&clist, tokens[0], tokens[1]);
++		config_close(parser);
+ 	}
+ 
+ 	ctl_sk = xsocket(PF_INET, SOCK_DGRAM, 0);
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 264a988..ff5847d 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -318,10 +318,7 @@ void read_config(const char *file)
+ 		keywords[i].handler(keywords[i].def, keywords[i].var);
+ 
+ 	parser = config_open(file);
+-	if (!parser)
+-		return;
+-
+-	while (config_read(parser, token, 2, 2, "# \t", PARSE_LAST_IS_GREEDY)) {
++	while (config_read(parser, token, 2, 2, "# \t", PARSE_NORMAL)) {
+ 		for (k = keywords, i = 0; i < ARRAY_SIZE(keywords); k++, i++) {
+ 			if (!strcasecmp(token[0], k->keyword)) {
+ 				if (!k->handler(token[1], k->var)) {
+diff --git a/procps/sysctl.c b/procps/sysctl.c
+index 3fe6f6f..79f0074 100644
+--- a/procps/sysctl.c
++++ b/procps/sysctl.c
+@@ -95,10 +95,7 @@ static int sysctl_preload_file_and_exit(const char *filename)
+ 	parser_t *parser;
+ 
+ 	parser = config_open(filename);
+-	if (!parser)
+-		return 1;
+-
+-	while (config_read(parser, token, 2, 2, "# \t=", PARSE_LAST_IS_GREEDY)) { // TODO: ';' is comment char too
++	while (config_read(parser, token, 2, 2, "# \t=", PARSE_NORMAL)) { // TODO: ';' is comment char too
+ //		if (!token[1]) {
+ //			bb_error_msg(WARN_BAD_LINE, filename, parser->lineno);
+ //		} else {
+diff --git a/selinux/sestatus.c b/selinux/sestatus.c
+index 1351600..eca557e 100644
+--- a/selinux/sestatus.c
++++ b/selinux/sestatus.c
+@@ -54,10 +54,7 @@ static void read_config(char **pc, int npc, char **fc, int nfc)
+ 	pc[0] = fc[0] = NULL;
+ 
+ 	parser = config_open("/etc/sestatus.conf");
+-	if (!parser)
+-		return;
+-
+-	while (config_read(parser, &buf, 1, 1, "# \t", PARSE_LAST_IS_GREEDY)) {
++	while (config_read(parser, &buf, 1, 1, "# \t", PARSE_NORMAL)) {
+ 		if (strcmp(buf, "[process]") == 0) {
+ 			section = 1;
+ 		} else if (strcmp(buf, "[files]") == 0) {
+diff --git a/testsuite/parse.tests b/testsuite/parse.tests
+index 06be8d2..f1ee7b8 100755
+--- a/testsuite/parse.tests
++++ b/testsuite/parse.tests
+@@ -5,20 +5,24 @@
+ 
+ . testing.sh
+ 
+-NO_REDUCE=65536
+-NO_TRIM=131072
+-GREEDY=262144
++COLLAPSE=$(( 0x00010000))
++TRIM=$((     0x00020000))
++GREEDY=$((   0x00040000))
++MIN_DIE=$((  0x00100000))
++KEEP_COPY=$((0x00200000))
++ESCAPE=$((   0x00400000))
++NORMAL=$((   COLLAPSE | TRIM | GREEDY))
+ 
+ # testing "description" "command" "result" "infile" "stdin"
+ 
+-testing "mdev.conf" \
+-	"parse -n 4 -m 3 -f $GREEDY -" \
++testing "parse mdev.conf" \
++	"parse -n 4 -m 3 -f $((NORMAL)) -" \
+ 	"[sda][0:0][644][@echo @echo TEST]\n" \
+ 	"-" \
+ 	" sda 0:0 644 @echo @echo TEST # echo trap\n"
+ 
+-testing "notrim" \
+-	"parse -n 4 -m 3 -f $(($GREEDY+$NO_TRIM)) -" \
++testing "parse notrim" \
++	"parse -n 4 -m 3 -f $((NORMAL - TRIM - COLLAPSE)) -" \
+ 	"[][sda][0:0][644 @echo @echo TEST ]\n" \
+ 	"-" \
+ 	" sda 0:0 644 @echo @echo TEST \n"
+@@ -49,12 +53,12 @@ cat >$FILE.res <<EOF
+ [/dev/cdrom][/cdrom][iso9660][ro,user,noauto,nohide][0][0]
+ [/dev/hdb5][/redhat][ext2][rw,root,noauto,nohide][0][0]
+ [/dev/hdb6][/win2home][ntfs][rw,root,noauto,nohide][0][0]
+-[/dev/hdb7][/win2skul][ntfs][rw,root,noauto,nohide][none][0]
++[/dev/hdb7][/win2skul][ntfs][rw,root,noauto,nohide][none][0		0]
+ [none][/dev/pts][devpts][gid=5,mode=620][0][0]
+ [none][/proc][proc][defaults][0][0]
+ EOF
+ 
+-testing "polluted fstab" \
++testing "parse polluted fstab" \
+ 	"parse -n 6 -m 6 $FILE" \
+ 	"`cat $FILE.res`\n" \
+ 	"" \
+@@ -74,8 +78,8 @@ cat >$FILE.res <<EOF
+ [][][shutdown][/sbin/swapoff -a]
+ EOF
+ 
+-testing "inittab from examples" \
+-	"parse -n 4 -m 4 -f $(($GREEDY+$NO_TRIM)) -d'#:' $FILE" \
++testing "parse inittab from examples" \
++	"parse -n 4 -m 4 -f $((NORMAL - TRIM - COLLAPSE)) -d'#:' $FILE" \
+ 	"`cat $FILE.res`\n" \
+ 	"" \
+ 	""
+@@ -94,7 +98,7 @@ cat >$FILE.res <<EOF
+ [option][lease][864000]
+ EOF
+ 
+-testing "udhcpd.conf from examples" \
++testing "parse udhcpd.conf from examples" \
+ 	"parse -n 127 $FILE" \
+ 	"`cat $FILE.res`\n" \
+ 	"" \
+diff --git a/util-linux/hexdump.c b/util-linux/hexdump.c
+index 8ac12f0..48edd70 100644
+--- a/util-linux/hexdump.c
++++ b/util-linux/hexdump.c
+@@ -16,11 +16,19 @@
+ 
+ static void bb_dump_addfile(dumper_t *dumper, char *name)
+ {
+-	parser_t *parser = config_open2(name, xfopen_for_read);
+-	while (config_read(parser, &name, 1, 1, "# \t", 0)) {
+-		bb_dump_add(dumper, name);
++	char *p;
++	FILE *fp;
++	char *buf;
++
++	fp = xfopen_for_read(name);
++	while ((buf = xmalloc_fgetline(fp)) != NULL) {
++		p = skip_whitespace(buf);
++		if (*p && (*p != '#')) {
++			bb_dump_add(dumper, p);
++		}
++		free(buf);
+ 	}
+-	config_close(parser);
++	fclose(fp);
+ }
+ 
+ static const char *const add_strings[] = {
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index f6440b1..d0d0103 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -107,10 +107,7 @@ static void make_device(char *path, int delete)
+ 	parser = config_open2("/etc/mdev.conf", fopen_for_read);
+ 
+ 	/* If we have config file, look up user settings */
+-	if (!parser)
+-		goto end_parse;
+-
+-	while (config_read(parser, tokens, 4, 3, "# \t", PARSE_LAST_IS_GREEDY)) {
++	while (config_read(parser, tokens, 4, 3, "# \t", PARSE_NORMAL)) {
+ 		regmatch_t off[1 + 9*ENABLE_FEATURE_MDEV_RENAME_REGEXP];
+ 		char *val;
+ 
+@@ -244,7 +241,6 @@ static void make_device(char *path, int delete)
+ 	} /* end of "while line is read from /etc/mdev.conf" */
+ 
+ 	config_close(parser);
+- end_parse:
+ #endif /* ENABLE_FEATURE_MDEV_CONF */
+ 
+ 	if (!delete && sscanf(dev_maj_min, "%u:%u", &major, &minor) == 2) {

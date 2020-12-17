@@ -1,0 +1,105 @@
+2010-02-26 09:31:40 +0100
+diff --git a/include/libbb.h b/include/libbb.h
+index 9e3c184..9d99b0d 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1142,6 +1142,7 @@ extern void selinux_or_die(void) FAST_FUNC;
+ extern int restricted_shell(const char *shell) FAST_FUNC;
+ 
+ /* setup_environment:
++ * if chdir pw->pw_dir: ok: else if to_tmp == 1: goto /tmp else: goto / or die
+  * if clear_env = 1: cd(pw->pw_dir), clear environment, then set
+  *   TERM=(old value)
+  *   USER=pw->pw_name, LOGNAME=pw->pw_name
+@@ -1155,7 +1156,9 @@ extern int restricted_shell(const char *shell) FAST_FUNC;
+  *   SHELL=shell
+  * else does nothing
+  */
+-extern void setup_environment(const char *shell, int clear_env, int change_env, const struct passwd *pw) FAST_FUNC;
++#define SETUP_ENV_CHANGEENV (1<<0)
++#define SETUP_ENV_TO_TMP    (1<<1)
++extern void setup_environment(const char *shell, int clear_env, int flags, const struct passwd *pw) FAST_FUNC;
+ extern int correct_password(const struct passwd *pw) FAST_FUNC;
+ /* Returns a malloced string */
+ #if !ENABLE_USE_BB_CRYPT
+diff --git a/libbb/setup_environment.c b/libbb/setup_environment.c
+index 78318ce..f0802f0 100644
+--- a/libbb/setup_environment.c
++++ b/libbb/setup_environment.c
+@@ -30,12 +30,12 @@
+ 
+ #include "libbb.h"
+ 
+-void FAST_FUNC setup_environment(const char *shell, int clear_env, int change_env, const struct passwd *pw)
++void FAST_FUNC setup_environment(const char *shell, int clear_env, int flags, const struct passwd *pw)
+ {
+ 	/* Change the current working directory to be the home directory
+ 	 * of the user */
+ 	if (chdir(pw->pw_dir)) {
+-		xchdir("/");
++		xchdir((flags & SETUP_ENV_TO_TMP) ? "/tmp" : "/");
+ 		bb_error_msg("can't chdir to home directory '%s'", pw->pw_dir);
+ 	}
+ 
+@@ -55,8 +55,7 @@ void FAST_FUNC setup_environment(const char *shell, int clear_env, int change_en
+ 		//xsetenv("LOGNAME", pw->pw_name);
+ 		//xsetenv("HOME",    pw->pw_dir);
+ 		//xsetenv("SHELL",   shell);
+-	}
+-	else if (change_env) {
++	} else if (flags & SETUP_ENV_CHANGEENV) {
+ 		/* Set HOME, SHELL, and if not becoming a super-user,
+ 		   USER and LOGNAME.  */
+ 		if (pw->pw_uid) {
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 7a6f246..974125d 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -478,7 +478,7 @@ int login_main(int argc UNUSED_PARAM, char **argv)
+ 	if (!tmp || !*tmp)
+ 		tmp = DEFAULT_SHELL;
+ 	/* setup_environment params: shell, clear_env, change_env, pw */
+-	setup_environment(tmp, !(opt & LOGIN_OPT_p), 1, pw);
++	setup_environment(tmp, !(opt & LOGIN_OPT_p), SETUP_ENV_CHANGEENV, pw);
+ 
+ 	motd();
+ 
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 0444404..7d57095 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -17,22 +17,6 @@
+ #define CRONUPDATE      "cron.update"
+ #endif
+ 
+-static void change_user(const struct passwd *pas)
+-{
+-	xsetenv("USER", pas->pw_name);
+-	xsetenv("HOME", pas->pw_dir);
+-	xsetenv("SHELL", DEFAULT_SHELL);
+-
+-	/* initgroups, setgid, setuid */
+-	change_identity(pas);
+-
+-	if (chdir(pas->pw_dir) < 0) {
+-		bb_perror_msg("chdir(%s) by %s failed",
+-				pas->pw_dir, pas->pw_name);
+-		xchdir("/tmp");
+-	}
+-}
+-
+ static void edit_file(const struct passwd *pas, const char *file)
+ {
+ 	const char *ptr;
+@@ -46,7 +30,10 @@ static void edit_file(const struct passwd *pas, const char *file)
+ 	}
+ 
+ 	/* CHILD - change user and run editor */
+-	change_user(pas);
++	/* initgroups, setgid, setuid */
++	change_identity(pas);
++	setup_environment(DEFAULT_SHELL, 0,
++		SETUP_ENV_CHANGEENV | SETUP_ENV_TO_TMP, pas);
+ 	ptr = getenv("VISUAL");
+ 	if (!ptr) {
+ 		ptr = getenv("EDITOR");

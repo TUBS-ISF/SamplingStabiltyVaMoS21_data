@@ -1,0 +1,35 @@
+2008-10-26 00:15:36 +0000
+diff --git a/miscutils/less.c b/miscutils/less.c
+index d9ada61..6f28200 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -1211,6 +1211,7 @@ static void flag_change(void)
+ 	}
+ }
+ 
++#ifdef BLOAT
+ static void show_flag_status(void)
+ {
+ 	int keypress;
+@@ -1246,6 +1247,8 @@ static void show_flag_status(void)
+ }
+ #endif
+ 
++#endif /* ENABLE_FEATURE_LESS_DASHCMD */
++
+ static void save_input_to_file(void)
+ {
+ 	const char *msg = "";
+@@ -1450,10 +1453,12 @@ static void keypress_process(int keypress)
+ 		flag_change();
+ 		buffer_print();
+ 		break;
++#ifdef BLOAT
+ 	case '_':
+ 		show_flag_status();
+ 		break;
+ #endif
++#endif
+ #if ENABLE_FEATURE_LESS_BRACKETS
+ 	case '{': case '(': case '[':
+ 		match_right_bracket(keypress);

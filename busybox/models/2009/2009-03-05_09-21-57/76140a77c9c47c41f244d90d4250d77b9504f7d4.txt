@@ -1,0 +1,460 @@
+2009-03-05 09:21:57 +0000
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index fadab6f..644874f 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -280,17 +280,16 @@ static int print_addrinfo(const struct sockaddr_nl *who UNUSED_PARAM,
+ 
+ 	if (rta_tb[IFA_LOCAL]) {
+ 		fputs(rt_addr_n2a(ifa->ifa_family,
+-					      RTA_PAYLOAD(rta_tb[IFA_LOCAL]),
+ 					      RTA_DATA(rta_tb[IFA_LOCAL]),
+ 					      abuf, sizeof(abuf)), stdout);
+ 
+-		if (rta_tb[IFA_ADDRESS] == NULL ||
+-		    memcmp(RTA_DATA(rta_tb[IFA_ADDRESS]), RTA_DATA(rta_tb[IFA_LOCAL]), 4) == 0) {
++		if (rta_tb[IFA_ADDRESS] == NULL
++		 || memcmp(RTA_DATA(rta_tb[IFA_ADDRESS]), RTA_DATA(rta_tb[IFA_LOCAL]), 4) == 0
++		) {
+ 			printf("/%d ", ifa->ifa_prefixlen);
+ 		} else {
+ 			printf(" peer %s/%d ",
+ 				rt_addr_n2a(ifa->ifa_family,
+-					    RTA_PAYLOAD(rta_tb[IFA_ADDRESS]),
+ 					    RTA_DATA(rta_tb[IFA_ADDRESS]),
+ 					    abuf, sizeof(abuf)),
+ 				ifa->ifa_prefixlen);
+@@ -300,14 +299,12 @@ static int print_addrinfo(const struct sockaddr_nl *who UNUSED_PARAM,
+ 	if (rta_tb[IFA_BROADCAST]) {
+ 		printf("brd %s ",
+ 			rt_addr_n2a(ifa->ifa_family,
+-				    RTA_PAYLOAD(rta_tb[IFA_BROADCAST]),
+ 				    RTA_DATA(rta_tb[IFA_BROADCAST]),
+ 				    abuf, sizeof(abuf)));
+ 	}
+ 	if (rta_tb[IFA_ANYCAST]) {
+ 		printf("any %s ",
+ 			rt_addr_n2a(ifa->ifa_family,
+-				    RTA_PAYLOAD(rta_tb[IFA_ANYCAST]),
+ 				    RTA_DATA(rta_tb[IFA_ANYCAST]),
+ 				    abuf, sizeof(abuf)));
+ 	}
+diff --git a/networking/libiproute/iplink.c b/networking/libiproute/iplink.c
+index d3d0338..1e7ee07 100644
+--- a/networking/libiproute/iplink.c
++++ b/networking/libiproute/iplink.c
+@@ -202,8 +202,7 @@ static int do_set(char **argv)
+ 			NEXT_ARG();
+ 			if (mtu != -1)
+ 				duparg("mtu", *argv);
+-			if (get_integer(&mtu, *argv, 0))
+-				invarg(*argv, "mtu");
++			mtu = get_unsigned(*argv, "mtu");
+ 		}
+ 		if (key == ARG_multicast) {
+ 			int param;
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index a7ec66c..66557d8 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -202,7 +202,6 @@ static int print_route(const struct sockaddr_nl *who UNUSED_PARAM,
+ 	if (tb[RTA_DST]) {
+ 		if (r->rtm_dst_len != host_len) {
+ 			printf("%s/%u ", rt_addr_n2a(r->rtm_family,
+-						RTA_PAYLOAD(tb[RTA_DST]),
+ 						RTA_DATA(tb[RTA_DST]),
+ 						abuf, sizeof(abuf)),
+ 					r->rtm_dst_len
+@@ -222,7 +221,6 @@ static int print_route(const struct sockaddr_nl *who UNUSED_PARAM,
+ 	if (tb[RTA_SRC]) {
+ 		if (r->rtm_src_len != host_len) {
+ 			printf("from %s/%u ", rt_addr_n2a(r->rtm_family,
+-						RTA_PAYLOAD(tb[RTA_SRC]),
+ 						RTA_DATA(tb[RTA_SRC]),
+ 						abuf, sizeof(abuf)),
+ 					r->rtm_src_len
+@@ -252,7 +250,6 @@ static int print_route(const struct sockaddr_nl *who UNUSED_PARAM,
+ 		   and symbolic name will not be useful.
+ 		 */
+ 		printf(" src %s ", rt_addr_n2a(r->rtm_family,
+-					RTA_PAYLOAD(tb[RTA_PREFSRC]),
+ 					RTA_DATA(tb[RTA_PREFSRC]),
+ 					abuf, sizeof(abuf)));
+ 	}
+@@ -367,8 +364,7 @@ USE_FEATURE_IP_RULE(ARG_table,)
+ 				mxlock |= (1 << RTAX_MTU);
+ 				NEXT_ARG();
+ 			}
+-			if (get_unsigned(&mtu, *argv, 0))
+-				invarg(*argv, "mtu");
++			mtu = get_unsigned(*argv, "mtu");
+ 			rta_addattr32(mxrta, sizeof(mxbuf), RTAX_MTU, mtu);
+ 		} else if (arg == ARG_protocol) {
+ 			uint32_t prot;
+@@ -391,8 +387,7 @@ USE_FEATURE_IP_RULE(ARG_table,)
+ 		} else if (arg == ARG_metric) {
+ 			uint32_t metric;
+ 			NEXT_ARG();
+-			if (get_u32(&metric, *argv, 0))
+-				invarg(*argv, "metric");
++			metric = get_u32(*argv, "metric");
+ 			addattr32(&req.n, sizeof(req), RTA_PRIORITY, metric);
+ 		} else {
+ 			int type;
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index ca22546..6c90c6d 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -78,7 +78,6 @@ static int print_rule(const struct sockaddr_nl *who UNUSED_PARAM,
+ 	if (tb[RTA_SRC]) {
+ 		if (r->rtm_src_len != host_len) {
+ 			printf("%s/%u", rt_addr_n2a(r->rtm_family,
+-							 RTA_PAYLOAD(tb[RTA_SRC]),
+ 							 RTA_DATA(tb[RTA_SRC]),
+ 							 abuf, sizeof(abuf)),
+ 				r->rtm_src_len
+@@ -99,7 +98,6 @@ static int print_rule(const struct sockaddr_nl *who UNUSED_PARAM,
+ 	if (tb[RTA_DST]) {
+ 		if (r->rtm_dst_len != host_len) {
+ 			printf("to %s/%u ", rt_addr_n2a(r->rtm_family,
+-							 RTA_PAYLOAD(tb[RTA_DST]),
+ 							 RTA_DATA(tb[RTA_DST]),
+ 							 abuf, sizeof(abuf)),
+ 				r->rtm_dst_len
+@@ -238,8 +236,7 @@ static int iprule_modify(int cmd, char **argv)
+ 			   key == ARG_priority) {
+ 			uint32_t pref;
+ 			NEXT_ARG();
+-			if (get_u32(&pref, *argv, 0))
+-				invarg(*argv, "preference");
++			pref = get_u32(*argv, "preference");
+ 			addattr32(&req.n, sizeof(req), RTA_PRIORITY, pref);
+ 		} else if (key == ARG_tos) {
+ 			uint32_t tos;
+@@ -250,8 +247,7 @@ static int iprule_modify(int cmd, char **argv)
+ 		} else if (key == ARG_fwmark) {
+ 			uint32_t fwmark;
+ 			NEXT_ARG();
+-			if (get_u32(&fwmark, *argv, 0))
+-				invarg(*argv, "fwmark");
++			fwmark = get_u32(*argv, "fwmark");
+ 			addattr32(&req.n, sizeof(req), RTA_PROTOINFO, fwmark);
+ 		} else if (key == ARG_realms) {
+ 			uint32_t realm;
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index 5349587..6a841aa 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -232,9 +232,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			if (strchr(*argv, '.'))
+ 				p->i_key = p->o_key = get_addr32(*argv);
+ 			else {
+-				if (get_unsigned(&uval, *argv, 0) < 0) {
+-					invarg(*argv, "key");
+-				}
++				uval = get_unsigned(*argv, "key");
+ 				p->i_key = p->o_key = htonl(uval);
+ 			}
+ 		} else if (key == ARG_ikey) {
+@@ -244,9 +242,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			if (strchr(*argv, '.'))
+ 				p->o_key = get_addr32(*argv);
+ 			else {
+-				if (get_unsigned(&uval, *argv, 0) < 0) {
+-					invarg(*argv, "ikey");
+-				}
++				uval = get_unsigned(*argv, "ikey");
+ 				p->i_key = htonl(uval);
+ 			}
+ 		} else if (key == ARG_okey) {
+@@ -256,9 +252,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			if (strchr(*argv, '.'))
+ 				p->o_key = get_addr32(*argv);
+ 			else {
+-				if (get_unsigned(&uval, *argv, 0) < 0) {
+-					invarg(*argv, "okey");
+-				}
++				uval = get_unsigned(*argv, "okey");
+ 				p->o_key = htonl(uval);
+ 			}
+ 		} else if (key == ARG_seq) {
+@@ -297,8 +291,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			NEXT_ARG();
+ 			key = index_in_strings(keywords, *argv);
+ 			if (key != ARG_inherit) {
+-				if (get_unsigned(&uval, *argv, 0))
+-					invarg(*argv, "TTL");
++				uval = get_unsigned(*argv, "TTL");
+ 				if (uval > 255)
+ 					invarg(*argv, "TTL must be <=255");
+ 				p->iph.ttl = uval;
+diff --git a/networking/libiproute/ll_proto.c b/networking/libiproute/ll_proto.c
+index b826873..a934935 100644
+--- a/networking/libiproute/ll_proto.c
++++ b/networking/libiproute/ll_proto.c
+@@ -115,13 +115,15 @@ int ll_proto_a2n(unsigned short *id, char *buf)
+ 	unsigned i;
+ 	for (i = 0; i < ARRAY_SIZE(llproto_names); i++) {
+ 		 if (strcasecmp(llproto_names[i].name, buf) == 0) {
+-			 *id = htons(llproto_names[i].id);
+-			 return 0;
++			 i = llproto_names[i].id;
++			 goto good;
+ 		 }
+ 	}
+-	if (get_u16(id, buf, 0))
++	i = bb_strtou(buf, NULL, 0);
++	if (errno || i > 0xffff)
+ 		return -1;
+-	*id = htons(*id);
++ good:
++	*id = htons(i);
+ 	return 0;
+ }
+ 
+diff --git a/networking/libiproute/utils.c b/networking/libiproute/utils.c
+index 6b9f6a7..c84d018 100644
+--- a/networking/libiproute/utils.c
++++ b/networking/libiproute/utils.c
+@@ -15,102 +15,46 @@
+ #include "utils.h"
+ #include "inet_common.h"
+ 
+-int get_integer(int *val, char *arg, int base)
+-{
+-	long res;
+-	char *ptr;
+-
+-	if (!arg || !*arg)
+-		return -1;
+-	res = strtol(arg, &ptr, base);
+-	if (!ptr || ptr == arg || *ptr || res > INT_MAX || res < INT_MIN)
+-		return -1;
+-	*val = res;
+-	return 0;
+-}
+-//XXX: FIXME: use some libbb function instead
+-int get_unsigned(unsigned *val, char *arg, int base)
+-{
+-	unsigned long res;
+-	char *ptr;
+-
+-	if (!arg || !*arg)
+-		return -1;
+-	res = strtoul(arg, &ptr, base);
+-	if (!ptr || ptr == arg || *ptr || res > UINT_MAX)
+-		return -1;
+-	*val = res;
+-	return 0;
+-}
+-
+-int get_u32(uint32_t *val, char *arg, int base)
++unsigned get_unsigned(char *arg, const char *errmsg)
+ {
+ 	unsigned long res;
+ 	char *ptr;
+ 
+-	if (!arg || !*arg)
+-		return -1;
+-	res = strtoul(arg, &ptr, base);
+-	if (!ptr || ptr == arg || *ptr || res > 0xFFFFFFFFUL)
+-		return -1;
+-	*val = res;
+-	return 0;
++	if (*arg) {
++		res = strtoul(arg, &ptr, 0);
++		if (!*ptr && res <= UINT_MAX) {
++			return res;
++		}
++	}
++	invarg(arg, errmsg); /* does not return */
+ }
+ 
+-int get_u16(uint16_t *val, char *arg, int base)
++uint32_t get_u32(char *arg, const char *errmsg)
+ {
+ 	unsigned long res;
+ 	char *ptr;
+ 
+-	if (!arg || !*arg)
+-		return -1;
+-	res = strtoul(arg, &ptr, base);
+-	if (!ptr || ptr == arg || *ptr || res > 0xFFFF)
+-		return -1;
+-	*val = res;
+-	return 0;
++	if (*arg) {
++		res = strtoul(arg, &ptr, 0);
++		if (!*ptr && res <= 0xFFFFFFFFUL) {
++			return res;
++		}
++	}
++	invarg(arg, errmsg); /* does not return */
+ }
+ 
+-int get_u8(uint8_t *val, char *arg, int base)
++uint16_t get_u16(char *arg, const char *errmsg)
+ {
+ 	unsigned long res;
+ 	char *ptr;
+ 
+-	if (!arg || !*arg)
+-		return -1;
+-	res = strtoul(arg, &ptr, base);
+-	if (!ptr || ptr == arg || *ptr || res > 0xFF)
+-		return -1;
+-	*val = res;
+-	return 0;
+-}
+-
+-int get_s16(int16_t *val, char *arg, int base)
+-{
+-	long res;
+-	char *ptr;
+-
+-	if (!arg || !*arg)
+-		return -1;
+-	res = strtol(arg, &ptr, base);
+-	if (!ptr || ptr == arg || *ptr || res > 0x7FFF || res < -0x8000)
+-		return -1;
+-	*val = res;
+-	return 0;
+-}
+-
+-int get_s8(int8_t *val, char *arg, int base)
+-{
+-	long res;
+-	char *ptr;
+-
+-	if (!arg || !*arg)
+-		return -1;
+-	res = strtol(arg, &ptr, base);
+-	if (!ptr || ptr == arg || *ptr || res > 0x7F || res < -0x80)
+-		return -1;
+-	*val = res;
+-	return 0;
++	if (*arg) {
++		res = strtoul(arg, &ptr, 0);
++		if (!*ptr && res <= 0xFFFF) {
++			return res;
++		}
++	}
++	invarg(arg, errmsg); /* does not return */
+ }
+ 
+ int get_addr_1(inet_prefix *addr, char *name, int family)
+@@ -161,8 +105,8 @@ static int get_prefix_1(inet_prefix *dst, char *arg, int family)
+ 	 || strcmp(arg, "any") == 0
+ 	) {
+ 		dst->family = family;
+-		dst->bytelen = 0;
+-		dst->bitlen = 0;
++		/*dst->bytelen = 0; - done by memset */
++		/*dst->bitlen = 0;*/
+ 		return 0;
+ 	}
+ 
+@@ -176,7 +120,8 @@ static int get_prefix_1(inet_prefix *dst, char *arg, int family)
+ 			inet_prefix netmask_pfx;
+ 
+ 			netmask_pfx.family = AF_UNSPEC;
+-			if ((get_unsigned(&plen, slash + 1, 0) || plen > dst->bitlen)
++			plen = bb_strtou(slash + 1, NULL, 0);
++			if ((errno || plen > dst->bitlen)
+ 			 && (get_addr_1(&netmask_pfx, slash + 1, family)))
+ 				err = -1;
+ 			else if (netmask_pfx.family == AF_INET) {
+@@ -262,7 +207,7 @@ int inet_addr_match(inet_prefix *a, inet_prefix *b, int bits)
+ {
+ 	uint32_t *a1 = a->data;
+ 	uint32_t *a2 = b->data;
+-	int words = bits >> 0x05;
++	int words = bits >> 5;
+ 
+ 	bits &= 0x1f;
+ 
+@@ -286,7 +231,7 @@ int inet_addr_match(inet_prefix *a, inet_prefix *b, int bits)
+ 	return 0;
+ }
+ 
+-const char *rt_addr_n2a(int af, int UNUSED_PARAM len,
++const char *rt_addr_n2a(int af,
+ 		void *addr, char *buf, int buflen)
+ {
+ 	switch (af) {
+@@ -298,9 +243,9 @@ const char *rt_addr_n2a(int af, int UNUSED_PARAM len,
+ 	}
+ }
+ 
++#ifdef RESOLVE_HOSTNAMES
+ const char *format_host(int af, int len, void *addr, char *buf, int buflen)
+ {
+-#ifdef RESOLVE_HOSTNAMES
+ 	if (resolve_hosts) {
+ 		struct hostent *h_ent;
+ 
+@@ -323,6 +268,6 @@ const char *format_host(int af, int len, void *addr, char *buf, int buflen)
+ 			}
+ 		}
+ 	}
+-#endif
+-	return rt_addr_n2a(af, len, addr, buf, buflen);
++	return rt_addr_n2a(af, addr, buf, buflen);
+ }
++#endif
+diff --git a/networking/libiproute/utils.h b/networking/libiproute/utils.h
+index c1dbc6e..3603c75 100644
+--- a/networking/libiproute/utils.h
++++ b/networking/libiproute/utils.h
+@@ -64,19 +64,17 @@ extern int get_addr_1(inet_prefix *dst, char *arg, int family);
+ extern int get_addr(inet_prefix *dst, char *arg, int family);
+ extern int get_prefix(inet_prefix *dst, char *arg, int family);
+ 
+-extern int get_integer(int *val, char *arg, int base);
+-extern int get_unsigned(unsigned *val, char *arg, int base);
+-#define get_byte get_u8
+-#define get_ushort get_u16
+-#define get_short get_s16
+-extern int get_u32(uint32_t *val, char *arg, int base);
+-extern int get_u16(uint16_t *val, char *arg, int base);
+-extern int get_s16(int16_t *val, char *arg, int base);
+-extern int get_u8(uint8_t *val, char *arg, int base);
+-extern int get_s8(int8_t *val, char *arg, int base);
++extern unsigned get_unsigned(char *arg, const char *errmsg);
++extern uint32_t get_u32(char *arg, const char *errmsg);
++extern uint16_t get_u16(char *arg, const char *errmsg);
+ 
++extern const char *rt_addr_n2a(int af, void *addr, char *buf, int buflen);
++#ifdef RESOLVE_HOSTNAMES
+ extern const char *format_host(int af, int len, void *addr, char *buf, int buflen);
+-extern const char *rt_addr_n2a(int af, int len, void *addr, char *buf, int buflen);
++#else
++#define format_host(af, len, addr, buf, buflen) \
++	rt_addr_n2a(af, addr, buf, buflen)
++#endif
+ 
+ void invarg(const char *, const char *) NORETURN;
+ void duparg(const char *, const char *) NORETURN;
+diff --git a/networking/tc.c b/networking/tc.c
+index 6e31074..03f57f6 100644
+--- a/networking/tc.c
++++ b/networking/tc.c
+@@ -508,15 +508,13 @@ int tc_main(int argc UNUSED_PARAM, char **argv)
+ 			   if ((slash = strchr(handle, '/')) != NULL)
+ 				   *slash = '\0';
+ 			 */
+-			if (get_u32(&msg.tcm_handle, *argv, 0))
+-				invarg(*argv, "handle");
+-			/* if (slash) {if (get_u32(__u32 &mask, slash+1,0)) inv mask;addattr32(n, MAX_MSG, TCA_FW_MASK, mask); */
++			msg.tcm_handle = get_u32(*argv, "handle");
++			/* if (slash) {if (get_u32(__u32 &mask, slash+1, NULL)) inv mask; addattr32(n, MAX_MSG, TCA_FW_MASK, mask); */
+ 		} else if (arg == ARG_classid && obj == OBJ_class && cmd == CMD_change){
+ 		} else if (arg == ARG_pref || arg == ARG_prio) { /* filter::list */
+ 			if (filter_prio)
+ 				duparg(*argv, "priority");
+-			if (get_u32(&filter_prio, *argv, 0))
+-				invarg(*argv, "priority");
++			filter_prio = get_u32(*argv, "priority");
+ 		} else if (arg == ARG_proto) { /* filter::list */
+ 			__u16 tmp;
+ 			if (filter_proto)

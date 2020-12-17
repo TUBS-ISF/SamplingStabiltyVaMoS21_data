@@ -1,0 +1,15 @@
+2007-06-21 10:28:11 +0000
+diff --git a/Makefile.flags b/Makefile.flags
+index c9b713b..e73cf9d 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -28,6 +28,9 @@ CFLAGS += $(call cc-option,-Wundef -Wstrict-prototypes,)
+ 
+ ifeq ($(CONFIG_WERROR),y)
+ CFLAGS += $(call cc-option,-Werror,)
++else
++# for development, warn a little bit about unused results..
++CPPFLAGS += -D_FORTIFY_SOURCE=2
+ endif
+ # gcc 3.x emits bogus "old style proto" warning on find.c:alloc_action()
+ CFLAGS += $(call cc-ifversion, -ge, 0400, -Wold-style-definition)

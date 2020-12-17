@@ -1,0 +1,190 @@
+2010-03-19 14:48:51 +0100
+diff --git a/archival/Config.in b/archival/Config.in
+index c99896b..deacc28 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -289,6 +289,14 @@ config FEATURE_TAR_NOPRESERVE_TIME
+ 	  With this option busybox supports GNU tar -m
+ 	  (do not preserve time) option.
+ 
++config FEATURE_TAR_SELINUX
++	bool "Support for extracting SELinux labels"
++	default n
++	depends on TAR && SELINUX
++	help
++	  With this option busybox supports restoring SELinux labels
++	  when extracting files from tar archives.
++
+ config UNCOMPRESS
+ 	bool "uncompress"
+ 	default n
+diff --git a/archival/libunarchive/data_extract_all.c b/archival/libunarchive/data_extract_all.c
+index 58b0533..cc48942 100644
+--- a/archival/libunarchive/data_extract_all.c
++++ b/archival/libunarchive/data_extract_all.c
+@@ -12,6 +12,17 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 	int dst_fd;
+ 	int res;
+ 
++#if ENABLE_FEATURE_TAR_SELINUX
++	char *sctx = archive_handle->tar__next_file_sctx;
++	if (!sctx)
++		sctx = archive_handle->tar__global_sctx;
++	if (sctx) { /* setfscreatecon is 4 syscalls, avoid if possible */
++		setfscreatecon(sctx);
++		free(archive_handle->tar__next_file_sctx);
++		archive_handle->tar__next_file_sctx = NULL;
++	}
++#endif
++
+ 	if (archive_handle->ah_flags & ARCHIVE_CREATE_LEADING_DIRS) {
+ 		char *slash = strrchr(file_header->name, '/');
+ 		if (slash) {
+@@ -45,7 +56,7 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 					"same age file exists", file_header->name);
+ 			}
+ 			data_skip(archive_handle);
+-			return;
++			goto ret;
+ 		}
+ 		else if ((unlink(file_header->name) == -1) && (errno != EISDIR)) {
+ 			bb_perror_msg_and_die("can't remove old file %s",
+@@ -158,4 +169,12 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 			utimes(file_header->name, t);
+ 		}
+ 	}
++
++ ret: ;
++#if ENABLE_FEATURE_TAR_SELINUX
++	if (sctx) {
++		/* reset the context after creating an entry */
++		setfscreatecon(NULL);
++	}
++#endif
+ }
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index d5b86ff..cf0b9ab 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -103,6 +103,63 @@ static unsigned long long getOctal(char *str, int len)
+ }
+ #define GET_OCTAL(a) getOctal((a), sizeof(a))
+ 
++#if ENABLE_FEATURE_TAR_SELINUX
++/* Scan a PAX header for SELinux contexts, via "RHT.security.selinux" keyword.
++ * This is what Red Hat's patched version of tar uses.
++ */
++# define SELINUX_CONTEXT_KEYWORD "RHT.security.selinux"
++static char *get_selinux_sctx_from_pax_hdr(archive_handle_t *archive_handle, unsigned sz)
++{
++	char *buf, *p;
++	char *result;
++
++	p = buf = xmalloc(sz + 1);
++	/* prevent bb_strtou from running off the buffer */
++	buf[sz] = '\0';
++	xread(archive_handle->src_fd, buf, sz);
++	archive_handle->offset += sz;
++
++	result = NULL;
++	while (sz != 0) {
++		char *end, *value;
++		unsigned len;
++
++		/* Every record has this format: "LEN NAME=VALUE\n" */
++		len = bb_strtou(p, &end, 10);
++		/* expect errno to be EINVAL, because the character
++		 * following the digits should be a space
++		 */
++		p += len;
++		sz -= len;
++		if ((int)sz < 0
++		 || len == 0
++		 || errno != EINVAL
++		 || *end != ' '
++		) {
++			bb_error_msg("malformed extended header, skipped");
++			// More verbose version:
++			//bb_error_msg("malformed extended header at %"OFF_FMT"d, skipped",
++			//		archive_handle->offset - (sz + len));
++			break;
++		}
++		/* overwrite the terminating newline with NUL
++		 * (we do not bother to check that it *was* a newline)
++		 */
++		p[-1] = '\0';
++		/* Is it selinux security context? */
++		value = end + 1;
++		if (strncmp(value, SELINUX_CONTEXT_KEYWORD"=", sizeof(SELINUX_CONTEXT_KEYWORD"=") - 1) == 0) {
++			value += sizeof(SELINUX_CONTEXT_KEYWORD"=") - 1;
++			result = xstrdup(value);
++			break;
++		}
++	}
++
++	free(buf);
++	return result;
++}
++#endif
++
+ void BUG_tar_header_size(void);
+ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+ {
+@@ -150,7 +207,7 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+ 	if (sizeof(tar) != 512)
+ 		BUG_tar_header_size();
+ 
+-#if ENABLE_FEATURE_TAR_GNU_EXTENSIONS
++#if ENABLE_FEATURE_TAR_GNU_EXTENSIONS || ENABLE_FEATURE_TAR_SELINUX
+  again:
+ #endif
+ 	/* Align header */
+@@ -392,8 +449,13 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+ 	case 'S':	/* Sparse file */
+ 	case 'V':	/* Volume header */
+ #endif
++#if !ENABLE_FEATURE_TAR_SELINUX
+ 	case 'g':	/* pax global header */
+-	case 'x': {	/* pax extended header */
++	case 'x':	/* pax extended header */
++#else
++ skip_ext_hdr:
++#endif
++	{
+ 		off_t sz;
+ 		bb_error_msg("warning: skipping header '%c'", tar.typeflag);
+ 		sz = (file_header->size + 511) & ~(off_t)511;
+@@ -404,6 +466,18 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+ 		/* return get_header_tar(archive_handle); */
+ 		goto again_after_align;
+ 	}
++#if ENABLE_FEATURE_TAR_SELINUX
++	case 'g':	/* pax global header */
++	case 'x': {	/* pax extended header */
++		char **pp;
++		if ((uoff_t)file_header->size > 0xfffff) /* paranoia */
++			goto skip_ext_hdr;
++		pp = (tar.typeflag == 'g') ? &archive_handle->tar__global_sctx : &archive_handle->tar__next_file_sctx;
++		free(*pp);
++		*pp = get_selinux_sctx_from_pax_hdr(archive_handle, file_header->size);
++		goto again;
++	}
++#endif
+ 	default:
+ 		bb_error_msg_and_die("unknown typeflag: 0x%x", tar.typeflag);
+ 	}
+diff --git a/include/unarchive.h b/include/unarchive.h
+index 92ebd65..a834816 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -59,6 +59,10 @@ typedef struct archive_handle_t {
+ 	char* tar__longname;
+ 	char* tar__linkname;
+ # endif
++# if ENABLE_FEATURE_TAR_SELINUX
++	char* tar__global_sctx;
++	char* tar__next_file_sctx;
++# endif
+ #endif
+ #if ENABLE_CPIO || ENABLE_RPM2CPIO || ENABLE_RPM
+ 	uoff_t cpio__blocks;

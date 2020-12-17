@@ -1,0 +1,119 @@
+2008-09-25 10:39:10 +0000
+diff --git a/applets/usage_compressed b/applets/usage_compressed
+index 05ceafd..c30bcfa 100755
+--- a/applets/usage_compressed
++++ b/applets/usage_compressed
+@@ -17,7 +17,7 @@ echo 'static const char packed_usage[] ALIGN1 = {'
+ ## Breaks on big-endian systems!
+ ## # Extra effort to avoid using "od -t x1": -t is not available
+ ## # in non-CONFIG_DESKTOPed busybox od
+-## 
++##
+ ## "$loc/usage" | bzip2 -1 | od -v -x \
+ ## | $SED -e 's/^[^ ]*//' \
+ ## | $SED -e 's/ //g' \
+diff --git a/console-tools/showkey.c b/console-tools/showkey.c
+index e4603e2..ee93180 100644
+--- a/console-tools/showkey.c
++++ b/console-tools/showkey.c
+@@ -72,9 +72,9 @@ int showkey_main(int argc UNUSED_PARAM, char **argv)
+ 	// get keyboard settings
+ 	xioctl(STDIN_FILENO, KDGKBMODE, &kbmode);
+ 	printf("kb mode was %s\n\nPress any keys. Program terminates %s\n\n",
+-		kbmode == K_RAW ? "RAW" : 
+-			(kbmode == K_XLATE ? "XLATE" : 
+-				(kbmode == K_MEDIUMRAW ? "MEDIUMRAW" : 
++		kbmode == K_RAW ? "RAW" :
++			(kbmode == K_XLATE ? "XLATE" :
++				(kbmode == K_MEDIUMRAW ? "MEDIUMRAW" :
+ 					(kbmode == K_UNICODE ? "UNICODE" : "?UNKNOWN?")))
+ 		, (option_mask32 & OPT_a) ? "when CTRL+D pressed" : "10s after last keypress"
+ 	);
+diff --git a/docs/busybox.net/news.html b/docs/busybox.net/news.html
+index a1fa375..d2c5d44 100644
+--- a/docs/busybox.net/news.html
++++ b/docs/busybox.net/news.html
+@@ -3,7 +3,7 @@
+ <ul>
+ 
+   <li>
+-    <p>We want to thank the following companies which are providing support for the BusyBox project:  
++    <p>We want to thank the following companies which are providing support for the BusyBox project:
+       <ul>
+         <li>AOE media, a <a href="http://www.aoemedia.com/typo3-development.html">
+         TYPO3 development agency</a> contributes financially.</li>
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 3c4dabc..cb45456 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -313,10 +313,10 @@ static void load_fs_info(const char *filename)
+ 	// Loop through entries
+ 	while (getmntent_r(fstab, &mte, bb_common_bufsiz1, COMMON_BUFSIZE)) {
+ 		//bb_info_msg("CREATE[%s][%s][%s][%s][%d]", mte.mnt_fsname, mte.mnt_dir,
+-		//	mte.mnt_type, mte.mnt_opts, 
++		//	mte.mnt_type, mte.mnt_opts,
+ 		//	mte.mnt_passno);
+ 		fs = create_fs_device(mte.mnt_fsname, mte.mnt_dir,
+-			mte.mnt_type, mte.mnt_opts, 
++			mte.mnt_type, mte.mnt_opts,
+ 			mte.mnt_passno);
+ 	}
+ 	endmntent(fstab);
+diff --git a/init/halt.c b/init/halt.c
+index cbb325e..e852b87 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -50,7 +50,7 @@ int halt_main(int argc UNUSED_PARAM, char **argv)
+ 	static const int magic[] = {
+ 		RB_HALT_SYSTEM,
+ 		RB_POWER_OFF,
+-		RB_AUTOBOOT	  
++		RB_AUTOBOOT
+ 	};
+ 	static const smallint signals[] = { SIGUSR1, SIGUSR2, SIGTERM };
+ 
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 8fb99b6..43fb6eb 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -510,7 +510,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 				*pargv = pp;
+ 			}
+ 			if (!(spec_flgs & ALL_ARGV_IS_OPTS))
+-				break; 
++				break;
+ 			pargv++;
+ 		}
+ 	}
+diff --git a/testsuite/makedevs.device_table.txt b/testsuite/makedevs.device_table.txt
+index 8ca5a88..4400083 100644
+--- a/testsuite/makedevs.device_table.txt
++++ b/testsuite/makedevs.device_table.txt
+@@ -1,5 +1,5 @@
+ # When building a target filesystem, it is desirable to not have to
+-# become root and then run 'mknod' a thousand times.  Using a device 
++# become root and then run 'mknod' a thousand times.  Using a device
+ # table you can create device nodes and directories "on the fly".
+ #
+ # This is a sample device table file for use with genext2fs.  You can
+@@ -14,17 +14,17 @@
+ # I could just use the following two table entries:
+ #   /dev/hda    b       640     0       0       3       0       0       0       -
+ #   /dev/hda    b       640     0       0       3       1       1       1       15
+-# 
++#
+ # Device table entries take the form of:
+ # <name>    <type>      <mode>  <uid>   <gid>   <major> <minor> <start> <inc>   <count>
+-# where name is the file name,  type can be one of: 
++# where name is the file name,  type can be one of:
+ #       f       A regular file
+ #       d       Directory
+ #       c       Character special device file
+ #       b       Block special device file
+ #       p       Fifo (named pipe)
+ # uid is the user id for the target file, gid is the group id for the
+-# target file.  The rest of the entries (major, minor, etc) apply only 
++# target file.  The rest of the entries (major, minor, etc) apply only
+ # to device special files.
+ 
+ # Have fun

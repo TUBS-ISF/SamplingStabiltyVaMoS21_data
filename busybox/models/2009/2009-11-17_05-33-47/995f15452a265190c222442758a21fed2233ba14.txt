@@ -1,0 +1,15 @@
+2009-11-17 05:33:47 +0100
+diff --git a/libbb/platform.c b/libbb/platform.c
+index fdd3882..17ad3f7 100644
+--- a/libbb/platform.c
++++ b/libbb/platform.c
+@@ -30,7 +30,8 @@ int FAST_FUNC vasprintf(char **string_ptr, const char *format, va_list p)
+ 
+ 	if (r < 128) {
+ 		va_end(p2);
+-		return xstrdup(buf);
++		*string_ptr = xstrdup(buf);
++		return r;
+ 	}
+ 
+ 	*string_ptr = xmalloc(r+1);

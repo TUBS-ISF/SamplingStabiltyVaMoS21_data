@@ -1,0 +1,78 @@
+2007-09-24 19:07:57 +0000
+diff --git a/archival/tar.c b/archival/tar.c
+index 11f5eba..bbda52d 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -386,6 +386,20 @@ static int writeFileToTarball(const char *fileName, struct stat *statbuf,
+ 	const char *header_name;
+ 	int inputFileFd = -1;
+ 
++	header_name = fileName;
++	while (header_name[0] == '/') {
++		static smallint warned;
++
++		if (!warned) {
++			bb_error_msg("removing leading '/' from member names");
++			warned = 1;
++		}
++		header_name++;
++	}
++
++	if (header_name[0] == '\0')
++		return TRUE;
++
+ 	/*
+ 	 * Check to see if we are dealing with a hard link.
+ 	 * If so -
+@@ -397,7 +411,7 @@ static int writeFileToTarball(const char *fileName, struct stat *statbuf,
+ 	if (statbuf->st_nlink > 1) {
+ 		tbInfo->hlInfo = findHardLinkInfo(tbInfo->hlInfoHead, statbuf);
+ 		if (tbInfo->hlInfo == NULL)
+-			addHardLinkInfo(&tbInfo->hlInfoHead, statbuf, fileName);
++			addHardLinkInfo(&tbInfo->hlInfoHead, statbuf, header_name);
+ 	}
+ 
+ 	/* It is against the rules to archive a socket */
+@@ -409,36 +423,23 @@ static int writeFileToTarball(const char *fileName, struct stat *statbuf,
+ 	/* It is a bad idea to store the archive we are in the process of creating,
+ 	 * so check the device and inode to be sure that this particular file isn't
+ 	 * the new tarball */
+-	if (tbInfo->statBuf.st_dev == statbuf->st_dev &&
+-		tbInfo->statBuf.st_ino == statbuf->st_ino) {
++	if (tbInfo->statBuf.st_dev == statbuf->st_dev
++	 && tbInfo->statBuf.st_ino == statbuf->st_ino
++	) {
+ 		bb_error_msg("%s: file is the archive; skipping", fileName);
+ 		return TRUE;
+ 	}
+ 
+-	header_name = fileName;
+-	while (header_name[0] == '/') {
+-		static smallint warned;
+-
+-		if (!warned) {
+-			bb_error_msg("removing leading '/' from member names");
+-			warned = 1;
+-		}
+-		header_name++;
+-	}
++	if (exclude_file(tbInfo->excludeList, header_name))
++		return SKIP;
+ 
+ #if !ENABLE_FEATURE_TAR_GNU_EXTENSIONS
+-	if (strlen(fileName) >= NAME_SIZE) {
++	if (strlen(header_name) >= NAME_SIZE) {
+ 		bb_error_msg("names longer than "NAME_SIZE_STR" chars not supported");
+ 		return TRUE;
+ 	}
+ #endif
+ 
+-	if (header_name[0] == '\0')
+-		return TRUE;
+-
+-	if (exclude_file(tbInfo->excludeList, header_name))
+-		return SKIP;
+-
+ 	/* Is this a regular file? */
+ 	if (tbInfo->hlInfo == NULL && S_ISREG(statbuf->st_mode)) {
+ 		/* open the file we want to archive, and make sure all is well */

@@ -1,0 +1,14 @@
+2008-04-30 13:56:32 +0000
+diff --git a/include/platform.h b/include/platform.h
+index 5193485..57cff2c 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -74,7 +74,7 @@
+ /* -fwhole-program makes all symbols local. The attribute externally_visible
+    forces a symbol global.  */
+ # if __GNUC_PREREQ (4,1)
+-#  define EXTERNALLY_VISIBLE __attribute__(( visibility("default") ));
++#  define EXTERNALLY_VISIBLE __attribute__(( visibility("default") ))
+ //__attribute__ ((__externally_visible__))
+ # else
+ #  define EXTERNALLY_VISIBLE

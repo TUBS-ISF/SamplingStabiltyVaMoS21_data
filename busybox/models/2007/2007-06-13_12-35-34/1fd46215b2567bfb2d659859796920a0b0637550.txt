@@ -1,0 +1,13 @@
+2007-06-13 12:35:34 +0000
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index 795a549..531c1ea 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -190,6 +190,7 @@ struct globals {
+ #define check_file_blk     (G.check_file_blk     )
+ #define current_name       (G.current_name       )
+ #define INIT_G() do { \
++	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
+ 	dirsize = 16; \
+ 	namelen = 14; \
+ 	current_name[0] = '/'; \

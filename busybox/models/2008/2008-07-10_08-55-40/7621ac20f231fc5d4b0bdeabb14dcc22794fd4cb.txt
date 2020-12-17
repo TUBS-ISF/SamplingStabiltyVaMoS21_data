@@ -1,0 +1,16 @@
+2008-07-10 08:55:40 +0000
+diff --git a/docs/busybox.net/sponsors.html b/docs/busybox.net/sponsors.html
+index 2488647..efbfd45 100644
+--- a/docs/busybox.net/sponsors.html
++++ b/docs/busybox.net/sponsors.html
+@@ -16,6 +16,10 @@ project, consider these fine companies!</p>
+   Custom Linux, embedded Linux, BusyBox, and uClibc development.
+   </li>
+ 
++  <li><a href=http://www.laptopcomputers.org/>Laptop Computers</a> contributes
++  financially.
++  </li>
++
+   <li>AOE media, a <a href=http://www.aoemedia.com/typo3-development.html>
+   TYPO3 development agency</a> contributes financially.
+   </li>

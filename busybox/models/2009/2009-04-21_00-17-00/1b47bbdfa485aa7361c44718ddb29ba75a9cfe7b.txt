@@ -1,0 +1,32 @@
+2009-04-21 00:17:00 +0000
+diff --git a/examples/udhcp/simple.script b/examples/udhcp/simple.script
+index ae09316..abf1b6f 100644
+--- a/examples/udhcp/simple.script
++++ b/examples/udhcp/simple.script
+@@ -1,10 +1,10 @@
+ #!/bin/sh
+-
+ # udhcpc script edited by Tim Riker <Tim@Rikers.org>
+ 
+-[ -z "$1" ] && echo "Error: should be called from udhcpc" && exit 1
+-
+ RESOLV_CONF="/etc/resolv.conf"
++
++[ -n "$1" ] || echo "Error: should be called from udhcpc" && exit 1
++
+ NETMASK=""
+ [ -n "$subnet" ] && NETMASK="netmask $subnet"
+ BROADCAST="broadcast +"
+@@ -35,10 +35,10 @@ case "$1" in
+ 
+ 		echo "Recreating $RESOLV_CONF"
+ 		echo -n > $RESOLV_CONF-$$
+-		[ -n "$domain" ] && echo search $domain >> $RESOLV_CONF-$$
++		[ -n "$domain" ] && echo "search $domain" >> $RESOLV_CONF-$$
+ 		for i in $dns ; do
+ 			echo " Adding DNS server $i"
+-			echo nameserver $i >> $RESOLV_CONF-$$
++			echo "nameserver $i" >> $RESOLV_CONF-$$
+ 		done
+ 		mv $RESOLV_CONF-$$ $RESOLV_CONF
+ 		;;

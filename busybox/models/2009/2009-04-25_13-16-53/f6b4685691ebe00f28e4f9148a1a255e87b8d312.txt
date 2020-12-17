@@ -1,0 +1,205 @@
+2009-04-25 13:16:53 +0000
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index f853e95..85f93b6 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -9,6 +9,7 @@
+ 
+ #include <netinet/in.h>
+ #include <net/if.h>
++#include <sys/un.h>
+ #include "libbb.h"
+ 
+ void FAST_FUNC setsockopt_reuseaddr(int fd)
+@@ -160,13 +161,26 @@ IF_FEATURE_IPV6(sa_family_t af,)
+ 		int ai_flags)
+ {
+ 	int rc;
+-	len_and_sockaddr *r = NULL;
++	len_and_sockaddr *r;
+ 	struct addrinfo *result = NULL;
+ 	struct addrinfo *used_res;
+ 	const char *org_host = host; /* only for error msg */
+ 	const char *cp;
+ 	struct addrinfo hint;
+ 
++	if (ENABLE_FEATURE_UNIX_LOCAL && strncmp(host, "local:", 6) == 0) {
++		struct sockaddr_un *sun;
++
++		r = xzalloc(LSA_LEN_SIZE + sizeof(struct sockaddr_un));
++		r->len = sizeof(struct sockaddr_un);
++		r->u.sa.sa_family = AF_UNIX;
++		sun = (struct sockaddr_un *)&r->u.sa;
++		safe_strncpy(sun->sun_path, host + 6, sizeof(sun->sun_path));
++		return r;
++	}
++
++	r = NULL;
++
+ 	/* Ugly parsing of host:addr */
+ 	if (ENABLE_FEATURE_IPV6 && host[0] == '[') {
+ 		/* Even uglier parsing of [xx]:nn */
+@@ -188,6 +202,7 @@ IF_FEATURE_IPV6(sa_family_t af,)
+ 	}
+ 	if (cp) { /* points to ":" or "]:" */
+ 		int sz = cp - host + 1;
++
+ 		host = safe_strncpy(alloca(sz), host, sz);
+ 		if (ENABLE_FEATURE_IPV6 && *cp != ':') {
+ 			cp++; /* skip ']' */
+@@ -371,6 +386,13 @@ static char* FAST_FUNC sockaddr2str(const struct sockaddr *sa, int flags)
+ 	int rc;
+ 	socklen_t salen;
+ 
++	if (ENABLE_FEATURE_UNIX_LOCAL && sa->sa_family == AF_UNIX) {
++		struct sockaddr_un *sun = (struct sockaddr_un *)sa;
++		return xasprintf("local:%.*s",
++				(int) sizeof(sun->sun_path),
++				sun->sun_path);
++	}
++
+ 	salen = LSA_SIZEOF_SA;
+ #if ENABLE_FEATURE_IPV6
+ 	if (sa->sa_family == AF_INET)
+diff --git a/networking/Config.in b/networking/Config.in
+index 392afcf..62a21f7 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -12,6 +12,13 @@ config FEATURE_IPV6
+ 	  Enable IPv6 support in busybox.
+ 	  This adds IPv6 support in the networking applets.
+ 
++config FEATURE_UNIX_LOCAL
++	bool "Enable Unix domain socket support"
++	default n
++	help
++	  Enable Unix domain socket support in all busybox networking
++	  applets.
++
+ config FEATURE_PREFER_IPV4_ADDRESS
+ 	bool "Prefer IPv4 addresses from DNS queries"
+ 	default y
+diff --git a/networking/nc.c b/networking/nc.c
+index e64c998..9c3f116 100644
+--- a/networking/nc.c
++++ b/networking/nc.c
+@@ -34,7 +34,6 @@ int nc_main(int argc, char **argv)
+ 	IF_NOT_NC_EXTRA (const) unsigned delay = 0;
+ 	IF_NOT_NC_EXTRA (const int execparam = 0;)
+ 	IF_NC_EXTRA     (char **execparam = NULL;)
+-	len_and_sockaddr *lsa;
+ 	fd_set readfds, testfds;
+ 	int opt; /* must be signed (getopt returns -1) */
+ 
+@@ -44,17 +43,17 @@ int nc_main(int argc, char **argv)
+ 		while ((opt = getopt(argc, argv,
+ 		        "" IF_NC_SERVER("lp:") IF_NC_EXTRA("w:i:f:e:") )) > 0
+ 		) {
+-			if (ENABLE_NC_SERVER && opt=='l')
++			if (ENABLE_NC_SERVER && opt == 'l')
+ 				IF_NC_SERVER(do_listen++);
+-			else if (ENABLE_NC_SERVER && opt=='p')
++			else if (ENABLE_NC_SERVER && opt == 'p')
+ 				IF_NC_SERVER(lport = bb_lookup_port(optarg, "tcp", 0));
+-			else if (ENABLE_NC_EXTRA && opt=='w')
++			else if (ENABLE_NC_EXTRA && opt == 'w')
+ 				IF_NC_EXTRA( wsecs = xatou(optarg));
+-			else if (ENABLE_NC_EXTRA && opt=='i')
++			else if (ENABLE_NC_EXTRA && opt == 'i')
+ 				IF_NC_EXTRA( delay = xatou(optarg));
+-			else if (ENABLE_NC_EXTRA && opt=='f')
++			else if (ENABLE_NC_EXTRA && opt == 'f')
+ 				IF_NC_EXTRA( cfd = xopen(optarg, O_RDWR));
+-			else if (ENABLE_NC_EXTRA && opt=='e' && optind <= argc) {
++			else if (ENABLE_NC_EXTRA && opt == 'e' && optind <= argc) {
+ 				/* We cannot just 'break'. We should let getopt finish.
+ 				** Or else we won't be able to find where
+ 				** 'host' and 'port' params are
+@@ -80,9 +79,12 @@ int nc_main(int argc, char **argv)
+ 		argc -= optind;
+ 		// -l and -f don't mix
+ 		if (do_listen && cfd) bb_show_usage();
+-		// Listen or file modes need zero arguments, client mode needs 2
+-		if (do_listen || cfd) {
++		// File mode needs need zero arguments, listen mode needs zero or one,
++		// client mode needs one or two
++		if (cfd) {
+ 			if (argc) bb_show_usage();
++		} else if (do_listen) {
++			if (argc > 1) bb_show_usage();
+ 		} else {
+ 			if (!argc || argc > 2) bb_show_usage();
+ 		}
+@@ -99,24 +101,20 @@ int nc_main(int argc, char **argv)
+ 
+ 	if (!cfd) {
+ 		if (do_listen) {
+-			/* create_and_bind_stream_or_die(NULL, lport)
+-			 * would've work wonderfully, but we need
+-			 * to know lsa */
+-			sfd = xsocket_stream(&lsa);
+-			if (lport)
+-				set_nport(lsa, htons(lport));
+-			setsockopt_reuseaddr(sfd);
+-			xbind(sfd, &lsa->u.sa, lsa->len);
++			sfd = create_and_bind_stream_or_die(argv[0], lport);
+ 			xlisten(sfd, do_listen); /* can be > 1 */
++#if 0  /* nc-1.10 does not do this (without -v) */
+ 			/* If we didn't specify a port number,
+ 			 * query and print it after listen() */
+ 			if (!lport) {
+-				getsockname(sfd, &lsa->u.sa, &lsa->len);
+-				lport = get_nport(&lsa->u.sa);
++				len_and_sockaddr lsa;
++				lsa.len = LSA_SIZEOF_SA;
++				getsockname(sfd, &lsa.u.sa, &lsa.len);
++				lport = get_nport(&lsa.u.sa);
+ 				fdprintf(2, "%d\n", ntohs(lport));
+ 			}
++#endif
+ 			close_on_exec_on(sfd);
+-			free(lsa);
+  accept_again:
+ 			cfd = accept(sfd, NULL, 0);
+ 			if (cfd < 0)
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index efe831e..9aaeec1 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -377,9 +377,7 @@ create new one, and bind() it. TODO */
+ 		socklen_t x = sizeof(optbuf);
+ 
+ 		rr = getsockopt(netfd, IPPROTO_IP, IP_OPTIONS, optbuf, &x);
+-		if (rr < 0)
+-			bb_perror_msg("getsockopt failed");
+-		else if (x) {    /* we've got options, lessee em... */
++		if (rr >= 0 && x) {    /* we've got options, lessee em... */
+ 			bin2hex(bigbuf_net, optbuf, x);
+ 			bigbuf_net[2*x] = '\0';
+ 			fprintf(stderr, "IP options: %s\n", bigbuf_net);
+@@ -603,7 +601,10 @@ Debug("got %d from the net, errno %d", rr, errno);
+ 	 mobygrams are kinda fun and exercise the reassembler. */
+ 			if (rr <= 0) {                        /* at end, or fukt, or ... */
+ 				FD_CLR(STDIN_FILENO, &ding1);                /* disable and close stdin */
+-				close(0);
++				close(STDIN_FILENO);
++// Does it make sense to shutdown(net_fd, SHUT_WR)
++// to let other side know that we won't write anything anymore?
++// (and what about keeping compat if we do that?)
+ 			} else {
+ 				rzleft = rr;
+ 				zp = bigbuf_in;
+@@ -768,7 +769,12 @@ int nc_main(int argc, char **argv)
+ 	setsockopt_reuseaddr(netfd);
+ 	if (o_udpmode)
+ 		socket_want_pktinfo(netfd);
+-	xbind(netfd, &ouraddr->u.sa, ouraddr->len);
++	if (!ENABLE_FEATURE_UNIX_LOCAL
++	 || o_listen
++	 || ouraddr->u.sa.sa_family != AF_UNIX
++	) {
++		xbind(netfd, &ouraddr->u.sa, ouraddr->len);
++	}
+ #if 0
+ 	setsockopt(netfd, SOL_SOCKET, SO_RCVBUF, &o_rcvbuf, sizeof o_rcvbuf);
+ 	setsockopt(netfd, SOL_SOCKET, SO_SNDBUF, &o_sndbuf, sizeof o_sndbuf);

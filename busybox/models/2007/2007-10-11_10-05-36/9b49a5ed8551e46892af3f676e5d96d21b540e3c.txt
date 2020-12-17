@@ -1,0 +1,3665 @@
+2007-10-11 10:05:36 +0000
+diff --git a/Makefile.flags b/Makefile.flags
+index 243f095..c023299 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -56,10 +56,13 @@ ifeq ($(CONFIG_DEBUG),y)
+ CFLAGS += $(call cc-option,-g)
+ endif
+ 
++ifeq ($(CONFIG_BUILD_LIBBUSYBOX),y)
+ # on i386: 14% smaller libbusybox.so
+ # (code itself is 9% bigger, we save on relocs/PLT/GOT)
+-ifeq ($(CONFIG_BUILD_LIBBUSYBOX),y)
+ CFLAGS += -fpic
++# and another 4% reduction of libbusybox.so:
++# (external entry points must be marked EXTERNALLY_VISIBLE)
++CFLAGS += $(call cc-option,-fvisibility=hidden)
+ endif
+ 
+ ifeq ($(CONFIG_STATIC),y)
+diff --git a/applets/applets.c b/applets/applets.c
+index bbf150c..1950cf3 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -24,6 +24,6 @@
+ #if ENABLE_BUILD_LIBBUSYBOX
+ int main(int argc, char **argv)
+ {
+-	return libbusybox_main(argc, argv);
++	return lbb_main(argc, argv);
+ }
+ #endif
+diff --git a/archival/ar.c b/archival/ar.c
+index cbe4d8e..0a95e5c 100644
+--- a/archival/ar.c
++++ b/archival/ar.c
+@@ -37,7 +37,7 @@ static void header_verbose_list_ar(const file_header_t *file_header)
+ #define AR_OPT_CREATE		0x20
+ #define AR_OPT_INSERT		0x40
+ 
+-int ar_main(int argc, char **argv);
++int ar_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ar_main(int argc, char **argv)
+ {
+ 	static const char msg_unsupported_err[] ALIGN1 =
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index e106bf0..61b5e39 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -158,7 +158,7 @@ USE_DESKTOP(long long) int unpack_bunzip2(void)
+ 	return unpack_bz2_stream(STDIN_FILENO, STDOUT_FILENO);
+ }
+ 
+-int bunzip2_main(int argc, char **argv);
++int bunzip2_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int bunzip2_main(int argc, char **argv)
+ {
+ 	getopt32(argv, "cf");
+@@ -256,7 +256,7 @@ USE_DESKTOP(long long) int unpack_gunzip(void)
+ 	return status;
+ }
+ 
+-int gunzip_main(int argc, char **argv);
++int gunzip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int gunzip_main(int argc, char **argv)
+ {
+ 	getopt32(argv, "cfvdt");
+@@ -294,7 +294,7 @@ USE_DESKTOP(long long) int unpack_unlzma(void)
+ 	return unpack_lzma_stream(STDIN_FILENO, STDOUT_FILENO);
+ }
+ 
+-int unlzma_main(int argc, char **argv);
++int unlzma_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int unlzma_main(int argc, char **argv)
+ {
+ 	getopt32(argv, "cf");
+@@ -336,7 +336,7 @@ USE_DESKTOP(long long) int unpack_uncompress(void)
+ 	return status;
+ }
+ 
+-int uncompress_main(int argc, char **argv);
++int uncompress_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int uncompress_main(int argc, char **argv)
+ {
+ 	getopt32(argv, "cf");
+diff --git a/archival/cpio.c b/archival/cpio.c
+index 9188e09..59ae60c 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -22,7 +22,7 @@
+ #define CPIO_OPT_CREATE_LEADING_DIR     0x20
+ #define CPIO_OPT_PRESERVE_MTIME         0x40
+ 
+-int cpio_main(int argc, char **argv);
++int cpio_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cpio_main(int argc, char **argv)
+ {
+ 	archive_handle_t *archive_handle;
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 337576c..27512eb 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -1557,7 +1557,7 @@ static void configure_package(deb_file_t *deb_file)
+ 	set_status(status_num, "installed", 3);
+ }
+ 
+-int dpkg_main(int argc, char **argv);
++int dpkg_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dpkg_main(int argc, char **argv)
+ {
+ 	deb_file_t **deb_file = NULL;
+diff --git a/archival/dpkg_deb.c b/archival/dpkg_deb.c
+index 9781b54..e1d2cd0 100644
+--- a/archival/dpkg_deb.c
++++ b/archival/dpkg_deb.c
+@@ -13,7 +13,7 @@
+ #define DPKG_DEB_OPT_EXTRACT	8
+ #define DPKG_DEB_OPT_EXTRACT_VERBOSE	16
+ 
+-int dpkg_deb_main(int argc, char **argv);
++int dpkg_deb_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dpkg_deb_main(int argc, char **argv)
+ {
+ 	archive_handle_t *ar_archive;
+diff --git a/archival/gzip.c b/archival/gzip.c
+index cabcc5e..bc7502e 100644
+--- a/archival/gzip.c
++++ b/archival/gzip.c
+@@ -2025,7 +2025,7 @@ USE_DESKTOP(long long) int pack_gzip(void)
+ 	return 0;
+ }
+ 
+-int gzip_main(int argc, char **argv);
++int gzip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int gzip_main(int argc, char **argv)
+ {
+ 	unsigned opt;
+diff --git a/archival/rpm.c b/archival/rpm.c
+index 0b7741a..f078aea 100644
+--- a/archival/rpm.c
++++ b/archival/rpm.c
+@@ -80,7 +80,7 @@ static void fileaction_dobackup(char *filename, int fileref);
+ static void fileaction_setowngrp(char *filename, int fileref);
+ static void loop_through_files(int filetag, void (*fileaction)(char *filename, int fileref));
+ 
+-int rpm_main(int argc, char **argv);
++int rpm_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int rpm_main(int argc, char **argv)
+ {
+ 	int opt = 0, func = 0, rpm_fd, offset;
+diff --git a/archival/rpm2cpio.c b/archival/rpm2cpio.c
+index fe71e98..329f8f7 100644
+--- a/archival/rpm2cpio.c
++++ b/archival/rpm2cpio.c
+@@ -49,7 +49,7 @@ static void skip_header(int rpm_fd)
+ }
+ 
+ /* No getopt required */
+-int rpm2cpio_main(int argc, char **argv);
++int rpm2cpio_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int rpm2cpio_main(int argc, char **argv)
+ {
+ 	struct rpm_lead lead;
+diff --git a/archival/tar.c b/archival/tar.c
+index 18b6267..3fe1886 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -769,7 +769,7 @@ static const char tar_longopts[] ALIGN1 =
+ 	;
+ #endif
+ 
+-int tar_main(int argc, char **argv);
++int tar_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tar_main(int argc, char **argv)
+ {
+ 	char (*get_header_ptr)(archive_handle_t *) = get_header_tar;
+diff --git a/archival/unzip.c b/archival/unzip.c
+index 21d4c25..bd113af 100644
+--- a/archival/unzip.c
++++ b/archival/unzip.c
+@@ -93,7 +93,7 @@ static int unzip_extract(zip_header_t *zip_header, int src_fd, int dst_fd)
+ 	return 0;
+ }
+ 
+-int unzip_main(int argc, char **argv);
++int unzip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int unzip_main(int argc, char **argv)
+ {
+ 	zip_header_t zip_header;
+diff --git a/console-tools/chvt.c b/console-tools/chvt.c
+index b1f81a2..8390c60 100644
+--- a/console-tools/chvt.c
++++ b/console-tools/chvt.c
+@@ -15,7 +15,7 @@ enum {
+ 	VT_WAITACTIVE = 0x5607  /* wait for vt active */
+ };
+ 
+-int chvt_main(int argc, char **argv);
++int chvt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chvt_main(int argc, char **argv)
+ {
+ 	int fd, num;
+diff --git a/console-tools/clear.c b/console-tools/clear.c
+index 3c7d704..769ce31 100644
+--- a/console-tools/clear.c
++++ b/console-tools/clear.c
+@@ -12,7 +12,7 @@
+ 
+ #include "libbb.h"
+ 
+-int clear_main(int argc, char **argv);
++int clear_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int clear_main(int argc, char **argv)
+ {
+ 	return printf("\033[H\033[J") != 6;
+diff --git a/console-tools/deallocvt.c b/console-tools/deallocvt.c
+index bf2bac1..48783fb 100644
+--- a/console-tools/deallocvt.c
++++ b/console-tools/deallocvt.c
+@@ -15,7 +15,7 @@
+ /* From <linux/vt.h> */
+ enum { VT_DISALLOCATE = 0x5608 }; /* free memory associated to vt */
+ 
+-int deallocvt_main(int argc, char **argv);
++int deallocvt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int deallocvt_main(int argc, char **argv)
+ {
+ 	/* num = 0 deallocate all unused consoles */
+diff --git a/console-tools/dumpkmap.c b/console-tools/dumpkmap.c
+index a606d56..40b58f7 100644
+--- a/console-tools/dumpkmap.c
++++ b/console-tools/dumpkmap.c
+@@ -22,7 +22,7 @@ struct kbentry {
+ #define NR_KEYS 128
+ #define MAX_NR_KEYMAPS 256
+ 
+-int dumpkmap_main(int argc, char **argv);
++int dumpkmap_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dumpkmap_main(int argc, char **argv)
+ {
+ 	struct kbentry ke;
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index 6b4dcb4..882b881 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -166,7 +166,7 @@ static void loadnewfont(int fd)
+ 	do_loadfont(fd, inbuf + offset, unit, 256);
+ }
+ 
+-int loadfont_main(int argc, char **argv);
++int loadfont_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int loadfont_main(int argc, char **argv)
+ {
+ 	int fd;
+diff --git a/console-tools/loadkmap.c b/console-tools/loadkmap.c
+index 4a726f9..40885ee 100644
+--- a/console-tools/loadkmap.c
++++ b/console-tools/loadkmap.c
+@@ -25,7 +25,7 @@ struct kbentry {
+ #define NR_KEYS         128
+ #define MAX_NR_KEYMAPS  256
+ 
+-int loadkmap_main(int argc, char **argv);
++int loadkmap_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int loadkmap_main(int argc, char **argv)
+ {
+ 	struct kbentry ke;
+diff --git a/console-tools/openvt.c b/console-tools/openvt.c
+index c050ba1..ff16953 100644
+--- a/console-tools/openvt.c
++++ b/console-tools/openvt.c
+@@ -12,7 +12,7 @@
+ 
+ #include "libbb.h"
+ 
+-int openvt_main(int argc, char **argv);
++int openvt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int openvt_main(int argc, char **argv)
+ {
+ 	char vtname[sizeof(VC_FORMAT) + 2];
+diff --git a/console-tools/reset.c b/console-tools/reset.c
+index deffe286..bb096cf 100644
+--- a/console-tools/reset.c
++++ b/console-tools/reset.c
+@@ -12,7 +12,7 @@
+ 
+ #include "libbb.h"
+ 
+-int reset_main(int argc, char **argv);
++int reset_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int reset_main(int argc, char **argv)
+ {
+ 	if (isatty(1)) {
+diff --git a/console-tools/resize.c b/console-tools/resize.c
+index 32551b2..b4cdf50 100644
+--- a/console-tools/resize.c
++++ b/console-tools/resize.c
+@@ -20,7 +20,7 @@ onintr(int sig ATTRIBUTE_UNUSED)
+ 	exit(1);
+ }
+ 
+-int resize_main(int argc, char **argv);
++int resize_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int resize_main(int argc, char **argv)
+ {
+ 	struct termios new;
+diff --git a/console-tools/setconsole.c b/console-tools/setconsole.c
+index 32218ae..0aa1d3a 100644
+--- a/console-tools/setconsole.c
++++ b/console-tools/setconsole.c
+@@ -18,7 +18,7 @@ static const char setconsole_longopts[] ALIGN1 =
+ 
+ #define OPT_SETCONS_RESET 1
+ 
+-int setconsole_main(int argc, char **argv);
++int setconsole_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int setconsole_main(int argc, char **argv)
+ {
+ 	unsigned long flags;
+diff --git a/console-tools/setkeycodes.c b/console-tools/setkeycodes.c
+index 3de5f98..ba3d2e4 100644
+--- a/console-tools/setkeycodes.c
++++ b/console-tools/setkeycodes.c
+@@ -20,8 +20,8 @@ enum {
+ 	KDSETKEYCODE = 0x4B4D  /* write kernel keycode table entry */
+ };
+ 
+-int setkeycodes_main(int argc, char** argv);
+-int setkeycodes_main(int argc, char** argv)
++int setkeycodes_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int setkeycodes_main(int argc, char **argv)
+ {
+ 	int fd, sc;
+ 	struct kbkeycode a;
+diff --git a/console-tools/setlogcons.c b/console-tools/setlogcons.c
+index 2e2a5a4..0f6491c 100644
+--- a/console-tools/setlogcons.c
++++ b/console-tools/setlogcons.c
+@@ -11,7 +11,7 @@
+ 
+ #include "libbb.h"
+ 
+-int setlogcons_main(int argc, char **argv);
++int setlogcons_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int setlogcons_main(int argc, char **argv)
+ {
+ 	struct {
+diff --git a/coreutils/basename.c b/coreutils/basename.c
+index ec1f85b..d536a1b 100644
+--- a/coreutils/basename.c
++++ b/coreutils/basename.c
+@@ -24,7 +24,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int basename_main(int argc, char **argv);
++int basename_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int basename_main(int argc, char **argv)
+ {
+ 	size_t m, n;
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index 3116e1e..8a08a9a 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -75,7 +75,7 @@ static char *build_row(char *p, unsigned *dp);
+ #define	J_WEEK_LEN	(WEEK_LEN + 7)
+ #define	HEAD_SEP	2		/* spaces between day headings */
+ 
+-int cal_main(int argc, char **argv);
++int cal_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cal_main(int argc, char **argv)
+ {
+ 	struct tm *local_time;
+diff --git a/coreutils/cat.c b/coreutils/cat.c
+index cd52778..a1db4cd 100644
+--- a/coreutils/cat.c
++++ b/coreutils/cat.c
+@@ -43,7 +43,7 @@ int bb_cat(char **argv)
+ 	return retval;
+ }
+ 
+-int cat_main(int argc, char **argv);
++int cat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cat_main(int argc, char **argv)
+ {
+ 	getopt32(argv, "u");
+diff --git a/coreutils/catv.c b/coreutils/catv.c
+index 5d5a550..5f5f1bf 100644
+--- a/coreutils/catv.c
++++ b/coreutils/catv.c
+@@ -12,7 +12,7 @@
+ 
+ #include "libbb.h"
+ 
+-int catv_main(int argc, char **argv);
++int catv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int catv_main(int argc, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+diff --git a/coreutils/chgrp.c b/coreutils/chgrp.c
+index 90a1cfe..7f39048 100644
+--- a/coreutils/chgrp.c
++++ b/coreutils/chgrp.c
+@@ -16,7 +16,7 @@
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+ 
+-int chgrp_main(int argc, char **argv);
++int chgrp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chgrp_main(int argc, char **argv)
+ {
+ 	/* "chgrp [opts] abc file(s)" == "chown [opts] :abc file(s)" */
+diff --git a/coreutils/chmod.c b/coreutils/chmod.c
+index dd7b784..a58e4f8 100644
+--- a/coreutils/chmod.c
++++ b/coreutils/chmod.c
+@@ -67,7 +67,7 @@ static int fileAction(const char *fileName, struct stat *statbuf, void* param, i
+ 	return FALSE;
+ }
+ 
+-int chmod_main(int argc, char **argv);
++int chmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chmod_main(int argc, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+diff --git a/coreutils/chown.c b/coreutils/chown.c
+index d974493..df3b77d 100644
+--- a/coreutils/chown.c
++++ b/coreutils/chown.c
+@@ -61,7 +61,7 @@ static int fileAction(const char *fileName, struct stat *statbuf,
+ 	return FALSE;
+ }
+ 
+-int chown_main(int argc, char **argv);
++int chown_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chown_main(int argc, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+diff --git a/coreutils/chroot.c b/coreutils/chroot.c
+index 192daa8..a3e70e9 100644
+--- a/coreutils/chroot.c
++++ b/coreutils/chroot.c
+@@ -11,7 +11,7 @@
+ 
+ #include "libbb.h"
+ 
+-int chroot_main(int argc, char **argv);
++int chroot_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chroot_main(int argc, char **argv)
+ {
+ 	if (argc < 2) {
+diff --git a/coreutils/cksum.c b/coreutils/cksum.c
+index 987f5f3..dd274af 100644
+--- a/coreutils/cksum.c
++++ b/coreutils/cksum.c
+@@ -8,7 +8,7 @@
+ 
+ #include "libbb.h"
+ 
+-int cksum_main(int argc, char **argv);
++int cksum_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cksum_main(int argc, char **argv)
+ {
+ 	uint32_t *crc32_table = crc32_filltable(NULL, 1);
+diff --git a/coreutils/comm.c b/coreutils/comm.c
+index a4ab148..67088e0 100644
+--- a/coreutils/comm.c
++++ b/coreutils/comm.c
+@@ -35,7 +35,7 @@ static void writeline(char *line, int class, int flags)
+ 	fputs(line, stdout);
+ }
+ 
+-int comm_main(int argc, char **argv);
++int comm_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int comm_main(int argc, char **argv)
+ {
+ #define LINE_LEN 100
+diff --git a/coreutils/cp.c b/coreutils/cp.c
+index 046067f..6cf1e21 100644
+--- a/coreutils/cp.c
++++ b/coreutils/cp.c
+@@ -21,7 +21,7 @@
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+ 
+-int cp_main(int argc, char **argv);
++int cp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cp_main(int argc, char **argv)
+ {
+ 	struct stat source_stat;
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index 1cf49c2..257f3d6 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -165,7 +165,7 @@ static void cut_file(FILE * file)
+ 
+ static const char _op_on_field[] ALIGN1 = " only when operating on fields";
+ 
+-int cut_main(int argc, char **argv);
++int cut_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cut_main(int argc, char **argv)
+ {
+ 	char *sopt, *ltok;
+diff --git a/coreutils/date.c b/coreutils/date.c
+index e33a977..a8e3393 100644
+--- a/coreutils/date.c
++++ b/coreutils/date.c
+@@ -38,7 +38,7 @@ static void maybe_set_utc(int opt)
+ 		putenv((char*)"TZ=UTC0");
+ }
+ 
+-int date_main(int argc, char **argv);
++int date_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int date_main(int argc, char **argv)
+ {
+ 	time_t tm;
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index b9f5b4c..fd4e7e8 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -73,7 +73,7 @@ static bool write_and_stats(int fd, const void *buf, size_t len, size_t obs,
+ #define XATOU_SFX xatoul_sfx
+ #endif
+ 
+-int dd_main(int argc, char **argv);
++int dd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dd_main(int argc, char **argv)
+ {
+ 	enum {
+diff --git a/coreutils/df.c b/coreutils/df.c
+index 6fe8e2f..ad6a4f3 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -29,7 +29,7 @@ static unsigned long kscale(unsigned long b, unsigned long bs)
+ }
+ #endif
+ 
+-int df_main(int argc, char **argv);
++int df_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int df_main(int argc, char **argv)
+ {
+ 	unsigned long blocks_used;
+diff --git a/coreutils/dirname.c b/coreutils/dirname.c
+index fd2c381..c0c0925 100644
+--- a/coreutils/dirname.c
++++ b/coreutils/dirname.c
+@@ -14,7 +14,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int dirname_main(int argc, char **argv);
++int dirname_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dirname_main(int argc, char **argv)
+ {
+ 	if (argc != 2) {
+diff --git a/coreutils/dos2unix.c b/coreutils/dos2unix.c
+index 2811098..295be29 100644
+--- a/coreutils/dos2unix.c
++++ b/coreutils/dos2unix.c
+@@ -78,7 +78,7 @@ static int convert(char *fn, int conv_type)
+ 	return 0;
+ }
+ 
+-int dos2unix_main(int argc, char **argv);
++int dos2unix_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dos2unix_main(int argc, char **argv)
+ {
+ 	int o, conv_type;
+diff --git a/coreutils/du.c b/coreutils/du.c
+index 2697acf..3941151 100644
+--- a/coreutils/du.c
++++ b/coreutils/du.c
+@@ -140,7 +140,7 @@ static unsigned long du(const char *filename)
+ 	return sum;
+ }
+ 
+-int du_main(int argc, char **argv);
++int du_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int du_main(int argc, char **argv)
+ {
+ 	unsigned long total;
+diff --git a/coreutils/echo.c b/coreutils/echo.c
+index 851d2ef..860853f 100644
+--- a/coreutils/echo.c
++++ b/coreutils/echo.c
+@@ -119,8 +119,8 @@ int bb_echo(char **argv)
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int echo_main(int argc, char** argv);
+-int echo_main(int argc, char** argv)
++int echo_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int echo_main(int argc, char **argv)
+ {
+ 	return bb_echo(argv);
+ }
+diff --git a/coreutils/env.c b/coreutils/env.c
+index 5d0cd82..b45cbcc 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -41,8 +41,8 @@ static const char env_longopts[] ALIGN1 =
+ 	;
+ #endif
+ 
+-int env_main(int argc, char** argv);
+-int env_main(int argc, char** argv)
++int env_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int env_main(int argc, char **argv)
+ {
+ 	/* cleanenv was static - why? */
+ 	char *cleanenv[1];
+diff --git a/coreutils/expand.c b/coreutils/expand.c
+index 0ef106d..96a74a3 100644
+--- a/coreutils/expand.c
++++ b/coreutils/expand.c
+@@ -125,7 +125,7 @@ static void unexpand(FILE *file, unsigned int tab_size, unsigned opt)
+ }
+ #endif
+ 
+-int expand_main(int argc, char **argv);
++int expand_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int expand_main(int argc, char **argv)
+ {
+ 	/* Default 8 spaces for 1 tab */
+diff --git a/coreutils/expr.c b/coreutils/expr.c
+index c2d9669..959f520 100644
+--- a/coreutils/expr.c
++++ b/coreutils/expr.c
+@@ -483,7 +483,7 @@ static VALUE *eval(void)
+ 	return l;
+ }
+ 
+-int expr_main(int argc, char **argv);
++int expr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int expr_main(int argc, char **argv)
+ {
+ 	VALUE *v;
+diff --git a/coreutils/false.c b/coreutils/false.c
+index 07cf9e8..5beb58a 100644
+--- a/coreutils/false.c
++++ b/coreutils/false.c
+@@ -14,7 +14,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int false_main(int ATTRIBUTE_UNUSED argc, char ATTRIBUTE_UNUSED **argv);
++int false_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int false_main(int ATTRIBUTE_UNUSED argc, char ATTRIBUTE_UNUSED **argv)
+ {
+ 	return EXIT_FAILURE;
+diff --git a/coreutils/fold.c b/coreutils/fold.c
+index bf4b198..ed484ed 100644
+--- a/coreutils/fold.c
++++ b/coreutils/fold.c
+@@ -38,7 +38,7 @@ static int adjust_column(int column, char c)
+ 	return column;
+ }
+ 
+-int fold_main(int argc, char **argv);
++int fold_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int fold_main(int argc, char **argv)
+ {
+ 	char *line_out = NULL;
+diff --git a/coreutils/head.c b/coreutils/head.c
+index af9e9f4..6293077 100644
+--- a/coreutils/head.c
++++ b/coreutils/head.c
+@@ -31,7 +31,7 @@ static const struct suffix_mult head_suffixes[] = {
+ 
+ static const char header_fmt_str[] ALIGN1 = "\n==> %s <==\n";
+ 
+-int head_main(int argc, char **argv);
++int head_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int head_main(int argc, char **argv)
+ {
+ 	unsigned long count = 10;
+diff --git a/coreutils/hostid.c b/coreutils/hostid.c
+index 7d96651..433eccc 100644
+--- a/coreutils/hostid.c
++++ b/coreutils/hostid.c
+@@ -13,7 +13,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int hostid_main(int argc, char ATTRIBUTE_UNUSED **argv);
++int hostid_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int hostid_main(int argc, char ATTRIBUTE_UNUSED **argv)
+ {
+ 	if (argc > 1) {
+diff --git a/coreutils/id.c b/coreutils/id.c
+index f72a027..7dba802 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -36,7 +36,7 @@ static int printf_full(unsigned int id, const char *arg, const char prefix)
+ 	return status;
+ }
+ 
+-int id_main(int argc, char **argv);
++int id_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int id_main(int argc, char **argv)
+ {
+ 	struct passwd *p;
+diff --git a/coreutils/install.c b/coreutils/install.c
+index 5162084..4adcadb 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -66,7 +66,7 @@ static void setdefaultfilecon(const char *path)
+ 
+ #endif
+ 
+-int install_main(int argc, char **argv);
++int install_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int install_main(int argc, char **argv)
+ {
+ 	struct stat statbuf;
+diff --git a/coreutils/length.c b/coreutils/length.c
+index a310b3b..c7523a0 100644
+--- a/coreutils/length.c
++++ b/coreutils/length.c
+@@ -6,7 +6,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int length_main(int argc, char **argv);
++int length_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int length_main(int argc, char **argv)
+ {
+ 	if ((argc != 2) || (**(++argv) == '-')) {
+diff --git a/coreutils/ln.c b/coreutils/ln.c
+index 658e32e..eb71719 100644
+--- a/coreutils/ln.c
++++ b/coreutils/ln.c
+@@ -22,7 +22,7 @@
+ #define LN_BACKUP           8
+ #define LN_SUFFIX           16
+ 
+-int ln_main(int argc, char **argv);
++int ln_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ln_main(int argc, char **argv)
+ {
+ 	int status = EXIT_SUCCESS;
+diff --git a/coreutils/logname.c b/coreutils/logname.c
+index 2e628bc..09fd396 100644
+--- a/coreutils/logname.c
++++ b/coreutils/logname.c
+@@ -24,7 +24,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int logname_main(int argc, char ATTRIBUTE_UNUSED **argv);
++int logname_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int logname_main(int argc, char ATTRIBUTE_UNUSED **argv)
+ {
+ 	char buf[128];
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 92a9a28..dbf1c5b 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -783,7 +783,7 @@ static const unsigned opt_flags[] = {
+ /* THIS IS A "SAFE" APPLET, main() MAY BE CALLED INTERNALLY FROM SHELL */
+ /* BE CAREFUL! */
+ 
+-int ls_main(int argc, char **argv);
++int ls_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ls_main(int argc, char **argv)
+ {
+ 	struct dnode **dnd;
+diff --git a/coreutils/md5_sha1_sum.c b/coreutils/md5_sha1_sum.c
+index 7f8b084..e94f2ce 100644
+--- a/coreutils/md5_sha1_sum.c
++++ b/coreutils/md5_sha1_sum.c
+@@ -77,7 +77,7 @@ static uint8_t *hash_file(const char *filename, hash_algo_t hash_algo)
+ 	return hash_value;
+ }
+ 
+-int md5_sha1_sum_main(int argc, char **argv);
++int md5_sha1_sum_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int md5_sha1_sum_main(int argc, char **argv)
+ {
+ 	int return_value = EXIT_SUCCESS;
+diff --git a/coreutils/mkdir.c b/coreutils/mkdir.c
+index d1a4380..6bdf76d 100644
+--- a/coreutils/mkdir.c
++++ b/coreutils/mkdir.c
+@@ -34,7 +34,7 @@ static const char mkdir_longopts[] ALIGN1 =
+ 	;
+ #endif
+ 
+-int mkdir_main(int argc, char **argv);
++int mkdir_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mkdir_main(int argc, char **argv)
+ {
+ 	mode_t mode = (mode_t)(-1);
+diff --git a/coreutils/mkfifo.c b/coreutils/mkfifo.c
+index e66f817..d298ada 100644
+--- a/coreutils/mkfifo.c
++++ b/coreutils/mkfifo.c
+@@ -13,7 +13,7 @@
+ #include "libbb.h"
+ #include "libcoreutils/coreutils.h"
+ 
+-int mkfifo_main(int argc, char **argv);
++int mkfifo_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mkfifo_main(int argc, char **argv)
+ {
+ 	mode_t mode;
+diff --git a/coreutils/mknod.c b/coreutils/mknod.c
+index a876daa..ee539e3 100644
+--- a/coreutils/mknod.c
++++ b/coreutils/mknod.c
+@@ -17,7 +17,7 @@
+ static const char modes_chars[] ALIGN1 = { 'p', 'c', 'u', 'b', 0, 1, 1, 2 };
+ static const mode_t modes_cubp[] = { S_IFIFO, S_IFCHR, S_IFBLK };
+ 
+-int mknod_main(int argc, char **argv);
++int mknod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mknod_main(int argc, char **argv)
+ {
+ 	mode_t mode;
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index d13f4d5..5d0b515 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -33,7 +33,7 @@ static const char mv_longopts[] ALIGN1 =
+ static const char fmt[] ALIGN1 =
+ 	"cannot overwrite %sdirectory with %sdirectory";
+ 
+-int mv_main(int argc, char **argv);
++int mv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mv_main(int argc, char **argv)
+ {
+ 	struct stat dest_stat;
+diff --git a/coreutils/nice.c b/coreutils/nice.c
+index 0cb31e4..d24a95b 100644
+--- a/coreutils/nice.c
++++ b/coreutils/nice.c
+@@ -10,7 +10,7 @@
+ #include <sys/resource.h>
+ #include "libbb.h"
+ 
+-int nice_main(int argc, char **argv);
++int nice_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int nice_main(int argc, char **argv)
+ {
+ 	int old_priority, adjustment;
+diff --git a/coreutils/nohup.c b/coreutils/nohup.c
+index e27bd2e..da8f58c 100644
+--- a/coreutils/nohup.c
++++ b/coreutils/nohup.c
+@@ -12,7 +12,7 @@
+ 
+ #include "libbb.h"
+ 
+-int nohup_main(int argc, char **argv);
++int nohup_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int nohup_main(int argc, char **argv)
+ {
+ 	int nullfd;
+diff --git a/coreutils/od.c b/coreutils/od.c
+index 114a746..85e979f 100644
+--- a/coreutils/od.c
++++ b/coreutils/od.c
+@@ -156,7 +156,7 @@ static const char od_o2si[] ALIGN1 = {
+ 	0xb, 1, 8, 9,
+ };
+ 
+-int od_main(int argc, char **argv);
++int od_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int od_main(int argc, char **argv)
+ {
+ 	int ch;
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 1bd1b0c..9655c23 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -1196,7 +1196,7 @@ dump_strings(void)
+ 	check_and_close();
+ }
+ 
+-int od_main(int argc, char **argv);
++int od_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int od_main(int argc, char **argv)
+ {
+ 	static const struct suffix_mult bkm[] = {
+diff --git a/coreutils/printenv.c b/coreutils/printenv.c
+index 19fa832..bac77e2 100644
+--- a/coreutils/printenv.c
++++ b/coreutils/printenv.c
+@@ -11,7 +11,7 @@
+ #include "libbb.h"
+ extern char **environ;
+ 
+-int printenv_main(int argc, char **argv);
++int printenv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int printenv_main(int argc, char **argv)
+ {
+ 	/* no variables specified, show whole env */
+diff --git a/coreutils/printf.c b/coreutils/printf.c
+index d5ef32e..a9ef61f 100644
+--- a/coreutils/printf.c
++++ b/coreutils/printf.c
+@@ -285,7 +285,7 @@ static int print_formatted(char *format, int argc, char **argv)
+ 	return save_argc - argc;
+ }
+ 
+-int printf_main(int argc, char **argv);
++int printf_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int printf_main(int argc, char **argv)
+ {
+ 	char *format;
+diff --git a/coreutils/pwd.c b/coreutils/pwd.c
+index 73a9d5b..ac604db 100644
+--- a/coreutils/pwd.c
++++ b/coreutils/pwd.c
+@@ -11,7 +11,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int pwd_main(int argc, char **argv);
++int pwd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int pwd_main(int argc, char **argv)
+ {
+ 	char *buf;
+diff --git a/coreutils/readlink.c b/coreutils/readlink.c
+index 39edc05..b6e389a 100644
+--- a/coreutils/readlink.c
++++ b/coreutils/readlink.c
+@@ -11,7 +11,7 @@
+ 
+ #include "libbb.h"
+ 
+-int readlink_main(int argc, char **argv);
++int readlink_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int readlink_main(int argc, char **argv)
+ {
+ 	char *buf;
+diff --git a/coreutils/realpath.c b/coreutils/realpath.c
+index 9c42987..bcb73a8 100644
+--- a/coreutils/realpath.c
++++ b/coreutils/realpath.c
+@@ -12,7 +12,7 @@
+ 
+ #include "libbb.h"
+ 
+-int realpath_main(int argc, char **argv);
++int realpath_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int realpath_main(int argc, char **argv)
+ {
+ 	int retval = EXIT_SUCCESS;
+diff --git a/coreutils/rm.c b/coreutils/rm.c
+index a686fc4..a123156 100644
+--- a/coreutils/rm.c
++++ b/coreutils/rm.c
+@@ -19,7 +19,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int rm_main(int argc, char **argv);
++int rm_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int rm_main(int argc, char **argv)
+ {
+ 	int status = 0;
+diff --git a/coreutils/rmdir.c b/coreutils/rmdir.c
+index 315401e..71d29dd 100644
+--- a/coreutils/rmdir.c
++++ b/coreutils/rmdir.c
+@@ -16,7 +16,7 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ 
+-int rmdir_main(int argc, char **argv);
++int rmdir_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int rmdir_main(int argc, char **argv)
+ {
+ 	int status = EXIT_SUCCESS;
+diff --git a/coreutils/seq.c b/coreutils/seq.c
+index 050c333..01d71f2 100644
+--- a/coreutils/seq.c
++++ b/coreutils/seq.c
+@@ -12,7 +12,7 @@
+ /* This is a NOFORK applet. Be very careful! */
+ 
+ 
+-int seq_main(int argc, char **argv);
++int seq_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int seq_main(int argc, char **argv)
+ {
+ 	double last, increment, i;
+diff --git a/coreutils/sleep.c b/coreutils/sleep.c
+index 26cdbc4..6890e35 100644
+--- a/coreutils/sleep.c
++++ b/coreutils/sleep.c
+@@ -33,7 +33,7 @@ static const struct suffix_mult sfx[] = {
+ };
+ #endif
+ 
+-int sleep_main(int argc, char **argv);
++int sleep_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int sleep_main(int argc, char **argv)
+ {
+ 	unsigned duration;
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index 311c774..3132346 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -274,7 +274,7 @@ static unsigned str2u(char **str)
+ }
+ #endif
+ 
+-int sort_main(int argc, char **argv);
++int sort_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int sort_main(int argc, char **argv)
+ {
+ 	FILE *fp, *outfile = stdout;
+diff --git a/coreutils/split.c b/coreutils/split.c
+index 6d8924a..51a631c 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -55,7 +55,7 @@ enum { READ_BUFFER_SIZE = COMMON_BUFSIZE - 1 };
+ #define SPLIT_OPT_b (1<<1)
+ #define SPLIT_OPT_a (1<<2)
+ 
+-int split_main(int argc, char **argv);
++int split_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int split_main(int argc, char **argv)
+ {
+ 	unsigned suffix_len = 2;
+diff --git a/coreutils/stat.c b/coreutils/stat.c
+index ed6580e..a5a3054 100644
+--- a/coreutils/stat.c
++++ b/coreutils/stat.c
+@@ -609,7 +609,7 @@ static bool do_stat(const char *filename, const char *format)
+ 	return 1;
+ }
+ 
+-int stat_main(int argc, char **argv);
++int stat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int stat_main(int argc, char **argv)
+ {
+ 	char *format = NULL;
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index 1f0d422..8ad12e6 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -911,7 +911,7 @@ static void set_control_char_or_die(const struct control_info *info,
+ #define STTY_verbose_output     (1<<2)
+ #define STTY_recoverable_output (1<<3)
+ #define STTY_noargs             (1<<4)
+-int stty_main(int argc, char **argv);
++int stty_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int stty_main(int argc, char **argv)
+ {
+ 	struct termios mode;
+diff --git a/coreutils/sum.c b/coreutils/sum.c
+index a75dd32..65478b0 100644
+--- a/coreutils/sum.c
++++ b/coreutils/sum.c
+@@ -74,7 +74,7 @@ static unsigned sum_file(const char *file, const unsigned type)
+ #undef buf
+ }
+ 
+-int sum_main(int argc, char **argv);
++int sum_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int sum_main(int argc, char **argv)
+ {
+ 	unsigned n;
+diff --git a/coreutils/sync.c b/coreutils/sync.c
+index d562f3f..9dbdd98 100644
+--- a/coreutils/sync.c
++++ b/coreutils/sync.c
+@@ -13,7 +13,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int sync_main(int argc, char **argv);
++int sync_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int sync_main(int argc, char **argv)
+ {
+ 	bb_warn_ignoring_args(argc - 1);
+diff --git a/coreutils/tail.c b/coreutils/tail.c
+index 53dbf33..beecbae 100644
+--- a/coreutils/tail.c
++++ b/coreutils/tail.c
+@@ -79,7 +79,7 @@ static unsigned eat_num(const char *p)
+ 	return xatou_sfx(p, tail_suffixes);
+ }
+ 
+-int tail_main(int argc, char **argv);
++int tail_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tail_main(int argc, char **argv)
+ {
+ 	unsigned count = 10;
+diff --git a/coreutils/tee.c b/coreutils/tee.c
+index 8313258..13fb4a3 100644
+--- a/coreutils/tee.c
++++ b/coreutils/tee.c
+@@ -13,7 +13,7 @@
+ #include "libbb.h"
+ #include <signal.h>
+ 
+-int tee_main(int argc, char **argv);
++int tee_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tee_main(int argc, char **argv)
+ {
+ 	const char *mode = "w\0a";
+diff --git a/coreutils/touch.c b/coreutils/touch.c
+index d8498d8..1b83dc4 100644
+--- a/coreutils/touch.c
++++ b/coreutils/touch.c
+@@ -21,7 +21,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int touch_main(int argc, char **argv);
++int touch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int touch_main(int argc, char **argv)
+ {
+ 	int fd;
+diff --git a/coreutils/tr.c b/coreutils/tr.c
+index 6a34e30..9521bbc 100644
+--- a/coreutils/tr.c
++++ b/coreutils/tr.c
+@@ -165,7 +165,7 @@ static int complement(char *buffer, int buffer_len)
+ 	return ix;
+ }
+ 
+-int tr_main(int argc, char **argv);
++int tr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tr_main(int argc, char **argv)
+ {
+ 	unsigned char *ptr;
+diff --git a/coreutils/true.c b/coreutils/true.c
+index 9dcd69a..2b59193 100644
+--- a/coreutils/true.c
++++ b/coreutils/true.c
+@@ -14,7 +14,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int true_main(int argc, char **argv);
++int true_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int true_main(int argc, char **argv)
+ {
+ 	return EXIT_SUCCESS;
+diff --git a/coreutils/tty.c b/coreutils/tty.c
+index d8ce78c..b0a50ff 100644
+--- a/coreutils/tty.c
++++ b/coreutils/tty.c
+@@ -12,7 +12,7 @@
+ 
+ #include "libbb.h"
+ 
+-int tty_main(int argc, char **argv);
++int tty_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tty_main(int argc, char **argv)
+ {
+ 	const char *s;
+diff --git a/coreutils/uname.c b/coreutils/uname.c
+index e70b1f9..2eecb5d 100644
+--- a/coreutils/uname.c
++++ b/coreutils/uname.c
+@@ -48,7 +48,7 @@ static const unsigned short utsname_offset[] ALIGN2 = {
+ 	offsetof(uname_info_t,processor)
+ };
+ 
+-int uname_main(int argc, char **argv);
++int uname_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int uname_main(int argc, char **argv)
+ {
+ 	uname_info_t uname_info;
+diff --git a/coreutils/uniq.c b/coreutils/uniq.c
+index 719bbb5..cda1e61 100644
+--- a/coreutils/uniq.c
++++ b/coreutils/uniq.c
+@@ -27,7 +27,7 @@ static FILE *xgetoptfile_uniq_s(char **argv, int read0write2)
+ 	return (read0write2) ? stdout : stdin;
+ }
+ 
+-int uniq_main(int argc, char **argv);
++int uniq_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int uniq_main(int argc, char **argv)
+ {
+ 	FILE *in, *out;
+diff --git a/coreutils/usleep.c b/coreutils/usleep.c
+index e0cd56e..1c90223 100644
+--- a/coreutils/usleep.c
++++ b/coreutils/usleep.c
+@@ -13,7 +13,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int usleep_main(int argc, char **argv);
++int usleep_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int usleep_main(int argc, char **argv)
+ {
+ 	if (argc != 2) {
+diff --git a/coreutils/uudecode.c b/coreutils/uudecode.c
+index 7a52bdb..4683662 100644
+--- a/coreutils/uudecode.c
++++ b/coreutils/uudecode.c
+@@ -126,7 +126,7 @@ static void read_base64(FILE *src_stream, FILE *dst_stream)
+ 	}
+ }
+ 
+-int uudecode_main(int argc, char **argv);
++int uudecode_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int uudecode_main(int argc, char **argv)
+ {
+ 	FILE *src_stream = stdin;
+diff --git a/coreutils/uuencode.c b/coreutils/uuencode.c
+index 17def8d..e19f996 100644
+--- a/coreutils/uuencode.c
++++ b/coreutils/uuencode.c
+@@ -15,7 +15,7 @@ enum {
+ 	DST_BUF_SIZE = 4 * ((SRC_BUF_SIZE + 2) / 3),
+ };
+ 
+-int uuencode_main(int argc, char **argv);
++int uuencode_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int uuencode_main(int argc, char **argv)
+ {
+ 	struct stat stat_buf;
+diff --git a/coreutils/wc.c b/coreutils/wc.c
+index c8a4865..291af41 100644
+--- a/coreutils/wc.c
++++ b/coreutils/wc.c
+@@ -68,7 +68,7 @@ enum {
+ 	WC_LENGTH	= 3
+ };
+ 
+-int wc_main(int argc, char **argv);
++int wc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int wc_main(int argc, char **argv)
+ {
+ 	FILE *fp;
+diff --git a/coreutils/who.c b/coreutils/who.c
+index 546050a..6e7710c 100644
+--- a/coreutils/who.c
++++ b/coreutils/who.c
+@@ -39,7 +39,7 @@ static void idle_string(char *str6, time_t t)
+ 	strcpy(str6, "old");
+ }
+ 
+-int who_main(int argc, char **argv);
++int who_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int who_main(int argc, char **argv)
+ {
+ 	char str6[6];
+diff --git a/coreutils/whoami.c b/coreutils/whoami.c
+index 3718358..e2fdfc9 100644
+--- a/coreutils/whoami.c
++++ b/coreutils/whoami.c
+@@ -13,7 +13,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int whoami_main(int argc, char **argv);
++int whoami_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int whoami_main(int argc, char **argv)
+ {
+ 	if (argc > 1)
+diff --git a/coreutils/yes.c b/coreutils/yes.c
+index 5529eab..269d2a0 100644
+--- a/coreutils/yes.c
++++ b/coreutils/yes.c
+@@ -18,7 +18,7 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-int yes_main(int argc, char **argv);
++int yes_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int yes_main(int argc, char **argv)
+ {
+ 	char **first_arg;
+diff --git a/debianutils/mktemp.c b/debianutils/mktemp.c
+index 1c71c2e..5772ad9 100644
+--- a/debianutils/mktemp.c
++++ b/debianutils/mktemp.c
+@@ -11,7 +11,7 @@
+ 
+ #include "libbb.h"
+ 
+-int mktemp_main(int argc, char **argv);
++int mktemp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mktemp_main(int argc, char **argv)
+ {
+ 	unsigned long flags = getopt32(argv, "dqt");
+diff --git a/debianutils/pipe_progress.c b/debianutils/pipe_progress.c
+index ac8fb50..4bfdf6a 100644
+--- a/debianutils/pipe_progress.c
++++ b/debianutils/pipe_progress.c
+@@ -14,7 +14,7 @@
+ /* Read a block of data from stdin, write it to stdout.
+  * Activity is indicated by a '.' to stderr
+  */
+-int pipe_progress_main(int argc, char **argv);
++int pipe_progress_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int pipe_progress_main(int argc, char **argv)
+ {
+ 	RESERVE_CONFIG_BUFFER(buf, PIPE_PROGRESS_SIZE);
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index 56f70c6..338817f 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -110,7 +110,7 @@ static const char runparts_longopts[] ALIGN1 =
+ 	;
+ #endif
+ 
+-int run_parts_main(int argc, char **argv);
++int run_parts_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int run_parts_main(int argc, char **argv)
+ {
+ 	const char *umask_p = "22";
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 7633cb0..6860bab 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -234,7 +234,7 @@ enum {
+ 	OPT_NICELEVEL  = 0x4000 * ENABLE_FEATURE_START_STOP_DAEMON_FANCY, // -N
+ };
+ 
+-int start_stop_daemon_main(int argc, char **argv);
++int start_stop_daemon_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int start_stop_daemon_main(int argc, char **argv)
+ {
+ 	unsigned opt;
+diff --git a/debianutils/which.c b/debianutils/which.c
+index b556a9f..8838130 100644
+--- a/debianutils/which.c
++++ b/debianutils/which.c
+@@ -12,7 +12,7 @@
+ 
+ #include "libbb.h"
+ 
+-int which_main(int argc, char **argv);
++int which_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int which_main(int argc, char **argv)
+ {
+ 	int status = EXIT_SUCCESS;
+diff --git a/docs/new-applet-HOWTO.txt b/docs/new-applet-HOWTO.txt
+index 05ff92f..37a78e9 100644
+--- a/docs/new-applet-HOWTO.txt
++++ b/docs/new-applet-HOWTO.txt
+@@ -42,7 +42,7 @@ For a new applet mu, here is the code that would go in mu.c:
+ #include "libbb.h"
+ #include "other.h"
+ 
+-int mu_main(int argc, char **argv);
++int mu_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mu_main(int argc, char **argv)
+ {
+ 	int fd;
+diff --git a/e2fsprogs/chattr.c b/e2fsprogs/chattr.c
+index 35424f8..db54372 100644
+--- a/e2fsprogs/chattr.c
++++ b/e2fsprogs/chattr.c
+@@ -142,7 +142,7 @@ static void change_attributes(const char *name, struct globals *gp)
+ 		iterate_on_dir(name, chattr_dir_proc, gp);
+ }
+ 
+-int chattr_main(int argc, char **argv);
++int chattr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chattr_main(int argc, char **argv)
+ {
+ 	struct globals g;
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 110b3d2..f80de81 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -1153,7 +1153,7 @@ static void signal_cancel(int sig ATTRIBUTE_UNUSED)
+ 	cancel_requested = 1;
+ }
+ 
+-int fsck_main(int argc, char **argv);
++int fsck_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int fsck_main(int argc, char **argv)
+ {
+ 	int i, status = 0;
+diff --git a/e2fsprogs/lsattr.c b/e2fsprogs/lsattr.c
+index 5f4f872..6f4b974 100644
+--- a/e2fsprogs/lsattr.c
++++ b/e2fsprogs/lsattr.c
+@@ -95,7 +95,7 @@ static void lsattr_args(const char *name)
+ 	}
+ }
+ 
+-int lsattr_main(int argc, char **argv);
++int lsattr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int lsattr_main(int argc, char **argv)
+ {
+ 	getopt32(argv, "Radlv");
+diff --git a/e2fsprogs/old_e2fsprogs/chattr.c b/e2fsprogs/old_e2fsprogs/chattr.c
+index b933938..ae39d92 100644
+--- a/e2fsprogs/old_e2fsprogs/chattr.c
++++ b/e2fsprogs/old_e2fsprogs/chattr.c
+@@ -170,7 +170,7 @@ static int chattr_dir_proc(const char *dir_name, struct dirent *de,
+ 	return 0;
+ }
+ 
+-int chattr_main(int argc, char **argv);
++int chattr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chattr_main(int argc, char **argv)
+ {
+ 	int i;
+diff --git a/e2fsprogs/old_e2fsprogs/fsck.c b/e2fsprogs/old_e2fsprogs/fsck.c
+index 7e73838..d4914a5 100644
+--- a/e2fsprogs/old_e2fsprogs/fsck.c
++++ b/e2fsprogs/old_e2fsprogs/fsck.c
+@@ -1321,7 +1321,7 @@ static void PRS(int argc, char **argv)
+ 	    max_running = atoi(tmp);
+ }
+ 
+-int fsck_main(int argc, char **argv);
++int fsck_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int fsck_main(int argc, char **argv)
+ {
+ 	int i, status = 0;
+diff --git a/e2fsprogs/old_e2fsprogs/lsattr.c b/e2fsprogs/old_e2fsprogs/lsattr.c
+index bbc03aa..277ec7c 100644
+--- a/e2fsprogs/old_e2fsprogs/lsattr.c
++++ b/e2fsprogs/old_e2fsprogs/lsattr.c
+@@ -112,7 +112,7 @@ static int lsattr_dir_proc(const char *dir_name, struct dirent *de,
+ 	return 0;
+ }
+ 
+-int lsattr_main(int argc, char **argv);
++int lsattr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int lsattr_main(int argc, char **argv)
+ {
+ 	int i;
+diff --git a/e2fsprogs/old_e2fsprogs/tune2fs.c b/e2fsprogs/old_e2fsprogs/tune2fs.c
+index 920a50c..c5c84d6 100644
+--- a/e2fsprogs/old_e2fsprogs/tune2fs.c
++++ b/e2fsprogs/old_e2fsprogs/tune2fs.c
+@@ -577,7 +577,7 @@ static void tune2fs_clean_up(void)
+ 	if (ENABLE_FEATURE_CLEAN_UP && journal_device) free(journal_device);
+ }
+ 
+-int tune2fs_main(int argc, char **argv);
++int tune2fs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tune2fs_main(int argc, char **argv)
+ {
+ 	errcode_t retval;
+diff --git a/editors/awk.c b/editors/awk.c
+index a820c7a..da3401b 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -2752,7 +2752,7 @@ static rstream *next_input_file(void)
+ #undef files_happen
+ }
+ 
+-int awk_main(int argc, char **argv);
++int awk_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int awk_main(int argc, char **argv)
+ {
+ 	unsigned opt;
+diff --git a/editors/cmp.c b/editors/cmp.c
+index 34a0de5..6dfe040 100644
+--- a/editors/cmp.c
++++ b/editors/cmp.c
+@@ -42,7 +42,7 @@ static const char opt_chars[] ALIGN1 = "sl";
+ #define CMP_OPT_s (1<<0)
+ #define CMP_OPT_l (1<<1)
+ 
+-int cmp_main(int argc, char **argv);
++int cmp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cmp_main(int argc, char **argv)
+ {
+ 	FILE *fp1, *fp2, *outfile = stdout;
+diff --git a/editors/diff.c b/editors/diff.c
+index 3a694e0..c158c87 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -1207,7 +1207,7 @@ static void diffdir(char *p1, char *p2)
+ #endif
+ 
+ 
+-int diff_main(int argc, char **argv);
++int diff_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int diff_main(int argc, char **argv)
+ {
+ 	bool gotstdin = 0;
+diff --git a/editors/ed.c b/editors/ed.c
+index 31185d9..cceff0c 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -88,7 +88,7 @@ static char *skip_blank(const char *cp)
+ }
+ 
+ 
+-int ed_main(int argc, char **argv);
++int ed_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ed_main(int argc, char **argv)
+ {
+ 	INIT_G();
+diff --git a/editors/patch.c b/editors/patch.c
+index 65791df..07fa5cf 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -77,7 +77,7 @@ static int file_doesnt_exist(const char *filename)
+ 	return stat(filename, &statbuf);
+ }
+ 
+-int patch_main(int argc, char **argv);
++int patch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int patch_main(int argc, char **argv)
+ {
+ 	int patch_level = -1;
+diff --git a/editors/sed.c b/editors/sed.c
+index dcdf382..f75fcee 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1223,7 +1223,7 @@ static void add_cmd_block(char *cmdstr)
+ 	free(sv);
+ }
+ 
+-int sed_main(int argc, char **argv);
++int sed_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int sed_main(int argc, char **argv)
+ {
+ 	enum {
+diff --git a/editors/vi.c b/editors/vi.c
+index 25c8234..249bf29 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -311,7 +311,7 @@ static void write1(const char *out)
+ 	fputs(out, stdout);
+ }
+ 
+-int vi_main(int argc, char **argv);
++int vi_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int vi_main(int argc, char **argv)
+ {
+ 	int c;
+diff --git a/findutils/find.c b/findutils/find.c
+index b618814..9efe2db 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -794,7 +794,7 @@ static action*** parse_params(char **argv)
+ }
+ 
+ 
+-int find_main(int argc, char **argv);
++int find_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int find_main(int argc, char **argv)
+ {
+ 	static const char options[] ALIGN1 =
+diff --git a/findutils/grep.c b/findutils/grep.c
+index 2d886a0..fc40be2 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -393,7 +393,7 @@ static int grep_dir(const char *dir)
+ 	return matched;
+ }
+ 
+-int grep_main(int argc, char **argv);
++int grep_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int grep_main(int argc, char **argv)
+ {
+ 	FILE *file;
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index f7c7832..ee16ea6 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -373,7 +373,7 @@ enum {
+ 	USE_FEATURE_XARGS_SUPPORT_TERMOPT(     "x") \
+ 	USE_FEATURE_XARGS_SUPPORT_ZERO_TERM(   "0")
+ 
+-int xargs_main(int argc, char **argv);
++int xargs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int xargs_main(int argc, char **argv)
+ {
+ 	char **args;
+diff --git a/include/applets.h b/include/applets.h
+index ac3f65f..ceab003 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -24,11 +24,11 @@ s     - suid type:
+ */
+ 
+ #if defined(PROTOTYPES)
+-# define APPLET(name,l,s)                    int name##_main(int argc, char **argv);
+-# define APPLET_NOUSAGE(name,main,l,s)       int main##_main(int argc, char **argv);
+-# define APPLET_ODDNAME(name,main,l,s,name2) int main##_main(int argc, char **argv);
+-# define APPLET_NOEXEC(name,main,l,s,name2)  int main##_main(int argc, char **argv);
+-# define APPLET_NOFORK(name,main,l,s,name2)  int main##_main(int argc, char **argv);
++# define APPLET(name,l,s)                    int name##_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++# define APPLET_NOUSAGE(name,main,l,s)       int main##_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++# define APPLET_ODDNAME(name,main,l,s,name2) int main##_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++# define APPLET_NOEXEC(name,main,l,s,name2)  int main##_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++# define APPLET_NOFORK(name,main,l,s,name2)  int main##_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ 
+ #elif defined(NAME_MAIN_CNAME)
+ # define APPLET(name,l,s)                    name name##_main name
+diff --git a/include/busybox.h b/include/busybox.h
+index 1c23b9b..5c01eca 100644
+--- a/include/busybox.h
++++ b/include/busybox.h
+@@ -48,12 +48,22 @@ struct bb_applet {
+ #endif
+ };
+ 
++
+ /* Defined in appletlib.c */
+ extern const struct bb_applet applets[];
+ extern const unsigned short NUM_APPLETS;
+-void bbox_prepare_main(char **argv);
++
++/* Length of these names has effect on size of libbusybox
++ * and "individual" binaries. Keep them short.
++ */
++void lbb_prepare(char **argv) MAIN_EXTERNALLY_VISIBLE;
+ #if ENABLE_BUILD_LIBBUSYBOX
+-int libbusybox_main(int argc, char **argv);
++#if ENABLE_FEATURE_SHARED_BUSYBOX
++int lbb_main(int argc, char **argv) EXTERNALLY_VISIBLE;
++#else
++int lbb_main(int argc, char **argv);
+ #endif
++#endif
++
+ 
+ #endif	/* _BB_INTERNAL_H_ */
+diff --git a/include/libbb.h b/include/libbb.h
+index 9d8b5f3..be548a3 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -673,7 +673,7 @@ extern int die_sleep;
+ extern int xfunc_error_retval;
+ extern jmp_buf die_jmp;
+ extern void xfunc_die(void) ATTRIBUTE_NORETURN;
+-extern void bb_show_usage(void) ATTRIBUTE_NORETURN ATTRIBUTE_EXTERNALLY_VISIBLE;
++extern void bb_show_usage(void) ATTRIBUTE_NORETURN;
+ extern void bb_error_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2)));
+ extern void bb_error_msg_and_die(const char *s, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
+ extern void bb_perror_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2)));
+@@ -687,18 +687,27 @@ extern void bb_perror_nomsg(void);
+ extern void bb_info_msg(const char *s, ...) __attribute__ ((format (printf, 1, 2)));
+ extern void bb_verror_msg(const char *s, va_list p, const char *strerr);
+ 
++/* We need to export XXX_main from libbusybox
++ * only if we build "individual" binaries
++ */
++#if ENABLE_FEATURE_INDIVIDUAL
++#define MAIN_EXTERNALLY_VISIBLE EXTERNALLY_VISIBLE
++#else
++#define MAIN_EXTERNALLY_VISIBLE
++#endif
++
+ 
+ /* applets which are useful from another applets */
+ int bb_cat(char** argv);
+ int bb_echo(char** argv);
+-int test_main(int argc, char** argv);
+-int kill_main(int argc, char **argv);
++int test_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int kill_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ #if ENABLE_ROUTE
+ void bb_displayroutes(int noresolve, int netstatfmt);
+ #endif
+-int chown_main(int argc, char **argv);
++int chown_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ #if ENABLE_GUNZIP
+-int gunzip_main(int argc, char **argv);
++int gunzip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ #endif
+ int bbunpack(char **argv,
+ 	char* (*make_new_name)(char *filename),
+diff --git a/include/platform.h b/include/platform.h
+index 3980945..53d7282 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -71,9 +71,10 @@
+ /* -fwhole-program makes all symbols local. The attribute externally_visible
+    forces a symbol global.  */
+ # if __GNUC_PREREQ (4,1)
+-#  define ATTRIBUTE_EXTERNALLY_VISIBLE __attribute__ ((__externally_visible__))
++#  define EXTERNALLY_VISIBLE __attribute__(( visibility("default") ));
++//__attribute__ ((__externally_visible__))
+ # else
+-#  define ATTRIBUTE_EXTERNALLY_VISIBLE
++#  define EXTERNALLY_VISIBLE
+ # endif /* GNUC >= 4.1 */
+ 
+ /* We use __extension__ in some places to suppress -pedantic warnings
+diff --git a/init/halt.c b/init/halt.c
+index e21ad57..d9f8b1a 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -10,7 +10,7 @@
+ #include "libbb.h"
+ #include <sys/reboot.h>
+ 
+-int halt_main(int argc, char **argv);
++int halt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int halt_main(int argc, char **argv)
+ {
+ 	static const int magic[] = {
+diff --git a/init/init.c b/init/init.c
+index 5e84011..409e8c4 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -882,7 +882,7 @@ static void reload_signal(int sig ATTRIBUTE_UNUSED)
+ }
+ #endif  /* FEATURE_USE_INITTAB */
+ 
+-int init_main(int argc, char **argv);
++int init_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int init_main(int argc, char **argv)
+ {
+ 	struct init_action *a;
+diff --git a/init/mesg.c b/init/mesg.c
+index 1a576cb..cfb517f 100644
+--- a/init/mesg.c
++++ b/init/mesg.c
+@@ -15,7 +15,7 @@
+ #define S_IWGRP_OR_S_IWOTH	(S_IWGRP | S_IWOTH)
+ #endif
+ 
+-int mesg_main(int argc, char **argv);
++int mesg_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mesg_main(int argc, char **argv)
+ {
+ 	struct stat sb;
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index 537a524..98b075f 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -133,7 +133,7 @@ static void sig_child_handler(int sig)
+ 		connection_status();
+ }
+ 
+-int tcpudpsvd_main(int argc, char **argv);
++int tcpudpsvd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tcpudpsvd_main(int argc, char **argv)
+ {
+ 	char *str_c, *str_C, *str_b, *str_t;
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 7808df5..953f1e7 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -127,7 +127,7 @@ const struct bb_applet *find_applet_by_name(const char *name)
+ int *const bb_errno __attribute__ ((section (".data")));
+ #endif
+ 
+-void bbox_prepare_main(char **argv)
++void lbb_prepare(char **argv)
+ {
+ #ifdef __GLIBC__
+ 	(*(int **)&bb_errno) = __errno_location();
+@@ -661,12 +661,12 @@ void run_applet_and_exit(const char *name, char **argv)
+ 
+ 
+ #if ENABLE_BUILD_LIBBUSYBOX
+-int libbusybox_main(int argc, char **argv)
++int lbb_main(int argc, char **argv)
+ #else
+ int main(int argc, char **argv)
+ #endif
+ {
+-	bbox_prepare_main(argv);
++	lbb_prepare(argv);
+ 
+ #if !BB_MMU
+ 	/* NOMMU re-exec trick sets high-order bit in first byte of name */
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index b213074..9b2c679 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -122,7 +122,7 @@ static void add_user_to_group(char **args,
+  * If called with two non-option arguments, addgroup
+  * will add an existing user to an existing group.
+  */
+-int addgroup_main(int argc, char **argv);
++int addgroup_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int addgroup_main(int argc, char **argv)
+ {
+ 	char *group;
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index 149ea9c..5c62428 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -165,7 +165,7 @@ static int adduser(struct passwd *p)
+  *
+  * can be customized via command-line parameters.
+  */
+-int adduser_main(int argc, char **argv);
++int adduser_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int adduser_main(int argc, char **argv)
+ {
+ 	struct passwd pw;
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index 61f9b89..7d47899 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -20,7 +20,7 @@ static const char chpasswd_longopts[] ALIGN1 =
+ #define OPT_ENC		1
+ #define OPT_MD5		2
+ 
+-int chpasswd_main(int argc, char **argv);
++int chpasswd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chpasswd_main(int argc, char **argv)
+ {
+ 	char *name, *pass;
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index 0847857..06817a6 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -7,7 +7,7 @@
+ 
+ #include "libbb.h"
+ 
+-int cryptpw_main(int argc, char **argv);
++int cryptpw_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int cryptpw_main(int argc, char **argv)
+ {
+ 	char salt[sizeof("$N$XXXXXXXX")];
+diff --git a/loginutils/deluser.c b/loginutils/deluser.c
+index 0e4f02d..c67ad72 100644
+--- a/loginutils/deluser.c
++++ b/loginutils/deluser.c
+@@ -93,7 +93,7 @@ static void del_line_matching(char **args,
+ 	free(new);
+ }
+ 
+-int deluser_main(int argc, char **argv);
++int deluser_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int deluser_main(int argc, char **argv)
+ {
+ 	if (argc == 2
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index db8d7ce..bc735d0 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -699,7 +699,7 @@ static void update_utmp(const char *line)
+ #endif /* SYSV_STYLE */
+ 
+ 
+-int getty_main(int argc, char **argv);
++int getty_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int getty_main(int argc, char **argv)
+ {
+ 	int nullfd;
+diff --git a/loginutils/login.c b/loginutils/login.c
+index dfdc58b..bddc0f5 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -219,7 +219,7 @@ static void alarm_handler(int sig ATTRIBUTE_UNUSED)
+ 	exit(EXIT_SUCCESS);
+ }
+ 
+-int login_main(int argc, char **argv);
++int login_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int login_main(int argc, char **argv)
+ {
+ 	enum {
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index ce333b4..99afde2 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -70,7 +70,7 @@ static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
+ 	return ret;
+ }
+ 
+-int passwd_main(int argc, char **argv);
++int passwd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int passwd_main(int argc, char **argv)
+ {
+ 	enum {
+diff --git a/loginutils/su.c b/loginutils/su.c
+index 123907e..8c55170 100644
+--- a/loginutils/su.c
++++ b/loginutils/su.c
+@@ -11,7 +11,7 @@
+ #define SU_OPT_mp (3)
+ #define SU_OPT_l (4)
+ 
+-int su_main(int argc, char **argv);
++int su_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int su_main(int argc, char **argv)
+ {
+ 	unsigned flags;
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index 5c73bda..7f100a1 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -34,7 +34,7 @@ static void catchalarm(int ATTRIBUTE_UNUSED junk)
+ }
+ 
+ 
+-int sulogin_main(int argc, char **argv);
++int sulogin_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int sulogin_main(int argc, char **argv)
+ {
+ 	char *cp;
+diff --git a/loginutils/vlock.c b/loginutils/vlock.c
+index 8e3a1ea..6e928e2 100644
+--- a/loginutils/vlock.c
++++ b/loginutils/vlock.c
+@@ -33,7 +33,7 @@ static void acquire_vt(int signo)
+ 	ioctl(vfd, VT_RELDISP, VT_ACKACQ);
+ }
+ 
+-int vlock_main(int argc, char **argv);
++int vlock_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int vlock_main(int argc, char **argv)
+ {
+ 	sigset_t sig;
+diff --git a/miscutils/adjtimex.c b/miscutils/adjtimex.c
+index b11807d..67dd0a9 100644
+--- a/miscutils/adjtimex.c
++++ b/miscutils/adjtimex.c
+@@ -43,7 +43,7 @@ static const char *const ret_code_descript[] = {
+ 	"clock not synchronized"
+ };
+ 
+-int adjtimex_main(int argc, char **argv);
++int adjtimex_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int adjtimex_main(int argc, char **argv)
+ {
+ 	enum {
+diff --git a/miscutils/bbconfig.c b/miscutils/bbconfig.c
+index 803d1d9..ee56678 100644
+--- a/miscutils/bbconfig.c
++++ b/miscutils/bbconfig.c
+@@ -4,7 +4,7 @@
+ #include "libbb.h"
+ #include "bbconfigopts.h"
+ 
+-int bbconfig_main(int argc, char **argv);
++int bbconfig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int bbconfig_main(int argc, char **argv)
+ {
+ 	printf(bbconfig_config);
+diff --git a/miscutils/chrt.c b/miscutils/chrt.c
+index 1f5465c..418e7ae 100644
+--- a/miscutils/chrt.c
++++ b/miscutils/chrt.c
+@@ -41,8 +41,8 @@ static void show_min_max(int pol)
+ #define OPT_f (1<<3)
+ #define OPT_o (1<<4)
+ 
+-int chrt_main(int argc, char** argv);
+-int chrt_main(int argc, char** argv)
++int chrt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int chrt_main(int argc, char **argv)
+ {
+ 	pid_t pid = 0;
+ 	unsigned opt;
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index fa7b3da..8ee7e58 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -128,7 +128,7 @@ static void crondlog(const char *ctl, ...)
+ 	}
+ }
+ 
+-int crond_main(int ac, char **av);
++int crond_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int crond_main(int ac, char **av)
+ {
+ 	unsigned opt;
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 1b827d7..6d245da 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -31,7 +31,7 @@ static void EditFile(const char *user, const char *file);
+ static int GetReplaceStream(const char *user, const char *file);
+ static int ChangeUser(const char *user, short dochdir);
+ 
+-int crontab_main(int ac, char **av);
++int crontab_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int crontab_main(int ac, char **av)
+ {
+ 	enum { NONE, EDIT, LIST, REPLACE, DELETE } option = NONE;
+diff --git a/miscutils/dc.c b/miscutils/dc.c
+index ced5149..ffc3f8d 100644
+--- a/miscutils/dc.c
++++ b/miscutils/dc.c
+@@ -197,7 +197,7 @@ static int number_of_tokens(char *buffer)
+ 	return i;
+ }
+ 
+-int dc_main(int argc, char **argv);
++int dc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dc_main(int argc, char **argv)
+ {
+ 	/* take stuff from stdin if no args are given */
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 734d4a7..cd94869 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -336,7 +336,7 @@ static unsigned int scan_dev_name(const char *d, unsigned int n, const char *ptr
+ 
+ /*  Public functions follow  */
+ 
+-int devfsd_main(int argc, char **argv);
++int devfsd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int devfsd_main(int argc, char **argv)
+ {
+ 	int print_version = FALSE;
+diff --git a/miscutils/eject.c b/miscutils/eject.c
+index e66d74e..99f01ab 100644
+--- a/miscutils/eject.c
++++ b/miscutils/eject.c
+@@ -25,7 +25,7 @@
+ #define FLAG_CLOSE  1
+ #define FLAG_SMART  2
+ 
+-int eject_main(int argc, char **argv);
++int eject_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int eject_main(int argc, char **argv)
+ {
+ 	unsigned long flags;
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 365e24c..869a5b2 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -2005,7 +2005,7 @@ static const char hdparm_options[] ALIGN1 =
+ /*-------------------------------------*/
+ 
+ /* our main() routine: */
+-int hdparm_main(int argc, char **argv);
++int hdparm_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int hdparm_main(int argc, char **argv)
+ {
+ 	int c;
+diff --git a/miscutils/last.c b/miscutils/last.c
+index f38c4b8..fc5916e 100644
+--- a/miscutils/last.c
++++ b/miscutils/last.c
+@@ -26,7 +26,7 @@
+ #error struct utmp member char[] size(s) have changed!
+ #endif
+ 
+-int last_main(int argc, char **argv);
++int last_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int last_main(int argc, char **argv)
+ {
+ 	struct utmp ut;
+diff --git a/miscutils/less.c b/miscutils/less.c
+index b1e5ce9..5ffebcd 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -1311,7 +1311,7 @@ static void sig_catcher(int sig ATTRIBUTE_UNUSED)
+ 	exit(1);
+ }
+ 
+-int less_main(int argc, char **argv);
++int less_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int less_main(int argc, char **argv)
+ {
+ 	int keypress;
+diff --git a/miscutils/makedevs.c b/miscutils/makedevs.c
+index d36c695..1f88f34 100644
+--- a/miscutils/makedevs.c
++++ b/miscutils/makedevs.c
+@@ -10,7 +10,7 @@
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_MAKEDEVS_LEAF
+-int makedevs_main(int argc, char **argv);
++int makedevs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int makedevs_main(int argc, char **argv)
+ {
+ 	mode_t mode;
+@@ -69,7 +69,7 @@ int makedevs_main(int argc, char **argv)
+ 
+ /* Licensed under the GPL v2 or later, see the file LICENSE in this tarball. */
+ 
+-int makedevs_main(int argc, char **argv);
++int makedevs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int makedevs_main(int argc, char **argv)
+ {
+ 	FILE *table = stdin;
+diff --git a/miscutils/microcom.c b/miscutils/microcom.c
+index e097dc4..1235f06 100644
+--- a/miscutils/microcom.c
++++ b/miscutils/microcom.c
+@@ -9,7 +9,7 @@
+  */
+ #include "libbb.h"
+ 
+-int microcom_main(int argc, char **argv);
++int microcom_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int microcom_main(int argc, char **argv)
+ {
+ 	struct pollfd pfd[2];
+diff --git a/miscutils/mountpoint.c b/miscutils/mountpoint.c
+index 376bd95..5647e4c 100644
+--- a/miscutils/mountpoint.c
++++ b/miscutils/mountpoint.c
+@@ -11,7 +11,7 @@
+ 
+ #include "libbb.h"
+ 
+-int mountpoint_main(int argc, char **argv);
++int mountpoint_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mountpoint_main(int argc, char **argv)
+ {
+ 	struct stat st;
+diff --git a/miscutils/mt.c b/miscutils/mt.c
+index b9bc2a1..be1f21a 100644
+--- a/miscutils/mt.c
++++ b/miscutils/mt.c
+@@ -50,7 +50,7 @@ static const struct mt_opcodes opcodes[] = {
+ 	{0, 0}
+ };
+ 
+-int mt_main(int argc, char **argv);
++int mt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mt_main(int argc, char **argv)
+ {
+ 	const char *file = "/dev/tape";
+diff --git a/miscutils/raidautorun.c b/miscutils/raidautorun.c
+index edcb6d6..2766245 100644
+--- a/miscutils/raidautorun.c
++++ b/miscutils/raidautorun.c
+@@ -13,7 +13,7 @@
+ #include <linux/major.h>
+ #include <linux/raid/md_u.h>
+ 
+-int raidautorun_main(int argc, char **argv);
++int raidautorun_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int raidautorun_main(int argc, char **argv)
+ {
+ 	if (argc != 2)
+diff --git a/miscutils/readahead.c b/miscutils/readahead.c
+index 103ce8e..647eb31 100644
+--- a/miscutils/readahead.c
++++ b/miscutils/readahead.c
+@@ -12,7 +12,7 @@
+ 
+ #include "libbb.h"
+ 
+-int readahead_main(int argc, char **argv);
++int readahead_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int readahead_main(int argc, char **argv)
+ {
+ 	FILE *f;
+diff --git a/miscutils/runlevel.c b/miscutils/runlevel.c
+index f51a647..04064ee 100644
+--- a/miscutils/runlevel.c
++++ b/miscutils/runlevel.c
+@@ -15,7 +15,7 @@
+ #include <utmp.h>
+ #include "libbb.h"
+ 
+-int runlevel_main(int argc, char **argv);
++int runlevel_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int runlevel_main(int argc, char **argv)
+ {
+ 	struct utmp *ut;
+diff --git a/miscutils/rx.c b/miscutils/rx.c
+index 675aad2..898703c 100644
+--- a/miscutils/rx.c
++++ b/miscutils/rx.c
+@@ -249,7 +249,7 @@ static void sigalrm_handler(int ATTRIBUTE_UNUSED signum)
+ {
+ }
+ 
+-int rx_main(int argc, char **argv);
++int rx_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int rx_main(int argc, char **argv)
+ {
+ 	char *fn;
+diff --git a/miscutils/setsid.c b/miscutils/setsid.c
+index 8d738ed..110bb6b 100644
+--- a/miscutils/setsid.c
++++ b/miscutils/setsid.c
+@@ -16,7 +16,7 @@
+ 
+ #include "libbb.h"
+ 
+-int setsid_main(int argc, char **argv);
++int setsid_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int setsid_main(int argc, char **argv)
+ {
+ 	if (argc < 2)
+diff --git a/miscutils/strings.c b/miscutils/strings.c
+index b7f5a0b..d75becc 100644
+--- a/miscutils/strings.c
++++ b/miscutils/strings.c
+@@ -16,7 +16,7 @@
+ #define PRINT_OFFSET	4
+ #define SIZE			8
+ 
+-int strings_main(int argc, char **argv);
++int strings_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int strings_main(int argc, char **argv)
+ {
+ 	int n, c, status = EXIT_SUCCESS;
+diff --git a/miscutils/taskset.c b/miscutils/taskset.c
+index 3c117da..e64fd65 100644
+--- a/miscutils/taskset.c
++++ b/miscutils/taskset.c
+@@ -41,8 +41,8 @@ static char *__from_cpuset(cpu_set_t *mask)
+ 
+ #define OPT_p 1
+ 
+-int taskset_main(int argc, char** argv);
+-int taskset_main(int argc, char** argv)
++int taskset_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int taskset_main(int argc, char **argv)
+ {
+ 	cpu_set_t mask, new_mask;
+ 	pid_t pid = 0;
+diff --git a/miscutils/time.c b/miscutils/time.c
+index 8f79a51..d21944e 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -402,7 +402,7 @@ static void run_command(char *const *cmd, resource_t * resp)
+ 	signal(SIGQUIT, quit_signal);
+ }
+ 
+-int time_main(int argc, char **argv);
++int time_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int time_main(int argc, char **argv)
+ {
+ 	resource_t res;
+diff --git a/miscutils/ttysize.c b/miscutils/ttysize.c
+index 292cfb8..f51b328 100644
+--- a/miscutils/ttysize.c
++++ b/miscutils/ttysize.c
+@@ -11,7 +11,7 @@
+  */
+ #include "libbb.h"
+ 
+-int ttysize_main(int argc, char **argv);
++int ttysize_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ttysize_main(int argc, char **argv)
+ {
+ 	unsigned w,h;
+diff --git a/miscutils/watchdog.c b/miscutils/watchdog.c
+index 14bd44f..e040c64 100644
+--- a/miscutils/watchdog.c
++++ b/miscutils/watchdog.c
+@@ -24,7 +24,7 @@ static void watchdog_shutdown(int ATTRIBUTE_UNUSED sig)
+ 	exit(0);
+ }
+ 
+-int watchdog_main(int argc, char **argv);
++int watchdog_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int watchdog_main(int argc, char **argv)
+ {
+ 	unsigned opts;
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index d7e4bef..6f3b7d0 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -72,7 +72,7 @@
+ #endif
+ 
+ #if ENABLE_FEATURE_2_6_MODULES
+-extern int insmod_ng_main(int argc, char **argv);
++extern int insmod_ng_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ #endif
+ 
+ 
+@@ -3952,8 +3952,8 @@ static void print_load_map(struct obj_file *f)
+ void print_load_map(struct obj_file *f);
+ #endif
+ 
+-int insmod_main( int argc, char **argv);
+-int insmod_main( int argc, char **argv)
++int insmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int insmod_main(int argc, char **argv)
+ {
+ 	char *opt_o, *arg1;
+ 	int len;
+@@ -4261,7 +4261,7 @@ static const char *moderror(int err)
+ 	}
+ }
+ 
+-int insmod_ng_main(int argc, char **argv);
++int insmod_ng_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int insmod_ng_main(int argc, char **argv)
+ {
+ 	long ret;
+diff --git a/modutils/lsmod.c b/modutils/lsmod.c
+index 09b03d0..7014681 100644
+--- a/modutils/lsmod.c
++++ b/modutils/lsmod.c
+@@ -74,7 +74,7 @@ enum {
+ 	NEW_MOD_INITIALIZING = 64
+ };
+ 
+-int lsmod_main(int argc, char **argv);
++int lsmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int lsmod_main(int argc, char **argv)
+ {
+ 	struct module_info info;
+@@ -140,7 +140,7 @@ int lsmod_main(int argc, char **argv)
+ 
+ #else /* CONFIG_FEATURE_QUERY_MODULE_INTERFACE */
+ 
+-int lsmod_main(int argc, char **argv);
++int lsmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int lsmod_main(int argc, char **argv)
+ {
+ 	FILE *file = xfopen("/proc/modules", "r");
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index 36a3c35..a67ddea 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -861,8 +861,8 @@ static int mod_remove(char *mod)
+ 	return rc;
+ }
+ 
+-int modprobe_main(int argc, char** argv);
+-int modprobe_main(int argc, char** argv)
++int modprobe_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int modprobe_main(int argc, char **argv)
+ {
+ 	int rc = EXIT_SUCCESS;
+ 	char *unused;
+diff --git a/modutils/rmmod.c b/modutils/rmmod.c
+index ba3e88c..61cfbd1 100644
+--- a/modutils/rmmod.c
++++ b/modutils/rmmod.c
+@@ -38,7 +38,7 @@ void filename2modname(char *modname, const char *afterslash);
+ int query_module(const char *name, int which, void *buf,
+ 			size_t bufsize, size_t *ret);
+ 
+-int rmmod_main(int argc, char **argv);
++int rmmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int rmmod_main(int argc, char **argv)
+ {
+ 	int n, ret = EXIT_SUCCESS;
+diff --git a/networking/arp.c b/networking/arp.c
+index 8cdee18..36985fc 100644
+--- a/networking/arp.c
++++ b/networking/arp.c
+@@ -434,7 +434,7 @@ static int arp_show(char *name)
+ 	return 0;
+ }
+ 
+-int arp_main(int argc, char **argv);
++int arp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int arp_main(int argc, char **argv)
+ {
+ 	char *hw_type;
+diff --git a/networking/arping.c b/networking/arping.c
+index a2c4c22..44615d5 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -227,7 +227,7 @@ static int recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 	return 1;
+ }
+ 
+-int arping_main(int argc, char **argv);
++int arping_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int arping_main(int argc, char **argv)
+ {
+ 	const char *device = "eth0";
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index c906de3..8f01d5c 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -328,7 +328,7 @@ static void interrupt(int x)
+ 	exit(2);
+ }
+ 
+-int dnsd_main(int argc, char **argv);
++int dnsd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dnsd_main(int argc, char **argv)
+ {
+ 	const char *listen_interface = "0.0.0.0";
+diff --git a/networking/ether-wake.c b/networking/ether-wake.c
+index fc26ad0..b752152 100644
+--- a/networking/ether-wake.c
++++ b/networking/ether-wake.c
+@@ -178,7 +178,7 @@ static int get_wol_pw(const char *ethoptarg, unsigned char *wol_passwd)
+ 	return byte_cnt;
+ }
+ 
+-int ether_wake_main(int argc, char **argv);
++int ether_wake_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ether_wake_main(int argc, char **argv)
+ {
+ 	const char *ifname = "eth0";
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index 58847a9..587f000 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -296,7 +296,7 @@ static const char ftpgetput_longopts[] ALIGN1 =
+ 	;
+ #endif
+ 
+-int ftpgetput_main(int argc, char **argv);
++int ftpgetput_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ftpgetput_main(int argc, char **argv)
+ {
+ 	/* content-length of the file */
+diff --git a/networking/hostname.c b/networking/hostname.c
+index 6783dba..2c224be 100644
+--- a/networking/hostname.c
++++ b/networking/hostname.c
+@@ -42,7 +42,7 @@ static void do_sethostname(char *s, int isfile)
+ 	}
+ }
+ 
+-int hostname_main(int argc, char **argv);
++int hostname_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int hostname_main(int argc, char **argv)
+ {
+ 	enum {
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 06a5a56..6118502 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -2111,7 +2111,7 @@ enum {
+ };
+ 
+ 
+-int httpd_main(int argc, char **argv);
++int httpd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int httpd_main(int argc, char **argv)
+ {
+ 	int server_socket = server_socket; /* for gcc */
+diff --git a/networking/ifconfig.c b/networking/ifconfig.c
+index 0d53676..3dcb118 100644
+--- a/networking/ifconfig.c
++++ b/networking/ifconfig.c
+@@ -261,7 +261,7 @@ static int in_ether(const char *bufp, struct sockaddr *sap);
+  * Our main function.
+  */
+ 
+-int ifconfig_main(int argc, char **argv);
++int ifconfig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ifconfig_main(int argc, char **argv)
+ {
+ 	struct ifreq ifr;
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index bd53f93..c4d7252 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -1133,7 +1133,7 @@ static llist_t *read_iface_state(void)
+ }
+ 
+ 
+-int ifupdown_main(int argc, char **argv);
++int ifupdown_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ifupdown_main(int argc, char **argv)
+ {
+ 	int (*cmds)(struct interface_defn_t *) = NULL;
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 6d72e13..9ea7f9c 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1303,7 +1303,7 @@ inetd_setproctitle(char *a, int s)
+ #endif
+ 
+ 
+-int inetd_main(int argc, char **argv);
++int inetd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int inetd_main(int argc, char **argv)
+ {
+ 	servtab_t *sep;
+diff --git a/networking/ip.c b/networking/ip.c
+index c82d731..3ea1b62 100644
+--- a/networking/ip.c
++++ b/networking/ip.c
+@@ -38,7 +38,7 @@ static int ip_do(int argc, char **argv)
+ }
+ 
+ #if ENABLE_FEATURE_IP_ADDRESS
+-int ipaddr_main(int argc, char **argv);
++int ipaddr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ipaddr_main(int argc, char **argv)
+ {
+     ip_func = do_ipaddr;
+@@ -46,7 +46,7 @@ int ipaddr_main(int argc, char **argv)
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_LINK
+-int iplink_main(int argc, char **argv);
++int iplink_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iplink_main(int argc, char **argv)
+ {
+     ip_func = do_iplink;
+@@ -54,7 +54,7 @@ int iplink_main(int argc, char **argv)
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_ROUTE
+-int iproute_main(int argc, char **argv);
++int iproute_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iproute_main(int argc, char **argv)
+ {
+     ip_func = do_iproute;
+@@ -62,7 +62,7 @@ int iproute_main(int argc, char **argv)
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_RULE
+-int iprule_main(int argc, char **argv);
++int iprule_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iprule_main(int argc, char **argv)
+ {
+     ip_func = do_iprule;
+@@ -70,7 +70,7 @@ int iprule_main(int argc, char **argv)
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_TUNNEL
+-int iptunnel_main(int argc, char **argv);
++int iptunnel_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iptunnel_main(int argc, char **argv)
+ {
+     ip_func = do_iptunnel;
+@@ -79,7 +79,7 @@ int iptunnel_main(int argc, char **argv)
+ #endif
+ 
+ 
+-int ip_main(int argc, char **argv);
++int ip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ip_main(int argc, char **argv)
+ {
+ 	static const char keywords[] ALIGN1 =
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index 7597043..d7c968c 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -75,7 +75,7 @@ int get_prefix(unsigned long netmask);
+ 		;
+ #endif
+ 
+-int ipcalc_main(int argc, char **argv);
++int ipcalc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ipcalc_main(int argc, char **argv)
+ {
+ 	unsigned opt;
+diff --git a/networking/isrv_identd.c b/networking/isrv_identd.c
+index 9bc3b60..a93de12 100644
+--- a/networking/isrv_identd.c
++++ b/networking/isrv_identd.c
+@@ -92,7 +92,7 @@ static void inetd_mode(void)
+ 	while (do_rd(0, (void*)&buf) == 0);
+ }
+ 
+-int fakeidentd_main(int argc, char **argv);
++int fakeidentd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int fakeidentd_main(int argc, char **argv)
+ {
+ 	enum {
+diff --git a/networking/nameif.c b/networking/nameif.c
+index 2114516..0369c08 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -55,7 +55,7 @@ static struct ether_addr *cc_macaddr(const char *str_macaddr)
+ 	return mac;
+ }
+ 
+-int nameif_main(int argc, char **argv);
++int nameif_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int nameif_main(int argc, char **argv)
+ {
+ 	mactable_t *clist = NULL;
+diff --git a/networking/nc.c b/networking/nc.c
+index 19750e5..b2f590a 100644
+--- a/networking/nc.c
++++ b/networking/nc.c
+@@ -22,7 +22,7 @@ static void timeout(int signum)
+ 	bb_error_msg_and_die("timed out");
+ }
+ 
+-int nc_main(int argc, char **argv);
++int nc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int nc_main(int argc, char **argv)
+ {
+ 	/* sfd sits _here_ only because of "repeat" option (-l -l). */
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index ab82465..cbc0a64 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -668,7 +668,7 @@ Debug("wrote %d to net, errno %d", rr, errno);
+ } /* readwrite */
+ 
+ /* main: now we pull it all together... */
+-int nc_main(int argc, char **argv);
++int nc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int nc_main(int argc, char **argv)
+ {
+ 	char *str_p, *str_s, *str_w;
+diff --git a/networking/netstat.c b/networking/netstat.c
+index e5ed10e..11f1419 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -484,7 +484,7 @@ static void do_info(const char *file, const char *name, void (*proc)(int, const
+  * Our main function.
+  */
+ 
+-int netstat_main(int argc, char **argv);
++int netstat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int netstat_main(int argc, char **argv)
+ {
+ 	const char *net_conn_line_header = PRINT_NET_CONN_HEADER;
+diff --git a/networking/nslookup.c b/networking/nslookup.c
+index fab7e3e..183ae15 100644
+--- a/networking/nslookup.c
++++ b/networking/nslookup.c
+@@ -127,7 +127,7 @@ static void set_default_dns(char *server)
+ 	}
+ }
+ 
+-int nslookup_main(int argc, char **argv);
++int nslookup_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int nslookup_main(int argc, char **argv)
+ {
+ 	/* We allow 1 or 2 arguments.
+diff --git a/networking/ping.c b/networking/ping.c
+index 5d61cd7..8b70d9a 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -173,7 +173,7 @@ static void ping6(len_and_sockaddr *lsa)
+ }
+ #endif
+ 
+-int ping_main(int argc, char **argv);
++int ping_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ping_main(int argc, char **argv)
+ {
+ 	len_and_sockaddr *lsa;
+@@ -676,7 +676,7 @@ static void ping(len_and_sockaddr *lsa)
+ 		ping4(lsa);
+ }
+ 
+-int ping_main(int argc, char **argv);
++int ping_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ping_main(int argc, char **argv)
+ {
+ 	len_and_sockaddr *lsa;
+@@ -724,7 +724,7 @@ int ping_main(int argc, char **argv)
+ 
+ 
+ #if ENABLE_PING6
+-int ping6_main(int argc, char **argv);
++int ping6_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ping6_main(int argc, char **argv)
+ {
+ 	argv[0] = (char*)"-6";
+diff --git a/networking/pscan.c b/networking/pscan.c
+index 5ae3e61..d18f8db 100644
+--- a/networking/pscan.c
++++ b/networking/pscan.c
+@@ -30,7 +30,7 @@ static const char *port_name(unsigned port)
+ /* We don't expect to see 1000+ seconds delay, unsigned is enough */
+ #define MONOTONIC_US() ((unsigned)monotonic_us())
+ 
+-int pscan_main(int argc, char **argv);
++int pscan_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int pscan_main(int argc, char **argv)
+ {
+ 	const char *opt_max_port = "1024";      /* -P: default max port */
+diff --git a/networking/route.c b/networking/route.c
+index 55a6c21..3425e63 100644
+--- a/networking/route.c
++++ b/networking/route.c
+@@ -640,7 +640,7 @@ static const char tbl_verb[] ALIGN1 =
+ 	"\010\002delete"  /* Since it's last, we can save a byte. */
+ ;
+ 
+-int route_main(int argc, char **argv);
++int route_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int route_main(int argc, char **argv)
+ {
+ 	unsigned opt;
+diff --git a/networking/slattach.c b/networking/slattach.c
+index ce6d705..17df4fa 100644
+--- a/networking/slattach.c
++++ b/networking/slattach.c
+@@ -119,7 +119,7 @@ static void sig_handler(int signo)
+ 	restore_state_and_exit(0);
+ }
+ 
+-int slattach_main(int argc, char **argv);
++int slattach_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int slattach_main(int argc, char **argv)
+ {
+ 	/* Line discipline code table */
+diff --git a/networking/telnet.c b/networking/telnet.c
+index ae526fa..9085c58 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -550,8 +550,8 @@ static void cookmode(void)
+ 		tcsetattr(0, TCSADRAIN, &G.termios_def);
+ }
+ 
+-int telnet_main(int argc, char** argv);
+-int telnet_main(int argc, char** argv)
++int telnet_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int telnet_main(int argc, char **argv)
+ {
+ 	char *host;
+ 	int port;
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index b219912..27dde1a 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -360,7 +360,7 @@ void free_session(struct tsession *ts);
+ #endif
+ 
+ 
+-int telnetd_main(int argc, char **argv);
++int telnetd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int telnetd_main(int argc, char **argv)
+ {
+ 	fd_set rdfdset, wrfdset;
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 59f53ae..a268397 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -391,7 +391,7 @@ static int tftp( USE_GETPUT(const int cmd,)
+ 	return finished == 0; /* returns 1 on failure */
+ }
+ 
+-int tftp_main(int argc, char **argv);
++int tftp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tftp_main(int argc, char **argv)
+ {
+ 	len_and_sockaddr *peer_lsa;
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index e8d486f..773fc6a 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -889,7 +889,7 @@ print_delta_ms(unsigned t1p, unsigned t2p)
+ 	printf("  %u.%03u ms", tt/1000, tt%1000);
+ }
+ 
+-int traceroute_main(int argc, char **argv);
++int traceroute_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int traceroute_main(int argc, char **argv)
+ {
+ 	int code, n;
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 21b496c..e00379b 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -140,7 +140,7 @@ static uint8_t* alloc_dhcp_option(int code, const char *str, int extra)
+ }
+ 
+ 
+-int udhcpc_main(int argc, char **argv);
++int udhcpc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int udhcpc_main(int argc, char **argv)
+ {
+ 	uint8_t *temp, *message;
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 4343f1c..9679e08 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -21,7 +21,7 @@ struct dhcpOfferedAddr *leases;
+ /* struct server_config_t server_config is in bb_common_bufsiz1 */
+ 
+ 
+-int udhcpd_main(int argc, char **argv);
++int udhcpd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int udhcpd_main(int argc, char **argv)
+ {
+ 	fd_set rfds;
+diff --git a/networking/udhcp/dhcprelay.c b/networking/udhcp/dhcprelay.c
+index 91fcb15..42378d6 100644
+--- a/networking/udhcp/dhcprelay.c
++++ b/networking/udhcp/dhcprelay.c
+@@ -279,7 +279,7 @@ static void dhcprelay_loop(int *fds, int num_sockets, int max_socket, char **cli
+ 	}
+ }
+ 
+-int dhcprelay_main(int argc, char **argv);
++int dhcprelay_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dhcprelay_main(int argc, char **argv)
+ {
+ 	int num_sockets, max_socket;
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 3e931c0..218e6bc 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -7,7 +7,7 @@
+ #include "common.h"
+ #include "dhcpd.h"
+ 
+-int dumpleases_main(int argc, char **argv);
++int dumpleases_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dumpleases_main(int argc, char **argv)
+ {
+ 	int fd;
+diff --git a/networking/vconfig.c b/networking/vconfig.c
+index 8bd8870..7b6c2fa 100644
+--- a/networking/vconfig.c
++++ b/networking/vconfig.c
+@@ -106,7 +106,7 @@ static const char name_types[] ALIGN1 = {
+ 
+ static const char conf_file_name[] ALIGN1 = "/proc/net/vlan/config";
+ 
+-int vconfig_main(int argc, char **argv);
++int vconfig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int vconfig_main(int argc, char **argv)
+ {
+ 	struct vlan_ioctl_args ifr;
+diff --git a/networking/wget.c b/networking/wget.c
+index 3f9954c..b12d19a 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -391,7 +391,7 @@ static char *gethdr(char *buf, size_t bufsiz, FILE *fp /*, int *istrunc*/)
+ }
+ 
+ 
+-int wget_main(int argc, char **argv);
++int wget_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int wget_main(int argc, char **argv)
+ {
+ 	char buf[512];
+diff --git a/networking/zcip.c b/networking/zcip.c
+index 62350c6..a16a642 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -156,7 +156,7 @@ static unsigned ALWAYS_INLINE ms_rdelay(unsigned secs)
+ /**
+  * main program
+  */
+-int zcip_main(int argc, char **argv);
++int zcip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int zcip_main(int argc, char **argv)
+ {
+ 	int state = PROBE;
+diff --git a/procps/free.c b/procps/free.c
+index 42193fd..e76dd21 100644
+--- a/procps/free.c
++++ b/procps/free.c
+@@ -11,7 +11,7 @@
+ 
+ #include "libbb.h"
+ 
+-int free_main(int argc, char **argv);
++int free_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int free_main(int argc, char **argv)
+ {
+ 	struct sysinfo info;
+diff --git a/procps/fuser.c b/procps/fuser.c
+index 60c1095..36d634d 100644
+--- a/procps/fuser.c
++++ b/procps/fuser.c
+@@ -316,7 +316,7 @@ static int fuser_kill_pid_list(pid_list *plist, int sig)
+ 	return success;
+ }
+ 
+-int fuser_main(int argc, char **argv);
++int fuser_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int fuser_main(int argc, char **argv)
+ {
+ 	/*static -- huh???*/ int opt = 0; /* FUSER_OPT_ */
+diff --git a/procps/kill.c b/procps/kill.c
+index 323ee7b..0c7c160 100644
+--- a/procps/kill.c
++++ b/procps/kill.c
+@@ -24,7 +24,7 @@
+  * This is needed to avoid collision with kill -9 ... syntax
+  */
+ 
+-int kill_main(int argc, char **argv);
++int kill_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int kill_main(int argc, char **argv)
+ {
+ 	char *arg;
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index 127a3d1..b846ee5 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -770,7 +770,7 @@ static init_func *const init_functions[] = {
+ 	init_cr
+ };
+ 
+-int nmeter_main(int argc, char **argv);
++int nmeter_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int nmeter_main(int argc, char **argv)
+ {
+ 	char buf[32];
+diff --git a/procps/pgrep.c b/procps/pgrep.c
+index c5747a1..f5d4cfc 100644
+--- a/procps/pgrep.c
++++ b/procps/pgrep.c
+@@ -44,7 +44,7 @@ static void act(unsigned pid, char *cmd, int signo, unsigned opt)
+ 		kill(pid, signo);
+ }
+ 
+-int pgrep_main(int argc, char **argv);
++int pgrep_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int pgrep_main(int argc, char **argv)
+ {
+ 	unsigned pid = getpid();
+diff --git a/procps/pidof.c b/procps/pidof.c
+index 9629452..f295617 100644
+--- a/procps/pidof.c
++++ b/procps/pidof.c
+@@ -16,7 +16,7 @@ enum {
+ 	OPT_OMIT   = USE_FEATURE_PIDOF_OMIT(  (1<<OPTBIT_OMIT  )) + 0,
+ };
+ 
+-int pidof_main(int argc, char **argv);
++int pidof_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int pidof_main(int argc, char **argv)
+ {
+ 	unsigned first = 1;
+diff --git a/procps/ps.c b/procps/ps.c
+index f5c801d..08922eb 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -278,7 +278,7 @@ static void format_process(const procps_status_t *ps)
+ 	printf("%.*s\n", terminal_width, buffer);
+ }
+ 
+-int ps_main(int argc, char **argv);
++int ps_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ps_main(int argc, char **argv)
+ {
+ 	procps_status_t *p;
+@@ -340,7 +340,7 @@ int ps_main(int argc, char **argv)
+ #else /* !ENABLE_DESKTOP */
+ 
+ 
+-int ps_main(int argc, char **argv);
++int ps_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ps_main(int argc, char **argv)
+ {
+ 	procps_status_t *p = NULL;
+diff --git a/procps/renice.c b/procps/renice.c
+index b2a9ed7..ab0d3a1 100644
+--- a/procps/renice.c
++++ b/procps/renice.c
+@@ -26,7 +26,7 @@ void BUG_bad_PRIO_PROCESS(void);
+ void BUG_bad_PRIO_PGRP(void);
+ void BUG_bad_PRIO_USER(void);
+ 
+-int renice_main(int argc, char **argv);
++int renice_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int renice_main(int argc, char **argv)
+ {
+ 	static const char Xetpriority_msg[] ALIGN1 = "%cetpriority";
+diff --git a/procps/sysctl.c b/procps/sysctl.c
+index 5100f57..a84f9ae 100644
+--- a/procps/sysctl.c
++++ b/procps/sysctl.c
+@@ -59,7 +59,7 @@ static void dwrite_str(int fd, const char *buf)
+ /*
+  *    sysctl_main()...
+  */
+-int sysctl_main(int argc, char **argv);
++int sysctl_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int sysctl_main(int argc, char **argv)
+ {
+ 	int retval = 0;
+diff --git a/procps/top.c b/procps/top.c
+index 1b8c185..7f1c83f 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -782,7 +782,7 @@ enum {
+ 		| PSSCAN_COMM,
+ };
+ 
+-int top_main(int argc, char **argv);
++int top_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int top_main(int argc, char **argv)
+ {
+ 	int count, lines, col;
+diff --git a/procps/uptime.c b/procps/uptime.c
+index ee0657e..07e8d60 100644
+--- a/procps/uptime.c
++++ b/procps/uptime.c
+@@ -25,7 +25,7 @@
+ #define LOAD_FRAC(x) LOAD_INT(((x) & (FIXED_1-1)) * 100)
+ 
+ 
+-int uptime_main(int argc, char **argv);
++int uptime_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int uptime_main(int argc, char **argv)
+ {
+ 	int updays, uphours, upminutes;
+diff --git a/procps/watch.c b/procps/watch.c
+index 3d18105..76d2a87 100644
+--- a/procps/watch.c
++++ b/procps/watch.c
+@@ -23,7 +23,7 @@
+ //
+ // (procps 3.x and procps 2.x are forks, not newer/older versions of the same)
+ 
+-int watch_main(int argc, char **argv);
++int watch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int watch_main(int argc, char **argv)
+ {
+ 	unsigned opt;
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 1bc8e18..0f605cc 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -289,7 +289,7 @@ static void envuidgid(int, char **) ATTRIBUTE_NORETURN;
+ static void envdir(int, char **) ATTRIBUTE_NORETURN;
+ static void softlimit(int, char **) ATTRIBUTE_NORETURN;
+ 
+-int chpst_main(int argc, char **argv);
++int chpst_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chpst_main(int argc, char **argv)
+ {
+ 	INIT_G();
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 7cf142d..8c5a4d4 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -439,7 +439,7 @@ static int ctrl(struct svdir *s, char c)
+ 	return 1;
+ }
+ 
+-int runsv_main(int argc, char **argv);
++int runsv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int runsv_main(int argc, char **argv)
+ {
+ 	struct stat s;
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 924f771..9e98ca6 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -204,7 +204,7 @@ static int setup_log(void)
+ 	return 1;
+ }
+ 
+-int runsvdir_main(int argc, char **argv);
++int runsvdir_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int runsvdir_main(int argc, char **argv)
+ {
+ 	struct stat s;
+diff --git a/runit/sv.c b/runit/sv.c
+index 757391a..e31adff 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -411,7 +411,7 @@ static int control(const char *a)
+ 	return 1;
+ }
+ 
+-int sv_main(int argc, char **argv);
++int sv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int sv_main(int argc, char **argv)
+ {
+ 	unsigned opt;
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index bf46ef7..5f682b1 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -843,7 +843,7 @@ static void logmatch(struct logdir *ld)
+ 	}
+ }
+ 
+-int svlogd_main(int argc, char **argv);
++int svlogd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int svlogd_main(int argc, char **argv)
+ {
+ 	char *r,*l,*b;
+diff --git a/scripts/trylink b/scripts/trylink
+index 6292dc6..25629aa 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -26,7 +26,7 @@ debug=false
+ # --enable-new-dtags            ?
+ # -z,combreloc                  ?
+ # -soname="libbusybox.so.$BB_VER"
+-# --undefined=libbusybox_main   Seed name to start pulling from
++# --undefined=lbb_main          Seed name to start pulling from
+ #                               (otherwise we'll need --whole-archive)
+ # -static                       Not used, but may be useful! manpage:
+ #                               "... This option can be used with -shared.
+@@ -172,7 +172,7 @@ if test "$CONFIG_BUILD_LIBBUSYBOX" = y; then
+ 	    -Wl,--enable-new-dtags \
+ 	    -Wl,-z,combreloc \
+ 	    -Wl,-soname="libbusybox.so.$BB_VER" \
+-	    -Wl,--undefined=libbusybox_main \
++	    -Wl,--undefined=lbb_main \
+ 	    -Wl,--sort-common \
+ 	    -Wl,--sort-section -Wl,alignment \
+ 	    -Wl,--start-group $A_FILES -Wl,--end-group \
+@@ -220,14 +220,14 @@ if test "$CONFIG_FEATURE_INDIVIDUAL" = y; then
+     while read name main junk; do
+ 
+ 	echo "\
+-void bbox_prepare_main(char **argv);
++void lbb_prepare(char **argv);
+ int $main(int argc, char **argv);
+ 
+ const char *applet_name = \"$name\";
+ 
+ int main(int argc, char **argv)
+ {
+-	bbox_prepare_main(argv);
++	lbb_prepare(argv);
+ 	return $main(argc, argv);
+ }
+ " >"$sharedlib_dir/applet.c"
+diff --git a/selinux/chcon.c b/selinux/chcon.c
+index 3609880..f00e242 100644
+--- a/selinux/chcon.c
++++ b/selinux/chcon.c
+@@ -120,7 +120,7 @@ static const char chcon_longopts[] ALIGN1 =
+ 	;
+ #endif
+ 
+-int chcon_main(int argc, char **argv);
++int chcon_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chcon_main(int argc, char **argv)
+ {
+ 	char *reference_file;
+diff --git a/selinux/getenforce.c b/selinux/getenforce.c
+index 62b4263..e11e78e 100644
+--- a/selinux/getenforce.c
++++ b/selinux/getenforce.c
+@@ -8,7 +8,7 @@
+ 
+ #include "libbb.h"
+ 
+-int getenforce_main(int argc, char **argv);
++int getenforce_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int getenforce_main(int argc, char **argv)
+ {
+ 	int rc;
+diff --git a/selinux/getsebool.c b/selinux/getsebool.c
+index 598a51c..ea080d4 100644
+--- a/selinux/getsebool.c
++++ b/selinux/getsebool.c
+@@ -8,7 +8,7 @@
+ 
+ #include "libbb.h"
+ 
+-int getsebool_main(int argc, char **argv);
++int getsebool_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int getsebool_main(int argc, char **argv)
+ {
+ 	int i, rc = 0, active, pending, len = 0;
+diff --git a/selinux/load_policy.c b/selinux/load_policy.c
+index add5c66..f9aa49d 100644
+--- a/selinux/load_policy.c
++++ b/selinux/load_policy.c
+@@ -4,7 +4,7 @@
+  */
+ #include "libbb.h"
+ 
+-int load_policy_main(int argc, char **argv);
++int load_policy_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int load_policy_main(int argc, char **argv)
+ {
+ 	int rc;
+diff --git a/selinux/matchpathcon.c b/selinux/matchpathcon.c
+index bb7099e..6de68bc 100644
+--- a/selinux/matchpathcon.c
++++ b/selinux/matchpathcon.c
+@@ -29,7 +29,7 @@ static int print_matchpathcon(char *path, int noprint)
+ #define OPT_PREFIX      (1<<3)  /* -p */
+ #define OPT_VERIFY      (1<<4)  /* -V */
+ 
+-int matchpathcon_main(int argc, char **argv);
++int matchpathcon_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int matchpathcon_main(int argc, char **argv)
+ {
+ 	int error = 0;
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index 37ac5d1..89a4b05 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -87,7 +87,7 @@ static const char runcon_longopts[] ALIGN1 =
+ #define OPTS_HELP	(1<<5)	/* h */
+ #define OPTS_CONTEXT_COMPONENT		(OPTS_ROLE | OPTS_TYPE | OPTS_USER | OPTS_RANGE)
+ 
+-int runcon_main(int argc, char **argv);
++int runcon_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int runcon_main(int argc, char **argv)
+ {
+ 	char *role = NULL;
+diff --git a/selinux/selinuxenabled.c b/selinux/selinuxenabled.c
+index 8a9c7cd..114d2b6 100644
+--- a/selinux/selinuxenabled.c
++++ b/selinux/selinuxenabled.c
+@@ -7,7 +7,7 @@
+  */
+ #include "libbb.h"
+ 
+-int selinuxenabled_main(int argc, char **argv);
++int selinuxenabled_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int selinuxenabled_main(int argc, char **argv)
+ {
+ 	return !is_selinux_enabled();
+diff --git a/selinux/setenforce.c b/selinux/setenforce.c
+index 59b1b0f..198324c 100644
+--- a/selinux/setenforce.c
++++ b/selinux/setenforce.c
+@@ -19,7 +19,7 @@ static const char *const setenforce_cmd[] = {
+ 	NULL,
+ };
+ 
+-int setenforce_main(int argc, char **argv);
++int setenforce_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int setenforce_main(int argc, char **argv)
+ {
+ 	int i, rc;
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index 5ae482e..905333f 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -486,7 +486,7 @@ static int process_one(char *name)
+ 	goto out;
+ }
+ 
+-int setfiles_main(int argc, char **argv);
++int setfiles_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int setfiles_main(int argc, char **argv)
+ {
+ 	struct stat sb;
+diff --git a/shell/ash.c b/shell/ash.c
+index af96c4d..2b9a8cc 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -12739,7 +12739,7 @@ extern int etext();
+  * exception occurs.  When an exception occurs the variable "state"
+  * is used to figure out how far we had gotten.
+  */
+-int ash_main(int argc, char **argv);
++int ash_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ash_main(int argc, char **argv)
+ {
+ 	char *shinit;
+diff --git a/shell/bbsh.c b/shell/bbsh.c
+index 09c4bd9..02e6050 100644
+--- a/shell/bbsh.c
++++ b/shell/bbsh.c
+@@ -198,7 +198,7 @@ static void handle(char *command)
+ 	}
+ }
+ 
+-int bbsh_main(int argc, char **argv);
++int bbsh_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int bbsh_main(int argc, char **argv)
+ {
+ 	char *command=NULL;
+diff --git a/shell/hush.c b/shell/hush.c
+index 1977da0..a763277 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3675,7 +3675,7 @@ static void setup_job_control(void)
+ }
+ #endif
+ 
+-int hush_main(int argc, char **argv);
++int hush_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int hush_main(int argc, char **argv)
+ {
+ 	static const char version_str[] ALIGN1 = "HUSH_VERSION="HUSH_VER_STR;
+diff --git a/shell/lash.c b/shell/lash.c
+index b7a0a6a..ce1ce7f 100644
+--- a/shell/lash.c
++++ b/shell/lash.c
+@@ -1491,7 +1491,7 @@ static inline void setup_job_control(void)
+ }
+ #endif
+ 
+-int lash_main(int argc_l, char **argv_l);
++int lash_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int lash_main(int argc_l, char **argv_l)
+ {
+ 	unsigned opt;
+diff --git a/shell/msh.c b/shell/msh.c
+index 41fe1b6..7efd7f9 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -5164,7 +5164,7 @@ static void freehere(int area)
+  * shell
+  */
+ 
+-int msh_main(int argc, char **argv);
++int msh_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int msh_main(int argc, char **argv)
+ {
+ 	int f;
+diff --git a/sysklogd/klogd.c b/sysklogd/klogd.c
+index 2af4105..1164246 100644
+--- a/sysklogd/klogd.c
++++ b/sysklogd/klogd.c
+@@ -35,7 +35,7 @@ static void klogd_signal(int sig ATTRIBUTE_UNUSED)
+ #define KLOGD_LOGBUF_SIZE BUFSIZ
+ #define log_buffer bb_common_bufsiz1
+ 
+-int klogd_main(int argc, char **argv);
++int klogd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int klogd_main(int argc, char **argv)
+ {
+ 	int i = i; /* silence gcc */
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index 6e1debd..e2d0746 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -81,7 +81,7 @@ static int pencode(char *s)
+ }
+ 
+ 
+-int logger_main(int argc, char **argv);
++int logger_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int logger_main(int argc, char **argv)
+ {
+ 	char *str_p, *str_t;
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index 69a084f..6567df3 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -53,7 +53,7 @@ static void interrupted(int sig ATTRIBUTE_UNUSED)
+ 	exit(0);
+ }
+ 
+-int logread_main(int argc, char **argv);
++int logread_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int logread_main(int argc, char **argv)
+ {
+ 	int cur;
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index f27bd83..284e574 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -556,7 +556,7 @@ static void do_syslogd(void)
+ 	} /* for */
+ }
+ 
+-int syslogd_main(int argc, char **argv);
++int syslogd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int syslogd_main(int argc, char **argv)
+ {
+ 	char OPTION_DECL;
+diff --git a/util-linux/dmesg.c b/util-linux/dmesg.c
+index 3aa99e5..1adb0fc 100644
+--- a/util-linux/dmesg.c
++++ b/util-linux/dmesg.c
+@@ -12,7 +12,7 @@
+ #include <sys/klog.h>
+ #include "libbb.h"
+ 
+-int dmesg_main(int argc, char **argv);
++int dmesg_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dmesg_main(int argc, char **argv)
+ {
+ 	char *size, *level;
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index a2b8b38..f67a283 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -309,7 +309,7 @@ static inline void showmode(struct fb_var_screeninfo *v)
+ #ifdef STANDALONE
+ int main(int argc, char **argv)
+ #else
+-int fbset_main(int argc, char **argv);
++int fbset_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int fbset_main(int argc, char **argv)
+ #endif
+ {
+diff --git a/util-linux/fdformat.c b/util-linux/fdformat.c
+index dc45e23..c4f97ae 100644
+--- a/util-linux/fdformat.c
++++ b/util-linux/fdformat.c
+@@ -1,12 +1,7 @@
+ /* vi: set sw=4 ts=4: */
+ /* fdformat.c  -  Low-level formats a floppy disk - Werner Almesberger */
+ 
+-/* 1999-02-22 Arkadiusz Mi¶kiewicz <misiek@pld.ORG.PL>
+- * - added Native Language Support
+- * 1999-03-20 Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+- * - more i18n/nls translatable strings marked
+- *
+- * 5 July 2003 -- modified for Busybox by Erik Andersen
++/* 5 July 2003 -- modified for Busybox by Erik Andersen
+  */
+ 
+ #include "libbb.h"
+@@ -45,8 +40,8 @@ struct format_descr {
+ #define FDGETPRM _IOR(2, 0x04, struct floppy_struct)
+ #define FD_FILL_BYTE 0xF6 /* format fill byte. */
+ 
+-int fdformat_main(int argc,char **argv);
+-int fdformat_main(int argc,char **argv)
++int fdformat_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int fdformat_main(int argc, char **argv)
+ {
+ 	int fd, n, cyl, read_bytes, verify;
+ 	unsigned char *data;
+@@ -116,7 +111,7 @@ int fdformat_main(int argc,char **argv)
+ 			/* Check backwards so we don't need a counter */
+ 			while (--read_bytes >= 0) {
+ 				if (data[read_bytes] != FD_FILL_BYTE) {
+-					 printf("bad data in cyl %d\nContinuing... ",cyl);
++					 printf("bad data in cyl %d\nContinuing... ", cyl);
+ 				}
+ 			}
+ 		}
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 9f30571..01c01bd 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -2735,7 +2735,7 @@ unknown_command(int c)
+ }
+ #endif
+ 
+-int fdisk_main(int argc, char **argv);
++int fdisk_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int fdisk_main(int argc, char **argv)
+ {
+ 	char *str_b, *str_C, *str_H, *str_S;
+diff --git a/util-linux/freeramdisk.c b/util-linux/freeramdisk.c
+index 4bd9378..bde6afc 100644
+--- a/util-linux/freeramdisk.c
++++ b/util-linux/freeramdisk.c
+@@ -14,7 +14,7 @@
+ /* From <linux/fd.h> */
+ #define FDFLUSH  _IO(2,0x4b)
+ 
+-int freeramdisk_main(int argc, char **argv);
++int freeramdisk_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int freeramdisk_main(int argc, char **argv)
+ {
+ 	int fd;
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index 5f92f35..deb82f7 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -1249,7 +1249,7 @@ static void check2(void)
+ void check2(void);
+ #endif
+ 
+-int fsck_minix_main(int argc, char **argv);
++int fsck_minix_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int fsck_minix_main(int argc, char **argv)
+ {
+ 	struct termios tmp;
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 4767d58..061750e 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -279,8 +279,8 @@ static const char getopt_longopts[] ALIGN1 =
+ 	;
+ #endif
+ 
+-int getopt_main(int argc, char *argv[]);
+-int getopt_main(int argc, char *argv[])
++int getopt_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int getopt_main(int argc, char **argv)
+ {
+ 	char *optstr = NULL;
+ 	char *name = NULL;
+diff --git a/util-linux/hexdump.c b/util-linux/hexdump.c
+index e294f19..e6820ae 100644
+--- a/util-linux/hexdump.c
++++ b/util-linux/hexdump.c
+@@ -54,7 +54,7 @@ static const struct suffix_mult suffixes[] = {
+ 	{ }
+ };
+ 
+-int hexdump_main(int argc, char **argv);
++int hexdump_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int hexdump_main(int argc, char **argv)
+ {
+ 	const char *p;
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index 09b09eb..f91379b 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -171,7 +171,7 @@ static int check_utc(void)
+ #define HWCLOCK_OPT_SYSTOHC     0x10
+ #define HWCLOCK_OPT_RTCFILE     0x20
+ 
+-int hwclock_main(int argc, char **argv);
++int hwclock_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int hwclock_main(int argc, char **argv)
+ {
+ 	unsigned opt;
+diff --git a/util-linux/ipcrm.c b/util-linux/ipcrm.c
+index f49d28e..a9400d1 100644
+--- a/util-linux/ipcrm.c
++++ b/util-linux/ipcrm.c
+@@ -76,7 +76,7 @@ static int remove_ids(type_id type, int argc, char **argv)
+ #endif /* IPCRM_LEGACY */
+ 
+ 
+-int ipcrm_main(int argc, char **argv);
++int ipcrm_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ipcrm_main(int argc, char **argv)
+ {
+ 	int c;
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index d532590..c7b46f5 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -558,7 +558,7 @@ static void print_sem(int semid)
+ 	bb_putchar('\n');
+ }
+ 
+-int ipcs_main(int argc, char **argv);
++int ipcs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ipcs_main(int argc, char **argv)
+ {
+ 	int id = 0;
+diff --git a/util-linux/losetup.c b/util-linux/losetup.c
+index c61af3d..a9ecfd5 100644
+--- a/util-linux/losetup.c
++++ b/util-linux/losetup.c
+@@ -11,7 +11,7 @@
+ 
+ #include "libbb.h"
+ 
+-int losetup_main(int argc, char **argv);
++int losetup_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int losetup_main(int argc, char **argv)
+ {
+ 	char dev[] = LOOP_NAME"0";
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 33dc5d3..a9c1469 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -287,7 +287,7 @@ static void load_firmware(const char *const firmware, const char *const sysfs_pa
+ 	}
+ }
+ 
+-int mdev_main(int argc, char **argv);
++int mdev_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mdev_main(int argc, char **argv)
+ {
+ 	char *action;
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 2b0697a..de9dde3 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -603,7 +603,7 @@ static void setup_tables(void)
+ 	printf("Maxsize=%ld\n", (long)SB_MAXSIZE);
+ }
+ 
+-int mkfs_minix_main(int argc, char **argv);
++int mkfs_minix_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mkfs_minix_main(int argc, char **argv)
+ {
+ 	struct mntent *mp;
+diff --git a/util-linux/mkswap.c b/util-linux/mkswap.c
+index 88f1fbb..af4cc10 100644
+--- a/util-linux/mkswap.c
++++ b/util-linux/mkswap.c
+@@ -8,7 +8,7 @@
+ 
+ #include "libbb.h"
+ 
+-int mkswap_main(int argc, char **argv);
++int mkswap_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mkswap_main(int argc, char **argv)
+ {
+ 	int fd, pagesize;
+diff --git a/util-linux/more.c b/util-linux/more.c
+index 0a21a9a..ee559b1 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -52,7 +52,7 @@ static void gotsig(int sig)
+ 
+ #define CONVERTED_TAB_SIZE 8
+ 
+-int more_main(int argc, char **argv);
++int more_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int more_main(int argc, char **argv)
+ {
+ 	int c = c; /* for gcc */
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 10ada54..7c58aef 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -1559,7 +1559,7 @@ static int singlemount(struct mntent *mp, int ignore_busy)
+ 
+ static const char must_be_root[] ALIGN1 = "you must be root";
+ 
+-int mount_main(int argc, char **argv);
++int mount_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mount_main(int argc, char **argv)
+ {
+ 	enum { OPT_ALL = 0x10 };
+diff --git a/util-linux/pivot_root.c b/util-linux/pivot_root.c
+index 929ed30..28af00c 100644
+--- a/util-linux/pivot_root.c
++++ b/util-linux/pivot_root.c
+@@ -12,7 +12,7 @@
+ 
+ extern int pivot_root(const char * new_root,const char * put_old);
+ 
+-int pivot_root_main(int argc, char **argv);
++int pivot_root_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int pivot_root_main(int argc, char **argv)
+ {
+ 	if (argc != 3)
+diff --git a/util-linux/rdate.c b/util-linux/rdate.c
+index 4387f04..150efbe 100644
+--- a/util-linux/rdate.c
++++ b/util-linux/rdate.c
+@@ -42,7 +42,7 @@ static time_t askremotedate(const char *host)
+ 	return ntohl(nett) - RFC_868_BIAS;
+ }
+ 
+-int rdate_main(int argc, char **argv);
++int rdate_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int rdate_main(int argc, char **argv)
+ {
+ 	time_t remote_time;
+diff --git a/util-linux/readprofile.c b/util-linux/readprofile.c
+index 1521376..dbe7c71 100644
+--- a/util-linux/readprofile.c
++++ b/util-linux/readprofile.c
+@@ -41,7 +41,7 @@
+ static const char defaultmap[] ALIGN1 = "/boot/System.map";
+ static const char defaultpro[] ALIGN1 = "/proc/profile";
+ 
+-int readprofile_main(int argc, char **argv);
++int readprofile_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int readprofile_main(int argc, char **argv)
+ {
+ 	FILE *map;
+diff --git a/util-linux/setarch.c b/util-linux/setarch.c
+index 08294e5..dbc02de 100644
+--- a/util-linux/setarch.c
++++ b/util-linux/setarch.c
+@@ -11,7 +11,7 @@
+ 
+ #include "libbb.h"
+ 
+-int setarch_main(int ATTRIBUTE_UNUSED argc, char **argv);
++int setarch_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int setarch_main(int ATTRIBUTE_UNUSED argc, char **argv)
+ {
+ 	int pers = -1;
+diff --git a/util-linux/swaponoff.c b/util-linux/swaponoff.c
+index db43aa5..6858d26 100644
+--- a/util-linux/swaponoff.c
++++ b/util-linux/swaponoff.c
+@@ -58,7 +58,7 @@ static int do_em_all(void)
+ 	return err;
+ }
+ 
+-int swap_on_off_main(int argc, char **argv);
++int swap_on_off_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int swap_on_off_main(int argc, char **argv)
+ {
+ 	int ret;
+diff --git a/util-linux/switch_root.c b/util-linux/switch_root.c
+index e4e9e21..700f799 100644
+--- a/util-linux/switch_root.c
++++ b/util-linux/switch_root.c
+@@ -64,7 +64,7 @@ static void delete_contents(const char *directory)
+ 	} else unlink(directory);
+ }
+ 
+-int switch_root_main(int argc, char **argv);
++int switch_root_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int switch_root_main(int argc, char **argv)
+ {
+ 	char *newroot, *console = NULL;
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index c57a49e..17d88b3 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -21,7 +21,7 @@
+ #define OPT_REMOUNT             (1 << 4)
+ #define OPT_ALL                 (ENABLE_FEATURE_UMOUNT_ALL ? (1 << 5) : 0)
+ 
+-int umount_main(int argc, char **argv);
++int umount_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int umount_main(int argc, char **argv)
+ {
+ 	int doForce;

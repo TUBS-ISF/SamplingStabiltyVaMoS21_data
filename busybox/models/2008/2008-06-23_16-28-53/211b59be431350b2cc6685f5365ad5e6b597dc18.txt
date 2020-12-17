@@ -1,0 +1,14 @@
+2008-06-23 16:28:53 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 4d7d14b..02eae7d 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2249,7 +2249,7 @@ static int free_pipe(struct pipe *pi, int indent)
+ 			debug_printf_clean("%s   (nil)\n", indenter(indent));
+ 		}
+ 		for (r = child->redirects; r; r = rnext) {
+-			debug_printf_clean("%s   redirect %d%s", indenter(indent), r->fd, redir_table[r->type].descrip);
++			debug_printf_clean("%s   redirect %d%s", indenter(indent), r->fd, redir_table[r->rd_type].descrip);
+ 			if (r->dup == -1) {
+ 				/* guard against the case >$FOO, where foo is unset or blank */
+ 				if (r->rd_filename) {

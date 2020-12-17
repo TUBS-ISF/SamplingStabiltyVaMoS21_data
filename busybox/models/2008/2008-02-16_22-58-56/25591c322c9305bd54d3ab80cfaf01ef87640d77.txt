@@ -1,0 +1,768 @@
+2008-02-16 22:58:56 +0000
+diff --git a/console-tools/resize.c b/console-tools/resize.c
+index b4cdf50..7f72b9a 100644
+--- a/console-tools/resize.c
++++ b/console-tools/resize.c
+@@ -37,10 +37,12 @@ int resize_main(int argc, char **argv)
+ 	new = old_termios;
+ 	new.c_cflag |= (CLOCAL | CREAD);
+ 	new.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+-	signal(SIGINT, onintr);
+-	signal(SIGQUIT, onintr);
+-	signal(SIGTERM, onintr);
+-	signal(SIGALRM, onintr);
++	bb_signals(0
++		+ (1 << SIGINT)
++		+ (1 << SIGQUIT)
++		+ (1 << SIGTERM)
++		+ (1 << SIGALRM)
++		, onintr);
+ 	tcsetattr(STDERR_FILENO, TCSANOW, &new);
+ 
+ 	/* save_cursor_pos 7
+diff --git a/coreutils/tee.c b/coreutils/tee.c
+index 13fb4a3..b388017 100644
+--- a/coreutils/tee.c
++++ b/coreutils/tee.c
+@@ -36,12 +36,12 @@ int tee_main(int argc, char **argv)
+ 	mode += (retval & 2);	/* Since 'a' is the 2nd option... */
+ 
+ 	if (retval & 1) {
+-		signal(SIGINT, SIG_IGN); /* TODO - switch to sigaction. */
++		signal(SIGINT, SIG_IGN); /* TODO - switch to sigaction. (why?) */
+ 	}
+ 	retval = EXIT_SUCCESS;
+ 	/* gnu tee ignores SIGPIPE in case one of the output files is a pipe
+ 	 * that doesn't consume all its input.  Good idea... */
+-	signal(SIGPIPE, SIG_IGN);	/* TODO - switch to sigaction. */
++	signal(SIGPIPE, SIG_IGN);
+ 
+ 	/* Allocate an array of FILE *'s, with one extra for a sentinal. */
+ 	fp = files = xzalloc(sizeof(FILE *) * (argc + 2));
+diff --git a/include/libbb.h b/include/libbb.h
+index f505cc7..67afcdf 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -274,14 +274,18 @@ char *xrealloc_getcwd_or_warn(char *cwd);
+ 
+ char *xmalloc_follow_symlinks(const char *path);
+ 
+-//TODO: signal(sid, f) is the same? then why?
+-extern void sig_catch(int,void (*)(int));
+-//#define sig_ignore(s) (sig_catch((s), SIG_IGN))
+-//#define sig_uncatch(s) (sig_catch((s), SIG_DFL))
+-extern void sig_block(int);
+-extern void sig_unblock(int);
+-/* UNUSED: extern void sig_blocknone(void); */
+-extern void sig_pause(void);
++//enum {
++//	BB_SIGS_FATAL = ,
++//};
++void bb_signals(int sigs, void (*f)(int));
++/* Unlike signal() and bb_signals, sets handler with sigaction()
++ * and in a way that while signal handler is run, no other signals
++ * will be blocked: */
++void bb_signals_recursive(int sigs, void (*f)(int));
++void sig_block(int);
++void sig_unblock(int);
++/* UNUSED: void sig_blocknone(void); */
++void sig_pause(void);
+ 
+ 
+ void xsetgid(gid_t gid);
+diff --git a/init/init.c b/init/init.c
+index 9e24817..080c5b3 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -319,15 +319,17 @@ static pid_t run(const struct init_action *a)
+ 	/* Child */
+ 
+ 	/* Reset signal handlers that were set by the parent process */
+-	signal(SIGUSR1, SIG_DFL);
+-	signal(SIGUSR2, SIG_DFL);
+-	signal(SIGINT, SIG_DFL);
+-	signal(SIGTERM, SIG_DFL);
+-	signal(SIGHUP, SIG_DFL);
+-	signal(SIGQUIT, SIG_DFL);
+-	signal(SIGCONT, SIG_DFL);
+-	signal(SIGSTOP, SIG_DFL);
+-	signal(SIGTSTP, SIG_DFL);
++	bb_signals(0
++		+ (1 << SIGUSR1)
++		+ (1 << SIGUSR2)
++		+ (1 << SIGINT)
++		+ (1 << SIGTERM)
++		+ (1 << SIGHUP)
++		+ (1 << SIGQUIT)
++		+ (1 << SIGCONT)
++		+ (1 << SIGSTOP)
++		+ (1 << SIGTSTP)
++		, SIG_DFL);
+ 
+ 	/* Create a new session and make ourself the process
+ 	 * group leader */
+@@ -349,9 +351,11 @@ static pid_t run(const struct init_action *a)
+ 
+ 		if (pid > 0) {
+ 			/* Parent - wait till the child is done */
+-			signal(SIGINT, SIG_IGN);
+-			signal(SIGTSTP, SIG_IGN);
+-			signal(SIGQUIT, SIG_IGN);
++			bb_signals(0
++				+ (1 << SIGINT)
++				+ (1 << SIGTSTP)
++				+ (1 << SIGQUIT)
++				, SIG_IGN);
+ 			signal(SIGCHLD, SIG_DFL);
+ 
+ 			waitfor(pid);
+@@ -864,15 +868,21 @@ int init_main(int argc, char **argv)
+ 		}
+ 		/* Set up sig handlers  -- be sure to
+ 		 * clear all of these in run() */
+-		signal(SIGHUP, exec_restart_action);
+-		signal(SIGQUIT, exec_restart_action);
+-		signal(SIGUSR1, halt_reboot_pwoff); /* halt */
+-		signal(SIGUSR2, halt_reboot_pwoff); /* poweroff */
+-		signal(SIGTERM, halt_reboot_pwoff); /* reboot */
++		bb_signals(0
++			+ (1 << SIGHUP)
++			+ (1 << SIGQUIT)
++			, exec_restart_action);
++		bb_signals(0
++			+ (1 << SIGUSR1)  /* halt */
++			+ (1 << SIGUSR2)  /* poweroff */
++			+ (1 << SIGTERM)  /* reboot */
++			, halt_reboot_pwoff);
+ 		signal(SIGINT, ctrlaltdel_signal);
+ 		signal(SIGCONT, cont_handler);
+-		signal(SIGSTOP, stop_handler);
+-		signal(SIGTSTP, stop_handler);
++		bb_signals(0
++			+ (1 << SIGSTOP)
++			+ (1 << SIGTSTP)
++			, stop_handler);
+ 
+ 		/* Turn off rebooting via CTL-ALT-DEL -- we get a
+ 		 * SIGINT on CAD so we can shut things down gracefully... */
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 2fb1b24..515368d 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -78,6 +78,7 @@ lib-y += safe_strncpy.o
+ lib-y += safe_write.o
+ lib-y += setup_environment.o
+ lib-y += sha1.o
++lib-y += signals.o
+ lib-y += simplify_path.o
+ lib-y += skip_whitespace.o
+ lib-y += speed_table.o
+diff --git a/libbb/signals.c b/libbb/signals.c
+new file mode 100644
+index 0000000..f7e4908
+--- /dev/null
++++ b/libbb/signals.c
+@@ -0,0 +1,80 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Utility routines.
++ *
++ * Copyright (C) 1999-2004 by Erik Andersen <andersen@codepoet.org>
++ * Copyright (C) 2006 Rob Landley
++ * Copyright (C) 2006 Denis Vlasenko
++ *
++ * Licensed under GPL version 2, see file LICENSE in this tarball for details.
++ */
++
++#include "libbb.h"
++
++void bb_signals(int sigs, void (*f)(int))
++{
++	int sig_no = 0;
++	int bit = 1;
++
++	while (sigs) {
++		if (sigs & bit) {
++			sigs &= ~bit;
++			signal(sig_no, f);
++		}
++		sig_no++;
++		bit <<= 1;
++	}
++}
++
++void bb_signals_recursive(int sigs, void (*f)(int))
++{
++	int sig_no = 0;
++	int bit = 1;
++	struct sigaction sa;
++
++	memset(&sa, 0, sizeof(sa));
++	sa.sa_handler = f;
++	/*sa.sa_flags = 0;*/
++	/*sigemptyset(&sa.sa_mask); - hope memset did it*/
++
++	while (sigs) {
++		if (sigs & bit) {
++			sigs &= ~bit;
++			sigaction(sig_no, &sa, NULL);
++		}
++		sig_no++;
++		bit <<= 1;
++	}
++}
++
++void sig_block(int sig)
++{
++	sigset_t ss;
++	sigemptyset(&ss);
++	sigaddset(&ss, sig);
++	sigprocmask(SIG_BLOCK, &ss, NULL);
++}
++
++void sig_unblock(int sig)
++{
++	sigset_t ss;
++	sigemptyset(&ss);
++	sigaddset(&ss, sig);
++	sigprocmask(SIG_UNBLOCK, &ss, NULL);
++}
++
++#if 0
++void sig_blocknone(void)
++{
++	sigset_t ss;
++	sigemptyset(&ss);
++	sigprocmask(SIG_SETMASK, &ss, NULL);
++}
++#endif
++
++void sig_pause(void)
++{
++	sigset_t ss;
++	sigemptyset(&ss);
++	sigsuspend(&ss);
++}
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 445e077..8dd414d 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -234,48 +234,6 @@ void xfflush_stdout(void)
+ 	}
+ }
+ 
+-void sig_block(int sig)
+-{
+-	sigset_t ss;
+-	sigemptyset(&ss);
+-	sigaddset(&ss, sig);
+-	sigprocmask(SIG_BLOCK, &ss, NULL);
+-}
+-
+-void sig_unblock(int sig)
+-{
+-	sigset_t ss;
+-	sigemptyset(&ss);
+-	sigaddset(&ss, sig);
+-	sigprocmask(SIG_UNBLOCK, &ss, NULL);
+-}
+-
+-#if 0
+-void sig_blocknone(void)
+-{
+-	sigset_t ss;
+-	sigemptyset(&ss);
+-	sigprocmask(SIG_SETMASK, &ss, NULL);
+-}
+-#endif
+-
+-void sig_catch(int sig, void (*f)(int))
+-{
+-	struct sigaction sa;
+-	sa.sa_handler = f;
+-	sa.sa_flags = 0;
+-	sigemptyset(&sa.sa_mask);
+-	sigaction(sig, &sa, NULL);
+-}
+-
+-void sig_pause(void)
+-{
+-	sigset_t ss;
+-	sigemptyset(&ss);
+-	sigsuspend(&ss);
+-}
+-
+-
+ void xsetenv(const char *key, const char *value)
+ {
+ 	if (setenv(key, value, 1))
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index 0df084e..2f85e9f 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -171,9 +171,11 @@ int passwd_main(int argc, char **argv)
+ 
+ 	rlimit_fsize.rlim_cur = rlimit_fsize.rlim_max = 512L * 30000;
+ 	setrlimit(RLIMIT_FSIZE, &rlimit_fsize);
+-	signal(SIGHUP, SIG_IGN);
+-	signal(SIGINT, SIG_IGN);
+-	signal(SIGQUIT, SIG_IGN);
++	bb_signals(0
++		+ (1 << SIGHUP)
++		+ (1 << SIGINT)
++		+ (1 << SIGQUIT)
++		, SIG_IGN);
+ 	umask(077);
+ 	xsetuid(0);
+ 
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 5ffebcd..85c5ec5 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -1355,8 +1355,10 @@ int less_main(int argc, char **argv)
+ 		empty_line_marker = "";
+ 
+ 	tcgetattr(kbd_fd, &term_orig);
+-	signal(SIGTERM, sig_catcher);
+-	signal(SIGINT, sig_catcher);
++	bb_signals(0
++		+ (1 << SIGTERM)
++		+ (1 << SIGINT)
++		, sig_catcher);
+ 	term_less = term_orig;
+ 	term_less.c_lflag &= ~(ICANON | ECHO);
+ 	term_less.c_iflag &= ~(IXON | ICRNL);
+diff --git a/miscutils/microcom.c b/miscutils/microcom.c
+index 63b07fd..b9ed9e4 100644
+--- a/miscutils/microcom.c
++++ b/miscutils/microcom.c
+@@ -99,10 +99,12 @@ int microcom_main(int argc, char **argv)
+ 	}
+ 
+ 	// setup signals
+-	sig_catch(SIGHUP,  signal_handler);
+-	sig_catch(SIGINT,  signal_handler);
+-	sig_catch(SIGTERM, signal_handler);
+-	sig_catch(SIGPIPE, signal_handler);
++	bb_signals_recursive(0
++			+ (1 << SIGHUP)
++			+ (1 << SIGINT)
++			+ (1 << SIGTERM)
++			+ (1 << SIGPIPE)
++			, signal_handler);
+ 
+ 	// error exit code if we fail to open the device
+ 	signalled = 1;
+diff --git a/miscutils/time.c b/miscutils/time.c
+index d21944e..677ca6d 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -61,7 +61,7 @@ static const char long_format[] ALIGN1 =
+    Return 0 on error, 1 if ok.  */
+ 
+ /* pid_t is short on BSDI, so don't try to promote it.  */
+-static int resuse_end(pid_t pid, resource_t * resp)
++static int resuse_end(pid_t pid, resource_t *resp)
+ {
+ 	int status;
+ 	pid_t caught;
+@@ -69,7 +69,7 @@ static int resuse_end(pid_t pid, resource_t * resp)
+ 	/* Ignore signals, but don't ignore the children.  When wait3
+ 	   returns the child process, set the time the command finished. */
+ 	while ((caught = wait3(&status, 0, &resp->ru)) != pid) {
+-		if (caught == -1)
++		if (caught == -1 && errno != EINTR)
+ 			return 0;
+ 	}
+ 	resp->elapsed_ms = (monotonic_us() / 1000) - resp->elapsed_ms;
+@@ -373,24 +373,26 @@ static void summarize(const char *fmt, char **command, resource_t * resp)
+ 
+ /* Run command CMD and return statistics on it.
+    Put the statistics in *RESP.  */
+-static void run_command(char *const *cmd, resource_t * resp)
++static void run_command(char *const *cmd, resource_t *resp)
+ {
+ 	pid_t pid;			/* Pid of child.  */
+-	__sighandler_t interrupt_signal, quit_signal;
++	void (*interrupt_signal)(int);
++	void (*quit_signal)(int);
+ 
+ 	resp->elapsed_ms = monotonic_us() / 1000;
+ 	pid = vfork();		/* Run CMD as child process.  */
+ 	if (pid < 0)
+ 		bb_error_msg_and_die("cannot fork");
+-	else if (pid == 0) {	/* If child.  */
++	if (pid == 0) {	/* If child.  */
+ 		/* Don't cast execvp arguments; that causes errors on some systems,
+ 		   versus merely warnings if the cast is left off.  */
+ 		BB_EXECVP(cmd[0], cmd);
+-		bb_error_msg("cannot run %s", cmd[0]);
+-		_exit(errno == ENOENT ? 127 : 126);
++		xfunc_error_retval = (errno == ENOENT ? 127 : 126);
++		bb_error_msg_and_die("cannot run %s", cmd[0]);
+ 	}
+ 
+ 	/* Have signals kill the child but not self (if possible).  */
++//TODO: just block all sigs? and reenable them in the very end in main?
+ 	interrupt_signal = signal(SIGINT, SIG_IGN);
+ 	quit_signal = signal(SIGQUIT, SIG_IGN);
+ 
+diff --git a/miscutils/watchdog.c b/miscutils/watchdog.c
+index e040c64..28bd358 100644
+--- a/miscutils/watchdog.c
++++ b/miscutils/watchdog.c
+@@ -47,8 +47,10 @@ int watchdog_main(int argc, char **argv)
+ 		bb_daemonize_or_rexec(DAEMON_CHDIR_ROOT, argv);
+ 	}
+ 
+-	signal(SIGHUP, watchdog_shutdown);
+-	signal(SIGINT, watchdog_shutdown);
++	bb_signals(0
++		+ (1 << SIGHUP)
++		+ (1 << SIGINT)
++		, watchdog_shutdown);
+ 
+ 	/* Use known fd # - avoid needing global 'int fd' */
+ 	xmove_fd(xopen(argv[argc - 1], O_WRONLY), 3);
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index 5e78861..0a52783 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -361,14 +361,16 @@ int dnsd_main(int argc, char **argv)
+ 	dnsentryinit();
+ 
+ 	signal(SIGINT, interrupt);
+-	/* why? signal(SIGPIPE, SIG_IGN); */
+-	signal(SIGHUP, SIG_IGN);
++	bb_signals(0
++		/* why? + (1 << SIGPIPE) */
++		+ (1 << SIGHUP)
+ #ifdef SIGTSTP
+-	signal(SIGTSTP, SIG_IGN);
++		+ (1 << SIGTSTP)
+ #endif
+ #ifdef SIGURG
+-	signal(SIGURG, SIG_IGN);
++		+ (1 << SIGURG)
+ #endif
++		, SIG_IGN);
+ 
+ 	lsa = xdotted2sockaddr(listen_interface, port);
+ 	udps = xsocket(lsa->u.sa.sa_family, SOCK_DGRAM, 0);
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 206c5e5..853577a 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -683,14 +683,18 @@ int nc_main(int argc, char **argv)
+ 	PTR_TO_GLOBALS = xzalloc(sizeof(G));
+ 
+ 	/* catch a signal or two for cleanup */
+-	signal(SIGINT, catch);
+-	signal(SIGQUIT, catch);
+-	signal(SIGTERM, catch);
++	bb_signals(0
++		+ (1 << SIGINT)
++		+ (1 << SIGQUIT)
++		+ (1 << SIGTERM)
++		, catch);
+ 	/* and suppress others... */
++	bb_signals(0
+ #ifdef SIGURG
+-	signal(SIGURG, SIG_IGN);
++		+ (1 << SIGURG)
+ #endif
+-	signal(SIGPIPE, SIG_IGN); /* important! */
++		+ (1 << SIGPIPE) /* important! */
++		, SIG_IGN);
+ 
+ 	proggie = argv;
+ 	while (*++proggie) {
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index 63305d1..fa995ab 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -111,8 +111,10 @@ static void launch_helper(const char **argv)
+ 		_exit(127);
+ 	}
+ 	// parent - check whether child is alive
+-	sig_catch(SIGCHLD, signal_handler);
+-	sig_catch(SIGALRM, signal_handler);
++	bb_signals_recursive(0
++			+ (1 << SIGCHLD)
++			+ (1 << SIGALRM)
++			, signal_handler);
+ 	signal_handler(SIGCHLD);
+ 	// child seems OK -> parent goes on
+ }
+diff --git a/networking/slattach.c b/networking/slattach.c
+index 17df4fa..e501d82 100644
+--- a/networking/slattach.c
++++ b/networking/slattach.c
+@@ -175,10 +175,12 @@ int slattach_main(int argc, char **argv)
+ 
+ 	/* Trap signals in order to restore tty states upon exit */
+ 	if (!(opt & OPT_e_quit)) {
+-		signal(SIGHUP, sig_handler);
+-		signal(SIGINT, sig_handler);
+-		signal(SIGQUIT, sig_handler);
+-		signal(SIGTERM, sig_handler);
++		bb_signals(0
++			+ (1 << SIGHUP)
++			+ (1 << SIGINT)
++			+ (1 << SIGQUIT)
++			+ (1 << SIGTERM)
++			, sig_handler);
+ 	}
+ 
+ 	/* Open tty */
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 962e5cc..0bffa97 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -279,8 +279,7 @@ make_new_session(
+ 	setsid();
+ 
+ 	/* Restore default signal handling */
+-	signal(SIGCHLD, SIG_DFL);
+-	signal(SIGPIPE, SIG_DFL);
++	bb_signals((1 << SIGCHLD) + (1 << SIGPIPE), SIG_DFL);
+ 
+ 	/* open the child's side of the tty. */
+ 	/* NB: setsid() disconnects from any previous ctty's. Therefore
+diff --git a/networking/udhcp/signalpipe.c b/networking/udhcp/signalpipe.c
+index 918abd0..1486b3b 100644
+--- a/networking/udhcp/signalpipe.c
++++ b/networking/udhcp/signalpipe.c
+@@ -42,9 +42,11 @@ void udhcp_sp_setup(void)
+ 	close_on_exec_on(signal_pipe.rd);
+ 	close_on_exec_on(signal_pipe.wr);
+ 	ndelay_on(signal_pipe.wr);
+-	signal(SIGUSR1, signal_handler);
+-	signal(SIGUSR2, signal_handler);
+-	signal(SIGTERM, signal_handler);
++	bb_signals(0
++		+ (1 << SIGUSR1)
++		+ (1 << SIGUSR2)
++		+ (1 << SIGTERM)
++		, signal_handler);
+ }
+ 
+ 
+diff --git a/procps/top.c b/procps/top.c
+index a47150e..f4bb509 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -772,8 +772,10 @@ int top_main(int argc, char **argv)
+ 	/* unbuffered input, turn off echo */
+ 	new_settings.c_lflag &= ~(ISIG | ICANON | ECHO | ECHONL);
+ 
+-	signal(SIGTERM, sig_catcher);
+-	signal(SIGINT, sig_catcher);
++	bb_signals(0
++		+ (1 << SIGTERM)
++		+ (1 << SIGINT)
++		, sig_catcher);
+ 	tcsetattr(0, TCSANOW, (void *) &new_settings);
+ 	atexit(reset_term);
+ #endif /* FEATURE_USE_TERMIOS */
+diff --git a/runit/runsv.c b/runit/runsv.c
+index e1d99e2..02271d6 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -345,8 +345,10 @@ static void startservice(struct svdir *s)
+ 				xdup2(logpipe.wr, 1);
+ 			}
+ 		}
+-		signal(SIGCHLD, SIG_DFL);
+-		signal(SIGTERM, SIG_DFL);
++		bb_signals(0
++			+ (1 << SIGCHLD)
++			+ (1 << SIGTERM)
++			, SIG_DFL);
+ 		sig_unblock(SIGCHLD);
+ 		sig_unblock(SIGTERM);
+ 		execvp(*run, run);
+@@ -460,9 +462,9 @@ int runsv_main(int argc, char **argv)
+ 	ndelay_on(selfpipe.wr);
+ 
+ 	sig_block(SIGCHLD);
+-	sig_catch(SIGCHLD, s_child);
++	bb_signals_recursive(1 << SIGCHLD, s_child);
+ 	sig_block(SIGTERM);
+-	sig_catch(SIGTERM, s_term);
++	bb_signals_recursive(1 << SIGTERM, s_term);
+ 
+ 	xchdir(dir);
+ 	/* bss: svd[0].pid = 0; */
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 4225ac1..3ff1d4c 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -100,8 +100,10 @@ static void runsv(int no, const char *name)
+ 		/* child */
+ 		if (set_pgrp)
+ 			setsid();
+-		signal(SIGHUP, SIG_DFL);
+-		signal(SIGTERM, SIG_DFL);
++		bb_signals(0
++			+ (1 << SIGHUP)
++			+ (1 << SIGTERM)
++			, SIG_DFL);
+ 		execvp(prog[0], prog);
+ 		fatal2_cannot("start runsv ", name);
+ 	}
+@@ -232,8 +234,8 @@ int runsvdir_main(int argc, char **argv)
+ 			bb_show_usage();
+ 	}
+ 
+-	sig_catch(SIGTERM, s_term);
+-	sig_catch(SIGHUP, s_hangup);
++	bb_signals_recursive(1 << SIGTERM, s_term);
++	bb_signals_recursive(1 << SIGHUP, s_hangup);
+ 	svdir = *argv++;
+ 	if (argv && *argv) {
+ 		rplog = *argv;
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 9c169da..73570da 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -222,9 +222,11 @@ static unsigned processorstart(struct logdir *ld)
+ 		int fd;
+ 
+ 		/* child */
+-		signal(SIGTERM, SIG_DFL);
+-		signal(SIGALRM, SIG_DFL);
+-		signal(SIGHUP, SIG_DFL);
++		bb_signals(0
++			+ (1 << SIGTERM)
++			+ (1 << SIGALRM)
++			+ (1 << SIGHUP)
++			, SIG_DFL);
+ 		sig_unblock(SIGTERM);
+ 		sig_unblock(SIGALRM);
+ 		sig_unblock(SIGHUP);
+@@ -903,10 +905,10 @@ int svlogd_main(int argc, char **argv)
+ 	sigaddset(&blocked_sigset, SIGALRM);
+ 	sigaddset(&blocked_sigset, SIGHUP);
+ 	sigprocmask(SIG_BLOCK, &blocked_sigset, NULL);
+-	sig_catch(SIGTERM, sig_term_handler);
+-	sig_catch(SIGCHLD, sig_child_handler);
+-	sig_catch(SIGALRM, sig_alarm_handler);
+-	sig_catch(SIGHUP, sig_hangup_handler);
++	bb_signals_recursive(1 << SIGTERM, sig_term_handler);
++	bb_signals_recursive(1 << SIGCHLD, sig_child_handler);
++	bb_signals_recursive(1 << SIGALRM, sig_alarm_handler);
++	bb_signals_recursive(1 << SIGHUP, sig_hangup_handler);
+ 
+ 	logdirs_reopen();
+ 
+diff --git a/shell/hush.c b/shell/hush.c
+index 8afa15e..4d48431 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -709,28 +709,34 @@ static void signal_SA_RESTART(int sig, void (*handler)(int))
+ /* Signals are grouped, we handle them in batches */
+ static void set_fatal_sighandler(void (*handler)(int))
+ {
+-	signal(SIGILL , handler);
+-	signal(SIGTRAP, handler);
+-	signal(SIGABRT, handler);
+-	signal(SIGFPE , handler);
+-	signal(SIGBUS , handler);
+-	signal(SIGSEGV, handler);
++	bb_signals(0
++		+ (1 << SIGILL)
++		+ (1 << SIGTRAP)
++		+ (1 << SIGABRT)
++		+ (1 << SIGFPE)
++		+ (1 << SIGBUS)
++		+ (1 << SIGSEGV)
+ 	/* bash 3.2 seems to handle these just like 'fatal' ones */
+-	signal(SIGHUP , handler);
+-	signal(SIGPIPE, handler);
+-	signal(SIGALRM, handler);
++		+ (1 << SIGHUP)
++		+ (1 << SIGPIPE)
++		+ (1 << SIGALRM)
++		, handler);
+ }
+ static void set_jobctrl_sighandler(void (*handler)(int))
+ {
+-	signal(SIGTSTP, handler);
+-	signal(SIGTTIN, handler);
+-	signal(SIGTTOU, handler);
++	bb_signals(0
++		+ (1 << SIGTSTP)
++		+ (1 << SIGTTIN)
++		+ (1 << SIGTTOU)
++		, handler);
+ }
+ static void set_misc_sighandler(void (*handler)(int))
+ {
+-	signal(SIGINT , handler);
+-	signal(SIGQUIT, handler);
+-	signal(SIGTERM, handler);
++	bb_signals(0
++		+ (1 << SIGINT)
++		+ (1 << SIGQUIT)
++		+ (1 << SIGTERM)
++		, handler);
+ }
+ /* SIGCHLD is special and handled separately */
+ 
+diff --git a/sysklogd/klogd.c b/sysklogd/klogd.c
+index d65b6f9..6a675b8 100644
+--- a/sysklogd/klogd.c
++++ b/sysklogd/klogd.c
+@@ -57,9 +57,10 @@ int klogd_main(int argc, char **argv)
+ 	openlog("kernel", 0, LOG_KERN);
+ 
+ 	/* Set up sig handlers */
+-	signal(SIGINT, klogd_signal);
+-	signal(SIGKILL, klogd_signal);
+-	signal(SIGTERM, klogd_signal);
++	bb_signals(0
++		+ (1 << SIGINT)
++		+ (1 << SIGTERM)
++		, klogd_signal);
+ 	signal(SIGHUP, SIG_IGN);
+ 
+ 	/* "Open the log. Currently a NOP." */
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 457f381..c6e0571 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -540,9 +540,11 @@ static void do_syslogd(void)
+ 	int sock_fd;
+ 
+ 	/* Set up signal handlers */
+-	signal(SIGINT, quit_signal);
+-	signal(SIGTERM, quit_signal);
+-	signal(SIGQUIT, quit_signal);
++	bb_signals(0
++		+ (1 << SIGINT)
++		+ (1 << SIGTERM)
++		+ (1 << SIGQUIT)
++		, quit_signal);
+ 	signal(SIGHUP, SIG_IGN);
+ 	/* signal(SIGCHLD, SIG_IGN); - why? */
+ #ifdef SYSLOGD_MARK
+diff --git a/util-linux/more.c b/util-linux/more.c
+index 2d7f3a9..eeeea50 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -87,9 +87,11 @@ int more_main(int argc, char **argv)
+ 	new_settings.c_cc[VMIN] = 1;
+ 	new_settings.c_cc[VTIME] = 0;
+ 	setTermSettings(cin_fileno, &new_settings);
+-	signal(SIGINT, gotsig);
+-	signal(SIGQUIT, gotsig);
+-	signal(SIGTERM, gotsig);
++	bb_signals(0
++		+ (1 << SIGINT)
++		+ (1 << SIGQUIT)
++		+ (1 << SIGTERM)
++		, gotsig);
+ #endif
+ 
+ 	do {

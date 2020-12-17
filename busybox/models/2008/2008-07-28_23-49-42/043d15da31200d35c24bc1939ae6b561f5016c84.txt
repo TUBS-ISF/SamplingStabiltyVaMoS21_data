@@ -1,0 +1,14 @@
+2008-07-28 23:49:42 +0000
+diff --git a/coreutils/tr.c b/coreutils/tr.c
+index 28798fe..860b812 100644
+--- a/coreutils/tr.c
++++ b/coreutils/tr.c
+@@ -135,6 +135,8 @@ static unsigned int expand(const char *arg, char *buffer)
+ 			/* "[xyz...", i=x, arg points to y */
+ 			if (ENABLE_FEATURE_TR_EQUIV && i == '=') { /* [=CHAR=] */
+ 				*buffer++ = *arg; /* copy CHAR */
++				if (!*arg || arg[1] != '=' || arg[2] != ']')
++					bb_show_usage();
+ 				arg += 3;	/* skip CHAR=] */
+ 				continue;
+ 			}

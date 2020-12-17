@@ -1,0 +1,885 @@
+2008-05-19 09:29:47 +0000
+diff --git a/applets/individual.c b/applets/individual.c
+index 0c7a4b7..414a11b 100644
+--- a/applets/individual.c
++++ b/applets/individual.c
+@@ -22,5 +22,5 @@ void bb_show_usage(void)
+ {
+ 	printf(APPLET_full_usage "\n");
+ 
+-	exit(1);
++	exit(EXIT_FAILURE);
+ }
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index 0be29b7..187552c 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -99,7 +99,7 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 	 * "tar: A lone zero block at N", where N = kilobyte
+ 	 * where EOF was met (not EOF block, actual EOF!),
+ 	 * and tar will exit with error code 0.
+-	 * We will mimic exit(0), although we will not mimic
++	 * We will mimic exit(EXIT_SUCCESS), although we will not mimic
+ 	 * the message and we don't check whether we indeed
+ 	 * saw zero block directly before this. */
+ 	if (i == 0)
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index 8fb8602..d0a2b7c 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -40,7 +40,7 @@ int open_transformer(int src_fd,
+ 			close(fd_pipe.wr); /* Send EOF */
+ 			close(src_fd);
+ 		}
+-		exit(0);
++		exit(EXIT_SUCCESS);
+ #else
+ 		{
+ 			char *argv[4];
+diff --git a/archival/tar.c b/archival/tar.c
+index be59f04..545081a 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -552,7 +552,7 @@ static void NOINLINE vfork_compressor(int tar_fd, int gzip)
+ 		/* exec gzip/bzip2 program/applet */
+ 		BB_EXECLP(zip_exec, zip_exec, "-f", NULL);
+ 		vfork_exec_errno = errno;
+-		_exit(1);
++		_exit(EXIT_FAILURE);
+ 	}
+ 
+ 	/* parent */
+diff --git a/console-tools/resize.c b/console-tools/resize.c
+index 01b1442..8a50f9d 100644
+--- a/console-tools/resize.c
++++ b/console-tools/resize.c
+@@ -17,7 +17,7 @@ static void
+ onintr(int sig ATTRIBUTE_UNUSED)
+ {
+ 	tcsetattr(STDERR_FILENO, TCSANOW, &old_termios);
+-	exit(1);
++	exit(EXIT_FAILURE);
+ }
+ 
+ int resize_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index 8a08a9a..8a93057 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -179,7 +179,7 @@ int cal_main(int argc, char **argv)
+ 		}
+ 	}
+ 
+-	fflush_stdout_and_exit(0);
++	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }
+ 
+ /*
+diff --git a/coreutils/env.c b/coreutils/env.c
+index 20cf348..e21740d 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -85,7 +85,7 @@ int env_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		puts(*ep);
+ 	}
+ 
+-	fflush_stdout_and_exit(0);
++	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }
+ 
+ /*
+diff --git a/coreutils/printenv.c b/coreutils/printenv.c
+index 31d76d7..2fc01f2 100644
+--- a/coreutils/printenv.c
++++ b/coreutils/printenv.c
+@@ -29,5 +29,5 @@ int printenv_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		}
+ 	}
+ 
+-	fflush_stdout_and_exit(0);
++	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }
+diff --git a/coreutils/printf.c b/coreutils/printf.c
+index a12f7ca..7c76131 100644
+--- a/coreutils/printf.c
++++ b/coreutils/printf.c
+@@ -266,7 +266,7 @@ static char **print_formatted(char *format, char **argv)
+ 			break;
+ 		case '\\':
+ 			if (*++f == 'c')
+-				exit(0);
++				exit(EXIT_SUCCESS);
+ 			bb_putchar(bb_process_escape_sequence((const char **)&f));
+ 			f--;
+ 			break;
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 5242599..8d73bdc 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -403,7 +403,7 @@ int start_stop_daemon_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			/* parent */
+ 			/* why _exit? the child may have changed the stack,
+ 			 * so "return 0" may do bad things */
+-			_exit(0);
++			_exit(EXIT_SUCCESS);
+ 		}
+ 		/* child */
+ 		setsid(); /* detach from controlling tty */
+diff --git a/findutils/grep.c b/findutils/grep.c
+index b319e22..6af1b46 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -35,7 +35,7 @@
+ enum {
+ 	OPTBIT_l, /* list matched file names only */
+ 	OPTBIT_n, /* print line# */
+-	OPTBIT_q, /* quiet - exit(0) of first match */
++	OPTBIT_q, /* quiet - exit(EXIT_SUCCESS) of first match */
+ 	OPTBIT_v, /* invert the match, to select non-matching lines */
+ 	OPTBIT_s, /* suppress errors about file open errors */
+ 	OPTBIT_c, /* count matches per file (suppresses normal output) */
+@@ -224,7 +224,7 @@ static int grep_file(FILE *file)
+ 					 * "exit immediately with zero status
+ 					 * if any match is found,
+ 					 * even if errors were detected" */
+-					exit(0);
++					exit(EXIT_SUCCESS);
+ 				}
+ 				/* if we're just printing filenames, we stop after the first match */
+ 				if (PRINT_FILES_WITH_MATCHES) {
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index d1cf192..352f7e6 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -517,7 +517,7 @@ void bb_show_usage(void)
+ {
+ 	fprintf(stderr, "Usage: %s [-p] [-r] [-t] -[x] [-n max_arg] [-s max_chars]\n",
+ 		applet_name);
+-	exit(1);
++	exit(EXIT_FAILURE);
+ }
+ 
+ int main(int argc, char **argv)
+diff --git a/init/init.c b/init/init.c
+index e2fde5f..63154ce 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -301,7 +301,7 @@ static void open_stdio_to_tty(const char* tty_name, int exit_on_failure)
+ 			message(L_LOG | L_CONSOLE, "Can't open %s: %s",
+ 				tty_name, strerror(errno));
+ 			if (exit_on_failure)
+-				_exit(1);
++				_exit(EXIT_FAILURE);
+ 			if (ENABLE_DEBUG_INIT)
+ 				_exit(2);
+ 		/* NB: we don't reach this if we were called after vfork.
+@@ -415,7 +415,7 @@ static pid_t run(const struct init_action *a)
+ 		pid = fork();
+ 		if (pid < 0) {
+ 			message(L_LOG | L_CONSOLE, "Can't fork");
+-			_exit(1);
++			_exit(EXIT_FAILURE);
+ 		}
+ 
+ 		if (pid > 0) {
+@@ -430,21 +430,21 @@ static pid_t run(const struct init_action *a)
+ 			waitfor(pid);
+ 			/* See if stealing the controlling tty back is necessary */
+ 			if (tcgetpgrp(0) != getpid())
+-				_exit(0);
++				_exit(EXIT_SUCCESS);
+ 
+ 			/* Use a temporary process to steal the controlling tty. */
+ 			pid = fork();
+ 			if (pid < 0) {
+ 				message(L_LOG | L_CONSOLE, "Can't fork");
+-				_exit(1);
++				_exit(EXIT_FAILURE);
+ 			}
+ 			if (pid == 0) {
+ 				setsid();
+ 				ioctl(0, TIOCSCTTY, 1);
+-				_exit(0);
++				_exit(EXIT_SUCCESS);
+ 			}
+ 			waitfor(pid);
+-			_exit(0);
++			_exit(EXIT_SUCCESS);
+ 		}
+ 
+ 		/* Child - fall though to actually execute things */
+@@ -531,13 +531,13 @@ static void run_actions(int action_type)
+ static void init_reboot(unsigned long magic)
+ {
+ 	pid_t pid;
+-	/* We have to fork here, since the kernel calls do_exit(0) in
++	/* We have to fork here, since the kernel calls do_exit(EXIT_SUCCESS) in
+ 	 * linux/kernel/sys.c, which can cause the machine to panic when
+ 	 * the init process is killed.... */
+ 	pid = vfork();
+ 	if (pid == 0) { /* child */
+ 		reboot(magic);
+-		_exit(0);
++		_exit(EXIT_SUCCESS);
+ 	}
+ 	waitfor(pid);
+ }
+@@ -821,7 +821,7 @@ static void reload_signal(int sig ATTRIBUTE_UNUSED)
+ 					kill(pid, SIGKILL);
+ 				}
+ 			}
+-			_exit(0);
++			_exit(EXIT_SUCCESS);
+ 		}
+ #endif
+ 	}
+@@ -936,7 +936,7 @@ int init_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			/* SELinux in enforcing mode but load_policy failed */
+ 			message(L_CONSOLE, "Cannot load SELinux Policy. "
+ 				"Machine is in enforcing mode. Halting now.");
+-			exit(1);
++			exit(EXIT_FAILURE);
+ 		}
+ 	}
+ #endif /* CONFIG_SELINUX */
+diff --git a/libbb/signals.c b/libbb/signals.c
+index 685c552..1342c89 100644
+--- a/libbb/signals.c
++++ b/libbb/signals.c
+@@ -89,7 +89,7 @@ void kill_myself_with_sig(int sig)
+ 	signal(sig, SIG_DFL);
+ 	sig_unblock(sig);
+ 	raise(sig);
+-	_exit(1); /* Should not reach it */
++	_exit(EXIT_FAILURE); /* Should not reach it */
+ }
+ 
+ void signal_SA_RESTART_empty_mask(int sig, void (*handler)(int))
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 7064eb3..9624efb 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -230,7 +230,7 @@ void forkexit_or_rexec(char **argv)
+ 	if (pid < 0) /* wtf? */
+ 		bb_perror_msg_and_die("vfork");
+ 	if (pid) /* parent */
+-		exit(0);
++		exit(EXIT_SUCCESS);
+ 	/* child - re-exec ourself */
+ 	re_exec(argv);
+ }
+@@ -244,7 +244,7 @@ void forkexit_or_rexec(void)
+ 	if (pid < 0) /* wtf? */
+ 		bb_perror_msg_and_die("fork");
+ 	if (pid) /* parent */
+-		exit(0);
++		exit(EXIT_SUCCESS);
+ 	/* child */
+ }
+ #define forkexit_or_rexec(argv) forkexit_or_rexec()
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 5e16182..f022aec 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -423,7 +423,7 @@ static char *get_logname(char *logname, unsigned size_logname,
+ 			/* Do not report trivial EINTR/EIO errors. */
+ 			if (read(0, &c, 1) < 1) {
+ 				if (errno == EINTR || errno == EIO)
+-					exit(0);
++					exit(EXIT_SUCCESS);
+ 				bb_perror_msg_and_die("%s: read", op->tty);
+ 			}
+ 
+@@ -475,7 +475,7 @@ static char *get_logname(char *logname, unsigned size_logname,
+ 				}
+ 				break;
+ 			case CTL('D'):
+-				exit(0);
++				exit(EXIT_SUCCESS);
+ 			default:
+ 				if (!isascii(ascval) || !isprint(ascval)) {
+ 					/* ignore garbage characters */
+diff --git a/loginutils/login.c b/loginutils/login.c
+index e8fe74e..900a7c0 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -130,7 +130,7 @@ static void die_if_nologin(void)
+ 		fclose(fp);
+ 	} else
+ 		puts("\r\nSystem closed for routine maintenance\r");
+-	exit(1);
++	exit(EXIT_FAILURE);
+ }
+ #else
+ static ALWAYS_INLINE void die_if_nologin(void) {}
+@@ -178,18 +178,18 @@ static void get_username_or_die(char *buf, int size_buf)
+ 	/* skip whitespace */
+ 	do {
+ 		c = getchar();
+-		if (c == EOF) exit(1);
++		if (c == EOF) exit(EXIT_FAILURE);
+ 		if (c == '\n') {
+-			if (!--cntdown) exit(1);
++			if (!--cntdown) exit(EXIT_FAILURE);
+ 			goto prompt;
+ 		}
+ 	} while (isspace(c));
+ 
+ 	*buf++ = c;
+ 	if (!fgets(buf, size_buf-2, stdin))
+-		exit(1);
++		exit(EXIT_FAILURE);
+ 	if (!strchr(buf, '\n'))
+-		exit(1);
++		exit(EXIT_FAILURE);
+ 	while (isgraph(*buf)) buf++;
+ 	*buf = '\0';
+ }
+diff --git a/loginutils/vlock.c b/loginutils/vlock.c
+index 96c1f67..3ce40dd 100644
+--- a/loginutils/vlock.c
++++ b/loginutils/vlock.c
+@@ -102,5 +102,5 @@ int vlock_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	ioctl(STDIN_FILENO, VT_SETMODE, &ovtm);
+ 	tcsetattr(STDIN_FILENO, TCSANOW, &oterm);
+-	fflush_stdout_and_exit(0);
++	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 6db4df4..2bed5a4 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -797,7 +797,7 @@ ForkJob(const char *user, CronLine *line, int mailFd,
+ 		if (mail_filename) {
+ 			fdprintf(1, "Exec failed: %s -c %s\n", prog, arg);
+ 		}
+-		_exit(0);
++		_exit(EXIT_SUCCESS);
+ 	}
+ 
+ 	line->cl_Pid = pid;
+@@ -930,7 +930,7 @@ static void RunJob(const char *user, CronLine *line)
+ 		execl(DEFAULT_SHELL, DEFAULT_SHELL, "-c", line->cl_Shell, NULL);
+ 		crondlog(ERR20 "can't exec, user %s cmd %s %s %s", user,
+ 				 DEFAULT_SHELL, "-c", line->cl_Shell);
+-		_exit(0);
++		_exit(EXIT_SUCCESS);
+ 	}
+ 	if (pid < 0) {
+ 		/* FORK FAILED */
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index bb6b679..782457a 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -283,9 +283,9 @@ static const char bb_msg_variable_not_found[] ALIGN1 = "variable: %s not found";
+ #else
+ #define info_logger(p, fmt, args...)
+ #define msg_logger(p, fmt, args...)
+-#define msg_logger_and_die(p, fmt, args...)           exit(1)
++#define msg_logger_and_die(p, fmt, args...)           exit(EXIT_FAILURE)
+ #define error_logger(p, fmt, args...)
+-#define error_logger_and_die(p, fmt, args...)         exit(1)
++#define error_logger_and_die(p, fmt, args...)         exit(EXIT_FAILURE)
+ #endif
+ 
+ static void safe_memcpy(char *dest, const char *src, int len)
+@@ -402,7 +402,7 @@ int devfsd_main(int argc, char **argv)
+ 	dir_operation(SERVICE, mount_point, 0, NULL);
+ 
+ 	if (ENABLE_DEVFSD_FG_NP && no_polling)
+-		exit(0);
++		exit(EXIT_SUCCESS);
+ 
+ 	if (ENABLE_DEVFSD_VERBOSE || ENABLE_DEBUG)
+ 		logmode = LOGMODE_BOTH;
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 25b91c0..f69bce9 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -882,7 +882,7 @@ static void colon_process(void)
+ 		change_file(-1);
+ 		break;
+ 	case 'q':
+-		less_exit(0);
++		less_exit(EXIT_SUCCESS);
+ 		break;
+ 	case 'x':
+ 		change_file(0);
+@@ -1270,7 +1270,7 @@ static void keypress_process(int keypress)
+ 		buffer_line(cur_fline);
+ 		break;
+ 	case 'q': case 'Q':
+-		less_exit(0);
++		less_exit(EXIT_SUCCESS);
+ 		break;
+ #if ENABLE_FEATURE_LESS_MARKS
+ 	case 'm':
+diff --git a/miscutils/time.c b/miscutils/time.c
+index ed43859..a6d158c 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -424,5 +424,5 @@ int time_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		return WTERMSIG(res.waitstatus);
+ 	if (WIFEXITED(res.waitstatus))
+ 		return WEXITSTATUS(res.waitstatus);
+-	fflush_stdout_and_exit(0);
++	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }
+diff --git a/miscutils/watchdog.c b/miscutils/watchdog.c
+index a5061f5..4ad21cb 100644
+--- a/miscutils/watchdog.c
++++ b/miscutils/watchdog.c
+@@ -20,7 +20,7 @@ static void watchdog_shutdown(int sig ATTRIBUTE_UNUSED)
+ 	write(3, &V, 1);	/* Magic, see watchdog-api.txt in kernel */
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		close(3);
+-	exit(0);
++	exit(EXIT_SUCCESS);
+ }
+ 
+ int watchdog_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 3be9dcb..08c0995 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -1124,7 +1124,7 @@ static void clean_up_and_exit(int sig ATTRIBUTE_UNUSED)
+ 			close(sep->se_fd);
+ 	}
+ 	remove_pidfile(_PATH_INETDPID);
+-	exit(0);
++	exit(EXIT_SUCCESS);
+ }
+ 
+ int inetd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+@@ -1344,7 +1344,7 @@ int inetd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				else
+ 					sep->se_builtin->bi_dgram_fn(ctrl, sep);
+ 				if (pid) /* we did vfork */
+-					_exit(1);
++					_exit(EXIT_FAILURE);
+ 				maybe_close(accepted_fd);
+ 				continue; /* -> check next fd in fd set */
+ 			}
+@@ -1408,7 +1408,7 @@ int inetd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			/* eat packet in udp case */
+ 			if (sep->se_socktype != SOCK_STREAM)
+ 				recv(0, line, LINE_SIZE, MSG_DONTWAIT);
+-			_exit(1);
++			_exit(EXIT_FAILURE);
+ 		} /* for (sep = servtab...) */
+ 	} /* for (;;) */
+ }
+@@ -1441,7 +1441,7 @@ static void echo_stream(int s, servtab_t *sep ATTRIBUTE_UNUSED)
+ 	close(STDERR_FILENO);
+ 	xopen("/dev/null", O_WRONLY);
+ 	BB_EXECVP("cat", (char**)cat_args);
+-	/* on failure we return to main, which does exit(1) */
++	/* on failure we return to main, which does exit(EXIT_FAILURE) */
+ #endif
+ }
+ static void echo_dg(int s, servtab_t *sep)
+@@ -1479,7 +1479,7 @@ static void discard_stream(int s, servtab_t *sep ATTRIBUTE_UNUSED)
+ 	/* no error messages please... */
+ 	xdup2(STDOUT_FILENO, STDERR_FILENO);
+ 	BB_EXECVP("cat", (char**)cat_args);
+-	/* on failure we return to main, which does exit(1) */
++	/* on failure we return to main, which does exit(EXIT_FAILURE) */
+ #endif
+ }
+ /* ARGSUSED */
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index 1190b68..752d812 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -284,7 +284,7 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 				struct ip_tunnel_parm old_p;
+ 				memset(&old_p, 0, sizeof(old_p));
+ 				if (do_get_ioctl(*argv, &old_p))
+-					exit(1);
++					exit(EXIT_FAILURE);
+ 				*p = old_p;
+ 			}
+ 		}
+diff --git a/networking/nc.c b/networking/nc.c
+index 7d4a6e0..27c58a8 100644
+--- a/networking/nc.c
++++ b/networking/nc.c
+@@ -183,7 +183,7 @@ int nc_main(int argc, char **argv)
+ 				nread = safe_read(fd, iobuf, sizeof(iobuf));
+ 				if (fd == cfd) {
+ 					if (nread < 1)
+-						exit(0);
++						exit(EXIT_SUCCESS);
+ 					ofd = STDOUT_FILENO;
+ 				} else {
+ 					if (nread<1) {
+diff --git a/networking/ping.c b/networking/ping.c
+index c3a7107..3ac9481 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -755,7 +755,7 @@ int ping_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	dotted = xmalloc_sockaddr2dotted_noport(&lsa->u.sa);
+ 	ping(lsa);
+-	print_stats_and_exit(0);
++	print_stats_and_exit(EXIT_SUCCESS);
+ 	/*return EXIT_SUCCESS;*/
+ }
+ #endif /* FEATURE_FANCY_PING */
+diff --git a/networking/slattach.c b/networking/slattach.c
+index 3ffbb3b..96dec7e 100644
+--- a/networking/slattach.c
++++ b/networking/slattach.c
+@@ -110,13 +110,13 @@ static void set_state(struct termios *state, int encap)
+ 	/* Set encapsulation (SLIP, CSLIP, etc) */
+ 	if (ioctl_or_warn(handle, SIOCSIFENCAP, &encap) < 0) {
+  bad:
+-		restore_state_and_exit(1);
++		restore_state_and_exit(EXIT_FAILURE);
+ 	}
+ }
+ 
+ static void sig_handler(int signo ATTRIBUTE_UNUSED)
+ {
+-	restore_state_and_exit(0);
++	restore_state_and_exit(EXIT_SUCCESS);
+ }
+ 
+ int slattach_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+@@ -239,5 +239,5 @@ int slattach_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		system(extcmd);
+ 
+ 	/* Restore states and exit */
+-	restore_state_and_exit(0);
++	restore_state_and_exit(EXIT_SUCCESS);
+ }
+diff --git a/networking/telnet.c b/networking/telnet.c
+index 32e9993..b357e69 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -122,7 +122,7 @@ static void conescape(void)
+ 			" e	exit telnet\r\n");
+ 
+ 	if (read(0, &b, 1) <= 0)
+-		doexit(1);
++		doexit(EXIT_FAILURE);
+ 
+ 	switch (b) {
+ 	case 'l':
+@@ -143,7 +143,7 @@ static void conescape(void)
+ 		rawmode();
+ 		break;
+ 	case 'e':
+-		doexit(0);
++		doexit(EXIT_SUCCESS);
+ 	}
+ 
+ 	write_str(1, "continuing...\r\n");
+@@ -634,7 +634,7 @@ int telnet_main(int argc, char **argv)
+ 			{
+ 				len = read(0, G.buf, DATABUFSIZE);
+ 				if (len <= 0)
+-					doexit(0);
++					doexit(EXIT_SUCCESS);
+ 				TRACE(0, ("Read con: %d\n", len));
+ 				handlenetoutput(len);
+ 			}
+@@ -648,7 +648,7 @@ int telnet_main(int argc, char **argv)
+ 				len = read(G.netfd, G.buf, DATABUFSIZE);
+ 				if (len <= 0) {
+ 					write_str(1, "Connection closed by foreign host\r\n");
+-					doexit(1);
++					doexit(EXIT_FAILURE);
+ 				}
+ 				TRACE(0, ("Read netfd (%d): %d\n", G.netfd, len));
+ 				handlenetinput(len);
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index e312c0b..3660d78 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -262,7 +262,7 @@ make_new_session(
+ 	BB_EXECVP(loginpath, (char **)login_argv);
+ 	/* _exit is safer with vfork, and we shouldn't send message
+ 	 * to remote clients anyway */
+-	_exit(1); /*bb_perror_msg_and_die("execv %s", loginpath);*/
++	_exit(EXIT_FAILURE); /*bb_perror_msg_and_die("execv %s", loginpath);*/
+ }
+ 
+ /* Must match getopt32 string */
+@@ -281,7 +281,7 @@ free_session(struct tsession *ts)
+ 	struct tsession *t = sessions;
+ 
+ 	if (option_mask32 & OPT_INETD)
+-		exit(0);
++		exit(EXIT_SUCCESS);
+ 
+ 	/* Unlink this telnet session from the session list */
+ 	if (t == ts)
+@@ -325,7 +325,7 @@ free_session(struct tsession *ts)
+ 
+ #else /* !FEATURE_TELNETD_STANDALONE */
+ 
+-/* Used in main() only, thus "return 0" actually is exit(0). */
++/* Used in main() only, thus "return 0" actually is exit(EXIT_SUCCESS). */
+ #define free_session(ts) return 0
+ 
+ #endif
+diff --git a/procps/top.c b/procps/top.c
+index ed74879..de30ffb 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -523,7 +523,7 @@ static void reset_term(void)
+ static void sig_catcher(int sig ATTRIBUTE_UNUSED)
+ {
+ 	reset_term();
+-	exit(1);
++	exit(EXIT_FAILURE);
+ }
+ #endif /* FEATURE_USE_TERMIOS */
+ 
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 2ab034a..e3b507d 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -640,7 +640,7 @@ int runsv_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 		if (svd[0].want == W_EXIT && svd[0].state == S_DOWN) {
+ 			if (svd[1].pid == 0)
+-				_exit(0);
++				_exit(EXIT_SUCCESS);
+ 			if (svd[1].want != W_EXIT) {
+ 				svd[1].want = W_EXIT;
+ 				/* stopservice(&svd[1]); */
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 32e4764..b4450c0 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -343,7 +343,7 @@ int runsvdir_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 		switch (exitsoon) {
+ 		case 1:
+-			_exit(0);
++			_exit(EXIT_SUCCESS);
+ 		case 2:
+ 			for (i = 0; i < svnum; i++)
+ 				if (sv[i].pid)
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index 02bb911..82e9e53 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -612,7 +612,7 @@ int setfiles_main(int argc, char **argv)
+ 		optind++;
+ 
+ 		if (nerr)
+-			exit(1);
++			exit(EXIT_FAILURE);
+ 	}
+ 
+ 	if (input_filename) {
+diff --git a/shell/ash.c b/shell/ash.c
+index b45229b..fa063bf 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -4789,7 +4789,7 @@ openhere(union node *redir)
+ 			full_write(pip[1], redir->nhere.doc->narg.text, len);
+ 		else
+ 			expandhere(redir->nhere.doc, pip[1]);
+-		_exit(0);
++		_exit(EXIT_SUCCESS);
+ 	}
+  out:
+ 	close(pip[1]);
+diff --git a/shell/ash_test/printenv.c b/shell/ash_test/printenv.c
+index 06df21f..c4ccda8 100644
+--- a/shell/ash_test/printenv.c
++++ b/shell/ash_test/printenv.c
+@@ -45,7 +45,7 @@ main (argc, argv)
+     {
+       for (envp = environ; *envp; envp++)
+ 	puts (*envp);
+-      exit (0);
++      exit(EXIT_SUCCESS);
+     }
+ 
+   /* printenv varname */
+@@ -59,9 +59,9 @@ main (argc, argv)
+ 	  if (*eval == '=')
+ 	    {
+ 	      puts (eval + 1);
+-	      exit (0);
++	      exit(EXIT_SUCCESS);
+ 	    }
+ 	}
+     }
+-  exit (1);
++  exit(EXIT_FAILURE);
+ }
+diff --git a/shell/ash_test/recho.c b/shell/ash_test/recho.c
+index 02be0d7..fb48d9c 100644
+--- a/shell/ash_test/recho.c
++++ b/shell/ash_test/recho.c
+@@ -41,7 +41,7 @@ char	**argv;
+ 		strprint(argv[i]);
+ 		printf(">\n");
+ 	}
+-	exit(0);
++	exit(EXIT_SUCCESS);
+ }
+ 
+ void
+diff --git a/shell/ash_test/zecho.c b/shell/ash_test/zecho.c
+index 621d06d..bf876f6 100644
+--- a/shell/ash_test/zecho.c
++++ b/shell/ash_test/zecho.c
+@@ -35,5 +35,5 @@ char	**argv;
+ 	}
+ 
+ 	putchar('\n');
+-	exit(0);
++	exit(EXIT_SUCCESS);
+ }
+diff --git a/shell/bbsh.c b/shell/bbsh.c
+index 02e6050..5386bb0 100644
+--- a/shell/bbsh.c
++++ b/shell/bbsh.c
+@@ -168,7 +168,7 @@ static int run_pipeline(struct pipeline *line)
+ 			run_applet_and_exit(cmd->argv[0],cmd->argc,cmd->argv);
+ 			execvp(cmd->argv[0],cmd->argv);
+ 			printf("No %s",cmd->argv[0]);
+-			exit(1);
++			exit(EXIT_FAILURE);
+ 		} else waitpid(pid, &status, 0);
+ 	}
+ 
+diff --git a/shell/hush.c b/shell/hush.c
+index aa740f1..26d113b 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1480,7 +1480,7 @@ static void pseudo_exec_argv(char **argv)
+ 	debug_printf_exec("execing '%s'\n", argv[0]);
+ 	execvp(argv[0], argv);
+ 	bb_perror_msg("cannot exec '%s'", argv[0]);
+-	_exit(1);
++	_exit(EXIT_FAILURE);
+ }
+ 
+ /* Called after [v]fork() in run_pipe()
+diff --git a/shell/msh.c b/shell/msh.c
+index aa6fb1d..48fa56e 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -2855,7 +2855,7 @@ static int forkexec(struct op *t, int *pin, int *pout, int no_fork, char **wp)
+ 	if (t->op_type == TPAREN)
+ 		_exit(execute(t->left, NOPIPE, NOPIPE, /* no_fork: */ 1));
+ 	if (wp[0] == NULL)
+-		_exit(0);
++		_exit(EXIT_SUCCESS);
+ 
+ 	cp = rexecve(wp[0], wp, makenv(0, NULL));
+ 	prs(wp[0]);
+@@ -4207,7 +4207,7 @@ static int grave(int quoted)
+ 	prs(argument_list[0]);
+ 	prs(": ");
+ 	err(cp);
+-	_exit(1);
++	_exit(EXIT_FAILURE);
+ }
+ 
+ 
+@@ -4733,7 +4733,7 @@ static int filechar(struct ioarg *ap)
+ 		while (size == 0 || position >= size) {
+ 			size = read_line_input(current_prompt, filechar_cmdbuf, BUFSIZ, line_input_state);
+ 			if (size < 0) /* Error/EOF */
+-				exit(0);
++				exit(EXIT_SUCCESS);
+ 			position = 0;
+ 			/* if Ctrl-C, size == 0 and loop will repeat */
+ 		}
+@@ -5212,7 +5212,7 @@ int msh_main(int argc, char **argv)
+ 
+ 			name = *++argv;
+ 			if (newfile(name))
+-				exit(1);		/* Exit on error */
++				exit(EXIT_FAILURE);		/* Exit on error */
+ 		}
+ 	}
+ 
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index af93aab..7eb8db1 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -64,7 +64,7 @@ static void interrupted(int sig ATTRIBUTE_UNUSED)
+ {
+ 	signal(SIGINT, SIG_IGN);
+ 	shmdt(shbuf);
+-	exit(0);
++	exit(EXIT_SUCCESS);
+ }
+ 
+ int logread_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 50ab48d..5871a06 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -394,7 +394,7 @@ read_line(const char *prompt)
+ 
+ 	sz = read_line_input(prompt, line_buffer, sizeof(line_buffer), NULL);
+ 	if (sz <= 0)
+-		exit(0); /* Ctrl-D or Ctrl-C */
++		exit(EXIT_SUCCESS); /* Ctrl-D or Ctrl-C */
+ 
+ 	if (line_buffer[sz-1] == '\n')
+ 		line_buffer[--sz] = '\0';
+@@ -2620,7 +2620,7 @@ xselect(void)
+ 			if (ENABLE_FEATURE_CLEAN_UP)
+ 				close_dev_fd();
+ 			bb_putchar('\n');
+-			exit(0);
++			exit(EXIT_SUCCESS);
+ 		case 'r':
+ 			return;
+ 		case 's':
+diff --git a/util-linux/ipcrm.c b/util-linux/ipcrm.c
+index 8d5f63c..5dcda85 100644
+--- a/util-linux/ipcrm.c
++++ b/util-linux/ipcrm.c
+@@ -111,7 +111,7 @@ int ipcrm_main(int argc, char **argv)
+ 				what = SEM;
+ 
+ 			if (remove_ids(what, argc-2, &argv[2]))
+-				fflush_stdout_and_exit(1);
++				fflush_stdout_and_exit(EXIT_FAILURE);
+ 			printf("resource(s) deleted\n");
+ 			return 0;
+ 		}
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index 4b5c597..111defa 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -588,15 +588,15 @@ int ipcs_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	if (flags & flag_print) {
+ 		if (flags & flag_shm) {
+ 			print_shm(id);
+-			fflush_stdout_and_exit(0);
++			fflush_stdout_and_exit(EXIT_SUCCESS);
+ 		}
+ 		if (flags & flag_sem) {
+ 			print_sem(id);
+-			fflush_stdout_and_exit(0);
++			fflush_stdout_and_exit(EXIT_SUCCESS);
+ 		}
+ 		if (flags & flag_msg) {
+ 			print_msg(id);
+-			fflush_stdout_and_exit(0);
++			fflush_stdout_and_exit(EXIT_SUCCESS);
+ 		}
+ 		bb_show_usage();
+ 	}
+@@ -617,5 +617,5 @@ int ipcs_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		do_msg();
+ 		bb_putchar('\n');
+ 	}
+-	fflush_stdout_and_exit(0);
++	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }

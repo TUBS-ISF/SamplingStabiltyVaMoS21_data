@@ -1,0 +1,24 @@
+2007-07-01 17:29:44 +0000
+diff --git a/findutils/find.c b/findutils/find.c
+index 07cae97..cb57665 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -758,12 +758,12 @@ static action*** parse_params(char **argv)
+ #define XATOU_SFX xatoul_sfx
+ #endif
+ 			static const struct suffix_mult find_suffixes[] = {
+-			        { "c", 1 },
+-			        { "w", 2 },
+-			        { "b"+1, 512 },
+-			        { "b", 512 },
+-			        { "k", 1024 },
+-			        { NULL, 0 }
++				{ "c", 1 },
++				{ "w", 2 },
++				{ "b"+1, 512 },
++				{ "b", 512 },
++				{ "k", 1024 },
++				{ NULL, 0 }
+ 			};
+ 			action_size *ap;
+ 			ap = ALLOC_ACTION(size);

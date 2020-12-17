@@ -1,0 +1,103 @@
+2008-08-19 11:28:52 +0000
+diff --git a/include/applets.h b/include/applets.h
+index 27c118e..2363e72 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -286,6 +286,7 @@ USE_PSCAN(APPLET(pscan, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_PWD(APPLET_NOFORK(pwd, pwd, _BB_DIR_BIN, _BB_SUID_NEVER, pwd))
+ USE_RAIDAUTORUN(APPLET(raidautorun, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_RDATE(APPLET(rdate, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
++USE_RDEV(APPLET(rdev, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_READAHEAD(APPLET(readahead, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_READLINK(APPLET(readlink, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_READPROFILE(APPLET(readprofile, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index 1e05eab..57a9f99 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3168,6 +3168,14 @@
+      "\n	-s	Set the system date and time (default)" \
+      "\n	-p	Print the date and time" \
+ 
++#define rdev_trivial_usage \
++       ""
++#define rdev_full_usage "\n\n" \
++       "Print the device node associated with the filesystem mounted at '/'"
++#define rdev_example_usage \
++       "$ rdev\n" \
++       "/dev/mtdblock9 /\n"
++
+ #define readahead_trivial_usage \
+        "[FILE]..."
+ #define readahead_full_usage "\n\n" \
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 404c50d..a3e98a1 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -520,6 +520,7 @@ CONFIG_FEATURE_MOUNT_FLAGS=y
+ CONFIG_FEATURE_MOUNT_FSTAB=y
+ CONFIG_PIVOT_ROOT=y
+ CONFIG_RDATE=y
++CONFIG_RDEV=y
+ CONFIG_READPROFILE=y
+ CONFIG_RTCWAKE=y
+ CONFIG_SCRIPT=y
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 7f61bf4..2ba9f01 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -707,6 +707,12 @@ config RDATE
+ 	  the RFC868 protocol, which is built into the inetd daemon on most
+ 	  systems.
+ 
++config RDEV
++       bool "rdev"
++       default n
++       help
++	  Print the device node associated with the filesystem mounted at '/'.
++
+ config READPROFILE
+ 	bool "readprofile"
+ 	default n
+diff --git a/util-linux/Kbuild b/util-linux/Kbuild
+index c0c2db7..38569c6 100644
+--- a/util-linux/Kbuild
++++ b/util-linux/Kbuild
+@@ -26,6 +26,7 @@ lib-$(CONFIG_MORE)              += more.o
+ lib-$(CONFIG_MOUNT)             += mount.o
+ lib-$(CONFIG_PIVOT_ROOT)        += pivot_root.o
+ lib-$(CONFIG_RDATE)             += rdate.o
++lib-$(CONFIG_RDEV)              += rdev.o
+ lib-$(CONFIG_READPROFILE)       += readprofile.o
+ lib-$(CONFIG_RTCWAKE)           += rtcwake.o
+ lib-$(CONFIG_SCRIPT)            += script.o
+diff --git a/util-linux/rdev.c b/util-linux/rdev.c
+new file mode 100644
+index 0000000..33abd39
+--- /dev/null
++++ b/util-linux/rdev.c
+@@ -0,0 +1,24 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * rdev - print device node associated with a filesystem
++ *
++ * Copyright (c) 2008 Nuovation System Designs, LLC
++ *   Grant Erickson <gerickson@nuovations.com>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ *
++ */
++
++#include "libbb.h"
++
++int rdev_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int rdev_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
++{
++	char const * const root_device = find_block_device("/");
++
++	if (root_device != NULL) {
++		printf("%s /\n", root_device);
++		return EXIT_SUCCESS;
++	}
++	return EXIT_FAILURE;
++}

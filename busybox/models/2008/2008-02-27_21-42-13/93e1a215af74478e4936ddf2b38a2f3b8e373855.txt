@@ -1,0 +1,17 @@
+2008-02-27 21:42:13 +0000
+diff --git a/docs/busybox.net/subversion.html b/docs/busybox.net/subversion.html
+index 87efb57..561a5b8 100644
+--- a/docs/busybox.net/subversion.html
++++ b/docs/busybox.net/subversion.html
+@@ -6,9 +6,8 @@
+ 
+ <h3>Patches</h3>
+ 
+-<p>If you don't want to mess with subversion, you can download
+-<a href="/downloads/patches/">all BusyBox patches</a> or check the
+-<a href="/downloads/patches/recent.html">most recent patches</a>.
++<p>You can <a href="/downloads/">download</a> fixes for particular releases
++of busybox, e.g. downloads/fixes-<em>major</em>-<em>minor</em>-<em>patch</em>/
+ 
+ <h3>Anonymous Subversion Access</h3>
+ 

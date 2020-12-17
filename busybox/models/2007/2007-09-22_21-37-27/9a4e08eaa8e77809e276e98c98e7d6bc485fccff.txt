@@ -1,0 +1,14 @@
+2007-09-22 21:37:27 +0000
+diff --git a/miscutils/microcom.c b/miscutils/microcom.c
+index 7a746a3..59a9102 100644
+--- a/miscutils/microcom.c
++++ b/miscutils/microcom.c
+@@ -7,7 +7,7 @@
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+-#include "busybox.h"
++#include "libbb.h"
+ 
+ int microcom_main(int argc, char **argv);
+ int microcom_main(int argc, char **argv)

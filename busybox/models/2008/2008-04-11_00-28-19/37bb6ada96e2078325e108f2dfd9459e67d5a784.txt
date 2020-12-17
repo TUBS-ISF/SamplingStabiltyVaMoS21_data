@@ -1,0 +1,51 @@
+2008-04-11 00:28:19 +0000
+diff --git a/docs/busybox.net/about.html b/docs/busybox.net/about.html
+index 475dd80..7b79afc 100644
+--- a/docs/busybox.net/about.html
++++ b/docs/busybox.net/about.html
+@@ -17,7 +17,7 @@ your embedded systems. To create a working system, just add some device
+ nodes in /dev, a few configuration files in /etc, and a Linux kernel.</p>
+ 
+ <p>BusyBox is maintained by
+-<a href="mailto:vda.linux@googlemail.com">Denis Vlasenko</a>,
++<a href="mailto:vda.linux@googlemail.com">Denys Vlasenko</a>,
+ and licensed under the <a href="/license.html">GNU GENERAL PUBLIC LICENSE</a>
+ version 2.</p>
+ 
+diff --git a/docs/busybox.net/footer.html b/docs/busybox.net/footer.html
+index 5f2335a..7f39ccb 100644
+--- a/docs/busybox.net/footer.html
++++ b/docs/busybox.net/footer.html
+@@ -16,7 +16,7 @@
+ 		    <br>
+ 		    Mail all comments, insults, suggestions and bribes to
+ 		    <br>
+-		    Denis Vlasenko <a href="mailto:vda.linux@googlemail.com">vda.linux@googlemail.com</a><br>
++		    Denys Vlasenko <a href="mailto:vda.linux@googlemail.com">vda.linux@googlemail.com</a><br>
+ 		</font>
+ 	    </td>
+ 
+diff --git a/docs/busybox.net/header.html b/docs/busybox.net/header.html
+index 60c6481..86e420b 100644
+--- a/docs/busybox.net/header.html
++++ b/docs/busybox.net/header.html
+@@ -79,12 +79,13 @@
+     <ul>
+         <li><a href="http://busybox.net/~landley">Rob</a></li>
+         <li><a href="http://busybox.net/~aldot">Bernhard</a></li>
+-	<li><a href="http://busybox.net/~vda">Denis</a>
+-	 <br>-<a href=http://busybox.net/~vda/mboot/>mboot</a>
+-	 <br>-<a href=http://busybox.net/~vda/linld/>linld</a>
+-	 <br>-<a href=http://busybox.net/~vda/init_vs_runsv.html>init must die</a>
+-	 <br>-<a href=http://busybox.net/~vda/no_ifup.txt>no ifup</a>
+-	 <br>-<a href=http://busybox.net/~vda/unscd/>unscd</a>
++	<li><a href="http://busybox.net/~vda">Denys</a>
++	 <br>- <a href=http://busybox.net/~vda/resume/resume200801/denys_vlasenko.htm>resume</a>
++	 <br>- <a href=http://busybox.net/~vda/mboot/>mboot</a>
++	 <br>- <a href=http://busybox.net/~vda/linld/>linld</a>
++	 <br>- <a href=http://busybox.net/~vda/init_vs_runsv.html>init must die</a>
++	 <br>- <a href=http://busybox.net/~vda/no_ifup.txt>no ifup</a>
++	 <br>- <a href=http://busybox.net/~vda/unscd/>unscd</a>
+ 	</li>
+     </ul>
+ 

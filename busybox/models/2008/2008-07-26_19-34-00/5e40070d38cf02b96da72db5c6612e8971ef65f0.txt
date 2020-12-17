@@ -1,0 +1,14 @@
+2008-07-26 19:34:00 +0000
+diff --git a/coreutils/tr.c b/coreutils/tr.c
+index e439fcb..28798fe 100644
+--- a/coreutils/tr.c
++++ b/coreutils/tr.c
+@@ -138,7 +138,7 @@ static unsigned int expand(const char *arg, char *buffer)
+ 				arg += 3;	/* skip CHAR=] */
+ 				continue;
+ 			}
+-			if (*arg != '-') { /* not [x-...] - copy verbatim */
++			if (i == '\0' || *arg != '-') { /* not [x-...] - copy verbatim */
+ 				*buffer++ = '[';
+ 				arg--; /* points to x */
+ 				continue; /* copy all, including eventual ']' */

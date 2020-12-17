@@ -1,0 +1,15 @@
+2008-03-25 02:49:11 +0000
+diff --git a/include/usage.h b/include/usage.h
+index e7e9002..58c5470 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -579,8 +579,7 @@
+      "\n" \
+      "\nRecognized formats for TIME:" \
+      "\n	[hh:]mm:ss" \
+-     "\n	mon.day-hh:mm[:ss]" \
+-     "\n	year.mon.day-hh:mm[:ss]" \
++     "\n	[YYYY.]MM.DD-hh:mm[:ss]" \
+      "\n	MMDDhhmm[[YY]YY][.ss]" \
+ 
+ #define date_example_usage \

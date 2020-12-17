@@ -1,0 +1,62 @@
+2008-07-16 23:04:49 +0000
+diff --git a/libbb/parse_config.c b/libbb/parse_config.c
+index e63204b..f070992 100644
+--- a/libbb/parse_config.c
++++ b/libbb/parse_config.c
+@@ -19,7 +19,7 @@ Typical usage:
+ 	// open file
+ 	if (config_open(filename, &p)) {
+ 		// parse line-by-line
+-		while (*config_read(&p, t, 3, 0, delimiters, comment_char)) { // 0..3 tokens
++		while (*config_read(&p, t, 3, 0, delimiters, comment_char) >= 0) { // 0..3 tokens
+ 			// use tokens
+ 			bb_error_msg("TOKENS: [%s][%s][%s]", t[0], t[1], t[2]);
+ 		}
+@@ -77,7 +77,7 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, int ntokens, int mint
+ //TODO: speed up xmalloc_fgetline by internally using fgets, not fgetc
+ 		line = xmalloc_fgetline(parser->fp);
+ 		if (!line)
+-			return line;
++			return -1;
+ 
+ 		parser->lineno++;
+ 		// handle continuations. Tito's code stolen :)
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index af37bb1..41f1517 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -468,7 +468,7 @@ static void SynchronizeFile(const char *fileName)
+ 		file->cf_User = xstrdup(fileName);
+ 		pline = &file->cf_LineBase;
+ 
+-		while (--maxLines && (n=config_read(&parser, tokens, 6, 0, " \t", '#')) > 0) {
++		while (--maxLines && (n=config_read(&parser, tokens, 6, 0, " \t", '#')) >= 0) {
+ 			CronLine *line;
+ 
+ 			if (DebugOpt) {
+diff --git a/networking/nameif.c b/networking/nameif.c
+index 506f4fa..c5a715e 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -163,7 +163,7 @@ int nameif_main(int argc, char **argv)
+ 		struct parser_t parser;
+ 		if (config_open(&parser, fname)) {
+ 			char *tokens[2];
+-			while (config_read(&parser, tokens, 2, 2, " \t", '#'))
++			while (config_read(&parser, tokens, 2, 2, " \t", '#') >= 0)
+ 				prepend_new_eth_table(&clist, tokens[0], tokens[1]);
+ 			config_close(&parser);
+ 		}
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 8968e45..c04410c 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -101,7 +101,7 @@ static void make_device(char *path, int delete)
+ 		if (!config_open(&parser, "/etc/mdev.conf"))
+ 			goto end_parse;
+ 
+-		while (config_read(&parser, tokens, 4, 3, " \t", '#')) {
++		while (config_read(&parser, tokens, 4, 3, " \t", '#') >= 0) {
+ 			regmatch_t off[1+9*ENABLE_FEATURE_MDEV_RENAME_REGEXP];
+ 			char *val;
+ 

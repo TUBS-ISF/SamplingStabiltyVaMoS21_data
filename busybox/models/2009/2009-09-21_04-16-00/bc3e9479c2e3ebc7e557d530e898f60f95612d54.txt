@@ -1,0 +1,14 @@
+2009-09-21 04:16:00 +0200
+diff --git a/editors/awk.c b/editors/awk.c
+index aa2fd48..d15dbb3 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -2024,7 +2024,7 @@ static NOINLINE int do_mktime(const char *ds)
+ 	}
+ 
+ 	then.tm_mon -= 1;
+-	then.tm_year -= - 1900;
++	then.tm_year -= 1900;
+ 
+ 	return mktime(&then);
+ }

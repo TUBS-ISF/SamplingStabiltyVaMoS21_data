@@ -1,0 +1,14 @@
+2009-01-19 16:38:30 +0000
+diff --git a/coreutils/uname.c b/coreutils/uname.c
+index 8e51aa8..cd0218a 100644
+--- a/coreutils/uname.c
++++ b/coreutils/uname.c
+@@ -80,7 +80,7 @@ int uname_main(int argc UNUSED_PARAM, char **argv)
+ 	const char *unknown_str = "unknown";
+ 	const char *fmt;
+ 	const unsigned short *delta;
+-	char toprint;
++	unsigned toprint;
+ 
+ 	toprint = getopt32(argv, options);
+ 

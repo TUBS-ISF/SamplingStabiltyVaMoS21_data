@@ -1,0 +1,83 @@
+2008-03-21 09:56:19 +0000
+diff --git a/docs/busybox.net/download.html b/docs/busybox.net/download.html
+index 483b415..0e97acd 100644
+--- a/docs/busybox.net/download.html
++++ b/docs/busybox.net/download.html
+@@ -10,14 +10,30 @@ downloaded from <a href="downloads/">http://www.busybox.net/downloads/</a>.
+ 
+ <p>
+ Each 1.x branch has bug fix releases after initial 1.x.0 release.
+-Latest releases for each branch:
+-<a href=http://busybox.net/downloads/busybox-1.9.1.tar.bz2>1.9.1</a>,
+-<a href=http://busybox.net/downloads/busybox-1.8.2.tar.bz2>1.8.2</a>,
+-<a href=http://busybox.net/downloads/busybox-1.7.4.tar.bz2>1.7.4</a>,
++Also there are patches on top of latest bug fix release.
++<p>
++Latest releases and patch directories for each branch:
++<br>
++<a href=http://busybox.net/downloads/busybox-1.9.2.tar.bz2>1.9.2</a>,
++<a href=http://busybox.net/downloads/fixes-1.9.2/>patches</a>,
++<br>
++<a href=http://busybox.net/downloads/busybox-1.8.3.tar.bz2>1.8.3</a>,
++<a href=http://busybox.net/downloads/fixes-1.8.3/>patches</a>,
++<br>
++<a href=http://busybox.net/downloads/busybox-1.7.5.tar.bz2>1.7.5</a>,
++<a href=http://busybox.net/downloads/fixes-1.7.5/>patches</a>,
++<br>
+ <a href=http://busybox.net/downloads/busybox-1.6.2.tar.bz2>1.6.2</a>,
+-<a href=http://busybox.net/downloads/busybox-1.5.1.tar.bz2>1.5.1</a>,
+-<a href=http://busybox.net/downloads/busybox-1.4.1.tar.bz2>1.4.1</a>,
+-<a href=http://busybox.net/downloads/busybox-1.3.2.tar.bz2>1.3.2</a>.
++<a href=http://busybox.net/downloads/fixes-1.6.2/>patches</a>,
++<br>
++<a href=http://busybox.net/downloads/busybox-1.5.2.tar.bz2>1.5.2</a>,
++<a href=http://busybox.net/downloads/fixes-1.5.2/>patches</a>,
++<br>
++<a href=http://busybox.net/downloads/busybox-1.4.2.tar.bz2>1.4.2</a>,
++<a href=http://busybox.net/downloads/fixes-1.4.2/>patches</a>,
++<br>
++<a href=http://busybox.net/downloads/busybox-1.3.2.tar.bz2>1.3.2</a>,
++<a href=http://busybox.net/downloads/fixes-1.3.2/>patches</a>.
+ 
+ <p>
+ You can also obtain <a href="downloads/snapshots/">Daily Snapshots</a> of
+diff --git a/scripts/bb_release b/scripts/bb_release
+new file mode 100755
+index 0000000..8aa3804
+--- /dev/null
++++ b/scripts/bb_release
+@@ -0,0 +1,34 @@
++#!/bin/sh
++
++# Create signed release tarballs and signature files from current svn.
++# Since you don't have my gpg key, this doesn't do you much good,
++# but if I get hit by a bus the next maintainer might find this useful.
++# Run this in an empty directory.  The VERSION= line can get confused
++# otherwise.
++
++#svn co svn://busybox.net/trunk/busybox
++cd busybox || { echo "cd busybox failed"; exit 1; }
++make release || { echo "make release failed"; exit 1; }
++cd ..
++
++VERSION=`ls busybox-*.tar.gz | sed 's/busybox-\(.*\)\.tar\.gz/\1/'`
++
++zcat busybox-$VERSION.tar.gz | bzip2 > busybox-$VERSION.tar.bz2
++
++test -f busybox-$VERSION.tar.gz || { echo "no busybox-$VERSION.tar.gz"; exit 1; }
++test -f busybox-$VERSION.tar.bz2 || { echo "no busybox-$VERSION.tar.bz2"; exit 1; }
++
++signit()
++{
++echo "$1 released `date -r $1 -R`
++
++MD5:  `md5sum $1`
++SHA1: `sha1sum $1`
++
++To verify this signature, you can obtain my public key
++from http://busybox.net/~vda/vda_pubkey.gpg
++" | gpg --clearsign > "$1.sign"
++}
++
++signit busybox-$VERSION.tar.gz
++signit busybox-$VERSION.tar.bz2

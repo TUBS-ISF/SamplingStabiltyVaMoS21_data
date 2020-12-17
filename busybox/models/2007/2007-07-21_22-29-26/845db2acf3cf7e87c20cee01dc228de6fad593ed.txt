@@ -1,0 +1,14 @@
+2007-07-21 22:29:26 +0000
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index 1f82317..f91ebdc 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -56,7 +56,7 @@ int chpasswd_main(int argc, char **argv)
+ 		/* This is rather complex: if user is not found in /etc/shadow,
+ 		 * we try to find & change his passwd in /etc/passwd */
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+-			rc = update_passwd(bb_path_shadow_file, name, pass);
++		rc = update_passwd(bb_path_shadow_file, name, pass);
+ 		if (rc == 0) /* no lines updated, no errors detected */
+ #endif
+ 			rc = update_passwd(bb_path_passwd_file, name, pass);

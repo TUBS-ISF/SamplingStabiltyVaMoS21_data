@@ -1,0 +1,369 @@
+2009-04-08 21:51:33 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 4641dca..9920e98 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2241,7 +2241,10 @@ static void re_execute_shell(const char *s, int is_heredoc)
+ 
+ 	debug_printf_exec("re_execute_shell pid:%d cmd:'%s'\n", getpid(), s);
+ 	sigprocmask(SIG_SETMASK, &G.inherited_set, NULL);
+-	execv(bb_busybox_exec_path, G.argv_from_re_execing);
++	execve(bb_busybox_exec_path,
++		G.argv_from_re_execing,
++		(is_heredoc ? pp /* points to NULL ptr */ : environ)
++		);
+ 	/* Fallback. Useful for init=/bin/hush usage etc */
+ 	if (G.argv0_for_re_execing[0] == '/')
+ 		execv(G.argv0_for_re_execing, G.argv_from_re_execing);
+@@ -4402,35 +4405,40 @@ static int parse_group(o_string *dest, struct parse_context *ctx,
+ 
+ #if ENABLE_HUSH_TICK || ENABLE_SH_MATH_SUPPORT
+ /* Subroutines for copying $(...) and `...` things */
+-static void add_till_backquote(o_string *dest, struct in_str *input);
++static int add_till_backquote(o_string *dest, struct in_str *input);
+ /* '...' */
+-static void add_till_single_quote(o_string *dest, struct in_str *input)
++static int add_till_single_quote(o_string *dest, struct in_str *input)
+ {
+ 	while (1) {
+ 		int ch = i_getch(input);
+-		if (ch == EOF)
+-			break;
++		if (ch == EOF) {
++			syntax("unterminated '");
++			return 1;
++		}
+ 		if (ch == '\'')
+-			break;
++			return 0;
+ 		o_addchr(dest, ch);
+ 	}
+ }
+ /* "...\"...`..`...." - do we need to handle "...$(..)..." too? */
+-static void add_till_double_quote(o_string *dest, struct in_str *input)
++static int add_till_double_quote(o_string *dest, struct in_str *input)
+ {
+ 	while (1) {
+ 		int ch = i_getch(input);
++		if (ch == EOF) {
++			syntax("unterminated \"");
++			return 1;
++		}
+ 		if (ch == '"')
+-			break;
++			return 0;
+ 		if (ch == '\\') {  /* \x. Copy both chars. */
+ 			o_addchr(dest, ch);
+ 			ch = i_getch(input);
+ 		}
+-		if (ch == EOF)
+-			break;
+ 		o_addchr(dest, ch);
+ 		if (ch == '`') {
+-			add_till_backquote(dest, input);
++			if (add_till_backquote(dest, input))
++				return 1;
+ 			o_addchr(dest, ch);
+ 			continue;
+ 		}
+@@ -4451,20 +4459,27 @@ static void add_till_double_quote(o_string *dest, struct in_str *input)
+  * Example                               Output
+  * echo `echo '\'TEST\`echo ZZ\`BEST`    \TESTZZBEST
+  */
+-static void add_till_backquote(o_string *dest, struct in_str *input)
++static int add_till_backquote(o_string *dest, struct in_str *input)
+ {
+ 	while (1) {
+ 		int ch = i_getch(input);
++		if (ch == EOF) {
++			syntax("unterminated `");
++			return 1;
++		}
+ 		if (ch == '`')
+-			break;
+-		if (ch == '\\') {  /* \x. Copy both chars unless it is \` */
++			return 0;
++		if (ch == '\\') {
++			/* \x. Copy both chars unless it is \` */
+ 			int ch2 = i_getch(input);
++			if (ch2 == EOF) {
++				syntax("unterminated `");
++				return 1;
++			}
+ 			if (ch2 != '`' && ch2 != '$' && ch2 != '\\')
+ 				o_addchr(dest, ch);
+ 			ch = ch2;
+ 		}
+-		if (ch == EOF)
+-			break;
+ 		o_addchr(dest, ch);
+ 	}
+ }
+@@ -4480,13 +4495,15 @@ static void add_till_backquote(o_string *dest, struct in_str *input)
+  * echo $(echo 'TEST)' BEST)            TEST) BEST
+  * echo $(echo \(\(TEST\) BEST)         ((TEST) BEST
+  */
+-static void add_till_closing_paren(o_string *dest, struct in_str *input, bool dbl)
++static int add_till_closing_paren(o_string *dest, struct in_str *input, bool dbl)
+ {
+ 	int count = 0;
+ 	while (1) {
+ 		int ch = i_getch(input);
+-		if (ch == EOF)
+-			break;
++		if (ch == EOF) {
++			syntax("unterminated )");
++			return 1;
++		}
+ 		if (ch == '(')
+ 			count++;
+ 		if (ch == ')') {
+@@ -4501,23 +4518,29 @@ static void add_till_closing_paren(o_string *dest, struct in_str *input, bool db
+ 		}
+ 		o_addchr(dest, ch);
+ 		if (ch == '\'') {
+-			add_till_single_quote(dest, input);
++			if (add_till_single_quote(dest, input))
++				return 1;
+ 			o_addchr(dest, ch);
+ 			continue;
+ 		}
+ 		if (ch == '"') {
+-			add_till_double_quote(dest, input);
++			if (add_till_double_quote(dest, input))
++				return 1;
+ 			o_addchr(dest, ch);
+ 			continue;
+ 		}
+-		if (ch == '\\') { /* \x. Copy verbatim. Important for  \(, \) */
++		if (ch == '\\') {
++			/* \x. Copy verbatim. Important for  \(, \) */
+ 			ch = i_getch(input);
+-			if (ch == EOF)
+-				break;
++			if (ch == EOF) {
++				syntax("unterminated )");
++				return 1;
++			}
+ 			o_addchr(dest, ch);
+ 			continue;
+ 		}
+ 	}
++	return 0;
+ }
+ #endif /* ENABLE_HUSH_TICK || ENABLE_SH_MATH_SUPPORT */
+ 
+@@ -4658,7 +4681,8 @@ static int handle_dollar(o_string *as_string,
+ #  if !BB_MMU
+ 			pos = dest->length;
+ #  endif
+-			add_till_closing_paren(dest, input, true);
++			if (add_till_closing_paren(dest, input, true))
++				return 1;
+ #  if !BB_MMU
+ 			if (as_string) {
+ 				o_addstr(as_string, dest->data + pos);
+@@ -4671,20 +4695,19 @@ static int handle_dollar(o_string *as_string,
+ 		}
+ # endif
+ # if ENABLE_HUSH_TICK
+-		//int pos = dest->length;
+ 		o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ 		o_addchr(dest, quote_mask | '`');
+ #  if !BB_MMU
+ 		pos = dest->length;
+ #  endif
+-		add_till_closing_paren(dest, input, false);
++		if (add_till_closing_paren(dest, input, false))
++			return 1;
+ #  if !BB_MMU
+ 		if (as_string) {
+ 			o_addstr(as_string, dest->data + pos);
+ 			o_addchr(as_string, '`');
+ 		}
+ #  endif
+-		//debug_printf_subst("SUBST RES2 '%s'\n", dest->data + pos);
+ 		o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ # endif
+ 		break;
+@@ -4778,7 +4801,8 @@ static int parse_stream_dquoted(o_string *as_string,
+ 		//int pos = dest->length;
+ 		o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ 		o_addchr(dest, 0x80 | '`');
+-		add_till_backquote(dest, input);
++		if (add_till_backquote(dest, input))
++			return 1;
+ 		o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ 		//debug_printf_subst("SUBST RES3 '%s'\n", dest->data + pos);
+ 		goto again;
+@@ -5043,10 +5067,20 @@ static struct pipe *parse_stream(char **pstring,
+ 			break;
+ #if ENABLE_HUSH_TICK
+ 		case '`': {
+-			//int pos = dest.length;
++#if !BB_MMU
++			int pos;
++#endif
+ 			o_addchr(&dest, SPECIAL_VAR_SYMBOL);
+ 			o_addchr(&dest, '`');
+-			add_till_backquote(&dest, input);
++#if !BB_MMU
++			pos = dest.length;
++#endif
++			if (add_till_backquote(&dest, input))
++				goto parse_error;
++#if !BB_MMU
++			o_addstr(&ctx.as_string, dest.data + pos);
++			o_addchr(&ctx.as_string, '`');
++#endif
+ 			o_addchr(&dest, SPECIAL_VAR_SYMBOL);
+ 			//debug_printf_subst("SUBST RES3 '%s'\n", dest.data + pos);
+ 			break;
+diff --git a/shell/hush_test/hush-misc/heredoc_huge.right b/shell/hush_test/hush-misc/heredoc_huge.right
+new file mode 100644
+index 0000000..11740f6
+--- /dev/null
++++ b/shell/hush_test/hush-misc/heredoc_huge.right
+@@ -0,0 +1,3 @@
++546ed3f5c81c780d3ab86ada14824237  -
++546ed3f5c81c780d3ab86ada14824237  -
++End
+diff --git a/shell/hush_test/hush-misc/heredoc_huge.tests b/shell/hush_test/hush-misc/heredoc_huge.tests
+new file mode 100755
+index 0000000..c2ec281
+--- /dev/null
++++ b/shell/hush_test/hush-misc/heredoc_huge.tests
+@@ -0,0 +1,9 @@
++# This creates 120k heredoc
++echo 'cat <<HERE | md5sum' >"$0.tmp"
++yes "123456789 123456789 123456789 123456789" | head -3000 >>"$0.tmp"
++echo 'HERE' >>"$0.tmp"
++
++yes "123456789 123456789 123456789 123456789" | head -3000 | md5sum
++. "$0.tmp"
++rm "$0.tmp"
++echo End
+diff --git a/shell/hush_test/hush-psubst/tick_huge.right b/shell/hush_test/hush-psubst/tick_huge.right
+new file mode 100644
+index 0000000..11740f6
+--- /dev/null
++++ b/shell/hush_test/hush-psubst/tick_huge.right
+@@ -0,0 +1,3 @@
++546ed3f5c81c780d3ab86ada14824237  -
++546ed3f5c81c780d3ab86ada14824237  -
++End
+diff --git a/shell/hush_test/hush-psubst/tick_huge.tests b/shell/hush_test/hush-psubst/tick_huge.tests
+new file mode 100755
+index 0000000..acce92f
+--- /dev/null
++++ b/shell/hush_test/hush-psubst/tick_huge.tests
+@@ -0,0 +1,7 @@
++# This creates 120k file
++yes "123456789 123456789 123456789 123456789" | head -3000 >>"$0.tmp"
++
++echo "`cat $0.tmp`" | md5sum
++rm "$0.tmp"
++yes "123456789 123456789 123456789 123456789" | head -3000 | md5sum
++echo End
+diff --git a/shell/hush_test/hush-z_slow/leak_all2.right b/shell/hush_test/hush-z_slow/leak_all2.right
+new file mode 100644
+index 0000000..c6f0334
+--- /dev/null
++++ b/shell/hush_test/hush-z_slow/leak_all2.right
+@@ -0,0 +1,3 @@
++Warm up
++Measuring memory leak...
++Ok
+diff --git a/shell/hush_test/hush-z_slow/leak_all2.tests b/shell/hush_test/hush-z_slow/leak_all2.tests
+new file mode 100755
+index 0000000..8fb1ca9
+--- /dev/null
++++ b/shell/hush_test/hush-z_slow/leak_all2.tests
+@@ -0,0 +1,87 @@
++# "Check many leaks" test #2
++# Cramming all kinds of weird commands in here.
++# As you find leaks, please create separate, small test
++# for each leak.
++# Narrowing down the leak using this large test may be difficult.
++# It is intended to be a blanket "is everything ok?" test
++
++echo "Warm up"
++local_var="local val"
++export dev_null="/dev/null"
++>$dev_null
++echo hi1 $local_var `echo ho` >>/dev/null
++echo hi2 $local_var </dev/null | echo 2>&- | cat 1<>/dev/null
++{ echo hi4 $local_var `echo ho` 1<>/dev/null; }
++( echo hi4 $local_var `echo ho` 1<>/dev/null )
++if echo $local_var; false
++    then echo not run
++    elif false <$dev_null
++    then none
++    else cat 0<>$dev_null 1<>"$dev_null"
++fi >>/dev/null
++{
++    if echo $local_var; then cat <<HERE
++Hi cat
++HERE
++    fi >>/dev/null
++} 1<>/dev/null
++while { echo $dev_null >>$dev_null; }; do cat <"$dev_null"; break; done
++( until { echo $dev_null >>$dev_null | false; }; do cat <"$dev_null"; break; done ) <$dev_null
++
++memleak
++
++echo "Measuring memory leak..."
++# Please copy the entire block from above verbatim
++local_var="local val"
++export dev_null="/dev/null"
++>$dev_null
++echo hi1 $local_var `echo ho` >>/dev/null
++echo hi2 $local_var </dev/null | echo 2>&- | cat 1<>/dev/null
++{ echo hi4 $local_var `echo ho` 1<>/dev/null; }
++( echo hi4 $local_var `echo ho` 1<>/dev/null )
++if echo $local_var; false
++    then echo not run
++    elif false <$dev_null
++    then none
++    else cat 0<>$dev_null 1<>"$dev_null"
++fi >>/dev/null
++{
++    if echo $local_var; then cat <<HERE
++Hi cat
++HERE
++    fi >>/dev/null
++} 1<>/dev/null
++while { echo $dev_null >>$dev_null; }; do cat <"$dev_null"; break; done
++( until { echo $dev_null >>$dev_null | false; }; do cat <"$dev_null"; break; done ) <$dev_null
++
++# And same again
++
++local_var="local val"
++export dev_null="/dev/null"
++>$dev_null
++echo hi1 $local_var `echo ho` >>/dev/null
++echo hi2 $local_var </dev/null | echo 2>&- | cat 1<>/dev/null
++{ echo hi4 $local_var `echo ho` 1<>/dev/null; }
++( echo hi4 $local_var `echo ho` 1<>/dev/null )
++if echo $local_var; false
++    then echo not run
++    elif false <$dev_null
++    then none
++    else cat 0<>$dev_null 1<>"$dev_null"
++fi >>/dev/null
++{
++    if echo $local_var; then cat <<HERE
++Hi cat
++HERE
++    fi >>/dev/null
++} 1<>/dev/null
++while { echo $dev_null >>$dev_null; }; do cat <"$dev_null"; break; done
++( until { echo $dev_null >>$dev_null | false; }; do cat <"$dev_null"; break; done ) <$dev_null
++
++memleak
++kb=$?
++if test $kb -le 4; then
++    echo Ok #$kb
++else
++    echo "Bad: $kb kb (or more) leaked"
++fi

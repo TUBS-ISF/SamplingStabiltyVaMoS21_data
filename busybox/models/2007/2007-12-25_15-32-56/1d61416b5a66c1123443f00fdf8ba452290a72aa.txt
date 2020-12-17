@@ -1,0 +1,27 @@
+2007-12-25 15:32:56 +0000
+diff --git a/examples/udhcp/udhcpd.conf b/examples/udhcp/udhcpd.conf
+index 763a121..8c9a968 100644
+--- a/examples/udhcp/udhcpd.conf
++++ b/examples/udhcp/udhcpd.conf
+@@ -96,15 +96,15 @@ option	lease	864000		# 10 days of seconds
+ #opt subnet
+ #opt timezone
+ #opt router
+-#opt timesvr
+-#opt namesvr
++#opt timesrv
++#opt namesrv
+ #opt dns
+-#opt logsvr
+-#opt cookiesvr
+-#opt lprsvr
++#opt logsrv
++#opt cookiesrv
++#opt lprsrv
+ #opt bootsize
+ #opt domain
+-#opt swapsvr
++#opt swapsrv
+ #opt rootpath
+ #opt ipttl
+ #opt mtu

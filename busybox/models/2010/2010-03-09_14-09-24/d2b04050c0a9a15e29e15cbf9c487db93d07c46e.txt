@@ -1,0 +1,122 @@
+2010-03-09 14:09:24 +0100
+diff --git a/include/libbb.h b/include/libbb.h
+index ead1020..fccc816 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1277,6 +1277,7 @@ enum {
+  * on first call.
+  */
+ int64_t read_key(int fd, char *buffer) FAST_FUNC;
++void read_key_ungets(char *buffer, const char *str, unsigned len) FAST_FUNC;
+ 
+ 
+ #if ENABLE_FEATURE_EDITING
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index c50b31d..8e339da 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1700,18 +1700,34 @@ static int lineedit_read_key(char *read_key_buffer)
+ #endif
+ 
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+-		{
++		if (unicode_status == UNICODE_ON) {
+ 			wchar_t wc;
+ 
+ 			if ((int32_t)ic < 0) /* KEYCODE_xxx */
+ 				return ic;
++			// TODO: imagine sequence like: 0xff, <left-arrow>: we are currently losing 0xff...
++
+ 			unicode_buf[unicode_idx++] = ic;
+ 			unicode_buf[unicode_idx] = '\0';
+-			if (mbstowcs(&wc, unicode_buf, 1) != 1 && unicode_idx < MB_CUR_MAX) {
+-				delay = 50;
+-				goto poll_again;
++			if (mbstowcs(&wc, unicode_buf, 1) != 1) {
++				/* Not (yet?) a valid unicode char */
++				if (unicode_idx < MB_CUR_MAX) {
++					delay = 50;
++					goto poll_again;
++				}
++				/* Invalid sequence. Save all "bad bytes" except first */
++				read_key_ungets(read_key_buffer, unicode_buf + 1, MB_CUR_MAX - 1);
++				/*
++				 * ic = unicode_buf[0] sounds even better, but currently
++				 * this does not work: wchar_t[] -> char[] conversion
++				 * when lineedit finishes mangles such "raw bytes"
++				 * (by misinterpreting them as unicode chars):
++				 */
++				ic = CONFIG_SUBST_WCHAR;
++			} else {
++				/* Valid unicode char, return its code */
++				ic = wc;
+ 			}
+-			ic = wc;
+ 		}
+ #endif
+ 	} while (errno == EAGAIN);
+diff --git a/libbb/read_key.c b/libbb/read_key.c
+index a2253ce..98b3131 100644
+--- a/libbb/read_key.c
++++ b/libbb/read_key.c
+@@ -246,3 +246,12 @@ int64_t FAST_FUNC read_key(int fd, char *buffer)
+ 	buffer[-1] = 0;
+ 	goto start_over;
+ }
++
++void FAST_FUNC read_key_ungets(char *buffer, const char *str, unsigned len)
++{
++	unsigned cur_len = (unsigned char)buffer[0];
++	if (len > KEYCODE_BUFFER_SIZE-1 - cur_len)
++		len = KEYCODE_BUFFER_SIZE-1 - cur_len;
++	memcpy(buffer + 1 + cur_len, str, len);
++	buffer[0] += cur_len + len;
++}
+diff --git a/testsuite/ash.tests b/testsuite/ash.tests
+new file mode 100755
+index 0000000..4b6efe4
+--- /dev/null
++++ b/testsuite/ash.tests
+@@ -0,0 +1,42 @@
++#!/bin/sh
++#
++# These are not ash tests, we use ash as a way to test lineedit!
++#
++# Copyright 2010 by Denys Vlasenko
++# Licensed under GPL v2, see file LICENSE for details.
++
++. ./testing.sh
++
++# testing "test name" "options" "expected result" "file input" "stdin"
++
++testing "One byte which is not valid unicode char followed by valid input" \
++	"script -q -c 'ash' /dev/null >/dev/null; cat output; rm output" \
++	"\
++00000000  3f 2d 0a                                          |?-.|
++00000003
++" \
++	"" \
++	"echo \xff- | hexdump -C >output; exit; exit; exit; exit\n" \
++
++testing "30 bytes which are not valid unicode chars followed by valid input" \
++	"script -q -c 'ash' /dev/null >/dev/null; cat output; rm output" \
++	"\
++00000000  3f 3f 3f 3f 3f 3f 3f 3f  3f 3f 3f 3f 3f 3f 3f 3f  |????????????????|
++00000010  3f 3f 3f 3f 3f 3f 3f 3f  3f 3f 3f 3f 3f 3f 2d 0a  |??????????????-.|
++00000020
++" \
++	"" \
++	"echo \xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff- | hexdump -C >output; exit; exit; exit; exit\n" \
++
++# Not sure this behavior is perfect: we lose all invalid input which precedes
++# arrow keys and such. In this example, \xff\xff are lost
++testing "2 bytes which are not valid unicode chars followed by left arrow key" \
++	"script -q -c 'ash' /dev/null >/dev/null; cat output; rm output" \
++	"\
++00000000  3d 2d 0a                                          |=-.|
++00000003
++" \
++	"" \
++	"echo =+\xff\xff\x1b\x5b\x44- | hexdump -C >output; exit; exit; exit; exit\n" \
++
++exit $FAILCOUNT

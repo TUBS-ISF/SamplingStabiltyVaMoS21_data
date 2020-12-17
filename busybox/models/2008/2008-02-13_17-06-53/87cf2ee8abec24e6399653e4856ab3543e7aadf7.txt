@@ -1,0 +1,34 @@
+2008-02-13 17:06:53 +0000
+diff --git a/archival/tar.c b/archival/tar.c
+index 64975c4..6b37383 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -28,6 +28,11 @@
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
++/* FIXME: Stop using this non-standard feature */
++#ifndef FNM_LEADING_DIR
++#define FNM_LEADING_DIR 0
++#endif
++
+ #define block_buf bb_common_bufsiz1
+ 
+ #if ENABLE_FEATURE_TAR_CREATE
+diff --git a/include/platform.h b/include/platform.h
+index 9acba63..bfe6315 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -268,12 +268,6 @@ static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+ # define lchown chown
+ #endif
+ 
+-/* THIS SHOULD BE CLEANED OUT OF THE TREE ENTIRELY */
+-/* FIXME: fix tar.c! */
+-#ifndef FNM_LEADING_DIR
+-#define FNM_LEADING_DIR 0
+-#endif
+-
+ #if (defined __digital__ && defined __unix__)
+ #include <standards.h>
+ #define HAVE_STANDARDS_H

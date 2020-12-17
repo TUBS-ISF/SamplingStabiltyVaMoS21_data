@@ -1,0 +1,33 @@
+2007-11-16 20:35:30 +0000
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index e8ef929..bbf088c 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -59,8 +59,9 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 		char chksum[8];     /* 148-155 */
+ 		char typeflag;      /* 156-156 */
+ 		char linkname[100]; /* 157-256 */
+-		char magic[6];      /* 257-262 */
+-		char version[2];    /* 263-264 */
++		/* POSIX:   "ustar" NUL "00" */
++		/* GNU tar: "ustar  " NUL */
++		char magic[8];      /* 257-264 */
+ 		char uname[32];     /* 265-296 */
+ 		char gname[32];     /* 297-328 */
+ 		char devmajor[8];   /* 329-336 */
+diff --git a/archival/tar.c b/archival/tar.c
+index 1def615..bbde88a 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -50,8 +50,9 @@ struct TarHeader {		  /* byte offset */
+ 	char chksum[8];           /* 148-155 */
+ 	char typeflag;            /* 156-156 */
+ 	char linkname[NAME_SIZE]; /* 157-256 */
+-	char magic[6];            /* 257-262 */
+-	char version[2];          /* 263-264 */
++	/* POSIX:   "ustar" NUL "00" */
++	/* GNU tar: "ustar  " NUL */
++	char magic[8];            /* 257-264 */
+ 	char uname[32];           /* 265-296 */
+ 	char gname[32];           /* 297-328 */
+ 	char devmajor[8];         /* 329-336 */

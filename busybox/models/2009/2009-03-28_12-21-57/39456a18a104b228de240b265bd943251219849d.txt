@@ -1,0 +1,13 @@
+2009-03-28 12:21:57 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index ad66200..51df2d6 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -549,7 +549,6 @@ static const struct built_in_command bltins[] = {
+ 	BLTIN("."     , builtin_source, "Run commands in a file"),
+ 	BLTIN(":"     , builtin_true, "No-op"),
+ 	BLTIN("["     , builtin_test, "Test condition"),
+-	BLTIN("[["    , builtin_test, "Test condition"),
+ #if ENABLE_HUSH_JOB
+ 	BLTIN("bg"    , builtin_fg_bg, "Resume a job in the background"),
+ #endif

@@ -1,0 +1,248 @@
+2007-06-13 06:47:47 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index ce62f45..5aa95ea 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -400,7 +400,11 @@ extern ssize_t safe_read(int fd, void *buf, size_t count);
+ extern ssize_t full_read(int fd, void *buf, size_t count);
+ extern void xread(int fd, void *buf, size_t count);
+ extern unsigned char xread_char(int fd);
++// Read one line a-la fgets. Uses one read(), works only on seekable streams
+ extern char *reads(int fd, char *buf, size_t count);
++// Read one line a-la fgets. Reads byte-by-byte.
++// Useful when it is important to not read ahead.
++extern char *xmalloc_reads(int fd, char *pfx);
+ extern ssize_t read_close(int fd, void *buf, size_t count);
+ extern ssize_t open_read_close(const char *filename, void *buf, size_t count);
+ extern void *xmalloc_open_read_close(const char *filename, size_t *sizep);
+diff --git a/libbb/read.c b/libbb/read.c
+index c05b26b..05bf754 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -38,10 +38,8 @@ ssize_t full_read(int fd, void *buf, size_t len)
+ 
+ 		if (cc < 0)
+ 			return cc;	/* read() returns -1 on failure. */
+-
+ 		if (cc == 0)
+ 			break;
+-
+ 		buf = ((char *)buf) + cc;
+ 		total += cc;
+ 		len -= cc;
+@@ -64,9 +62,7 @@ void xread(int fd, void *buf, size_t count)
+ unsigned char xread_char(int fd)
+ {
+ 	char tmp;
+-
+ 	xread(fd, &tmp, 1);
+-
+ 	return tmp;
+ }
+ 
+@@ -95,6 +91,37 @@ char *reads(int fd, char *buffer, size_t size)
+ 	return buffer;
+ }
+ 
++// Read one line a-la fgets. Reads byte-by-byte.
++// Useful when it is important to not read ahead.
++char *xmalloc_reads(int fd, char *buf)
++{
++	char *p;
++	int sz = buf ? strlen(buf) : 0;
++
++	goto jump_in;
++	while (1) {
++		if (p - buf == sz) {
++ jump_in:
++			buf = xrealloc(buf, sz + 128);
++			p = buf + sz;
++			sz += 128;
++		}
++		if (safe_read(fd, p, 1) != 1) { /* EOF/error */
++			if (p == buf) {
++				/* we read nothing [and buf was NULL initially] */
++				free(buf);
++				return NULL;
++			}
++			break;
++		}
++		if (*p == '\n')
++			break;
++		p++;
++	}
++	*p++ = '\0';
++	return xrealloc(buf, p - buf);
++}
++
+ ssize_t read_close(int fd, void *buf, size_t size)
+ {
+ 	int e;
+@@ -113,25 +140,29 @@ ssize_t open_read_close(const char *filename, void *buf, size_t size)
+ 	return read_close(fd, buf, size);
+ }
+ 
++// Read (potentially big) files in one go. File size is estimated by
++// lseek to end.
+ void *xmalloc_open_read_close(const char *filename, size_t *sizep)
+ {
+ 	char *buf;
+ 	size_t size = sizep ? *sizep : INT_MAX;
+-	int fd = xopen(filename, O_RDONLY);
++	int fd;
++	off_t len;
++
++	fd = xopen(filename, O_RDONLY);
+ 	/* /proc/N/stat files report len 0 here */
+ 	/* In order to make such files readable, we add small const */
+-	off_t len = xlseek(fd, 0, SEEK_END) + 256;
++	len = xlseek(fd, 0, SEEK_END) | 0x3ff; /* + up to 1k */
+ 	xlseek(fd, 0, SEEK_SET);
+-
+-	if (len > size)
+-		bb_error_msg_and_die("file '%s' is too big", filename);
+-	size = len;
++	if (len < size)
++		size = len;
+ 	buf = xmalloc(size + 1);
+ 	size = read_close(fd, buf, size);
+ 	if ((ssize_t)size < 0)
+ 		bb_perror_msg_and_die("'%s'", filename);
+ 	xrealloc(buf, size + 1);
+ 	buf[size] = '\0';
+-	if (sizep) *sizep = size;
++	if (sizep)
++		*sizep = size;
+ 	return buf;
+ }
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index a81ca7f..b9d8a02 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -4262,6 +4262,7 @@ int insmod_ng_main(int argc, char **argv)
+ {
+ 	long ret;
+ 	size_t len;
++	int optlen;
+ 	void *map;
+ 	char *filename, *options;
+ 
+@@ -4270,12 +4271,12 @@ int insmod_ng_main(int argc, char **argv)
+ 		bb_show_usage();
+ 
+ 	/* Rest is options */
+-	options = xstrdup("");
++	options = xzalloc(1);
++	optlen = 0;
+ 	while (*++argv) {
+-		int optlen = strlen(options);
+ 		options = xrealloc(options, optlen + 2 + strlen(*argv) + 2);
+ 		/* Spaces handled by "" pairs, but no way of escaping quotes */
+-		sprintf(options + optlen, (strchr(*argv,' ') ? "\"%s\" " : "%s "), *argv);
++		optlen += sprintf(options + optlen, (strchr(*argv,' ') ? "\"%s\" " : "%s "), *argv);
+ 	}
+ 
+ #if 0
+diff --git a/modutils/modprobe.c b/modutils/modprobe.c
+index a7c6307..dbed4ea 100644
+--- a/modutils/modprobe.c
++++ b/modutils/modprobe.c
+@@ -234,7 +234,7 @@ static void include_conf(struct dep_t **first, struct dep_t **current, char *buf
+ {
+ 	int continuation_line = 0;
+ 
+-	// alias parsing is not 100% correct (no correct handling of continuation lines within an alias) !
++	// alias parsing is not 100% correct (no correct handling of continuation lines within an alias)!
+ 
+ 	while (reads(fd, buffer, buflen)) {
+ 		int l;
+diff --git a/shell/README b/shell/README
+index a09353d..b86f96c 100644
+--- a/shell/README
++++ b/shell/README
+@@ -1,5 +1,8 @@
+ Various bits of what is known about busybox shells, in no particular order.
+ 
++2007-06-13
++hush: exec <"$1" doesn't do parameter subst
++
+ 2007-05-24
+ hush: environment-related memory leak plugged, with net code size
+ decrease.
+diff --git a/shell/ash.c b/shell/ash.c
+index ae078e6..173beb1 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -11567,8 +11567,8 @@ readcmd(int argc, char **argv)
+ #endif
+ #if ENABLE_ASH_READ_TIMEOUT
+ 	if (ts.tv_sec || ts.tv_usec) {
+-		FD_ZERO (&set);
+-		FD_SET (0, &set);
++		FD_ZERO(&set);
++		FD_SET(0, &set);
+ 
+ 		i = select(FD_SETSIZE, &set, NULL, NULL, &ts);
+ 		if (!i) {
+diff --git a/shell/hush.c b/shell/hush.c
+index 40bcafd..e6fa3d9 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -942,21 +942,11 @@ static int builtin_pwd(char **argv ATTRIBUTE_UNUSED)
+ /* built-in 'read VAR' handler */
+ static int builtin_read(char **argv)
+ {
+-	char string[BUFSIZ];
+-	char *p;
++	char *string;
+ 	const char *name = argv[1] ? argv[1] : "REPLY";
+-	int name_len = strlen(name);
+ 
+-	if (name_len >= sizeof(string) - 2)
+-		return EXIT_FAILURE;
+-	strcpy(string, name);
+-	p = string + name_len;
+-	*p++ = '=';
+-	*p = '\0'; /* In case stdin has only EOF */
+-	/* read string. name_len+1 chars are already used by 'name=' */
+-	fgets(p, sizeof(string) - 1 - name_len, stdin);
+-	chomp(p);
+-	return set_local_var(xstrdup(string), 0);
++	string = xmalloc_reads(STDIN_FILENO, xasprintf("%s=", name));
++	return set_local_var(string, 0);
+ }
+ 
+ /* built-in 'set [VAR=value]' handler */
+diff --git a/shell/hush_test/hush-misc/read.right b/shell/hush_test/hush-misc/read.right
+new file mode 100644
+index 0000000..0e50e2a
+--- /dev/null
++++ b/shell/hush_test/hush-misc/read.right
+@@ -0,0 +1,4 @@
++read
++cat
++echo "REPLY=$REPLY"
++REPLY=exec <read.tests
+diff --git a/shell/hush_test/hush-misc/read.tests b/shell/hush_test/hush-misc/read.tests
+new file mode 100755
+index 0000000..ff1acbd
+--- /dev/null
++++ b/shell/hush_test/hush-misc/read.tests
+@@ -0,0 +1,4 @@
++exec <read.tests
++read
++cat
++echo "REPLY=$REPLY"
+diff --git a/util-linux/readprofile.c b/util-linux/readprofile.c
+index f2bd3bb..02afedc 100644
+--- a/util-linux/readprofile.c
++++ b/util-linux/readprofile.c
+@@ -99,7 +99,7 @@ int readprofile_main(int argc, char **argv)
+ 	/*
+ 	 * Use an fd for the profiling buffer, to skip stdio overhead
+ 	 */
+-	len = INT_MAX;
++	len = MAXINT(ssize_t);
+ 	buf = xmalloc_open_read_close(proFile, &len);
+ 	if (!optNative) {
+ 		int entries = len/sizeof(*buf);

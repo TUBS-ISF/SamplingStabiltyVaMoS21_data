@@ -1,0 +1,15 @@
+2008-07-09 20:07:59 +0000
+diff --git a/scripts/kconfig/lex.zconf.c_shipped b/scripts/kconfig/lex.zconf.c_shipped
+index 7a4ca2c..b4792d3 100644
+--- a/scripts/kconfig/lex.zconf.c_shipped
++++ b/scripts/kconfig/lex.zconf.c_shipped
+@@ -842,6 +842,9 @@ static void yy_flex_strncpy (char *,yyconst char *,int );
+ static int yy_flex_strlen (yyconst char * );
+ #endif
+ 
++//bbox: suppressing "defined but not used" warning
++#define YY_NO_INPUT 1
++
+ #ifndef YY_NO_INPUT
+ 
+ #ifdef __cplusplus

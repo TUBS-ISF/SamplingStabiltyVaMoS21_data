@@ -1,0 +1,20 @@
+2009-10-27 09:54:34 +0100
+diff --git a/libbb/bb_do_delay.c b/libbb/bb_do_delay.c
+index 3d52cc5..139dc18 100644
+--- a/libbb/bb_do_delay.c
++++ b/libbb/bb_do_delay.c
+@@ -13,10 +13,9 @@ void FAST_FUNC bb_do_delay(int seconds)
+ {
+ 	time_t start, now;
+ 
+-	time(&start);
+-	now = start;
+-	while (difftime(now, start) < seconds) {
++	start = time(NULL);
++	do {
+ 		sleep(seconds);
+-		time(&now);
+-	}
++		now = time(NULL);
++	} while ((now - start) < seconds);
+ }

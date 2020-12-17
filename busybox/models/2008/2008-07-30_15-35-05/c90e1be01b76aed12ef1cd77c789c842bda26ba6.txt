@@ -1,0 +1,45 @@
+2008-07-30 15:35:05 +0000
+diff --git a/shell/ash.c b/shell/ash.c
+index 1eb29eb..3a1e1d7 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -9665,7 +9665,7 @@ shiftcmd(int argc UNUSED_PARAM, char **argv)
+ 	if (argv[1])
+ 		n = number(argv[1]);
+ 	if (n > shellparam.nparam)
+-		n = shellparam.nparam;
++		n = 0; /* bash compat, was = shellparam.nparam; */
+ 	INT_OFF;
+ 	shellparam.nparam -= n;
+ 	for (ap1 = shellparam.p; --n >= 0; ap1++) {
+diff --git a/shell/ash_test/ash-misc/shift1.right b/shell/ash_test/ash-misc/shift1.right
+new file mode 100644
+index 0000000..b53453c
+--- /dev/null
++++ b/shell/ash_test/ash-misc/shift1.right
+@@ -0,0 +1,9 @@
++2 3 4
++0: shift: line 1: Illegal number: -1
++1 2 3 4
++2 3 4
++3 4
++4
++
++1 2 3 4
++1 2 3 4
+diff --git a/shell/ash_test/ash-misc/shift1.tests b/shell/ash_test/ash-misc/shift1.tests
+new file mode 100755
+index 0000000..0992d9b
+--- /dev/null
++++ b/shell/ash_test/ash-misc/shift1.tests
+@@ -0,0 +1,10 @@
++$THIS_SH -c 'shift;    echo "$@"' 0 1 2 3 4
++#We do abort on -1, but then we abort. bash executes echo.
++$THIS_SH -c 'shift -1; echo "$@"' 0 1 2 3 4
++$THIS_SH -c 'shift  0; echo "$@"' 0 1 2 3 4
++$THIS_SH -c 'shift  1; echo "$@"' 0 1 2 3 4
++$THIS_SH -c 'shift  2; echo "$@"' 0 1 2 3 4
++$THIS_SH -c 'shift  3; echo "$@"' 0 1 2 3 4
++$THIS_SH -c 'shift  4; echo "$@"' 0 1 2 3 4
++$THIS_SH -c 'shift  5; echo "$@"' 0 1 2 3 4
++$THIS_SH -c 'shift  6; echo "$@"' 0 1 2 3 4

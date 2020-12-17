@@ -1,0 +1,126 @@
+2008-07-31 10:34:48 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 8be0ecf..b639386 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -587,7 +587,7 @@ static int glob_needed(const char *s)
+ 
+ static int is_assignment(const char *s)
+ {
+-	if (!s || !isalpha(*s))
++	if (!s || !(isalpha(*s) || *s == '_'))
+ 		return 0;
+ 	s++;
+ 	while (isalnum(*s) || *s == '_')
+@@ -3529,22 +3529,24 @@ static int handle_dollar(o_string *dest, struct in_str *input)
+ 
+ 	debug_printf_parse("handle_dollar entered: ch='%c'\n", ch);
+ 	if (isalpha(ch)) {
++		i_getch(input);
++ make_var:
+ 		o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ 		while (1) {
+ 			debug_printf_parse(": '%c'\n", ch);
+-			i_getch(input);
+ 			o_addchr(dest, ch | quote_mask);
+ 			quote_mask = 0;
+ 			ch = i_peek(input);
+ 			if (!isalnum(ch) && ch != '_')
+ 				break;
++			i_getch(input);
+ 		}
+ 		o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ 	} else if (isdigit(ch)) {
+  make_one_char_var:
++		i_getch(input);
+ 		o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ 		debug_printf_parse(": '%c'\n", ch);
+-		i_getch(input);
+ 		o_addchr(dest, ch | quote_mask);
+ 		o_addchr(dest, SPECIAL_VAR_SYMBOL);
+ 	} else switch (ch) {
+@@ -3586,8 +3588,15 @@ static int handle_dollar(o_string *dest, struct in_str *input)
+ 			break;
+ 		}
+ #endif
+-		case '-':
+ 		case '_':
++			i_getch(input);
++			ch = i_peek(input);
++			if (isalnum(ch)) { /* it's $_name or $_123 */
++				ch = '_';
++				goto make_var;
++			}
++			/* else: it's $_ */
++		case '-':
+ 			/* still unhandled, but should be eventually */
+ 			bb_error_msg("unhandled syntax: $%c", ch);
+ 			return 1;
+diff --git a/shell/hush_test/hush-vars/var.right b/shell/hush_test/hush-vars/var.right
+deleted file mode 100644
+index 14b2314..0000000
+--- a/shell/hush_test/hush-vars/var.right
++++ /dev/null
+@@ -1,4 +0,0 @@
+-http://busybox.net
+-http://busybox.net_abc
+-1
+-1
+diff --git a/shell/hush_test/hush-vars/var.tests b/shell/hush_test/hush-vars/var.tests
+deleted file mode 100755
+index 0a63696..0000000
+--- a/shell/hush_test/hush-vars/var.tests
++++ /dev/null
+@@ -1,9 +0,0 @@
+-URL=http://busybox.net
+-
+-echo $URL
+-echo ${URL}_abc
+-
+-true
+-false; echo $?
+-true
+-{ false; echo $?; }
+diff --git a/shell/hush_test/hush-vars/var1.right b/shell/hush_test/hush-vars/var1.right
+new file mode 100644
+index 0000000..14b2314
+--- /dev/null
++++ b/shell/hush_test/hush-vars/var1.right
+@@ -0,0 +1,4 @@
++http://busybox.net
++http://busybox.net_abc
++1
++1
+diff --git a/shell/hush_test/hush-vars/var1.tests b/shell/hush_test/hush-vars/var1.tests
+new file mode 100755
+index 0000000..0a63696
+--- /dev/null
++++ b/shell/hush_test/hush-vars/var1.tests
+@@ -0,0 +1,9 @@
++URL=http://busybox.net
++
++echo $URL
++echo ${URL}_abc
++
++true
++false; echo $?
++true
++{ false; echo $?; }
+diff --git a/shell/hush_test/hush-vars/var2.right b/shell/hush_test/hush-vars/var2.right
+new file mode 100644
+index 0000000..40bf4bf
+--- /dev/null
++++ b/shell/hush_test/hush-vars/var2.right
+@@ -0,0 +1,2 @@
++http://busybox.net
++http://busybox.net_abc
+diff --git a/shell/hush_test/hush-vars/var2.tests b/shell/hush_test/hush-vars/var2.tests
+new file mode 100755
+index 0000000..1292410
+--- /dev/null
++++ b/shell/hush_test/hush-vars/var2.tests
+@@ -0,0 +1,4 @@
++_1=http://busybox.net
++
++echo $_1
++echo ${_1}_abc

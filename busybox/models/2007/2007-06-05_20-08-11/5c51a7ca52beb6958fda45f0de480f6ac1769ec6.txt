@@ -1,0 +1,131 @@
+2007-06-05 20:08:11 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 0136337..dd0f5c1 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -304,9 +304,12 @@ enum {
+ 		}
+ 	)
+ };
+-/* Create stream socket, and allocated suitable lsa
+- * (lsa of correct size and lsa->sa.sa_family (AF_INET/AF_INET6)) */
+-int xsocket_type(len_and_sockaddr **lsap, int sock_type);
++/* Create stream socket, and allocate suitable lsa.
++ * (lsa of correct size and lsa->sa.sa_family (AF_INET/AF_INET6))
++ * af == AF_UNSPEC will result in trying to create IPv6, and
++ * if kernel doesn't support it, IPv4.
++ */
++int xsocket_type(len_and_sockaddr **lsap, USE_FEATURE_IPV6(int af,) int sock_type);
+ int xsocket_stream(len_and_sockaddr **lsap);
+ /* Create server socket bound to bindaddr:port. bindaddr can be NULL,
+  * numeric IP ("N.N.N.N") or numeric IPv6 address,
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index e7d5106..b90aa9a 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -208,23 +208,31 @@ len_and_sockaddr* xdotted2sockaddr(const char *host, int port)
+ 	return str2sockaddr(host, port, AF_UNSPEC, AI_NUMERICHOST | DIE_ON_ERROR);
+ }
+ 
+-int xsocket_type(len_and_sockaddr **lsap, int sock_type)
++int xsocket_type(len_and_sockaddr **lsap, USE_FEATURE_IPV6(int family,) int sock_type)
+ {
++	SKIP_FEATURE_IPV6(enum { family = AF_INET };)
+ 	len_and_sockaddr *lsa;
+ 	int fd;
+-	int len = sizeof(struct sockaddr_in);
+-	int family = AF_INET;
++	int len;
+ 
+ #if ENABLE_FEATURE_IPV6
+-	fd = socket(AF_INET6, sock_type, 0);
+-	if (fd >= 0) {
+-		len = sizeof(struct sockaddr_in6);
+-		family = AF_INET6;
+-	} else
++	if (family == AF_UNSPEC) {
++		fd = socket(AF_INET6, sock_type, 0);
++		if (fd >= 0) {
++			family = AF_INET6;
++			goto done;
++		}
++		family = AF_INET;
++	}
+ #endif
+-	{
+-		fd = xsocket(AF_INET, sock_type, 0);
++	fd = xsocket(family, sock_type, 0);
++	len = sizeof(struct sockaddr_in);
++#if ENABLE_FEATURE_IPV6
++	if (family == AF_INET6) {
++ done:
++		len = sizeof(struct sockaddr_in6);
+ 	}
++#endif
+ 	lsa = xzalloc(offsetof(len_and_sockaddr, sa) + len);
+ 	lsa->len = len;
+ 	lsa->sa.sa_family = family;
+@@ -234,7 +242,7 @@ int xsocket_type(len_and_sockaddr **lsap, int sock_type)
+ 
+ int xsocket_stream(len_and_sockaddr **lsap)
+ {
+-	return xsocket_type(lsap, SOCK_STREAM);
++	return xsocket_type(lsap, USE_FEATURE_IPV6(AF_UNSPEC,) SOCK_STREAM);
+ }
+ 
+ static int create_and_bind_or_die(const char *bindaddr, int port, int sock_type)
+@@ -247,7 +255,7 @@ static int create_and_bind_or_die(const char *bindaddr, int port, int sock_type)
+ 		/* user specified bind addr dictates family */
+ 		fd = xsocket(lsa->sa.sa_family, sock_type, 0);
+ 	} else {
+-		fd = xsocket_type(&lsa, sock_type);
++		fd = xsocket_type(&lsa, USE_FEATURE_IPV6(AF_UNSPEC,) sock_type);
+ 		set_nport(lsa, htons(port));
+ 	}
+ 	setsockopt_reuseaddr(fd);
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 5096e32..a318c81 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -751,6 +751,13 @@ int nc_main(int argc, char **argv)
+ 	/* We manage our fd's so that they are never 0,1,2 */
+ 	/*bb_sanitize_stdio(); - not needed */
+ 
++	if (argv[0]) {
++		themaddr = xhost2sockaddr(argv[0],
++			argv[1]
++			? bb_lookup_port(argv[1], o_udpmode ? "udp" : "tcp", 0)
++			: 0);
++	}
++
+ 	/* create & bind network socket */
+ 	x = (o_udpmode ? SOCK_DGRAM : SOCK_STREAM);
+ 	if (option_mask32 & OPT_s) { /* local address */
+@@ -758,7 +765,11 @@ int nc_main(int argc, char **argv)
+ 		ouraddr = xhost2sockaddr(str_s, o_lport);
+ 		x = xsocket(ouraddr->sa.sa_family, x, 0);
+ 	} else {
+-		x = xsocket_type(&ouraddr, x);
++		/* We try IPv6, then IPv4, unless addr family is
++		 * implicitly set by way of remote addr/port spec */
++		x = xsocket_type(&ouraddr,
++				USE_FEATURE_IPV6((themaddr ? themaddr->sa.sa_family : AF_UNSPEC),)
++				x);
+ 		if (o_lport)
+ 			set_nport(ouraddr, htons(o_lport));
+ 	}
+@@ -789,14 +800,6 @@ int nc_main(int argc, char **argv)
+ 		xmove_fd(xopen(str_o, O_WRONLY|O_CREAT|O_TRUNC), ofd);
+ #endif
+ 
+-	if (argv[0]) {
+-		themaddr = xhost2sockaddr(argv[0],
+-			argv[1]
+-			? bb_lookup_port(argv[1], o_udpmode ? "udp" : "tcp", 0)
+-			: 0);
+-///what if sa_family won't match??
+-	}
+-
+ 	if (o_listen) {
+ 		dolisten();
+ 		/* dolisten does its own connect reporting */

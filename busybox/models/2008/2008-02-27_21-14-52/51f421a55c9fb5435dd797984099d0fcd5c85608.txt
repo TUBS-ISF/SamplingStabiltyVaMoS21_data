@@ -1,0 +1,21 @@
+2008-02-27 21:14:52 +0000
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 902df34..b19c3a3 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -248,7 +248,6 @@ static int verbose_mount(const char *source, const char *target,
+ #define verbose_mount(...) mount(__VA_ARGS__)
+ #endif
+ 
+-#if ENABLE_FEATURE_MOUNT_LABEL
+ static int resolve_mount_spec(char **fsname)
+ {
+ 	char *tmp = NULL;
+@@ -264,7 +263,6 @@ static int resolve_mount_spec(char **fsname)
+ 	}
+ 	return 0;
+ }
+-#endif
+ 
+ /* Append mount options to string */
+ static void append_mount_options(char **oldopts, const char *newopts)

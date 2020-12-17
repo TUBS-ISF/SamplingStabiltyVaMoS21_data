@@ -1,0 +1,14 @@
+2008-10-21 12:59:34 +0000
+diff --git a/editors/awk.c b/editors/awk.c
+index 6ebdec4..bdf2a7f 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -2025,7 +2025,7 @@ static var *exec_builtin(node *op, var *res)
+ 
+ 	case B_a2:
+ #if ENABLE_FEATURE_AWK_MATH
+-		setvar_i(res, atan2(getvar_i(av[i]), getvar_i(av[1])));
++		setvar_i(res, atan2(getvar_i(av[0]), getvar_i(av[1])));
+ #else
+ 		syntax_error(EMSG_NO_MATH);
+ #endif

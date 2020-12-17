@@ -1,0 +1,4 @@
+2009-05-23 17:00:13 +0200
+diff --git a/shell/hush_test/hush-misc/compound.tests b/shell/hush_test/hush-misc/compound.tests
+old mode 100644
+new mode 100755

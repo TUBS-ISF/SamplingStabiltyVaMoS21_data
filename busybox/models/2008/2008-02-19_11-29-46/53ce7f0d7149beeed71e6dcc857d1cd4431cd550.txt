@@ -1,0 +1,54 @@
+2008-02-19 11:29:46 +0000
+diff --git a/util-linux/findfs.c b/util-linux/findfs.c
+index 4f03642..5b64399 100644
+--- a/util-linux/findfs.c
++++ b/util-linux/findfs.c
+@@ -17,7 +17,7 @@ int findfs_main(int argc, char **argv)
+ 	char *tmp = NULL;
+ 
+ 	if (argc != 2)
+-		bb_show_usage();                                                                                                             
++		bb_show_usage();
+ 
+ 	if (!strncmp(argv[1], "LABEL=", 6))
+ 		tmp = get_devname_from_label(argv[1] + 6);
+@@ -25,14 +25,14 @@ int findfs_main(int argc, char **argv)
+ 		tmp = get_devname_from_uuid(argv[1] + 5);
+ 	else if (!strncmp(argv[1], "/dev/", 5)) {
+ 		/* Just pass a device name right through.  This might aid in some scripts
+-	   	being able to call this unconditionally */
++		being able to call this unconditionally */
+ 		tmp = argv[1];
+ 	} else
+ 		bb_show_usage();
+-		
+-	if (tmp) { 
+-		puts(tmp);                                                                                                                   
++
++	if (tmp) {
++		puts(tmp);
+ 		return 0;
+ 	}
+ 	return 1;
+-}    
++}
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index b19c3a3..902df34 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -248,6 +248,7 @@ static int verbose_mount(const char *source, const char *target,
+ #define verbose_mount(...) mount(__VA_ARGS__)
+ #endif
+ 
++#if ENABLE_FEATURE_MOUNT_LABEL
+ static int resolve_mount_spec(char **fsname)
+ {
+ 	char *tmp = NULL;
+@@ -263,6 +264,7 @@ static int resolve_mount_spec(char **fsname)
+ 	}
+ 	return 0;
+ }
++#endif
+ 
+ /* Append mount options to string */
+ static void append_mount_options(char **oldopts, const char *newopts)

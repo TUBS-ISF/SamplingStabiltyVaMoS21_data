@@ -1,0 +1,182 @@
+2010-04-01 15:09:44 +0200
+diff --git a/console-tools/setkeycodes.c b/console-tools/setkeycodes.c
+index 597272a..b785101 100644
+--- a/console-tools/setkeycodes.c
++++ b/console-tools/setkeycodes.c
+@@ -8,8 +8,6 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+-//#include <sys/ioctl.h>
+ #include "libbb.h"
+ 
+ /* From <linux/kd.h> */
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/bitops.h b/e2fsprogs/old_e2fsprogs/ext2fs/bitops.h
+index b34bd98..7271a49 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/bitops.h
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/bitops.h
+@@ -13,9 +13,7 @@
+  * i386 bitops operations taken from <asm/bitops.h>, Copyright 1992,
+  * Linus Torvalds.
+  */
+-
+ #include <string.h>
+-//#include <strings.h>
+ 
+ extern int ext2fs_set_bit(unsigned int nr,void * addr);
+ extern int ext2fs_clear_bit(unsigned int nr, void * addr);
+diff --git a/libbb/xgethostbyname.c b/libbb/xgethostbyname.c
+index f1839f7..7afa9b6 100644
+--- a/libbb/xgethostbyname.c
++++ b/libbb/xgethostbyname.c
+@@ -6,8 +6,6 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+-//#include <netdb.h>
+ #include "libbb.h"
+ 
+ struct hostent* FAST_FUNC xgethostbyname(const char *name)
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index 28f0c0b..0b3ebf7 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -102,7 +102,7 @@
+ 
+ /* #include <net/if.h> - no. linux/if_bonding.h pulls in linux/if.h */
+ #include <linux/if.h>
+-#include <net/if_arp.h>
++//#include <net/if_arp.h> - not needed?
+ #include <linux/if_bonding.h>
+ #include <linux/sockios.h>
+ #include "fix_u32.h" /* hack, so we may include kernel's ethtool.h */
+diff --git a/networking/interface.c b/networking/interface.c
+index 0d5a0f9..b59a61d 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -33,14 +33,18 @@
+ 
+ #include <net/if.h>
+ #include <net/if_arp.h>
++#if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined(_NEWLIB_VERSION)
++# include <net/ethernet.h>
++#else
++# include <linux/if_ether.h>
++#endif
+ #include "libbb.h"
+ #include "inet_common.h"
+ 
+-
+ #if ENABLE_FEATURE_HWIB
+ /* #include <linux/if_infiniband.h> */
+-#undef INFINIBAND_ALEN
+-#define INFINIBAND_ALEN 20
++# undef INFINIBAND_ALEN
++# define INFINIBAND_ALEN 20
+ #endif
+ 
+ #if ENABLE_FEATURE_IPV6
+@@ -53,39 +57,35 @@
+ #define _PATH_PROCNET_IFINET6           "/proc/net/if_inet6"
+ 
+ #ifdef HAVE_AFINET6
+-
+-#ifndef _LINUX_IN6_H
++# ifndef _LINUX_IN6_H
+ /*
+- *    This is in linux/include/net/ipv6.h.
++ * This is from linux/include/net/ipv6.h
+  */
+-
+ struct in6_ifreq {
+ 	struct in6_addr ifr6_addr;
+ 	uint32_t ifr6_prefixlen;
+ 	unsigned int ifr6_ifindex;
+ };
+-
+-#endif
+-
++# endif
+ #endif /* HAVE_AFINET6 */
+ 
+ /* Defines for glibc2.0 users. */
+ #ifndef SIOCSIFTXQLEN
+-#define SIOCSIFTXQLEN      0x8943
+-#define SIOCGIFTXQLEN      0x8942
++# define SIOCSIFTXQLEN      0x8943
++# define SIOCGIFTXQLEN      0x8942
+ #endif
+ 
+ /* ifr_qlen is ifru_ivalue, but it isn't present in 2.0 kernel headers */
+ #ifndef ifr_qlen
+-#define ifr_qlen        ifr_ifru.ifru_mtu
++# define ifr_qlen        ifr_ifru.ifru_mtu
+ #endif
+ 
+ #ifndef HAVE_TXQUEUELEN
+-#define HAVE_TXQUEUELEN 1
++# define HAVE_TXQUEUELEN 1
+ #endif
+ 
+ #ifndef IFF_DYNAMIC
+-#define IFF_DYNAMIC     0x8000	/* dialup device with changing addresses */
++# define IFF_DYNAMIC     0x8000 /* dialup device with changing addresses */
+ #endif
+ 
+ /* Display an Internet socket address. */
+@@ -711,14 +711,6 @@ static const struct hwtype loop_hwtype = {
+ 	.type =		ARPHRD_LOOPBACK
+ };
+ 
+-#include <net/if_arp.h>
+-
+-#if (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1) || defined(_NEWLIB_VERSION)
+-#include <net/ethernet.h>
+-#else
+-#include <linux/if_ether.h>
+-#endif
+-
+ /* Display an Ethernet address in readable format. */
+ static char* FAST_FUNC ether_print(unsigned char *ptr)
+ {
+@@ -794,8 +786,6 @@ static int FAST_FUNC ether_input(const char *bufp, struct sockaddr *sap)
+ 	return 0;
+ }
+ 
+-#include <net/if_arp.h>
+-
+ static const struct hwtype ppp_hwtype = {
+ 	.name =		"ppp",
+ 	.title =	"Point-to-Point Protocol",
+@@ -993,7 +983,6 @@ static void ife_print6(struct interface *ptr)
+ #define ife_print6(a) ((void)0)
+ #endif
+ 
+-
+ static void ife_print(struct interface *ptr)
+ {
+ 	const struct aftype *ap;
+@@ -1277,7 +1266,6 @@ int FAST_FUNC in_ib(const char *bufp, struct sockaddr *sap)
+ }
+ #endif
+ 
+-
+ int FAST_FUNC display_interfaces(char *ifname)
+ {
+ 	int status;
+diff --git a/networking/libiproute/iplink.c b/networking/libiproute/iplink.c
+index de7d640..df8a354 100644
+--- a/networking/libiproute/iplink.c
++++ b/networking/libiproute/iplink.c
+@@ -6,9 +6,6 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+-//#include <sys/ioctl.h>
+-//#include <sys/socket.h>
+ #include <net/if.h>
+ #include <net/if_packet.h>
+ #include <netpacket/packet.h>

@@ -1,0 +1,163 @@
+2009-11-15 19:58:19 +0100
+diff --git a/shell/brace.txt b/shell/brace.txt
+new file mode 100644
+index 0000000..664861b
+--- /dev/null
++++ b/shell/brace.txt
+@@ -0,0 +1,50 @@
++Brace Expansion
++
++Brace expansion is a mechanism by which arbitrary strings may be gener-
++ated.   This  mechanism is similar to pathname expansion, but the file-
++names generated need not exist.  Patterns to be brace expanded take the
++form of an optional preamble, followed by either a series of comma-sep-
++arated strings or a sequence expression between a pair of braces,  fol-
++lowed  by  an  optional  postscript.   The preamble is prefixed to each
++string contained within the braces, and the postscript is then appended
++to each resulting string, expanding left to right.
++
++Brace  expansions  may  be nested.  The results of each expanded string
++are not sorted;  left  to  right  order  is  preserved.   For  example,
++a{d,c,b}e expands into `ade ace abe'.
++
++A  sequence  expression takes the form {x..y}, where x and y are either
++integers or single characters.  When integers are supplied, the expres-
++sion  expands  to each number between x and y, inclusive.  When charac-
++ters are supplied, the expression expands  to  each  character  lexico-
++graphically between x and y, inclusive.  Note that both x and y must be
++of the same type.
++
++Brace expansion is performed before any other expansions, and any char-
++acters  special to other expansions are preserved in the result.  It is
++strictly textual.  Bash does not apply any syntactic interpretation  to
++the context of the expansion or the text between the braces.
++
++A  correctly-formed  brace  expansion must contain unquoted opening and
++closing braces, and at least one unquoted comma  or  a  valid  sequence
++expression.   Any incorrectly formed brace expansion is left unchanged.
++A { or , may be quoted with a backslash to prevent its being considered
++part  of  a brace expression.  To avoid conflicts with parameter expan-
++sion, the string ${ is not considered eligible for brace expansion.
++
++This construct is typically used as shorthand when the common prefix of
++the strings to be generated is longer than in the above example:
++
++       mkdir /usr/local/src/bash/{old,new,dist,bugs}
++or
++       chown root /usr/{ucb/{ex,edit},lib/{ex?.?*,how_ex}}
++
++Brace  expansion  introduces  a  slight incompatibility with historical
++versions of sh.  sh does not treat opening or closing braces  specially
++when  they  appear as part of a word, and preserves them in the output.
++Bash removes braces from words as a  consequence  of  brace  expansion.
++For  example,  a word entered to sh as file{1,2} appears identically in
++the output.  The same word is output as file1 file2 after expansion  by
++bash.   If strict compatibility with sh is desired, start bash with the
+++B option or disable brace expansion with the +B option to the set com-
++mand
+diff --git a/shell/hush.c b/shell/hush.c
+index 891d87b..6f394d1 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2287,7 +2287,7 @@ static NOINLINE int expand_vars_to_list(o_string *output, int n, char *arg, char
+ 			 * expanded result may need to be globbed
+ 			 * and $IFS-splitted */
+ 			debug_printf_subst("SUBST '%s' first_ch %x\n", arg, first_ch);
+-			process_command_subs(&subst_result, arg);
++			G.last_exitcode = process_command_subs(&subst_result, arg);
+ 			debug_printf_subst("SUBST RES '%s'\n", subst_result.data);
+ 			val = subst_result.data;
+ 			goto store_val;
+@@ -3904,7 +3904,7 @@ static NOINLINE int run_pipe(struct pipe *pi)
+ 		/* if someone gives us an empty string: `cmd with empty output` */
+ 		if (!argv_expanded[0]) {
+ 			debug_leave();
+-			return 0;
++			return 0; // or G.last_exitcode? see emptytick.tests
+ 		}
+ 
+ 		x = find_builtin(argv_expanded[0]);
+@@ -5202,10 +5202,10 @@ static int fetch_heredocs(int heredoc_cnt, struct parse_context *ctx, struct in_
+ 
+ 
+ #if ENABLE_HUSH_TICK
+-static FILE *generate_stream_from_string(const char *s)
++static FILE *generate_stream_from_string(const char *s, pid_t *pid_p)
+ {
+-	FILE *pf;
+-	int pid, channel[2];
++	pid_t pid;
++	int channel[2];
+ # if !BB_MMU
+ 	char **to_free;
+ # endif
+@@ -5291,6 +5291,7 @@ static FILE *generate_stream_from_string(const char *s)
+ 	}
+ 
+ 	/* parent */
++	*pid_p = pid;
+ # if ENABLE_HUSH_FAST
+ 	G.count_SIGCHLD++;
+ //bb_error_msg("[%d] fork in generate_stream_from_string: G.count_SIGCHLD:%d G.handled_SIGCHLD:%d", getpid(), G.count_SIGCHLD, G.handled_SIGCHLD);
+@@ -5300,8 +5301,8 @@ static FILE *generate_stream_from_string(const char *s)
+ 	free(to_free);
+ # endif
+ 	close(channel[1]);
+-	pf = fdopen(channel[0], "r");
+-	return pf;
++//TODO: libbb: fdopen_or_die?
++	return fdopen(channel[0], "r");
+ }
+ 
+ /* Return code is exit status of the process that is run. */
+@@ -5309,9 +5310,10 @@ static int process_command_subs(o_string *dest, const char *s)
+ {
+ 	FILE *pf;
+ 	struct in_str pipe_str;
+-	int ch, eol_cnt;
++	pid_t pid;
++	int status, ch, eol_cnt;
+ 
+-	pf = generate_stream_from_string(s);
++	pf = generate_stream_from_string(s, &pid);
+ 	if (pf == NULL)
+ 		return 1;
+ 	close_on_exec_on(fileno(pf));
+@@ -5331,16 +5333,14 @@ static int process_command_subs(o_string *dest, const char *s)
+ 		o_addQchr(dest, ch);
+ 	}
+ 
+-	debug_printf("done reading from pipe, pclose()ing\n");
+-	/* Note: we got EOF, and we just close the read end of the pipe.
+-	 * We do not wait for the `cmd` child to terminate. bash and ash do.
+-	 * Try these:
+-	 * echo `echo Hi; exec 1>&-; sleep 2` - bash waits 2 sec
+-	 * `false`; echo $? - bash outputs "1"
+-	 */
++	debug_printf("done reading from `cmd` pipe, closing it\n");
+ 	fclose(pf);
+-	debug_printf("closed FILE from child. return 0\n");
+-	return 0;
++	/* We need to extract exitcode. Test case
++	 * "true; echo `sleep 1; false` $?"
++	 * should print 1 */
++	safe_waitpid(pid, &status, 0);
++	debug_printf("child exited. returning its exitcode:%d\n", WEXITSTATUS(status));
++	return WEXITSTATUS(status);
+ }
+ #endif /* ENABLE_HUSH_TICK */
+ 
+diff --git a/shell/hush_test/hush-psubst/tick5.right b/shell/hush_test/hush-psubst/tick5.right
+new file mode 100644
+index 0000000..d00491f
+--- /dev/null
++++ b/shell/hush_test/hush-psubst/tick5.right
+@@ -0,0 +1 @@
++1
+diff --git a/shell/hush_test/hush-psubst/tick5.tests b/shell/hush_test/hush-psubst/tick5.tests
+new file mode 100755
+index 0000000..bd160c9
+--- /dev/null
++++ b/shell/hush_test/hush-psubst/tick5.tests
+@@ -0,0 +1 @@
++true; echo `false` $?

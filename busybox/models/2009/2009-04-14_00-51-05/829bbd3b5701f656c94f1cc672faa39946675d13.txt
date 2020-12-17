@@ -1,0 +1,688 @@
+2009-04-14 00:51:05 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 0b94f70..1faa9e9 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1142,9 +1142,16 @@ extern int obscure(const char *old, const char *newval, const struct passwd *pwd
+  * (otherwise we risk having same salt generated)
+  */
+ extern int crypt_make_salt(char *p, int cnt, int rnd) FAST_FUNC;
++
+ /* Returns number of lines changed, or -1 on error */
+-extern int update_passwd(const char *filename, const char *username,
+-			const char *new_pw) FAST_FUNC;
++#if !(ENABLE_FEATURE_ADDUSER_TO_GROUP || ENABLE_FEATURE_DEL_USER_FROM_GROUP)
++#define update_passwd(filename, username, data, member) \
++	update_passwd(filename, username, data)
++#endif
++extern int update_passwd(const char *filename,
++		const char *username,
++		const char *data,
++		const char *member) FAST_FUNC;
+ 
+ int index_in_str_array(const char *const string_array[], const char *key) FAST_FUNC;
+ int index_in_strings(const char *strings, const char *key) FAST_FUNC;
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 2c8830f..57d5d21 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -120,6 +120,9 @@ lib-y += xrealloc_vector.o
+ lib-$(CONFIG_FEATURE_MOUNT_LOOP) += loop.o
+ lib-$(CONFIG_LOSETUP) += loop.o
+ lib-$(CONFIG_FEATURE_MTAB_SUPPORT) += mtab.o
++lib-$(CONFIG_ADDGROUP) += update_passwd.o
++lib-$(CONFIG_ADDUSER) += update_passwd.o
++lib-$(CONFIG_DELUSER) += update_passwd.o
+ lib-$(CONFIG_PASSWD) += pw_encrypt.o update_passwd.o
+ lib-$(CONFIG_CHPASSWD) += pw_encrypt.o update_passwd.o
+ lib-$(CONFIG_CRYPTPW) += pw_encrypt.o
+diff --git a/libbb/update_passwd.c b/libbb/update_passwd.c
+index 565dd37..3294348 100644
+--- a/libbb/update_passwd.c
++++ b/libbb/update_passwd.c
+@@ -8,9 +8,11 @@
+  *
+  * Moved from loginutils/passwd.c by Alexander Shishkin <virtuoso@slind.org>
+  *
++ * Modified to be able to add or delete users, groups and users to/from groups
++ * by Tito Ragusa <farmatito@tiscali.it>
++ *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+-
+ #include "libbb.h"
+ 
+ #if ENABLE_SELINUX
+@@ -35,12 +37,44 @@ static void check_selinux_update_passwd(const char *username)
+ 		freecon(context);
+ }
+ #else
+-#define check_selinux_update_passwd(username) ((void)0)
++# define check_selinux_update_passwd(username) ((void)0)
+ #endif
+ 
+-int FAST_FUNC update_passwd(const char *filename, const char *username,
+-			const char *new_pw)
++/*
++ 1) add a user: update_passwd(FILE, USER, REMAINING_PWLINE, NULL)
++    only if CONFIG_ADDUSER=y and applet_name[0] == 'a' like in adduser
++
++ 2) add a group: update_passwd(FILE, GROUP, REMAINING_GRLINE, NULL)
++    only if CONFIG_ADDGROUP=y and applet_name[0] == 'a' like in addgroup
++
++ 3) add a user to a group: update_passwd(FILE, GROUP, NULL, MEMBER)
++    only if CONFIG_FEATURE_ADDUSER_TO_GROUP=y, applet_name[0] == 'a'
++    like in addgroup and member != NULL
++
++ 4) delete a user: update_passwd(FILE, USER, NULL, NULL)
++
++ 5) delete a group: update_passwd(FILE, GROUP, NULL, NULL)
++
++ 6) delete a user from a group: update_passwd(FILE, GROUP, NULL, MEMBER)
++    only if CONFIG_FEATURE_DEL_USER_FROM_GROUP=y and member != NULL
++
++ 7) change user's passord: update_passwd(FILE, USER, NEW_PASSWD, NULL)
++    only if CONFIG_PASSWD=y and applet_name[0] == 'p' like in passwd
++    or if CONFIG_CHPASSWD=y and applet_name[0] == 'c' like in chpasswd
++
++ This function does not validate the arguments fed to it
++ so the calling program should take care of that.
++
++ Returns number of lines changed, or -1 on error.
++*/
++int FAST_FUNC update_passwd(const char *filename,
++		const char *name,
++		const char *new_passwd,
++		const char *member)
+ {
++#if !(ENABLE_FEATURE_ADDUSER_TO_GROUP || ENABLE_FEATURE_DEL_USER_FROM_GROUP)
++#define member NULL
++#endif
+ 	struct stat sb;
+ 	struct flock lock;
+ 	FILE *old_fp;
+@@ -51,22 +85,25 @@ int FAST_FUNC update_passwd(const char *filename, const char *username,
+ 	int old_fd;
+ 	int new_fd;
+ 	int i;
+-	int cnt = 0;
++	int changed_lines;
+ 	int ret = -1; /* failure */
+ 
+ 	filename = xmalloc_follow_symlinks(filename);
+ 	if (filename == NULL)
+-		return -1;
++		return ret;
+ 
+-	check_selinux_update_passwd(username);
++	check_selinux_update_passwd(name);
+ 
+ 	/* New passwd file, "/etc/passwd+" for now */
+ 	fnamesfx = xasprintf("%s+", filename);
+ 	sfx_char = &fnamesfx[strlen(fnamesfx)-1];
+-	username = xasprintf("%s:", username);
+-	user_len = strlen(username);
++	name = xasprintf("%s:", name);
++	user_len = strlen(name);
+ 
+-	old_fp = fopen(filename, "r+");
++	if (strstr(filename, "shadow"))
++		old_fp = fopen(filename, "r+");
++	else
++		old_fp = fopen_or_warn(filename, "r+");
+ 	if (!old_fp)
+ 		goto free_mem;
+ 	old_fd = fileno(old_fp);
+@@ -82,7 +119,7 @@ int FAST_FUNC update_passwd(const char *filename, const char *username,
+ 		if (errno != EEXIST) break;
+ 		usleep(100000); /* 0.1 sec */
+ 	} while (--i);
+-	bb_perror_msg("cannot create '%s'", fnamesfx);
++	bb_perror_msg("can't create '%s'", fnamesfx);
+ 	goto close_old_fp;
+ 
+  created:
+@@ -90,8 +127,10 @@ int FAST_FUNC update_passwd(const char *filename, const char *username,
+ 		fchmod(new_fd, sb.st_mode & 0777); /* ignore errors */
+ 		fchown(new_fd, sb.st_uid, sb.st_gid);
+ 	}
++	errno = 0;
+ 	new_fp = fdopen(new_fd, "w");
+ 	if (!new_fp) {
++		bb_perror_nomsg();
+ 		close(new_fd);
+ 		goto unlink_new;
+ 	}
+@@ -102,7 +141,8 @@ int FAST_FUNC update_passwd(const char *filename, const char *username,
+ 	i = (unlink(fnamesfx) && errno != ENOENT);
+ 	/* Create backup as a hardlink to current */
+ 	if (i || link(filename, fnamesfx))
+-		bb_perror_msg("warning: cannot create backup copy '%s'", fnamesfx);
++		bb_perror_msg("warning: can't create backup copy '%s'",
++				fnamesfx);
+ 	*sfx_char = '+';
+ 
+ 	/* Lock the password file before updating */
+@@ -111,38 +151,107 @@ int FAST_FUNC update_passwd(const char *filename, const char *username,
+ 	lock.l_start = 0;
+ 	lock.l_len = 0;
+ 	if (fcntl(old_fd, F_SETLK, &lock) < 0)
+-		bb_perror_msg("warning: cannot lock '%s'", filename);
++		bb_perror_msg("warning: can't lock '%s'", filename);
+ 	lock.l_type = F_UNLCK;
+ 
+ 	/* Read current password file, write updated /etc/passwd+ */
++	changed_lines = 0;
+ 	while (1) {
+-		char *line = xmalloc_fgets(old_fp);
+-		if (!line) break; /* EOF/error */
+-		if (strncmp(username, line, user_len) == 0) {
+-			/* we have a match with "username:"... */
+-			const char *cp = line + user_len;
+-			/* now cp -> old passwd, skip it: */
+-			cp = strchrnul(cp, ':');
+-			/* now cp -> ':' after old passwd or -> "" */
+-			fprintf(new_fp, "%s%s%s", username, new_pw, cp);
+-			cnt++;
++		char *cp, *line;
++
++		line = xmalloc_fgetline(old_fp);
++		if (!line) /* EOF/error */
++			break;
++		if (strncmp(name, line, user_len) != 0) {
++			fprintf(new_fp, "%s\n", line);
++			goto next;
++		}
++
++		/* We have a match with "name:"... */
++		cp = line + user_len; /* move past name: */
++
++#if ENABLE_FEATURE_ADDUSER_TO_GROUP || ENABLE_FEATURE_DEL_USER_FROM_GROUP
++		if (member) {
++			/* It's actually /etc/group+, not /etc/passwd+ */
++			if (ENABLE_FEATURE_ADDUSER_TO_GROUP
++			 && applet_name[0] == 'a'
++			) {
++				/* Add user to group */
++				fprintf(new_fp, "%s%s%s\n", line,
++					last_char_is(line, ':') ? "" : ",",
++					member);
++				changed_lines++;
++			} else if (ENABLE_FEATURE_DEL_USER_FROM_GROUP
++			/* && applet_name[0] == 'd' */
++			) {
++				/* Delete user from group */
++				char *tmp;
++				const char *fmt = "%s";
++
++				/* find the start of the member list: last ':' */
++				cp = strrchr(line, ':');
++				/* cut it */
++				*cp++ = '\0';
++				/* write the cut line name:passwd:gid:
++				 * or name:!:: */
++				fprintf(new_fp, "%s:", line);
++				/* parse the tokens of the member list */
++				tmp = cp;
++				while ((cp = strsep(&tmp, ",")) != NULL) {
++					if (strcmp(member, cp) != 0) {
++						fprintf(new_fp, fmt, cp);
++						fmt = ",%s";
++					} else {
++						/* found member, skip it */
++						changed_lines++;
++					}
++				}
++				fprintf(new_fp, "\n");
++			}
+ 		} else
+-			fputs(line, new_fp);
++#endif
++		if ((ENABLE_PASSWD && applet_name[0] == 'p')
++		 || (ENABLE_CHPASSWD && applet_name[0] == 'c')
++		) {
++			/* Change passwd */
++			cp = strchrnul(cp, ':'); /* move past old passwd */
++			/* name: + new_passwd + :rest of line */
++			fprintf(new_fp, "%s%s%s\n", name, new_passwd, cp);
++			changed_lines++;
++		} /* else delete user or group: skip the line */
++ next:
+ 		free(line);
+ 	}
++
++	if (changed_lines == 0) {
++		if (ENABLE_FEATURE_DEL_USER_FROM_GROUP && member)
++			bb_error_msg("can't find %s in %s", member, filename);
++		if ((ENABLE_ADDUSER || ENABLE_ADDGROUP)
++		 && applet_name[0] == 'a' && !member
++		) {
++			/* add user or group */
++			fprintf(new_fp, "%s%s\n", name, new_passwd);
++			changed_lines++;
++		}
++	}
++
+ 	fcntl(old_fd, F_SETLK, &lock);
+ 
+ 	/* We do want all of them to execute, thus | instead of || */
++	errno = 0;
+ 	if ((ferror(old_fp) | fflush(new_fp) | fsync(new_fd) | fclose(new_fp))
+ 	 || rename(fnamesfx, filename)
+ 	) {
+ 		/* At least one of those failed */
++		bb_perror_nomsg();
+ 		goto unlink_new;
+ 	}
+-	ret = cnt; /* whee, success! */
++	/* Success: ret >= 0 */
++	ret = changed_lines;
+ 
+  unlink_new:
+-	if (ret < 0) unlink(fnamesfx);
++	if (ret < 0)
++		unlink(fnamesfx);
+ 
+  close_old_fp:
+ 	fclose(old_fp);
+@@ -150,6 +259,6 @@ int FAST_FUNC update_passwd(const char *filename, const char *username,
+  free_mem:
+ 	free(fnamesfx);
+ 	free((char *)filename);
+-	free((char *)username);
++	free((char *)name);
+ 	return ret;
+ }
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index 5032d7b..5a0cf3f 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -9,7 +9,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  *
+  */
+-
+ #include "libbb.h"
+ 
+ static void xgroup_study(struct group *g)
+@@ -45,8 +44,8 @@ static void xgroup_study(struct group *g)
+ /* append a new user to the passwd file */
+ static void new_group(char *group, gid_t gid)
+ {
+-	FILE *file;
+ 	struct group gr;
++	char *p;
+ 
+ 	/* make sure gid and group haven't already been allocated */
+ 	gr.gr_gid = gid;
+@@ -54,67 +53,17 @@ static void new_group(char *group, gid_t gid)
+ 	xgroup_study(&gr);
+ 
+ 	/* add entry to group */
+-	file = xfopen(bb_path_group_file, "a");
+-	/* group:passwd:gid:userlist */
+-	fprintf(file, "%s:x:%u:\n", group, (unsigned)gr.gr_gid);
++	p = xasprintf("x:%u:", gr.gr_gid);
++	if (update_passwd(bb_path_group_file, group, p, NULL) < 0)
++		exit(EXIT_FAILURE);
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+-		fclose(file);
++		free(p);
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+-	file = fopen_or_warn(bb_path_gshadow_file, "a");
+-	if (file) {
+-		fprintf(file, "%s:!::\n", group);
+-		if (ENABLE_FEATURE_CLEAN_UP)
+-			fclose(file);
+-	}
++	/* Ignore errors: if file is missing we suppose admin doesn't want it */
++	update_passwd(bb_path_gshadow_file, group, "!::", NULL);
+ #endif
+ }
+ 
+-#if ENABLE_FEATURE_ADDUSER_TO_GROUP
+-static void add_user_to_group(char **args,
+-		const char *path,
+-		FILE* FAST_FUNC (*fopen_func)(const char *fileName, const char *mode))
+-{
+-	char *line;
+-	int len = strlen(args[1]);
+-	llist_t *plist = NULL;
+-	FILE *group_file;
+-
+-	group_file = fopen_func(path, "r");
+-
+-	if (!group_file) return;
+-
+-	while ((line = xmalloc_fgetline(group_file)) != NULL) {
+-		/* Find the group */
+-		if (!strncmp(line, args[1], len)
+-		 && line[len] == ':'
+-		) {
+-			/* Add the new user */
+-			line = xasprintf("%s%s%s", line,
+-						last_char_is(line, ':') ? "" : ",",
+-						args[0]);
+-		}
+-		llist_add_to_end(&plist, line);
+-	}
+-
+-	if (ENABLE_FEATURE_CLEAN_UP) {
+-		fclose(group_file);
+-		group_file = fopen_func(path, "w");
+-		while ((line = llist_pop(&plist))) {
+-			if (group_file)
+-				fprintf(group_file, "%s\n", line);
+-			free(line);
+-		}
+-		if (group_file)
+-			fclose(group_file);
+-	} else {
+-		group_file = fopen_func(path, "w");
+-		if (group_file)
+-			while ((line = llist_pop(&plist)))
+-				fprintf(group_file, "%s\n", line);
+-	}
+-}
+-#endif
+-
+ /*
+  * addgroup will take a login_name as its first parameter.
+  *
+@@ -166,10 +115,12 @@ int addgroup_main(int argc UNUSED_PARAM, char **argv)
+ 				return EXIT_SUCCESS;
+ 			}
+ 		}
+-		add_user_to_group(argv, bb_path_group_file, xfopen);
+-#if ENABLE_FEATURE_SHADOWPASSWDS
+-		add_user_to_group(argv, bb_path_gshadow_file, fopen_or_warn);
+-#endif
++		if (update_passwd(bb_path_group_file, argv[1], NULL, argv[0]) < 0) {
++			return EXIT_FAILURE;
++		}
++# if ENABLE_FEATURE_SHADOWPASSWDS
++		update_passwd(bb_path_gshadow_file, argv[1], NULL, argv[0]);
++# endif
+ 	} else
+ #endif /* ENABLE_FEATURE_ADDUSER_TO_GROUP */
+ 	{
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index b94bb3a..d0a870c 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -7,14 +7,12 @@
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+-
+ #include "libbb.h"
+ 
+ #define OPT_DONT_SET_PASS  (1 << 4)
+ #define OPT_SYSTEM_ACCOUNT (1 << 5)
+ #define OPT_DONT_MAKE_HOME (1 << 6)
+ 
+-
+ /* remix */
+ /* recoded such that the uid may be passed in *p */
+ static void passwd_study(struct passwd *p)
+@@ -88,10 +86,7 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct passwd pw;
+ 	const char *usegroup = NULL;
+-	FILE *file;
+-#if ENABLE_FEATURE_SHADOWPASSWDS
+-	int fd;
+-#endif
++	char *p;
+ 
+ #if ENABLE_FEATURE_ADDUSER_LONG_OPTIONS
+ 	applet_long_options = adduser_longopts;
+@@ -124,32 +119,19 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ 	/* make sure everything is kosher and setup uid && maybe gid */
+ 	passwd_study(&pw);
+ 
+-	/* add to passwd */
+-	file = xfopen(bb_path_passwd_file, "a");
+-	//fseek(file, 0, SEEK_END); /* paranoia, "a" should ensure that anyway */
+-	if (putpwent(&pw, file) != 0) {
+-		bb_perror_nomsg_and_die();
++	p = xasprintf("x:%u:%u:%s:%s:%s", pw.pw_uid, pw.pw_gid, pw.pw_gecos, pw.pw_dir, pw.pw_shell);
++	if (update_passwd(bb_path_passwd_file, pw.pw_name, p, NULL) < 0) {
++		return EXIT_FAILURE;
+ 	}
+-	/* do fclose even if !ENABLE_FEATURE_CLEAN_UP.
+-	 * We will exec passwd, files must be flushed & closed before that! */
+-	fclose(file);
++	if (ENABLE_FEATURE_CLEAN_UP)
++		free(p);
+ 
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+-	/* add to shadow if necessary */
+-	/* fopen(..., "a"); would create shadow file, which is wrong.
+-	 * If shadow file doesn't exist, admin probably does not want it */
+-	fd = open_or_warn(bb_path_shadow_file, O_WRONLY | O_APPEND);
+-	if (fd >= 0) {
+-		char *s = xasprintf("%s:!:%u:0:99999:7:::\n",
+-				pw.pw_name,             /* username */
+-				(unsigned)(time(NULL) / 86400) /* sp->sp_lstchg */
+-				/*0,*/                  /* sp->sp_min */
+-				/*99999,*/              /* sp->sp_max */
+-				/*7*/                   /* sp->sp_warn */
+-		);
+-		xwrite_str(fd, s);
+-		close(fd);
+-	}
++	p = xasprintf("!:%u:0:99999:7:::",  (unsigned)(time(NULL) / 86400)); /* sp->sp_lstchg */
++	/* Ignore errors: if file is missing we suppose admin doesn't want it */
++	update_passwd(bb_path_shadow_file, pw.pw_name, p, NULL);
++	if (ENABLE_FEATURE_CLEAN_UP)
++		free(p);
+ #endif
+ 
+ 	/* add to group */
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index c83d1da..4bffbe8 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -5,7 +5,6 @@
+  * Written for SLIND (from passwd.c) by Alexander Shishkin <virtuoso@slind.org>
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+ #include "libbb.h"
+ 
+ #if ENABLE_GETOPT_LONG
+@@ -53,10 +52,10 @@ int chpasswd_main(int argc UNUSED_PARAM, char **argv)
+ 		/* This is rather complex: if user is not found in /etc/shadow,
+ 		 * we try to find & change his passwd in /etc/passwd */
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+-		rc = update_passwd(bb_path_shadow_file, name, pass);
++		rc = update_passwd(bb_path_shadow_file, name, pass, NULL);
+ 		if (rc == 0) /* no lines updated, no errors detected */
+ #endif
+-			rc = update_passwd(bb_path_passwd_file, name, pass);
++			rc = update_passwd(bb_path_passwd_file, name, pass, NULL);
+ 		/* LOGMODE_BOTH logs to syslog also */
+ 		logmode = LOGMODE_BOTH;
+ 		if (rc < 0)
+diff --git a/loginutils/deluser.c b/loginutils/deluser.c
+index 5625371..293e324 100644
+--- a/loginutils/deluser.c
++++ b/loginutils/deluser.c
+@@ -9,117 +9,48 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  *
+  */
+-
+ #include "libbb.h"
+ 
+-/* Status */
+-#define STATUS_OK            0
+-#define NAME_NOT_FOUND       1
+-#define MEMBER_NOT_FOUND     2
+-
+-static void del_line_matching(char **args,
+-		const char *filename,
+-		FILE* FAST_FUNC (*fopen_func)(const char *fileName, const char *mode))
++static int del_line_matching(char **args, const char *filename)
+ {
+-	FILE *passwd;
+-	smallint error = NAME_NOT_FOUND;
+-	char *name = (ENABLE_FEATURE_DEL_USER_FROM_GROUP && args[2]) ? args[2] : args[1];
+-	char *line, *del;
+-	char *new = xzalloc(1);
+-
+-	passwd = fopen_func(filename, "r");
+-	if (passwd) {
+-		while ((line = xmalloc_fgets(passwd))) {
+-			int len = strlen(name);
+-
+-			if (strncmp(line, name, len) == 0
+-			 && line[len] == ':'
+-			) {
+-				error = STATUS_OK;
+-				if (ENABLE_FEATURE_DEL_USER_FROM_GROUP) {
+-					struct group *gr;
+-					char *p;
+-					if (args[2]
+-					 /* There were two args on commandline */
+-					 && (gr = getgrnam(name))
+-					 /* The group was not deleted in the meanwhile */
+-					 && (p = strrchr(line, ':'))
+-					 /* We can find a pointer to the last ':' */
+-					) {
+-						error = MEMBER_NOT_FOUND;
+-						/* Move past ':' (worst case to '\0') and cut the line */
+-						p[1] = '\0';
+-						/* Reuse p */
+-						for (p = xzalloc(1); *gr->gr_mem != NULL; gr->gr_mem++) {
+-							/* Add all the other group members */
+-							if (strcmp(args[1], *gr->gr_mem) != 0) {
+-								del = p;
+-								p = xasprintf("%s%s%s", p, p[0] ? "," : "", *gr->gr_mem);
+-								free(del);
+-							} else
+-								error = STATUS_OK;
+-						}
+-						/* Recompose the line */
+-						line = xasprintf("%s%s\n", line, p);
+-						if (ENABLE_FEATURE_CLEAN_UP) free(p);
+-					} else
+-						goto skip;
+-				}
+-			}
+-			del = new;
+-			new = xasprintf("%s%s", new, line);
+-			free(del);
+- skip:
+-			free(line);
+-		}
+-
+-		if (ENABLE_FEATURE_CLEAN_UP) fclose(passwd);
+-
+-		if (error) {
+-			if (ENABLE_FEATURE_DEL_USER_FROM_GROUP && error == MEMBER_NOT_FOUND) {
+-				/* Set the correct values for error message */
+-				filename = name;
+-				name = args[1];
+-			}
+-			bb_error_msg("can't find %s in %s", name, filename);
+-		} else {
+-			passwd = fopen_func(filename, "w");
+-			if (passwd) {
+-				fputs(new, passwd);
+-				if (ENABLE_FEATURE_CLEAN_UP) fclose(passwd);
+-			}
+-		}
++	if (ENABLE_FEATURE_DEL_USER_FROM_GROUP && args[2]) {
++		return update_passwd(filename, args[2], NULL, args[1]);
+ 	}
+-	free(new);
++	return update_passwd(filename, args[1], NULL, NULL);
+ }
+ 
+ int deluser_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int deluser_main(int argc, char **argv)
+ {
+-	if (argc == 2
+-	 || (ENABLE_FEATURE_DEL_USER_FROM_GROUP
+-	    && (applet_name[3] == 'g' && argc == 3))
++	if (argc != 2
++	 && (!ENABLE_FEATURE_DEL_USER_FROM_GROUP
++	    || (applet_name[3] != 'g' || argc != 3))
+ 	) {
+-		if (geteuid())
+-			bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
++		bb_show_usage();
++	}
+ 
+-		if ((ENABLE_FEATURE_DEL_USER_FROM_GROUP && argc != 3)
+-		 || ENABLE_DELUSER
+-		 || (ENABLE_DELGROUP && ENABLE_DESKTOP)
++	if (geteuid())
++		bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
++
++	if ((ENABLE_FEATURE_DEL_USER_FROM_GROUP && argc != 3)
++	 || ENABLE_DELUSER
++	 || (ENABLE_DELGROUP && ENABLE_DESKTOP)
++	) {
++		if (ENABLE_DELUSER
++		 && (!ENABLE_DELGROUP || applet_name[3] == 'u')
+ 		) {
+-			if (ENABLE_DELUSER
+-			 && (!ENABLE_DELGROUP || applet_name[3] == 'u')
+-			) {
+-				del_line_matching(argv, bb_path_passwd_file, xfopen);
+-				if (ENABLE_FEATURE_SHADOWPASSWDS)
+-					del_line_matching(argv, bb_path_shadow_file, fopen_or_warn);
+-			} else if (ENABLE_DESKTOP && ENABLE_DELGROUP && getpwnam(argv[1]))
+-				bb_error_msg_and_die("can't remove primary group of user %s", argv[1]);
+-		}
+-		del_line_matching(argv, bb_path_group_file, xfopen);
+-		if (ENABLE_FEATURE_SHADOWPASSWDS)
+-			del_line_matching(argv, bb_path_gshadow_file, fopen_or_warn);
+-		return EXIT_SUCCESS;
+-	} else
+-		bb_show_usage();
++			if (del_line_matching(argv, bb_path_passwd_file) < 0)
++				return EXIT_FAILURE;
++			if (ENABLE_FEATURE_SHADOWPASSWDS) {
++				del_line_matching(argv, bb_path_shadow_file);
++			}
++		} else if (ENABLE_DESKTOP && ENABLE_DELGROUP && getpwnam(argv[1]))
++			bb_error_msg_and_die("can't remove primary group of user %s", argv[1]);
++	}
++	if (del_line_matching(argv, bb_path_group_file) < 0)
++		return EXIT_FAILURE;
++	if (ENABLE_FEATURE_SHADOWPASSWDS) {
++		del_line_matching(argv, bb_path_gshadow_file);
++	}
++	return EXIT_SUCCESS;
+ }
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index 9ed78c1..7b93713 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -2,7 +2,6 @@
+ /*
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+ #include "libbb.h"
+ #include <syslog.h>
+ 
+@@ -181,12 +180,12 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
+ 
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+ 	filename = bb_path_shadow_file;
+-	rc = update_passwd(bb_path_shadow_file, name, newp);
++	rc = update_passwd(bb_path_shadow_file, name, newp, NULL);
+ 	if (rc == 0) /* no lines updated, no errors detected */
+ #endif
+ 	{
+ 		filename = bb_path_passwd_file;
+-		rc = update_passwd(bb_path_passwd_file, name, newp);
++		rc = update_passwd(bb_path_passwd_file, name, newp, NULL);
+ 	}
+ 	/* LOGMODE_BOTH */
+ 	if (rc < 0)

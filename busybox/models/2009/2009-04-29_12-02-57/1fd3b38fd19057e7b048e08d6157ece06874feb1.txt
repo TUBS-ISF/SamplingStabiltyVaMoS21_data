@@ -1,0 +1,114 @@
+2009-04-29 12:02:57 +0000
+diff --git a/miscutils/flash_eraseall.c b/miscutils/flash_eraseall.c
+index 3e0c06f..4f3e94d 100644
+--- a/miscutils/flash_eraseall.c
++++ b/miscutils/flash_eraseall.c
+@@ -97,7 +97,7 @@ int flash_eraseall_main(int argc UNUSED_PARAM, char **argv)
+ 				if (clmlen > 8)
+ 					clmlen = 8;
+ 				if (clmlen == 0)
+-					bb_error_msg_and_die("Autoplacement selected and no empty space in oob");
++					bb_error_msg_and_die("autoplacement selected and no empty space in oob");
+ 			} else {
+ 				/* Legacy mode */
+ 				switch (meminfo.oobsize) {
+diff --git a/networking/ifplugd.c b/networking/ifplugd.c
+index 3315e9a..c9f603f 100644
+--- a/networking/ifplugd.c
++++ b/networking/ifplugd.c
+@@ -258,7 +258,7 @@ static void up_iface(void)
+ 	if (network_ioctl(SIOCGIFADDR, &ifrequest) < 0) {
+ 		bb_error_msg("can't get interface address");
+ 	} else if (ifrequest.ifr_addr.sa_family != AF_INET) {
+-		bb_perror_msg("The interface is not IP-based");
++		bb_perror_msg("the interface is not IP-based");
+ 	} else {
+ 		((struct sockaddr_in*)(&ifrequest.ifr_addr))->sin_addr.s_addr = INADDR_ANY;
+ 		if (network_ioctl(SIOCSIFADDR, &ifrequest) < 0)
+@@ -299,7 +299,7 @@ static void maybe_up_new_iface(void)
+ 				(uint8_t)(ifrequest.ifr_hwaddr.sa_data[5]));
+ 		}
+ 
+-		bb_error_msg("Using interface %s%s with driver<%s> (version: %s)",
++		bb_error_msg("using interface %s%s with driver<%s> (version: %s)",
+ 			G.iface, buf, driver_info.driver, driver_info.version);
+ 	}
+ #endif
+diff --git a/networking/tc.c b/networking/tc.c
+index 03f57f6..79cdd7c 100644
+--- a/networking/tc.c
++++ b/networking/tc.c
+@@ -284,12 +284,12 @@ static int print_qdisc(const struct sockaddr_nl *who UNUSED_PARAM,
+ 	char *name;
+ 
+ 	if (hdr->nlmsg_type != RTM_NEWQDISC && hdr->nlmsg_type != RTM_DELQDISC) {
+-		/* bb_error_msg("Not a qdisc"); */
++		/* bb_error_msg("not a qdisc"); */
+ 		return 0; /* ??? mimic upstream; should perhaps return -1 */
+ 	}
+ 	len -= NLMSG_LENGTH(sizeof(*msg));
+ 	if (len < 0) {
+-		/* bb_error_msg("Wrong len %d", len); */
++		/* bb_error_msg("wrong len %d", len); */
+ 		return -1;
+ 	}
+ 	/* not the desired interface? */
+@@ -342,12 +342,12 @@ static int print_class(const struct sockaddr_nl *who UNUSED_PARAM,
+ 	/*XXX Eventually factor out common code */
+ 
+ 	if (hdr->nlmsg_type != RTM_NEWTCLASS && hdr->nlmsg_type != RTM_DELTCLASS) {
+-		/* bb_error_msg("Not a class"); */
++		/* bb_error_msg("not a class"); */
+ 		return 0; /* ??? mimic upstream; should perhaps return -1 */
+ 	}
+ 	len -= NLMSG_LENGTH(sizeof(*msg));
+ 	if (len < 0) {
+-		/* bb_error_msg("Wrong len %d", len); */
++		/* bb_error_msg("wrong len %d", len); */
+ 		return -1;
+ 	}
+ 	/* not the desired interface? */
+diff --git a/util-linux/mkfs_vfat.c b/util-linux/mkfs_vfat.c
+index 72c2058..98a0895 100644
+--- a/util-linux/mkfs_vfat.c
++++ b/util-linux/mkfs_vfat.c
+@@ -273,10 +273,10 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 			device_num == 0x0d00 || // xd
+ 			device_num == 0x1600 )  // hdc, hdd
+ 		)
+-			bb_error_msg_and_die("Will not try to make filesystem on full-disk device (use -I if wanted)");
++			bb_error_msg_and_die("will not try to make filesystem on full-disk device (use -I if wanted)");
+ 		// can't work on mounted filesystems
+ 		if (find_mount_point(device_name, NULL))
+-			bb_error_msg_and_die("Can't format mounted filesystem");
++			bb_error_msg_and_die("can't format mounted filesystem");
+ #endif
+ 		// get true sector size
+ 		// (parameter must be int*, not long* or size_t*)
+@@ -562,7 +562,7 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 		start_data_sector = (reserved_sect + NUM_FATS * sect_per_fat) * (bytes_per_sect / SECTOR_SIZE);
+ 		start_data_block = (start_data_sector + SECTORS_PER_BLOCK - 1) / SECTORS_PER_BLOCK;
+ 
+-		bb_info_msg("Searching for bad blocks ");
++		bb_info_msg("searching for bad blocks ");
+ 		currently_testing = 0;
+ 		try = TEST_BUFFER_BLOCKS;
+ 		while (currently_testing < volume_size_blocks) {
+@@ -577,7 +577,7 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 			if (got < 0)
+ 				got = 0;
+ 			if (got & (BLOCK_SIZE - 1))
+-				bb_error_msg("Unexpected values in do_check: probably bugs");
++				bb_error_msg("unexpected values in do_check: probably bugs");
+ 			got /= BLOCK_SIZE;
+ 			currently_testing += got;
+ 			if (got == try) {
+@@ -592,7 +592,7 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 			for (i = 0; i < SECTORS_PER_BLOCK; i++) {
+ 				int cluster = (currently_testing * SECTORS_PER_BLOCK + i - start_data_sector) / (int) (sect_per_clust) / (bytes_per_sect / SECTOR_SIZE);
+ 				if (cluster < 0)
+-					bb_error_msg_and_die("Invalid cluster number in mark_sector: probably bug!");
++					bb_error_msg_and_die("invalid cluster number in mark_sector: probably bug!");
+ 				MARK_CLUSTER(cluster, BAD_FAT32);
+ 			}
+ 			badblocks++;

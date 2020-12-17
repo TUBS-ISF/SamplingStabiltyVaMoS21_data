@@ -1,0 +1,23 @@
+2008-04-19 17:40:29 +0000
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index a2679f3..601fd72 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -250,7 +250,7 @@ enum {
+ };
+ 
+ int start_stop_daemon_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int start_stop_daemon_main(int argc, char **argv)
++int start_stop_daemon_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned opt;
+ 	char *signame;
+@@ -292,7 +292,7 @@ int start_stop_daemon_main(int argc, char **argv)
+ //		if (retry_arg)
+ //			retries = xatoi_u(retry_arg);
+ //	)
+-	argc -= optind;
++	//argc -= optind;
+ 	argv += optind;
+ 
+ 	if (userspec) {

@@ -1,0 +1,28 @@
+2008-10-27 14:33:03 +0000
+diff --git a/shell/ash_test/ash-signals/reap1.right b/shell/ash_test/ash-signals/reap1.right
+new file mode 100644
+index 0000000..7326d96
+--- /dev/null
++++ b/shell/ash_test/ash-signals/reap1.right
+@@ -0,0 +1 @@
++Ok
+diff --git a/shell/ash_test/ash-signals/reap1.tests b/shell/ash_test/ash-signals/reap1.tests
+new file mode 100755
+index 0000000..bf1a1f9
+--- /dev/null
++++ b/shell/ash_test/ash-signals/reap1.tests
+@@ -0,0 +1,14 @@
++#!/bin/sh
++
++# Must not find us alive
++{ sleep 2; kill -9 $$; } 2>/dev/null &
++
++sleep 1 &
++PID=$!
++
++# We must exit the loop in one second.
++# We had bug 5304: builtins never waited for exited children
++while kill -0 $PID >/dev/null 2>&1; do
++    true
++done
++echo Ok

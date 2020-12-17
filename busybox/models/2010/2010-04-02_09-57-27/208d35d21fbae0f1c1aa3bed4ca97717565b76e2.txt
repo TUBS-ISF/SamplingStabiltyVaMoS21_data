@@ -1,0 +1,69 @@
+2010-04-02 09:57:27 +0200
+diff --git a/testsuite/cp/cp-parents b/testsuite/cp/cp-parents
+index a721cea..e27c162 100644
+--- a/testsuite/cp/cp-parents
++++ b/testsuite/cp/cp-parents
+@@ -1,3 +1,4 @@
++# FEATURE: CONFIG_FEATURE_CP_LONG_OPTIONS
+ mkdir -p foo/bar/baz
+ touch foo/bar/baz/file
+ mkdir dir
+diff --git a/testsuite/mount.tests b/testsuite/mount.tests
+index 8bd60ea..043586f 100755
+--- a/testsuite/mount.tests
++++ b/testsuite/mount.tests
+@@ -9,6 +9,13 @@ test "`id -u`" = 0 || {
+ 	exit 0
+ }
+ 
++optional MKFS_MINIX
++if [ -n "$SKIP" ]
++then
++  echo "SKIPPED: mount"
++  exit 0
++fi
++
+ testdir=$PWD/testdir
+ 
+ dd if=/dev/zero of=mount.image1m count=1 bs=1M 2>/dev/null || { echo "dd error"; exit 1; }
+diff --git a/testsuite/runtest b/testsuite/runtest
+index 5ddf07d..c300233 100755
+--- a/testsuite/runtest
++++ b/testsuite/runtest
+@@ -26,10 +26,12 @@ run_applet_testcase()
+ 	if grep "^# FEATURE: " "$testcase" >/dev/null; then
+ 		local feature=$(sed -ne 's/^# FEATURE: //p' "$testcase")
+ 
+-		if grep "^# $feature is not set$" "$bindir/.config" >/dev/null; then
+-			echo "UNTESTED: $testname"
+-			return 0
+-		fi
++		for f in $feature; do
++			if grep "^# $f is not set$" "$bindir/.config" >/dev/null; then
++				echo "UNTESTED: $testname"
++				return 0
++			fi
++		done
+ 	fi
+ 
+ 	rm -rf ".tmpdir.$applet"
+diff --git a/testsuite/tar.tests b/testsuite/tar.tests
+index 6c136a6..71095cb 100755
+--- a/testsuite/tar.tests
++++ b/testsuite/tar.tests
+@@ -31,6 +31,7 @@ Ok
+ " \
+ "" ""
+ 
++optional FEATURE_TAR_LONG_OPTIONS
+ testing "tar --overwrite" "\
+ rm -rf input_* test.tar 2>/dev/null
+ ln input input_hard
+@@ -43,6 +44,7 @@ tar xf test.tar --overwrite 2>&1 && cat input
+ Ok
+ " \
+ "Ok\n" ""
++SKIP=
+ 
+ cd .. && rm -rf tempdir || exit 1
+ 

@@ -1,0 +1,47 @@
+2007-08-09 08:10:13 +0000
+diff --git a/coreutils/stat.c b/coreutils/stat.c
+index 9930d84..7c72127 100644
+--- a/coreutils/stat.c
++++ b/coreutils/stat.c
+@@ -342,8 +342,11 @@ static bool do_statfs(char const *filename, char const *format)
+ 	security_context_t scontext = NULL;
+ 
+ 	if (option_mask32 & OPT_SELINUX) {
+-		if ((option_mask32 & OPT_DEREFERENCE ? lgetfilecon(filename, scontext):
+-		     getfilecon(filename, scontext))< 0) {
++		if ((option_mask32 & OPT_DEREFERENCE
++		     ? lgetfilecon(filename, &scontext)
++		     : getfilecon(filename, &scontext)
++		    ) < 0
++		) {
+ 			bb_perror_msg(filename);
+ 			return 0;
+ 		}
+@@ -448,9 +451,12 @@ static bool do_stat(char const *filename, char const *format)
+ 	security_context_t scontext = NULL;
+ 
+ 	if (option_mask32 & OPT_SELINUX) {
+-		if ((option_mask32 & OPT_DEREFERENCE ? lgetfilecon(filename, scontext):
+-		     getfilecon(filename, scontext))< 0) {
+-			bb_perror_msg (filename);
++		if ((option_mask32 & OPT_DEREFERENCE
++		     ? lgetfilecon(filename, &scontext)
++		     : getfilecon(filename, &scontext)
++		    ) < 0
++		) {
++			bb_perror_msg(filename);
+ 			return 0;
+ 		}
+ 	}
+diff --git a/libbb/make_directory.c b/libbb/make_directory.c
+index d540ad1..8841c95 100644
+--- a/libbb/make_directory.c
++++ b/libbb/make_directory.c
+@@ -98,6 +98,6 @@ int bb_make_directory (char *path, long mode, int flags)
+ 
+ 	} while (1);
+ 
+-	bb_perror_msg ("cannot %s directory '%s'", fail_msg, path);
++	bb_perror_msg("cannot %s directory '%s'", fail_msg, path);
+ 	return -1;
+ }

@@ -1,0 +1,78 @@
+2007-08-13 11:09:30 +0000
+diff --git a/coreutils/cal.c b/coreutils/cal.c
+index 37aca00..3170993 100644
+--- a/coreutils/cal.c
++++ b/coreutils/cal.c
+@@ -45,7 +45,7 @@ static unsigned julian;
+ /* leap year -- account for Gregorian reformation in 1752 */
+ static int leap_year(unsigned yr)
+ {
+-	if (yr <= 1752) 
++	if (yr <= 1752)
+ 		return !(yr % 4);
+ 	return (!(yr % 4) && (yr % 100)) || !(yr % 400);
+ }
+diff --git a/findutils/find.c b/findutils/find.c
+index ea789a0..60b2a75 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -475,8 +475,8 @@ static action*** parse_params(char **argv)
+ 	                         "-o\0"
+ 	USE_FEATURE_FIND_NOT(    "!\0"       )
+ #if ENABLE_DESKTOP
+-	                         "-and\0"  
+-	                         "-or\0"   
++	                         "-and\0"
++	                         "-or\0"
+ 	USE_FEATURE_FIND_NOT(	 "-not\0"    )
+ #endif
+ 	                         "-print\0"
+@@ -487,7 +487,7 @@ static action*** parse_params(char **argv)
+ 	USE_FEATURE_FIND_EXEC(   "-exec\0"   )
+ 	USE_FEATURE_FIND_PAREN(  "(\0"       )
+ 	/* All options starting from here require argument */
+-	                         "-name\0" 
++	                         "-name\0"
+ 	USE_FEATURE_FIND_PATH(   "-path\0"   )
+ 	USE_FEATURE_FIND_REGEX(  "-regex\0"  )
+ 	USE_FEATURE_FIND_TYPE(   "-type\0"   )
+diff --git a/miscutils/ttysize.c b/miscutils/ttysize.c
+index 51d4ec7..5a3f5dc 100644
+--- a/miscutils/ttysize.c
++++ b/miscutils/ttysize.c
+@@ -16,7 +16,7 @@ int ttysize_main(int argc, char **argv)
+ {
+ 	unsigned w,h;
+ 	struct winsize wsz;
+-    
++
+ 	w = 80;
+ 	h = 24;
+ 	if (!ioctl(0, TIOCGWINSZ, &wsz)) {
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 3e3117a..9c02ad6 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1395,7 +1395,8 @@ static int sendFile(const char *url)
+ 		fd++; /* write to fd #1 in inetd mode */
+ #if ENABLE_FEATURE_HTTPD_USE_SENDFILE
+ 	do {
+-		count = sendfile(fd, f, &offset, MAXINT(ssize_t));
++		/* byte count is rounded down to 64k */
++		count = sendfile(fd, f, &offset, MAXINT(ssize_t) - 0xffff);
+ 		if (count < 0) {
+ 			if (offset == 0)
+ 				goto fallback;
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index 6c3f518..015a233 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -75,7 +75,7 @@ static const char runcon_longopts[] ALIGN1 =
+ 	"type\0"    Required_argument "t"
+ 	"range\0"   Required_argument "l"
+ 	"compute\0" No_argument "c"
+-	"help\0"    No_argument "h"      
++	"help\0"    No_argument "h"
+ 	;
+ #endif
+ 

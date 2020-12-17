@@ -1,0 +1,59 @@
+2009-03-15 22:20:31 +0000
+diff --git a/editors/awk.c b/editors/awk.c
+index 3f8368c..9b15b3c 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -604,8 +604,8 @@ static void *hash_find(xhash *hash, const char *name)
+ 			hash_rebuild(hash);
+ 
+ 		l = strlen(name) + 1;
+-		hi = xzalloc(sizeof(hash_item) + l);
+-		memcpy(hi->name, name, l);
++		hi = xzalloc(sizeof(*hi) + l);
++		strcpy(hi->name, name);
+ 
+ 		idx = hashidx(name) % hash->csize;
+ 		hi->next = hash->items[idx];
+@@ -1482,6 +1482,7 @@ static node *mk_splitter(const char *s, tsplitter *spl)
+  */
+ static regex_t *as_regex(node *op, regex_t *preg)
+ {
++	int cflags;
+ 	var *v;
+ 	const char *s;
+ 
+@@ -1490,7 +1491,17 @@ static regex_t *as_regex(node *op, regex_t *preg)
+ 	}
+ 	v = nvalloc(1);
+ 	s = getvar_s(evaluate(op, v));
+-	xregcomp(preg, s, icase ? REG_EXTENDED | REG_ICASE : REG_EXTENDED);
++
++	cflags = icase ? REG_EXTENDED | REG_ICASE : REG_EXTENDED;
++	/* Testcase where REG_EXTENDED fails (unpaired '{'):
++	 * echo Hi | awk 'gsub("@(samp|code|file)\{","");'
++	 * gawk 3.1.5 eats this. We revert to ~REG_EXTENDED
++	 * (maybe gsub is not supposed to use REG_EXTENDED?).
++	 */
++	if (regcomp(preg, s, cflags)) {
++		cflags &= ~REG_EXTENDED;
++		xregcomp(preg, s, cflags);
++	}
+ 	nvfree(v);
+ 	return preg;
+ }
+diff --git a/testsuite/awk.tests b/testsuite/awk.tests
+index 953a6e5..8e72dd3 100755
+--- a/testsuite/awk.tests
++++ b/testsuite/awk.tests
+@@ -22,6 +22,11 @@ testing "awk hex const 1" "awk '{ print or(0xffffffff,1) }'" "4.29497e+09\n" ""
+ testing "awk hex const 2" "awk '{ print or(0x80000000,1) }'" "2.14748e+09\n" "" "\n"
+ testing "awk oct const"   "awk '{ print or(01234,1) }'"      "669\n"         "" "\n"
+ 
++# '@(samp|code|file)\{' is an invalid extended regex (unmatched '{'),
++# but gawk 3.1.5 does not bail out on it.
++testing "awk gsub falls back to non-extended-regex" \
++	"awk 'gsub(\"@(samp|code|file)\{\",\"\");'; echo \$?" "0\n" "" "Hi\n"
++
+ tar xjf awk_t1.tar.bz2
+ testing "awk 'gcc build bug'" \
+ 	"awk -f awk_t1_opt-functions.awk -f awk_t1_opth-gen.awk <awk_t1_input | md5sum" \

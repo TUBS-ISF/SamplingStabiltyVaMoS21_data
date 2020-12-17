@@ -1,0 +1,935 @@
+2009-11-02 14:19:51 +0100
+diff --git a/archival/cpio.c b/archival/cpio.c
+index ef22899..41aeef1 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -252,7 +252,7 @@ static NOINLINE int cpio_o(void)
+ 				free(lpath);
+ 			} else { /* S_ISREG */
+ 				int fd = xopen(name, O_RDONLY);
+-				fflush(stdout);
++				fflush_all();
+ 				/* We must abort if file got shorter too! */
+ 				bb_copyfd_exact_size(fd, STDOUT_FILENO, st.st_size);
+ 				bytes += st.st_size;
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index 8bba62c..f1e63fd 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -189,7 +189,7 @@ int dd_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	memset(&Z, 0, sizeof(Z));
+ 	INIT_G();
+-	//fflush(NULL); - is this needed because of NOEXEC?
++	//fflush_all(); - is this needed because of NOEXEC?
+ 
+ 	for (n = 1; argv[n]; n++) {
+ 		int what;
+diff --git a/coreutils/dirname.c b/coreutils/dirname.c
+index c0c0925..1f5f70d 100644
+--- a/coreutils/dirname.c
++++ b/coreutils/dirname.c
+@@ -23,5 +23,5 @@ int dirname_main(int argc, char **argv)
+ 
+ 	puts(dirname(argv[1]));
+ 
+-	return fflush(stdout);
++	return fflush_all();
+ }
+diff --git a/coreutils/echo.c b/coreutils/echo.c
+index decca09..6903996 100644
+--- a/coreutils/echo.c
++++ b/coreutils/echo.c
+@@ -141,7 +141,7 @@ int echo_main(int argc UNUSED_PARAM, char **argv)
+ 		bb_putchar('\n');
+ 	}
+  ret:
+-	return fflush(stdout);
++	return fflush_all();
+ }
+ 
+ /*-
+diff --git a/coreutils/hostid.c b/coreutils/hostid.c
+index 2794510..6f007d8 100644
+--- a/coreutils/hostid.c
++++ b/coreutils/hostid.c
+@@ -22,5 +22,5 @@ int hostid_main(int argc, char **argv UNUSED_PARAM)
+ 
+ 	printf("%lx\n", gethostid());
+ 
+-	return fflush(stdout);
++	return fflush_all();
+ }
+diff --git a/coreutils/length.c b/coreutils/length.c
+index 43a0f59..015b221 100644
+--- a/coreutils/length.c
++++ b/coreutils/length.c
+@@ -18,5 +18,5 @@ int length_main(int argc, char **argv)
+ 
+ 	printf("%u\n", (unsigned)strlen(*argv));
+ 
+-	return fflush(stdout);
++	return fflush_all();
+ }
+diff --git a/coreutils/logname.c b/coreutils/logname.c
+index 7983d17..7e50132 100644
+--- a/coreutils/logname.c
++++ b/coreutils/logname.c
+@@ -36,7 +36,7 @@ int logname_main(int argc, char **argv UNUSED_PARAM)
+ 	/* Using _r function - avoid pulling in static buffer from libc */
+ 	if (getlogin_r(buf, sizeof(buf)) == 0) {
+ 		puts(buf);
+-		return fflush(stdout);
++		return fflush_all();
+ 	}
+ 
+ 	bb_perror_msg_and_die("getlogin");
+diff --git a/coreutils/pwd.c b/coreutils/pwd.c
+index 57953d2..11278a2 100644
+--- a/coreutils/pwd.c
++++ b/coreutils/pwd.c
+@@ -20,7 +20,7 @@ int pwd_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	if (buf != NULL) {
+ 		puts(buf);
+ 		free(buf);
+-		return fflush(stdout);
++		return fflush_all();
+ 	}
+ 
+ 	return EXIT_FAILURE;
+diff --git a/coreutils/seq.c b/coreutils/seq.c
+index 03ae3c6..84d11fd 100644
+--- a/coreutils/seq.c
++++ b/coreutils/seq.c
+@@ -95,5 +95,5 @@ int seq_main(int argc, char **argv)
+ 	if (n) /* if while loop executed at least once */
+ 		bb_putchar('\n');
+ 
+-	return fflush(stdout);
++	return fflush_all();
+ }
+diff --git a/coreutils/whoami.c b/coreutils/whoami.c
+index 0dbcba9..1031cdb 100644
+--- a/coreutils/whoami.c
++++ b/coreutils/whoami.c
+@@ -22,5 +22,5 @@ int whoami_main(int argc, char **argv UNUSED_PARAM)
+ 	/* Will complain and die if username not found */
+ 	puts(xuid2uname(geteuid()));
+ 
+-	return fflush(stdout);
++	return fflush_all();
+ }
+diff --git a/editors/awk.c b/editors/awk.c
+index bc1d938..ce6c9b7 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -2552,7 +2552,7 @@ static var *evaluate(node *op, var *res)
+ 				break;
+ 
+ 			case F_sy:
+-				fflush(NULL);
++				fflush_all();
+ 				R.d = (ENABLE_FEATURE_ALLOW_EXEC && L.s && *L.s)
+ 						? (system(L.s) >> 8) : 0;
+ 				break;
+@@ -2565,7 +2565,7 @@ static var *evaluate(node *op, var *res)
+ 						X.rsm = newfile(L.s);
+ 						fflush(X.rsm->F);
+ 					} else {
+-						fflush(NULL);
++						fflush_all();
+ 					}
+ 				}
+ 				break;
+diff --git a/editors/cmp.c b/editors/cmp.c
+index a20bb88..384e57c 100644
+--- a/editors/cmp.c
++++ b/editors/cmp.c
+@@ -108,7 +108,7 @@ int cmp_main(int argc UNUSED_PARAM, char **argv)
+ 				outfile = stderr;
+ 				/* There may have been output to stdout (option -l), so
+ 				 * make sure we fflush before writing to stderr. */
+-				xfflush_stdout();
++				fflush_all();
+ 			}
+ 			if (!(opt & CMP_OPT_s)) {
+ 				if (opt & CMP_OPT_l) {
+diff --git a/editors/ed.c b/editors/ed.c
+index dbd8020..8ed4cd4 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -686,7 +686,7 @@ static int readLines(const char *file, int num)
+ 	cc = 0;
+ 
+ 	printf("\"%s\", ", file);
+-	fflush(stdout);
++	fflush_all();
+ 
+ 	do {
+ 		cp = memchr(bufPtr, '\n', bufUsed);
+@@ -775,7 +775,7 @@ static int writeLines(const char *file, int num1, int num2)
+ 	}
+ 
+ 	printf("\"%s\", ", file);
+-	fflush(stdout);
++	fflush_all();
+ 
+ 	lp = findLine(num1);
+ 	if (lp == NULL) {
+diff --git a/editors/vi.c b/editors/vi.c
+index 82f302d..1a3997a 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -2136,7 +2136,7 @@ static void rawmode(void)
+ 
+ static void cookmode(void)
+ {
+-	fflush(stdout);
++	fflush_all();
+ 	tcsetattr_stdin_TCSANOW(&term_orig);
+ }
+ 
+@@ -2201,7 +2201,7 @@ static int readit(void) // read (maybe cursor) key from stdin
+ {
+ 	int c;
+ 
+-	fflush(stdout);
++	fflush_all();
+ 	c = read_key(STDIN_FILENO, readbuffer);
+ 	if (c == -1) { // EOF/error
+ 		go_bottom_and_clear_to_eol();
+@@ -2555,7 +2555,7 @@ static void show_status_line(void)
+ 		}
+ 		place_cursor(crow, ccol, FALSE);	// put cursor back in correct place
+ 	}
+-	fflush(stdout);
++	fflush_all();
+ }
+ 
+ //----- format the status buffer, the bottom line of screen ------
+@@ -3963,7 +3963,7 @@ static void crash_test()
+ 	if (msg[0]) {
+ 		printf("\n\n%d: \'%c\' %s\n\n\n%s[Hit return to continue]%s",
+ 			totalcmds, last_input_char, msg, SOs, SOn);
+-		fflush(stdout);
++		fflush_all();
+ 		while (safe_read(STDIN_FILENO, d, 1) > 0) {
+ 			if (d[0] == '\n' || d[0] == '\r')
+ 				break;
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index 76d1d54..ab1a6d0 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -279,7 +279,7 @@ static int xargs_ask_confirmation(void)
+ 
+ 	tty_stream = xfopen_for_read(CURRENT_TTY);
+ 	fputs(" ?...", stderr);
+-	fflush(stderr);
++	fflush_all();
+ 	c = savec = getc(tty_stream);
+ 	while (c != EOF && c != '\n')
+ 		c = getc(tty_stream);
+diff --git a/include/libbb.h b/include/libbb.h
+index d2b7437..955287c 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -659,7 +659,7 @@ extern char *xmalloc_fgetline(FILE *file) FAST_FUNC;
+ 
+ extern void die_if_ferror(FILE *file, const char *msg) FAST_FUNC;
+ extern void die_if_ferror_stdout(void) FAST_FUNC;
+-extern void xfflush_stdout(void) FAST_FUNC;
++extern int fflush_all(void) FAST_FUNC;
+ extern void fflush_stdout_and_exit(int retval) NORETURN FAST_FUNC;
+ extern int fclose_if_not_stdin(FILE *file) FAST_FUNC;
+ extern FILE *xfopen(const char *filename, const char *mode) FAST_FUNC;
+diff --git a/libbb/bb_askpass.c b/libbb/bb_askpass.c
+index 073175c..f9b918c 100644
+--- a/libbb/bb_askpass.c
++++ b/libbb/bb_askpass.c
+@@ -55,7 +55,7 @@ char* FAST_FUNC bb_ask(const int fd, int timeout, const char *prompt)
+ 	}
+ 
+ 	fputs(prompt, stdout);
+-	fflush(stdout);
++	fflush_all();
+ 	ret = NULL;
+ 	/* On timeout or Ctrl-C, read will hopefully be interrupted,
+ 	 * and we return NULL */
+@@ -77,6 +77,6 @@ char* FAST_FUNC bb_ask(const int fd, int timeout, const char *prompt)
+ 
+ 	tcsetattr_stdin_TCSANOW(&oldtio);
+ 	bb_putchar('\n');
+-	fflush(stdout);
++	fflush_all();
+ 	return ret;
+ }
+diff --git a/libbb/info_msg.c b/libbb/info_msg.c
+index 8b8a1fc..5f375d4 100644
+--- a/libbb/info_msg.c
++++ b/libbb/info_msg.c
+@@ -44,7 +44,7 @@ void FAST_FUNC bb_info_msg(const char *s, ...)
+ 	if (ENABLE_FEATURE_SYSLOG && (logmode & LOGMODE_SYSLOG))
+ 		syslog(LOG_INFO, "%s", msg);
+ 	if (logmode & LOGMODE_STDIO) {
+-		fflush(stdout);
++		fflush_all();
+ 		/* used = strlen(msg); - must be true already */
+ 		msg[used++] = '\n';
+ 		full_write(STDOUT_FILENO, msg, used);
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 0f7ab8c..a997257 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -373,7 +373,7 @@ static void input_backward(unsigned num)
+ static void put_prompt(void)
+ {
+ 	out1str(cmdedit_prompt);
+-	fflush(NULL);
++	fflush_all();
+ #if ENABLE_FEATURE_EDITING_ASK_TERMINAL
+ 	{
+ 		/* Ask terminal where is the cursor now.
+@@ -411,7 +411,7 @@ static void put_prompt(void)
+ 		if (safe_poll(&pfd, 1, 0) == 0) {
+ 			S.sent_ESC_br6n = 1;
+ 			out1str("\033" "[6n");
+-			fflush(NULL); /* make terminal see it ASAP! */
++			fflush_all(); /* make terminal see it ASAP! */
+ 		}
+ 	}
+ #endif
+@@ -1636,7 +1636,7 @@ static void cmdedit_setwidth(unsigned w, int redraw_flg)
+ 		int new_y = (cursor + cmdedit_prmt_len) / w;
+ 		/* redraw */
+ 		redraw((new_y >= cmdedit_y ? new_y : cmdedit_y), command_len - cursor);
+-		fflush(NULL);
++		fflush_all();
+ 	}
+ }
+ 
+@@ -1748,7 +1748,7 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ 	) {
+ 		/* Happens when e.g. stty -echo was run before */
+ 		parse_and_put_prompt(prompt);
+-		/* fflush(stdout); - done by parse_and_put_prompt */
++		/* fflush_all(); - done by parse_and_put_prompt */
+ 		if (fgets(command, maxsize, stdin) == NULL)
+ 			len = -1; /* EOF or error */
+ 		else
+@@ -1841,7 +1841,7 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ 		};
+ 		int32_t ic, ic_raw;
+ 
+-		fflush(NULL);
++		fflush_all();
+ 		ic = ic_raw = lineedit_read_key(read_key_buffer);
+ 
+ #if ENABLE_FEATURE_EDITING_VI
+@@ -2245,7 +2245,7 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ 	tcsetattr_stdin_TCSANOW(&initial_settings);
+ 	/* restore SIGWINCH handler */
+ 	signal(SIGWINCH, previous_SIGWINCH_handler);
+-	fflush(NULL);
++	fflush_all();
+ 
+ 	len = command_len;
+ 	DEINIT_S();
+@@ -2259,7 +2259,7 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ int FAST_FUNC read_line_input(const char* prompt, char* command, int maxsize)
+ {
+ 	fputs(prompt, stdout);
+-	fflush(NULL);
++	fflush_all();
+ 	fgets(command, maxsize, stdin);
+ 	return strlen(command);
+ }
+diff --git a/libbb/login.c b/libbb/login.c
+index 07247a8..740c588 100644
+--- a/libbb/login.c
++++ b/libbb/login.c
+@@ -85,7 +85,7 @@ void FAST_FUNC print_login_issue(const char *issue_file, const char *tty)
+ 		fputs(outbuf, stdout);
+ 	}
+ 	fclose(fp);
+-	fflush(stdout);
++	fflush_all();
+ }
+ 
+ void FAST_FUNC print_login_prompt(void)
+@@ -94,7 +94,7 @@ void FAST_FUNC print_login_prompt(void)
+ 
+ 	fputs(hostname, stdout);
+ 	fputs(LOGIN, stdout);
+-	fflush(stdout);
++	fflush_all();
+ 	free(hostname);
+ }
+ 
+diff --git a/libbb/verror_msg.c b/libbb/verror_msg.c
+index 506b906..70f792f 100644
+--- a/libbb/verror_msg.c
++++ b/libbb/verror_msg.c
+@@ -64,7 +64,7 @@ void FAST_FUNC bb_verror_msg(const char *s, va_list p, const char* strerr)
+ 	}
+ 
+ 	if (logmode & LOGMODE_STDIO) {
+-		fflush(stdout);
++		fflush_all();
+ 		full_write(STDERR_FILENO, msg, used);
+ 	}
+ 	if (logmode & LOGMODE_SYSLOG) {
+@@ -125,8 +125,8 @@ void FAST_FUNC bb_verror_msg(const char *s, va_list p, const char* strerr)
+ 		iov[1].iov_len = 2;
+ 		/*iov[2].iov_base = msgc;*/
+ 		/*iov[2].iov_len = used;*/
+-		fflush(stdout);
+-		writev(2, iov, 3);
++		fflush_all();
++		writev(STDERR_FILENO, iov, 3);
+ 	}
+ 	if (logmode & LOGMODE_SYSLOG) {
+ 		syslog(LOG_ERR, "%s", msgc);
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 27efb0e..9be9017 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -25,7 +25,7 @@ pid_t FAST_FUNC spawn(char **argv)
+ 	volatile int failed;
+ 	pid_t pid;
+ 
+-// Ain't it a good place to fflush(NULL)?
++	fflush_all();
+ 
+ 	/* Be nice to nommu machines. */
+ 	failed = 0;
+diff --git a/libbb/xfuncs_printf.c b/libbb/xfuncs_printf.c
+index 241887a..644134a 100644
+--- a/libbb/xfuncs_printf.c
++++ b/libbb/xfuncs_printf.c
+@@ -255,12 +255,9 @@ void FAST_FUNC die_if_ferror_stdout(void)
+ 	die_if_ferror(stdout, bb_msg_standard_output);
+ }
+ 
+-// Die with an error message if we have trouble flushing stdout.
+-void FAST_FUNC xfflush_stdout(void)
++int FAST_FUNC fflush_all(void)
+ {
+-	if (fflush(stdout)) {
+-		bb_perror_msg_and_die(bb_msg_standard_output);
+-	}
++	return fflush(NULL);
+ }
+ 
+ 
+@@ -276,9 +273,9 @@ int FAST_FUNC bb_putchar(int ch)
+  * then close that file. */
+ void FAST_FUNC xprint_and_close_file(FILE *file)
+ {
+-	fflush(stdout);
++	fflush_all();
+ 	// copyfd outputs error messages for us.
+-	if (bb_copyfd_eof(fileno(file), 1) == -1)
++	if (bb_copyfd_eof(fileno(file), STDOUT_FILENO) == -1)
+ 		xfunc_die();
+ 
+ 	fclose(file);
+diff --git a/loginutils/login.c b/loginutils/login.c
+index c3e31d0..1ffa965 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -137,7 +137,7 @@ static void die_if_nologin(void)
+ 		puts("\r\nSystem closed for routine maintenance\r");
+ 
+ 	fclose(fp);
+-	fflush(NULL);
++	fflush_all();
+ 	/* Users say that they do need this prior to exit: */
+ 	tcdrain(STDOUT_FILENO);
+ 	exit(EXIT_FAILURE);
+@@ -250,7 +250,7 @@ static void motd(void)
+ 
+ 	fd = open(bb_path_motd_file, O_RDONLY);
+ 	if (fd >= 0) {
+-		fflush(stdout);
++		fflush_all();
+ 		bb_copyfd_eof(fd, STDOUT_FILENO);
+ 		close(fd);
+ 	}
+@@ -263,7 +263,7 @@ static void alarm_handler(int sig UNUSED_PARAM)
+ 	 * We don't want to block here */
+ 	ndelay_on(1);
+ 	printf("\r\nLogin timed out after %d seconds\r\n", TIMEOUT);
+-	fflush(NULL);
++	fflush_all();
+ 	/* unix API is brain damaged regarding O_NONBLOCK,
+ 	 * we should undo it, or else we can affect other processes */
+ 	ndelay_off(1);
+diff --git a/mailutils/mail.c b/mailutils/mail.c
+index 68883ff..64a5b99 100644
+--- a/mailutils/mail.c
++++ b/mailutils/mail.c
+@@ -87,7 +87,7 @@ const FAST_FUNC char *command(const char *fmt, const char *param)
+ 		msg = xasprintf(fmt, param);
+ 		printf("%s\r\n", msg);
+ 	}
+-	fflush(stdout);
++	fflush_all();
+ 	return msg;
+ }
+ 
+diff --git a/miscutils/flash_eraseall.c b/miscutils/flash_eraseall.c
+index 4f3e94d..ba0a6b5 100644
+--- a/miscutils/flash_eraseall.c
++++ b/miscutils/flash_eraseall.c
+@@ -43,7 +43,7 @@ static void show_progress(mtd_info_t *meminfo, erase_info_t *erase)
+ 	printf("\rErasing %d Kibyte @ %x -- %2llu %% complete.",
+ 		(unsigned)meminfo->erasesize / 1024, erase->start,
+ 		(unsigned long long) erase->start * 100 / meminfo->size);
+-	fflush(stdout);
++	fflush_all();
+ }
+ 
+ int flash_eraseall_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index c4d2f3b..399b77a 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -1406,7 +1406,7 @@ static void do_time(int cache /*,int fd*/)
+ 	} else { /* Time device */
+ 		printf("Timing buffered disk reads:");
+ 	}
+-	fflush(stdout);
++	fflush_all();
+ 
+ 	/* Now do the timing */
+ 	iterations = 0;
+diff --git a/miscutils/less.c b/miscutils/less.c
+index ce77ddd..48f3a75 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -157,7 +157,7 @@ struct globals {
+ /* Reset terminal input to normal */
+ static void set_tty_cooked(void)
+ {
+-	fflush(stdout);
++	fflush_all();
+ 	tcsetattr(kbd_fd, TCSANOW, &term_orig);
+ }
+ 
+@@ -835,7 +835,7 @@ static int getch_nowait(void)
+ 	/* Position cursor if line input is done */
+ 	if (less_gets_pos >= 0)
+ 		move_cursor(max_displayed_line + 2, less_gets_pos + 1);
+-	fflush(stdout);
++	fflush_all();
+ 
+ 	if (kbd_input[0] == 0) { /* if nothing is buffered */
+ #if ENABLE_FEATURE_LESS_WINCH
+diff --git a/networking/arping.c b/networking/arping.c
+index 71690cf..e3418a9 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -237,7 +237,7 @@ static bool recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 		} else {
+ 			printf(" UNSOLICITED?\n");
+ 		}
+-		fflush(stdout);
++		fflush_all();
+ 	}
+ 	received++;
+ 	if (FROM->sll_pkttype != PACKET_HOST)
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index 70a3533..9937cc3 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -630,7 +630,7 @@ popen_ls(const char *opt)
+ 	cwd = xrealloc_getcwd_or_warn(NULL);
+ 	xpiped_pair(outfd);
+ 
+-	/*fflush(NULL); - so far we dont use stdio on output */
++	/*fflush_all(); - so far we dont use stdio on output */
+ 	pid = BB_MMU ? fork() : vfork();
+ 	if (pid < 0)
+ 		bb_perror_msg_and_die(BB_MMU ? "fork" : "vfork");
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index d0c5cce..88d1944 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -969,7 +969,7 @@ static int doit(char *str)
+ 		pid_t child;
+ 		int status;
+ 
+-		fflush(NULL);
++		fflush_all();
+ 		child = vfork();
+ 		switch (child) {
+ 		case -1: /* failure */
+@@ -1038,7 +1038,7 @@ static int popen2(FILE **in, FILE **out, char *command, char *param)
+ 	xpiped_pair(infd);
+ 	xpiped_pair(outfd);
+ 
+-	fflush(NULL);
++	fflush_all();
+ 	pid = vfork();
+ 
+ 	switch (pid) {
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index 86d2754..fcf9623 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -182,7 +182,7 @@ static NOINLINE int print_linkinfo(const struct nlmsghdr *n)
+ 		}
+ 	}
+ 	bb_putchar('\n');
+-	/*fflush(stdout);*/
++	/*fflush_all();*/
+ 	return 0;
+ }
+ 
+@@ -344,7 +344,7 @@ static int FAST_FUNC print_addrinfo(const struct sockaddr_nl *who UNUSED_PARAM,
+ 		printf("       %s", buf);
+ 	}
+ 	bb_putchar('\n');
+-	/*fflush(stdout);*/
++	/*fflush_all();*/
+ 	return 0;
+ }
+ 
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index e524731..659f3a9 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -151,7 +151,7 @@ static int FAST_FUNC print_rule(const struct sockaddr_nl *who UNUSED_PARAM,
+ 		fputs(rtnl_rtntype_n2a(r->rtm_type, b1), stdout);
+ 
+ 	bb_putchar('\n');
+-	/*fflush(stdout);*/
++	/*fflush_all();*/
+ 	return 0;
+ }
+ 
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 9aaeec1..ad98bed 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -152,7 +152,7 @@ enum {
+ /* Debug: squirt whatever message and sleep a bit so we can see it go by. */
+ /* Beware: writes to stdOUT... */
+ #if 0
+-#define Debug(...) do { printf(__VA_ARGS__); printf("\n"); fflush(stdout); sleep(1); } while (0)
++#define Debug(...) do { printf(__VA_ARGS__); printf("\n"); fflush_all(); sleep(1); } while (0)
+ #else
+ #define Debug(...) do { } while (0)
+ #endif
+diff --git a/networking/ping.c b/networking/ping.c
+index 71b2a4b..d30eb5c 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -491,7 +491,7 @@ static void unpack_tail(int sz, uint32_t *tp,
+ 	if (tp)
+ 		printf(" time=%u.%03u ms", triptime / 1000, triptime % 1000);
+ 	puts(dupmsg);
+-	fflush(stdout);
++	fflush_all();
+ }
+ static void unpack4(char *buf, int sz, struct sockaddr_in *from)
+ {
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index 163efaa..b0a1cc4 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -288,7 +288,7 @@ make_new_session(
+ 		/*ts->size2 = 0;*/
+ 	}
+ 
+-	fflush(NULL); /* flush all streams */
++	fflush_all();
+ 	pid = vfork(); /* NOMMU-friendly */
+ 	if (pid < 0) {
+ 		free(ts);
+@@ -331,7 +331,7 @@ make_new_session(
+ 	/*termbuf.c_lflag &= ~ICANON;*/
+ 	tcsetattr_stdin_TCSANOW(&termbuf);
+ 
+-	/* Uses FILE-based I/O to stdout, but does fflush(stdout),
++	/* Uses FILE-based I/O to stdout, but does fflush_all(),
+ 	 * so should be safe with vfork.
+ 	 * I fear, though, that some users will have ridiculously big
+ 	 * issue files, and they may block writing to fd 1,
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 7284f00..fa45db9 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -815,7 +815,7 @@ int traceroute_main(int argc, char **argv)
+ 
+ 			if (!first && pausemsecs > 0)
+ 				usleep(pausemsecs * 1000);
+-			fflush(stdout);
++			fflush_all();
+ 
+ 			t1 = monotonic_us();
+ 			send_probe(++seq, ttl);
+diff --git a/procps/top.c b/procps/top.c
+index 252f6f7..7991569 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -632,7 +632,7 @@ static NOINLINE void display_process_list(int lines_rem, int scr_width)
+ 	}
+ 	/* printf(" %d", hist_iterations); */
+ 	bb_putchar(OPT_BATCH_MODE ? '\n' : '\r');
+-	fflush(stdout);
++	fflush_all();
+ }
+ #undef UPSCALE
+ #undef SHOW_STAT
+@@ -856,7 +856,7 @@ static NOINLINE void display_topmem_process_list(int lines_rem, int scr_width)
+ 		s++;
+ 	}
+ 	bb_putchar(OPT_BATCH_MODE ? '\n' : '\r');
+-	fflush(stdout);
++	fflush_all();
+ #undef HDR_STR
+ #undef MIN_WIDTH
+ }
+diff --git a/procps/watch.c b/procps/watch.c
+index 5fd0510..f446ec9 100644
+--- a/procps/watch.c
++++ b/procps/watch.c
+@@ -64,7 +64,7 @@ int watch_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 			puts(header);
+ 		}
+-		fflush(stdout);
++		fflush_all();
+ 		// TODO: 'real' watch pipes cmd's output to itself
+ 		// and does not allow it to overflow the screen
+ 		// (taking into account linewrap!)
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index b7fd152..9a00fad 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -1152,7 +1152,7 @@ int svlogd_main(int argc, char **argv)
+ 			/* Move unprocessed data to the front of line */
+ 			memmove((timestamp ? line+26 : line), lineptr, stdin_cnt);
+ 		}
+-		fflush(NULL);////
++		fflush_all();////
+ 	}
+ 
+ 	for (i = 0; i < dirn; ++i) {
+diff --git a/scripts/echo.c b/scripts/echo.c
+index 9e591c4..85a8aa9 100644
+--- a/scripts/echo.c
++++ b/scripts/echo.c
+@@ -187,7 +187,7 @@ int main(int argc, char **argv)
+ 		putchar('\n');
+ 	}
+  ret:
+-	return fflush(stdout);
++	return fflush_all();
+ }
+ 
+ /*-
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index aabc371..0a46437 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -286,7 +286,7 @@ static int restore(const char *file)
+ 			if (count == 0)
+ 				bb_putchar('\n');
+ 			bb_putchar('*');
+-			fflush(stdout);
++			fflush_all();
+ 		}
+ 	}
+ 
+diff --git a/shell/ash.c b/shell/ash.c
+index 481b841..6b985ad 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -389,16 +389,7 @@ static void
+ flush_stdout_stderr(void)
+ {
+ 	INT_OFF;
+-	fflush(stdout);
+-	fflush(stderr);
+-	INT_ON;
+-}
+-
+-static void
+-flush_stderr(void)
+-{
+-	INT_OFF;
+-	fflush(stderr);
++	fflush_all();
+ 	INT_ON;
+ }
+ 
+@@ -451,7 +442,7 @@ static void
+ out2str(const char *p)
+ {
+ 	outstr(p, stderr);
+-	flush_stderr();
++	flush_stdout_stderr();
+ }
+ 
+ 
+@@ -8184,7 +8175,7 @@ evaltree(union node *n, int flags)
+ 	default:
+ #if DEBUG
+ 		out1fmt("Node type = %d\n", n->type);
+-		fflush(stdout);
++		fflush_all();
+ 		break;
+ #endif
+ 	case NNOT:
+@@ -9101,7 +9092,7 @@ evalcommand(union node *cmd, int flags)
+ 		for (;;) {
+ 			find_command(argv[0], &cmdentry, cmd_flag, path);
+ 			if (cmdentry.cmdtype == CMDUNKNOWN) {
+-				flush_stderr();
++				flush_stdout_stderr();
+ 				status = 127;
+ 				goto bail;
+ 			}
+diff --git a/shell/hush.c b/shell/hush.c
+index 1187cbe..891d87b 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1206,7 +1206,7 @@ static void hush_exit(int exitcode)
+ 	}
+ 
+ #if ENABLE_HUSH_JOB
+-	fflush(NULL); /* flush all streams */
++	fflush_all();
+ 	sigexit(- (exitcode & 0xff));
+ #else
+ 	exit(exitcode);
+@@ -1679,7 +1679,7 @@ static void get_user_input(struct in_str *i)
+ 	do {
+ 		G.flag_SIGINT = 0;
+ 		fputs(prompt_str, stdout);
+-		fflush(stdout);
++		fflush_all();
+ 		G.user_input_buf[0] = r = fgetc(i->file);
+ 		/*G.user_input_buf[1] = '\0'; - already is and never changed */
+ //do we need check_and_run_traps(0)? (maybe only if stdin)
+@@ -3220,7 +3220,7 @@ static void exec_function(char ***to_free,
+ 	G.global_argc = n;
+ 	/* On MMU, funcp->body is always non-NULL */
+ 	n = run_list(funcp->body);
+-	fflush(NULL);
++	fflush_all();
+ 	_exit(n);
+ # else
+ 	re_execute_shell(to_free,
+@@ -3307,7 +3307,7 @@ static void exec_builtin(char ***to_free,
+ {
+ #if BB_MMU
+ 	int rcode = x->function(argv);
+-	fflush(NULL);
++	fflush_all();
+ 	_exit(rcode);
+ #else
+ 	/* On NOMMU, we must never block!
+@@ -3933,7 +3933,7 @@ static NOINLINE int run_pipe(struct pipe *pi)
+ 					debug_printf_exec(": builtin '%s' '%s'...\n",
+ 						x->cmd, argv_expanded[1]);
+ 					rcode = x->function(argv_expanded) & 0xff;
+-					fflush(NULL);
++					fflush_all();
+ 				}
+ #if ENABLE_HUSH_FUNCTIONS
+ 				else {
+@@ -7136,7 +7136,7 @@ static int FAST_FUNC builtin_export(char **argv)
+ 				putchar('\n');
+ #endif
+ 			}
+-			/*fflush(stdout); - done after each builtin anyway */
++			/*fflush_all(); - done after each builtin anyway */
+ 		}
+ 		return EXIT_SUCCESS;
+ 	}
+@@ -7181,7 +7181,7 @@ static int FAST_FUNC builtin_trap(char **argv)
+ 				printf(" %s\n", get_signame(i));
+ 			}
+ 		}
+-		/*fflush(stdout); - done after each builtin anyway */
++		/*fflush_all(); - done after each builtin anyway */
+ 		return EXIT_SUCCESS;
+ 	}
+ 
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index 603a377..932bbec 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -135,7 +135,7 @@ int logread_main(int argc UNUSED_PARAM, char **argv)
+ 		} else { /* logread -f */
+ 			if (cur == shbuf_tail) {
+ 				sem_up(log_semid);
+-				fflush(stdout);
++				fflush_all();
+ 				sleep(1); /* TODO: replace me with a sleep_on */
+ 				continue;
+ 			}
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index cdd3060..cc9eec2 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -341,7 +341,7 @@ static int ask(const char *string, int def)
+ 	}
+ 	printf(def ? "%s (y/n)? " : "%s (n/y)? ", string);
+ 	for (;;) {
+-		fflush(NULL);
++		fflush_all();
+ 		c = getchar();
+ 		if (c == EOF) {
+ 			if (!def)
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index cf75761..8819cee 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -505,7 +505,7 @@ static void alarm_intr(int alnum UNUSED_PARAM)
+ 	if (!G.currently_testing)
+ 		return;
+ 	printf("%d ...", G.currently_testing);
+-	fflush(stdout);
++	fflush_all();
+ }
+ 
+ static void check_blocks(void)
+diff --git a/util-linux/more.c b/util-linux/more.c
+index 9ac4dd8..555f033 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -114,7 +114,7 @@ int more_main(int argc UNUSED_PARAM, char **argv)
+ 						(int) (ftello(file)*100 / st.st_size),
+ 						st.st_size);
+ 				}
+-				fflush(stdout);
++				fflush_all();
+ 
+ 				/*
+ 				 * We've just displayed the "--More--" prompt, so now we need
+@@ -189,7 +189,7 @@ int more_main(int argc UNUSED_PARAM, char **argv)
+ 			putchar(c);
+ 		}
+ 		fclose(file);
+-		fflush(stdout);
++		fflush_all();
+ 	} while (*argv && *++argv);
+  end:
+ 	setTermSettings(cin_fileno, &initial_settings);
+diff --git a/util-linux/rtcwake.c b/util-linux/rtcwake.c
+index f90f73c..049f699 100644
+--- a/util-linux/rtcwake.c
++++ b/util-linux/rtcwake.c
+@@ -172,7 +172,7 @@ int rtcwake_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	sync();
+ 	printf("wakeup from \"%s\" at %s", suspend, ctime(&alarm_time));
+-	fflush(NULL);
++	fflush_all();
+ 	usleep(10 * 1000);
+ 
+ 	if (strcmp(suspend, "on"))

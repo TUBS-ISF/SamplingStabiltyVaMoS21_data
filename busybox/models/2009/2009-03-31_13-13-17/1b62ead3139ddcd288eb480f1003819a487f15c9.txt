@@ -1,0 +1,14 @@
+2009-03-31 13:13:17 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index a96b179..de3b56d 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3314,8 +3314,6 @@ static void initialize_context(struct parse_context *ctx)
+ 
+ /* If a reserved word is found and processed, parse context is modified
+  * and 1 is returned.
+- * Handles if, then, elif, else, fi, for, while, until, do, done.
+- * case, function, and select are obnoxious, save those for later.
+  */
+ #if HAS_KEYWORDS
+ struct reserved_combo {

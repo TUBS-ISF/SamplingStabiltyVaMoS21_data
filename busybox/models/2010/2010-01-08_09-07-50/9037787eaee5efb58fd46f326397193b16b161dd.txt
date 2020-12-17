@@ -1,0 +1,171 @@
+2010-01-08 09:07:50 +0100
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/ext2fs_inline.c b/e2fsprogs/old_e2fsprogs/ext2fs/ext2fs_inline.c
+index da1cf5b..b9aab44 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/ext2fs_inline.c
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/ext2fs_inline.c
+@@ -50,9 +50,7 @@ errcode_t ext2fs_resize_mem(unsigned long EXT2FS_ATTR((unused)) old_size,
+ 	/* Use "memcpy" for pointer assignments here to avoid problems
+ 	 * with C99 strict type aliasing rules. */
+ 	memcpy(&p, ptr, sizeof (p));
+-	p = realloc(p, size);
+-	if (!p)
+-		return EXT2_ET_NO_MEMORY;
++	p = xrealloc(p, size);
+ 	memcpy(ptr, &p, sizeof (p));
+ 	return 0;
+ }
+diff --git a/e2fsprogs/old_e2fsprogs/fsck.c b/e2fsprogs/old_e2fsprogs/fsck.c
+index 687938c..c0964f7 100644
+--- a/e2fsprogs/old_e2fsprogs/fsck.c
++++ b/e2fsprogs/old_e2fsprogs/fsck.c
+@@ -377,8 +377,7 @@ static struct fs_info *create_fs_device(const char *device, const char *mntpnt,
+ {
+ 	struct fs_info *fs;
+ 
+-	if (!(fs = malloc(sizeof(struct fs_info))))
+-		return NULL;
++	fs = xmalloc(sizeof(struct fs_info));
+ 
+ 	fs->device = string_copy(device);
+ 	fs->mountpt = string_copy(mntpnt);
+@@ -573,10 +572,7 @@ static int execute(const char *type, const char *device, const char *mntpt,
+ 	struct fsck_instance *inst, *p;
+ 	pid_t   pid;
+ 
+-	inst = malloc(sizeof(struct fsck_instance));
+-	if (!inst)
+-		return ENOMEM;
+-	memset(inst, 0, sizeof(struct fsck_instance));
++	inst = xzalloc(sizeof(struct fsck_instance));
+ 
+ 	prog = xasprintf("fsck.%s", type);
+ 	argv[0] = prog;
+diff --git a/editors/ed.c b/editors/ed.c
+index 9ce8bea..516b8d7 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -454,11 +454,7 @@ static void subCommand(const char *cmd, int num1, int num2)
+ 		 * structure and use that.  Link it in in place of
+ 		 * the old line structure.
+ 		 */
+-		nlp = malloc(sizeof(LINE) + lp->len + deltaLen);
+-		if (nlp == NULL) {
+-			bb_error_msg("can't get memory for line");
+-			return;
+-		}
++		nlp = xmalloc(sizeof(LINE) + lp->len + deltaLen);
+ 
+ 		nlp->len = lp->len + deltaLen;
+ 
+@@ -712,12 +708,7 @@ static int readLines(const char *file, int num)
+ 
+ 		if (bufUsed >= bufSize) {
+ 			len = (bufSize * 3) / 2;
+-			cp = realloc(bufBase, len);
+-			if (cp == NULL) {
+-				bb_error_msg("no memory for buffer");
+-				close(fd);
+-				return FALSE;
+-			}
++			cp = xrealloc(bufBase, len);
+ 			bufBase = cp;
+ 			bufPtr = bufBase + bufUsed;
+ 			bufSize = len;
+@@ -872,11 +863,7 @@ static int insertLine(int num, const char *data, int len)
+ 		return FALSE;
+ 	}
+ 
+-	newLp = malloc(sizeof(LINE) + len - 1);
+-	if (newLp == NULL) {
+-		bb_error_msg("failed to allocate memory for line");
+-		return FALSE;
+-	}
++	newLp = xmalloc(sizeof(LINE) + len - 1);
+ 
+ 	memcpy(newLp->data, data, len);
+ 	newLp->len = len;
+diff --git a/editors/sed.c b/editors/sed.c
+index 19e7683..fd9dd1b 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1094,7 +1094,7 @@ static void process_files(void)
+ 			/* append next_line, read new next_line. */
+ 			}
+ 			len = strlen(pattern_space);
+-			pattern_space = realloc(pattern_space, len + strlen(next_line) + 2);
++			pattern_space = xrealloc(pattern_space, len + strlen(next_line) + 2);
+ 			pattern_space[len] = '\n';
+ 			strcpy(pattern_space + len+1, next_line);
+ 			last_gets_char = next_gets_char;
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index c450c6a..03f5073 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -97,9 +97,8 @@ static void print_queuelen(char *name)
+ static NOINLINE int print_linkinfo(const struct nlmsghdr *n)
+ {
+ 	struct ifinfomsg *ifi = NLMSG_DATA(n);
+-	struct rtattr * tb[IFLA_MAX+1];
++	struct rtattr *tb[IFLA_MAX+1];
+ 	int len = n->nlmsg_len;
+-	unsigned m_flag = 0;
+ 
+ 	if (n->nlmsg_type != RTM_NEWLINK && n->nlmsg_type != RTM_DELLINK)
+ 		return 0;
+@@ -130,22 +129,27 @@ static NOINLINE int print_linkinfo(const struct nlmsghdr *n)
+ 		printf("Deleted ");
+ 
+ 	printf("%d: %s", ifi->ifi_index,
+-		tb[IFLA_IFNAME] ? (char*)RTA_DATA(tb[IFLA_IFNAME]) : "<nil>");
+-
+-	if (tb[IFLA_LINK]) {
+-		SPRINT_BUF(b1);
+-		int iflink = *(int*)RTA_DATA(tb[IFLA_LINK]);
+-		if (iflink == 0)
+-			printf("@NONE: ");
+-		else {
+-			printf("@%s: ", ll_idx_n2a(iflink, b1));
+-			m_flag = ll_index_to_flags(iflink);
+-			m_flag = !(m_flag & IFF_UP);
++		/*tb[IFLA_IFNAME] ? (char*)RTA_DATA(tb[IFLA_IFNAME]) : "<nil>" - we checked tb[IFLA_IFNAME] above*/
++		(char*)RTA_DATA(tb[IFLA_IFNAME])
++	);
++
++	{
++		unsigned m_flag = 0;
++		if (tb[IFLA_LINK]) {
++			SPRINT_BUF(b1);
++			int iflink = *(int*)RTA_DATA(tb[IFLA_LINK]);
++			if (iflink == 0)
++				printf("@NONE: ");
++			else {
++				printf("@%s: ", ll_idx_n2a(iflink, b1));
++				m_flag = ll_index_to_flags(iflink);
++				m_flag = !(m_flag & IFF_UP);
++			}
++		} else {
++			printf(": ");
+ 		}
+-	} else {
+-		printf(": ");
++		print_link_flags(ifi->ifi_flags, m_flag);
+ 	}
+-	print_link_flags(ifi->ifi_flags, m_flag);
+ 
+ 	if (tb[IFLA_MTU])
+ 		printf("mtu %u ", *(int*)RTA_DATA(tb[IFLA_MTU]));
+@@ -382,12 +386,10 @@ static int FAST_FUNC store_nlmsg(const struct sockaddr_nl *who, struct nlmsghdr
+ 	struct nlmsg_list *h;
+ 	struct nlmsg_list **lp;
+ 
+-	h = malloc(n->nlmsg_len+sizeof(void*));
+-	if (h == NULL)
+-		return -1;
++	h = xzalloc(n->nlmsg_len + sizeof(void*));
+ 
+ 	memcpy(&h->h, n, n->nlmsg_len);
+-	h->next = NULL;
++	/*h->next = NULL; - xzalloc did it */
+ 
+ 	for (lp = linfo; *lp; lp = &(*lp)->next)
+ 		continue;

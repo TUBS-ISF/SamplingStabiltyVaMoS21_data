@@ -1,0 +1,195 @@
+2008-06-26 14:32:57 +0000
+diff --git a/archival/libunarchive/decompress_bunzip2.c b/archival/libunarchive/decompress_bunzip2.c
+index 8f35bc5..6da09fc 100644
+--- a/archival/libunarchive/decompress_bunzip2.c
++++ b/archival/libunarchive/decompress_bunzip2.c
+@@ -761,9 +761,9 @@ int main(int argc, char **argv)
+ 	char c;
+ 
+ 	if (i < 0)
+-		fprintf(stderr,"%s\n", bunzip_errors[-i]);
++		fprintf(stderr, "%s\n", bunzip_errors[-i]);
+ 	else if (read(STDIN_FILENO, &c, 1))
+-		fprintf(stderr,"Trailing garbage ignored\n");
++		fprintf(stderr, "Trailing garbage ignored\n");
+ 	return -i;
+ }
+ #endif
+diff --git a/archival/unzip.c b/archival/unzip.c
+index c7d39da..2c89712 100644
+--- a/archival/unzip.c
++++ b/archival/unzip.c
+@@ -308,7 +308,7 @@ int unzip_main(int argc, char **argv)
+ 			} else if (last_char_is(dst_fn, '/')) { /* Extract directory */
+ 				if (stat(dst_fn, &stat_buf) == -1) {
+ 					if (errno != ENOENT) {
+-						bb_perror_msg_and_die("cannot stat '%s'",dst_fn);
++						bb_perror_msg_and_die("cannot stat '%s'", dst_fn);
+ 					}
+ 					if (verbose) {
+ 						printf("   creating: %s\n", dst_fn);
+@@ -328,7 +328,7 @@ int unzip_main(int argc, char **argv)
+  _check_file:
+ 				if (stat(dst_fn, &stat_buf) == -1) { /* File does not exist */
+ 					if (errno != ENOENT) {
+-						bb_perror_msg_and_die("cannot stat '%s'",dst_fn);
++						bb_perror_msg_and_die("cannot stat '%s'", dst_fn);
+ 					}
+ 					i = 'y';
+ 				} else { /* File already exists */
+@@ -345,7 +345,7 @@ int unzip_main(int argc, char **argv)
+ 							i = key_buf[0];
+ 						}
+ 					} else { /* File is not regular file */
+-						bb_error_msg_and_die("'%s' exists but is not regular file",dst_fn);
++						bb_error_msg_and_die("'%s' exists but is not regular file", dst_fn);
+ 					}
+ 				}
+ 			}
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/probe.c b/e2fsprogs/old_e2fsprogs/blkid/probe.c
+index 453b4d0..48b240e 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/probe.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/probe.c
+@@ -429,9 +429,9 @@ static int probe_ocfs(int fd __BLKID_ATTR((unused)),
+ 
+ 	major = ocfsmajor(ovh);
+ 	if (major == 1)
+-		blkid_set_tag(dev,"SEC_TYPE","ocfs1",sizeof("ocfs1"));
++		blkid_set_tag(dev, "SEC_TYPE", "ocfs1", sizeof("ocfs1"));
+ 	else if (major >= 9)
+-		blkid_set_tag(dev,"SEC_TYPE","ntocfs",sizeof("ntocfs"));
++		blkid_set_tag(dev, "SEC_TYPE", "ntocfs", sizeof("ntocfs"));
+ 
+ 	blkid_set_tag(dev, "LABEL", (const char*)ovl.label, ocfslabellen(ovl));
+ 	blkid_set_tag(dev, "MOUNT", (const char*)ovh.mount, ocfsmountlen(ovh));
+diff --git a/e2fsprogs/old_e2fsprogs/mke2fs.c b/e2fsprogs/old_e2fsprogs/mke2fs.c
+index 89b5223..e16fe93 100644
+--- a/e2fsprogs/old_e2fsprogs/mke2fs.c
++++ b/e2fsprogs/old_e2fsprogs/mke2fs.c
+@@ -176,7 +176,7 @@ static void mke2fs_error_msg_and_die(int retval, const char *fmt, ...)
+ 
+ 	if (retval) {
+ 		va_start(ap, fmt);
+-		fprintf(stderr,"\nCould not ");
++		fprintf(stderr, "\nCould not ");
+ 		vfprintf(stderr, fmt, ap);
+ 		fprintf(stderr, "\n");
+ 		va_end(ap);
+@@ -209,7 +209,7 @@ static void mke2fs_warning_msg(int retval, char *fmt, ... )
+ 
+ 	if (retval) {
+ 		va_start(ap, fmt);
+-		fprintf(stderr,"\nWarning: ");
++		fprintf(stderr, "\nWarning: ");
+ 		vfprintf(stderr, fmt, ap);
+ 		fprintf(stderr, "\n");
+ 		va_end(ap);
+diff --git a/editors/patch.c b/editors/patch.c
+index 1c9e970..2bc594d 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -50,7 +50,7 @@ static char *extract_filename(char *line, int patch_level, const char *pat)
+ 
+ 	if (strncmp(line, pat, 4) == 0) {
+ 		/* Terminate string at end of source filename */
+-		line[strcspn(line,"\t\n\r")] = '\0';
++		line[strcspn(line, "\t\n\r")] = '\0';
+ 
+ 		/* Skip over (patch_level) number of leading directories */
+ 		while (patch_level--) {
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 782457a..ffc595a 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -1091,7 +1091,7 @@ static int get_uid_gid(int flag, const char *string)
+ 		msg = "group";
+ 
+ 	if (ENABLE_DEVFSD_VERBOSE)
+-		msg_logger(LOG_ERR,"unknown %s: %s, defaulting to %cid=0",  msg, string, msg[0]);
++		msg_logger(LOG_ERR, "unknown %s: %s, defaulting to %cid=0",  msg, string, msg[0]);
+ 	return 0;
+ }/*  End Function get_uid_gid  */
+ 
+@@ -1732,7 +1732,7 @@ static const char *expand_variable(char *buffer, unsigned int length,
+ 				--open_braces;
+ 				break;
+ 			case '\0':
+-				info_logger(LOG_INFO,"\"}\" not found in: %s", input);
++				info_logger(LOG_INFO, "\"}\" not found in: %s", input);
+ 				return NULL;
+ 			default:
+ 				break;
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 3fbb02b..4ac1a1e 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -2893,7 +2893,7 @@ new_init_module(const char *m_name, struct obj_file *f, unsigned long m_size)
+ 
+ 	sec = obj_find_section(f, ".this");
+ 	if (!sec || !sec->contents) {
+-		bb_perror_msg_and_die("corrupt module %s?",m_name);
++		bb_perror_msg_and_die("corrupt module %s?", m_name);
+ 	}
+ 	module = (struct new_module *) sec->contents;
+ 	m_addr = sec->header.sh_addr;
+diff --git a/shell/bbsh.c b/shell/bbsh.c
+index 5386bb0..3be64ee 100644
+--- a/shell/bbsh.c
++++ b/shell/bbsh.c
+@@ -167,7 +167,7 @@ static int run_pipeline(struct pipeline *line)
+ 		if (!pid) {
+ 			run_applet_and_exit(cmd->argv[0],cmd->argc,cmd->argv);
+ 			execvp(cmd->argv[0],cmd->argv);
+-			printf("No %s",cmd->argv[0]);
++			printf("No %s", cmd->argv[0]);
+ 			exit(EXIT_FAILURE);
+ 		} else waitpid(pid, &status, 0);
+ 	}
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 5871a06..4034ca5 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -1807,7 +1807,7 @@ check_consistency(const struct partition *p, int partition)
+ 		printf("Partition %d has different physical/logical "
+ 			"beginnings (non-Linux?):\n", partition + 1);
+ 		printf("     phys=(%d, %d, %d) ", pbc, pbh, pbs);
+-		printf("logical=(%d, %d, %d)\n",lbc, lbh, lbs);
++		printf("logical=(%d, %d, %d)\n", lbc, lbh, lbs);
+ 	}
+ 
+ /* Same physical / logical ending? */
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index e3b4ca6..bdf5f97 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -255,9 +255,9 @@ static struct option *add_long_options(struct option *long_options, char *option
+ 
+ static void set_shell(const char *new_shell)
+ {
+-	if (!strcmp(new_shell,"bash") || !strcmp(new_shell,"sh"))
++	if (!strcmp(new_shell, "bash") || !strcmp(new_shell, "sh"))
+ 		return;
+-	if (!strcmp(new_shell,"tcsh") || !strcmp(new_shell,"csh"))
++	if (!strcmp(new_shell, "tcsh") || !strcmp(new_shell, "csh"))
+ 		option_mask32 |= SHELL_IS_TCSH;
+ 	else
+ 		bb_error_msg("unknown shell '%s', assuming bash", new_shell);
+diff --git a/util-linux/volume_id/util.c b/util-linux/volume_id/util.c
+index 240b3c1..315d75c 100644
+--- a/util-linux/volume_id/util.c
++++ b/util-linux/volume_id/util.c
+@@ -165,12 +165,12 @@ set:
+ 			buf[3], buf[2], buf[1], buf[0]);
+ 		break;
+ 	case UUID_NTFS:
+-		sprintf(id->uuid,"%02X%02X%02X%02X%02X%02X%02X%02X",
++		sprintf(id->uuid, "%02X%02X%02X%02X%02X%02X%02X%02X",
+ 			buf[7], buf[6], buf[5], buf[4],
+ 			buf[3], buf[2], buf[1], buf[0]);
+ 		break;
+ 	case UUID_HFS:
+-		sprintf(id->uuid,"%02X%02X%02X%02X%02X%02X%02X%02X",
++		sprintf(id->uuid, "%02X%02X%02X%02X%02X%02X%02X%02X",
+ 			buf[0], buf[1], buf[2], buf[3],
+ 			buf[4], buf[5], buf[6], buf[7]);
+ 		break;

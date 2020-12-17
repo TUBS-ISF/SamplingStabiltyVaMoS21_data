@@ -1,0 +1,51 @@
+2008-05-28 14:19:27 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 0d6e3af..947f28d 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -244,6 +244,7 @@ extern void chomp(char *s);
+ extern void trim(char *s);
+ extern char *skip_whitespace(const char *);
+ extern char *skip_non_whitespace(const char *);
++extern char *strrstr(const char *haystack, const char *needle);
+ 
+ //TODO: supply a pointer to char[11] buffer (avoid statics)?
+ extern const char *bb_mode_string(mode_t mode);
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 0c7e254..201d795 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -87,6 +87,7 @@ lib-y += simplify_path.o
+ lib-y += skip_whitespace.o
+ lib-y += speed_table.o
+ lib-y += str_tolower.o
++lib-y += strrstr.o
+ lib-y += time.o
+ lib-y += trim.o
+ lib-y += u_signal_names.o
+diff --git a/libbb/strrstr.c b/libbb/strrstr.c
+new file mode 100644
+index 0000000..b314264
+--- /dev/null
++++ b/libbb/strrstr.c
+@@ -0,0 +1,20 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Utility routines.
++ *
++ * Copyright (C) 2008 Bernhard Fischer
++ *
++ * Licensed under GPLv2 or later, see file License in this tarball for details.
++ */
++
++#include "libbb.h"
++
++/* reverse strstr() */
++char* strrstr(const char *haystack, const char *needle)
++{
++	char *tmp = strrchr(haystack, *needle);
++	if (tmp == NULL || strcmp(tmp, needle) != 0)
++		return NULL;
++	return tmp;
++}
++

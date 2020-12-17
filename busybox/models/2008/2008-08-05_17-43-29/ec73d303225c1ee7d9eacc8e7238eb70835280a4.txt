@@ -1,0 +1,40 @@
+2008-08-05 17:43:29 +0000
+diff --git a/libbb/read.c b/libbb/read.c
+index 9f6bfcd..815007c 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -338,12 +338,16 @@ int FAST_FUNC open_zipped(const char *fname)
+ 			/* .gz and .bz2 both have 2-byte signature, and their
+ 			 * unpack_XXX_stream want this header skipped. */
+ 			xread(fd, &magic, 2);
++#if ENABLE_FEATURE_SEAMLESS_GZ
+ #if BB_MMU
+ 			xformer = unpack_gz_stream;
+ #else
+ 			xformer_prog = "gunzip";
+ #endif
+-			if (magic[0] != 0x1f || magic[1] != 0x8b) {
++#endif
++			if (!ENABLE_FEATURE_SEAMLESS_GZ
++			 || magic[0] != 0x1f || magic[1] != 0x8b
++			) {
+ 				if (!ENABLE_FEATURE_SEAMLESS_BZ2
+ 				 || magic[0] != 'B' || magic[1] != 'Z'
+ 				) {
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 24d1d6e..6e5180b 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -174,9 +174,9 @@ int chpst_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int chpst_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct bb_uidgid_t ugid;
+-	char *set_user;
+-	char *env_user;
+-	char *env_dir;
++	char *set_user = set_user; /* for compiler */
++	char *env_user = env_user;
++	char *env_dir = env_dir;
+ 	char *root;
+ 	char *nicestr;
+ 	unsigned limita;

@@ -1,0 +1,331 @@
+2007-07-27 11:20:10 +0000
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 27fb26e..614d6d0 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -20,13 +20,13 @@
+ #define JUST_USER         4
+ #define JUST_GROUP        8
+ #if ENABLE_SELINUX
+-#define JUST_CONTEXT    16
++#define JUST_CONTEXT     16
+ #endif
+ 
+-static short printf_full(unsigned int id, const char *arg, const char prefix)
++static int printf_full(unsigned int id, const char *arg, const char prefix)
+ {
+ 	const char *fmt = "%cid=%u";
+-	short status = EXIT_FAILURE;
++	int status = EXIT_FAILURE;
+ 
+ 	if (arg) {
+ 		fmt = "%cid=%u(%s)";
+@@ -71,8 +71,8 @@ int id_main(int argc, char **argv)
+ 	if (flags & (JUST_GROUP | JUST_USER USE_SELINUX(| JUST_CONTEXT))) {
+ 		/* JUST_GROUP and JUST_USER are mutually exclusive */
+ 		if (flags & NAME_NOT_NUMBER) {
+-			/* bb_getpwuid and bb_getgrgid exit on failure so puts cannot segfault */
+-			puts((flags & JUST_USER) ? bb_getpwuid(NULL, uid, -1 ) : bb_getgrgid(NULL, gid, -1 ));
++			/* bb_getXXXid(-1) exit on failure, puts cannot segfault */
++			puts((flags & JUST_USER) ? bb_getpwuid(NULL, -1, uid) : bb_getgrgid(NULL, -1, gid));
+ 		} else {
+ 			if (flags & JUST_USER) {
+ 				printf("%u\n", uid);
+@@ -100,11 +100,10 @@ int id_main(int argc, char **argv)
+ 	}
+ 
+ 	/* Print full info like GNU id */
+-	/* bb_getpwuid doesn't exit on failure here */
+-	status = printf_full(uid, bb_getpwuid(NULL, uid, 0), 'u');
++	/* bb_getpwuid(0) doesn't exit on failure (returns NULL) */
++	status = printf_full(uid, bb_getpwuid(NULL, 0, uid), 'u');
+ 	putchar(' ');
+-	/* bb_getgrgid doesn't exit on failure here */
+-	status |= printf_full(gid, bb_getgrgid(NULL, gid, 0), 'g');
++	status |= printf_full(gid, bb_getgrgid(NULL, 0, gid), 'g');
+ 
+ #if ENABLE_SELINUX
+ 	if (is_selinux_enabled()) {
+diff --git a/coreutils/whoami.c b/coreutils/whoami.c
+index 156516f..3718358 100644
+--- a/coreutils/whoami.c
++++ b/coreutils/whoami.c
+@@ -19,7 +19,8 @@ int whoami_main(int argc, char **argv)
+ 	if (argc > 1)
+ 		bb_show_usage();
+ 
+-	puts(bb_getpwuid(NULL, geteuid(), -1));
++	/* Will complain and die if username not found */
++	puts(bb_getpwuid(NULL, -1, geteuid()));
+ 
+ 	return fflush(stdout);
+ }
+diff --git a/include/libbb.h b/include/libbb.h
+index 8fb5520..82cee38 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -481,10 +481,14 @@ struct bb_uidgid_t {
+ int get_uidgid(struct bb_uidgid_t*, const char*, int numeric_ok);
+ /* chown-like handling of "user[:[group]" */
+ void parse_chown_usergroup_or_die(struct bb_uidgid_t *u, char *user_group);
+-/* what is this? */
+-/*extern char *bb_getug(char *buffer, char *idname, long id, int bufsize, char prefix);*/
+-char *bb_getpwuid(char *name, long uid, int bufsize);
+-char *bb_getgrgid(char *group, long gid, int bufsize);
++/* bb_getpwuid, bb_getgrgid:
++bb_getXXXid(buf, bufsz, id) - copy user/group name or id
++                as a string to buf, return user/group name or NULL
++bb_getXXXid(NULL, 0, id) - return user/group name or NULL
++bb_getXXXid(NULL, -1, id) - return user/group name or exit
++*/
++char *bb_getpwuid(char *name, int bufsize, long uid);
++char *bb_getgrgid(char *group, int bufsize, long gid);
+ /* versions which cache results (useful for ps, ls etc) */
+ const char* get_cached_username(uid_t uid);
+ const char* get_cached_groupname(gid_t gid);
+@@ -596,6 +600,7 @@ extern const char *opt_complementary;
+ extern const char *applet_long_options;
+ #endif
+ extern uint32_t option_mask32;
++/* TODO: don't pass argc, determine it by looking at argv */
+ extern uint32_t getopt32(int argc, char **argv, const char *applet_opts, ...);
+ 
+ 
+diff --git a/libbb/bb_pwd.c b/libbb/bb_pwd.c
+index 3af1994..2bdb662 100644
+--- a/libbb/bb_pwd.c
++++ b/libbb/bb_pwd.c
+@@ -11,22 +11,20 @@
+ 
+ #define assert(x) ((void)0)
+ 
+-/*
+- * if bufsize is > 0 char *buffer cannot be set to NULL.
+- *                   If idname is not NULL it is written on the static
+- *                   allocated buffer (and a pointer to it is returned).
+- *                   if idname is NULL, id as string is written to the static
+- *                   allocated buffer and NULL is returned.
+- * if bufsize is = 0 char *buffer can be set to NULL.
+- *                   If idname exists a pointer to it is returned,
+- *                   else NULL is returned.
+- * if bufsize is < 0 char *buffer can be set to NULL.
+- *                   If idname exists a pointer to it is returned,
+- *                   else an error message is printed and the program exits.
+- */
+-
+ /* internal function for bb_getpwuid and bb_getgrgid */
+-static char* bb_getug(char *buffer, char *idname, long id, int bufsize, char prefix)
++/* Hacked by Tito Ragusa (c) 2004 <farmatito@tiscali.it> to make it more
++ * flexible:
++ *
++ * bufsize > 0:      If idname is not NULL it is copied to buffer,
++ *                   and buffer is returned. Else id as string is written
++ *                   to buffer, and NULL is returned.
++ *
++ * bufsize == 0:     idname is returned.
++ *
++ * bufsize < 0:      If idname is not NULL it is returned.
++ *                   Else an error message is printed and the program exits.
++ */
++static char* bb_getug(char *buffer, int bufsize, char *idname, long id, char prefix)
+ {
+ 	if (bufsize > 0) {
+ 		assert(buffer != NULL);
+@@ -40,31 +38,29 @@ static char* bb_getug(char *buffer, char *idname, long id, int bufsize, char pre
+ 	return idname;
+ }
+ 
+-/* Hacked by Tito Ragusa (c) 2004 <farmatito@tiscali.it> to make it more
+- * flexible :
+- *
+- * if bufsize is > 0 char *group cannot be set to NULL.
+- *                   On success groupname is written on static allocated buffer
+- *                   group (and a pointer to it is returned).
+- *                   On failure gid as string is written to static allocated
+- *                   buffer group and NULL is returned.
+- * if bufsize is = 0 char *group can be set to NULL.
+- *                   On success groupname is returned.
+- *                   On failure NULL is returned.
+- * if bufsize is < 0 char *group can be set to NULL.
+- *                   On success groupname is returned.
+- *                   On failure an error message is printed and
+- *                   the program exits.
++/* bb_getpwuid, bb_getgrgid:
++ * bb_getXXXid(buf, bufsz, id) - copy user/group name or id
++ *               as a string to buf, return user/group name or NULL
++ * bb_getXXXid(NULL, 0, id) - return user/group name or NULL
++ * bb_getXXXid(NULL, -1, id) - return user/group name or exit
+  */
++/* gets a username given a uid */
++char* bb_getpwuid(char *name, int bufsize, long uid)
++{
++	struct passwd *myuser = getpwuid(uid);
+ 
++	return bb_getug(name, bufsize,
++			(myuser ? myuser->pw_name : (char*)myuser),
++			uid, 'u');
++}
+ /* gets a groupname given a gid */
+-char* bb_getgrgid(char *group, long gid, int bufsize)
++char* bb_getgrgid(char *group, int bufsize, long gid)
+ {
+ 	struct group *mygroup = getgrgid(gid);
+ 
+-	return bb_getug(group,
+-			mygroup ? mygroup->gr_name : (char *)mygroup,
+-			gid, bufsize, 'g');
++	return bb_getug(group, bufsize,
++			(mygroup ? mygroup->gr_name : (char*)mygroup),
++			gid, 'g');
+ }
+ 
+ /* returns a gid given a group name */
+@@ -91,32 +87,6 @@ long xuname2uid(const char *name)
+ 	return myuser->pw_uid;
+ }
+ 
+-/* Hacked by Tito Ragusa (c) 2004 <farmatito@tiscali.it> to make it more
+- * flexible :
+- *
+- * if bufsize is > 0 char *name cannot be set to NULL.
+- *                   On success username is written on the static allocated
+- *                   buffer name (and a pointer to it is returned).
+- *                   On failure uid as string is written to the static
+- *                   allocated buffer name and NULL is returned.
+- * if bufsize is = 0 char *name can be set to NULL.
+- *                   On success username is returned.
+- *                   On failure NULL is returned.
+- * if bufsize is < 0 char *name can be set to NULL
+- *                   On success username is returned.
+- *                   On failure an error message is printed and
+- *                   the program exits.
+- */
+-
+-/* gets a username given a uid */
+-char* bb_getpwuid(char *name, long uid, int bufsize)
+-{
+-	struct passwd *myuser = getpwuid(uid);
+-
+-	return bb_getug(name, myuser ? myuser->pw_name : (char *)myuser,
+-				uid, bufsize, 'u');
+-}
+-
+ unsigned long get_ug_id(const char *s,
+ 		long (*xname2id)(const char *))
+ {
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 3759370..aa207af 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -52,7 +52,7 @@ static int get_cached(cache_t *cp, unsigned id)
+ }
+ #endif
+ 
+-typedef char* ug_func(char *name, long uid, int bufsize);
++typedef char* ug_func(char *name, int bufsize, long uid);
+ static char* get_cached(cache_t *cp, unsigned id, ug_func* fp)
+ {
+ 	int i;
+@@ -62,7 +62,8 @@ static char* get_cached(cache_t *cp, unsigned id, ug_func* fp)
+ 	i = cp->size++;
+ 	cp->cache = xrealloc(cp->cache, cp->size * sizeof(*cp->cache));
+ 	cp->cache[i].id = id;
+-	fp(cp->cache[i].name, id, sizeof(cp->cache[i].name));
++	/* Never fails. Generates numeric string if name isn't found */
++	fp(cp->cache[i].name, sizeof(cp->cache[i].name), id);
+ 	return cp->cache[i].name;
+ }
+ const char* get_cached_username(uid_t uid)
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index cd98d41..a293ee9 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -51,13 +51,13 @@ static char* new_password(const struct passwd *pw, uid_t myuid, int algo)
+ 		goto err_ret;
+ 	}
+ 
+-	/*memset(salt, 0, sizeof(salt)); - why?*/
+ 	crypt_make_salt(salt, 1, 0); /* des */
+ 	if (algo) { /* MD5 */
+ 		strcpy(salt, "$1$");
+ 		crypt_make_salt(salt + 3, 4, 0);
+ 	}
+-	ret = xstrdup(pw_encrypt(newp, salt)); /* returns ptr to static */
++	/* pw_encrypt returns ptr to static */
++	ret = xstrdup(pw_encrypt(newp, salt));
+ 	/* whee, success! */
+ 
+  err_ret:
+@@ -80,7 +80,7 @@ int passwd_main(int argc, char **argv)
+ 		OPT_delete = 0x8, /* -d - delete password */
+ 		OPT_lud = 0xe,
+ 		STATE_ALGO_md5 = 0x10,
+-		/*STATE_ALGO_des = 0x20, not needed yet */
++		//STATE_ALGO_des = 0x20, not needed yet
+ 	};
+ 	unsigned opt;
+ 	int rc;
+@@ -104,7 +104,7 @@ int passwd_main(int argc, char **argv)
+ 	logmode = LOGMODE_BOTH;
+ 	openlog(applet_name, LOG_NOWAIT, LOG_AUTH);
+ 	opt = getopt32(argc, argv, "a:lud", &opt_a);
+-	argc -= optind;
++	//argc -= optind;
+ 	argv += optind;
+ 
+ 	if (strcasecmp(opt_a, "des") != 0) /* -a */
+@@ -112,11 +112,13 @@ int passwd_main(int argc, char **argv)
+ 	//else
+ 	//	opt |= STATE_ALGO_des;
+ 	myuid = getuid();
+-	if ((opt & OPT_lud) && (!argc || myuid))
++	/* -l, -u, -d require root priv and username argument */
++	if ((opt & OPT_lud) && (myuid || !argv[0]))
+ 		bb_show_usage();
+ 
+-	myname = xstrdup(bb_getpwuid(NULL, myuid, -1));
+-	name = argc ? argv[0] : myname;
++	/* Will complain and die if username not found */
++	myname = xstrdup(bb_getpwuid(NULL, -1, myuid));
++	name = argv[0] ? argv[0] : myname;
+ 
+ 	pw = getpwnam(name);
+ 	if (!pw) bb_error_msg_and_die("unknown user %s", name);
+@@ -158,9 +160,12 @@ int passwd_main(int argc, char **argv)
+ 		newp = xasprintf("!%s", pw->pw_passwd);
+ 	} else if (opt & OPT_unlock) {
+ 		if (c) goto skip; /* not '!' */
++		/* pw->pw_passwd pints to static storage,
++		 * strdup'ing to avoid nasty surprizes */
+ 		newp = xstrdup(&pw->pw_passwd[1]);
+ 	} else if (opt & OPT_delete) {
+-		newp = xstrdup("");
++		//newp = xstrdup("");
++		newp = (char*)"";
+ 	}
+ 
+ 	rlimit_fsize.rlim_cur = rlimit_fsize.rlim_max = 512L * 30000;
+@@ -177,8 +182,8 @@ int passwd_main(int argc, char **argv)
+ 				filename);
+ 	bb_info_msg("Password for %s changed by %s", name, myname);
+ 
+-	if (ENABLE_FEATURE_CLEAN_UP) free(newp);
+-skip:
++	//if (ENABLE_FEATURE_CLEAN_UP) free(newp);
++ skip:
+ 	if (!newp) {
+ 		bb_error_msg_and_die("password for %s is already %slocked",
+ 			name, (opt & OPT_unlock) ? "un" : "");
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index d9c3e50..3f67aff 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -89,7 +89,7 @@ int logger_main(int argc, char **argv)
+ 	char name[80];
+ 
+ 	/* Fill out the name string early (may be overwritten later) */
+-	bb_getpwuid(name, geteuid(), sizeof(name));
++	bb_getpwuid(name, sizeof(name), geteuid());
+ 	str_t = name;
+ 
+ 	/* Parse any options */

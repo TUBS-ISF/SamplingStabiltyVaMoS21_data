@@ -1,0 +1,241 @@
+2009-10-27 11:05:00 +0100
+diff --git a/include/platform.h b/include/platform.h
+index 7c88d1b..1fa2ece 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -7,6 +7,13 @@
+ #ifndef	BB_PLATFORM_H
+ #define BB_PLATFORM_H 1
+ 
++/* Assume all these functions exist by default.  Platforms where it is not
++ * true will #undef them below.
++ */
++#define HAVE_FDPRINTF 1
++#define HAVE_STRCHRNUL 1
++#define HAVE_VASPRINTF 1
++
+ /* Convenience macros to test the version of gcc. */
+ #undef __GNUC_PREREQ
+ #if defined __GNUC__ && defined __GNUC_MINOR__
+@@ -126,7 +133,6 @@
+ # define __BIG_ENDIAN__ (BYTE_ORDER == BIG_ENDIAN)
+ # define __BYTE_ORDER BYTE_ORDER
+ #elif defined __FreeBSD__
+-char *strchrnul(const char *s, int c);
+ # include <sys/resource.h>	/* rlimit */
+ # include <machine/endian.h>
+ # define bswap_64 __bswap64
+@@ -148,7 +154,7 @@ char *strchrnul(const char *s, int c);
+ # define BB_BIG_ENDIAN 0
+ # define BB_LITTLE_ENDIAN 1
+ #else
+-# error "Can't determine endiannes"
++# error "Can't determine endianness"
+ #endif
+ 
+ /* SWAP_LEnn means "convert CPU<->little_endian by swapping bytes" */
+@@ -293,24 +299,6 @@ typedef unsigned smalluint;
+ # define USE_FOR_MMU(...) __VA_ARGS__
+ #endif
+ 
+-/* Platforms that haven't got dprintf need to implement fdprintf() in
+- * libbb.  This would require a platform.c.  It's not going to be cleaned
+- * out of the tree, so stop saying it should be. */
+-#if !defined(__dietlibc__)
+-/* Needed for: glibc */
+-/* Not needed for: dietlibc */
+-/* Others: ?? (add as needed) */
+-# define fdprintf dprintf
+-#endif
+-
+-#if defined(__dietlibc__)
+-static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+-{
+-	while (*s && *s != c) ++s;
+-	return (char*)s;
+-}
+-#endif
+-
+ /* Don't use lchown with glibc older than 2.1.x */
+ #if defined(__GLIBC__) && __GLIBC__ <= 2 && __GLIBC_MINOR__ < 1
+ # define lchown chown
+@@ -342,5 +330,39 @@ static ALWAYS_INLINE char* strchrnul(const char *s, char c)
+ 
+ #endif
+ 
++#if defined(__GLIBC__)
++# define fdprintf dprintf
++#endif
++
++#if defined(__dietlibc__)
++#undef HAVE_STRCHRNUL
++#endif
++
++#if defined(__WATCOMC__)
++#undef HAVE_FDPRINTF
++#undef HAVE_STRCHRNUL
++#undef HAVE_VASPRINTF
++#endif
++
++#if defined(__FreeBSD__)
++#undef HAVE_STRCHRNUL
++#endif
++
++/*
++ * Now, define prototypes for all the functions defined in platform.c
++ * These must come after all the HAVE_* macros are defined (or not)
++ */
++
++#ifndef HAVE_STRCHRNUL
++extern char *strchrnul(const char *s, int c) FAST_FUNC;
++#endif
++
++#ifndef HAVE_VASPRINTF
++extern int vasprintf(char **string_ptr, const char *format, va_list p) FAST_FUNC;
++#endif
++
++#ifndef HAVE_FDPRINTF
++extern int fdprintf(int fd, const char *format, ...);
++#endif
+ 
+ #endif
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 8c7a189..c3c02b3 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -71,6 +71,7 @@ lib-y += perror_msg_and_die.o
+ lib-y += perror_nomsg.o
+ lib-y += perror_nomsg_and_die.o
+ lib-y += pidfile.o
++lib-y += platform.o
+ lib-y += printable.o
+ lib-y += print_flags.o
+ lib-y += process_escape_sequence.o
+diff --git a/libbb/platform.c b/libbb/platform.c
+new file mode 100644
+index 0000000..470185a
+--- /dev/null
++++ b/libbb/platform.c
+@@ -0,0 +1,57 @@
++/*
++ * Replacements for common but usually nonstandard functions that aren't
++ * supplied by all platforms.
++ *
++ * Copyright (C) 2009 by Dan Fandrich <dan@coneharvesters.com>, et. al.
++ *
++ * Licensed under the GPL version 2, see the file LICENSE in this tarball.
++ */
++
++#include "libbb.h"
++
++#ifndef HAVE_STRCHRNUL
++char * FAST_FUNC strchrnul(const char *s, int c)
++{
++	while (*s && *s != c) ++s;
++	return (char*)s;
++}
++#endif
++
++#ifndef HAVE_VASPRINTF
++int FAST_FUNC vasprintf(char **string_ptr, const char *format, va_list p)
++{
++	int r;
++	va_list p2;
++
++	va_copy(p2, p);
++	r = vsnprintf(NULL, 0, format, p);
++	va_end(p);
++	*string_ptr = xmalloc(r+1);
++	if (!*string_ptr)
++		r = -1;
++	else
++		r = vsnprintf(*string_ptr, r+1, format, p2);
++	va_end(p2);
++
++	return r;
++}
++#endif
++
++#ifndef HAVE_FDPRINTF
++int fdprintf(int fd, const char *format, ...)
++{
++	va_list p;
++	int r;
++	char *string_ptr;
++
++	va_start(p, format);
++	r = vasprintf(&string_ptr, format, p);
++	va_end(p);
++	if (r >= 0) {
++		r = full_write(fd, string_ptr, r);
++		free(string_ptr);
++	}
++	return r;
++}
++#endif
++
+diff --git a/libbb/xfuncs_printf.c b/libbb/xfuncs_printf.c
+index aaf9989..345c842 100644
+--- a/libbb/xfuncs_printf.c
++++ b/libbb/xfuncs_printf.c
+@@ -283,60 +283,15 @@ char* FAST_FUNC xasprintf(const char *format, ...)
+ 	int r;
+ 	char *string_ptr;
+ 
+-#if 1
+-	// GNU extension
+ 	va_start(p, format);
+ 	r = vasprintf(&string_ptr, format, p);
+ 	va_end(p);
+-#else
+-	// Bloat for systems that haven't got the GNU extension.
+-	va_start(p, format);
+-	r = vsnprintf(NULL, 0, format, p);
+-	va_end(p);
+-	string_ptr = xmalloc(r+1);
+-	va_start(p, format);
+-	r = vsnprintf(string_ptr, r+1, format, p);
+-	va_end(p);
+-#endif
+ 
+ 	if (r < 0)
+ 		bb_error_msg_and_die(bb_msg_memory_exhausted);
+ 	return string_ptr;
+ }
+ 
+-#if 0 /* If we will ever meet a libc which hasn't [f]dprintf... */
+-int FAST_FUNC fdprintf(int fd, const char *format, ...)
+-{
+-	va_list p;
+-	int r;
+-	char *string_ptr;
+-
+-#if 1
+-	// GNU extension
+-	va_start(p, format);
+-	r = vasprintf(&string_ptr, format, p);
+-	va_end(p);
+-#else
+-	// Bloat for systems that haven't got the GNU extension.
+-	va_start(p, format);
+-	r = vsnprintf(NULL, 0, format, p) + 1;
+-	va_end(p);
+-	string_ptr = malloc(r);
+-	if (string_ptr) {
+-		va_start(p, format);
+-		r = vsnprintf(string_ptr, r, format, p);
+-		va_end(p);
+-	}
+-#endif
+-
+-	if (r >= 0) {
+-		full_write(fd, string_ptr, r);
+-		free(string_ptr);
+-	}
+-	return r;
+-}
+-#endif
+-
+ void FAST_FUNC xsetenv(const char *key, const char *value)
+ {
+ 	if (setenv(key, value, 1))

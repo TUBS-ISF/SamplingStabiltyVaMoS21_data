@@ -1,0 +1,177 @@
+2008-09-26 16:29:12 +0000
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 77331d9..1ab1732 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -79,8 +79,18 @@ static void add_param_req_option(struct dhcpMessage *packet)
+ }
+ 
+ 
++static int raw_bcast_from_client_config_ifindex(struct dhcpMessage *packet)
++{
++	return udhcp_send_raw_packet(packet,
++		/*src*/ INADDR_ANY, CLIENT_PORT,
++		/*dst*/ INADDR_BROADCAST, SERVER_PORT, MAC_BCAST_ADDR,
++		client_config.ifindex);
++}
++
++
+ #if ENABLE_FEATURE_UDHCPC_ARPING
+-/* Unicast a DHCP decline message */
++/* Broadcast a DHCP decline message */
++//FIXME: maybe it should be unicast?
+ int FAST_FUNC send_decline(uint32_t xid, uint32_t server, uint32_t requested)
+ {
+ 	struct dhcpMessage packet;
+@@ -92,8 +102,7 @@ int FAST_FUNC send_decline(uint32_t xid, uint32_t server, uint32_t requested)
+ 
+ 	bb_info_msg("Sending decline...");
+ 
+-	return udhcp_send_raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST,
+-		SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
++	return raw_bcast_from_client_config_ifindex(&packet);
+ }
+ #endif
+ 
+@@ -114,13 +123,13 @@ int FAST_FUNC send_discover(uint32_t xid, uint32_t requested)
+ 	add_param_req_option(&packet);
+ 
+ 	bb_info_msg("Sending discover...");
+-	return udhcp_send_raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST,
+-			SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
++	return raw_bcast_from_client_config_ifindex(&packet);
+ }
+ 
+ 
+ /* Broadcasts a DHCP request message */
+-int FAST_FUNC send_selecting(uint32_t xid, uint32_t server, uint32_t requested)
++//FIXME: maybe it should be unicast?
++int FAST_FUNC send_select(uint32_t xid, uint32_t server, uint32_t requested)
+ {
+ 	struct dhcpMessage packet;
+ 	struct in_addr addr;
+@@ -134,8 +143,7 @@ int FAST_FUNC send_selecting(uint32_t xid, uint32_t server, uint32_t requested)
+ 
+ 	addr.s_addr = requested;
+ 	bb_info_msg("Sending select for %s...", inet_ntoa(addr));
+-	return udhcp_send_raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST,
+-				SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
++	return raw_bcast_from_client_config_ifindex(&packet);
+ }
+ 
+ 
+@@ -151,10 +159,11 @@ int FAST_FUNC send_renew(uint32_t xid, uint32_t server, uint32_t ciaddr)
+ 	add_param_req_option(&packet);
+ 	bb_info_msg("Sending renew...");
+ 	if (server)
+-		return udhcp_send_kernel_packet(&packet, ciaddr, CLIENT_PORT, server, SERVER_PORT);
++		return udhcp_send_kernel_packet(&packet,
++			ciaddr, CLIENT_PORT,
++			server, SERVER_PORT);
+ 
+-	return udhcp_send_raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST,
+-				SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
++	return raw_bcast_from_client_config_ifindex(&packet);
+ }
+ 
+ 
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index bf099d8..68fa65c 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -66,8 +66,9 @@ int udhcp_recv_kernel_packet(struct dhcpMessage *packet, int fd) FAST_FUNC;
+ 
+ int udhcp_send_raw_packet(struct dhcpMessage *payload,
+ 		uint32_t source_ip, int source_port,
+-		uint32_t dest_ip, int dest_port,
+-		const uint8_t *dest_arp, int ifindex) FAST_FUNC;
++		uint32_t dest_ip, int dest_port, const uint8_t *dest_arp,
++		int ifindex) FAST_FUNC;
++
+ int udhcp_send_kernel_packet(struct dhcpMessage *payload,
+ 		uint32_t source_ip, int source_port,
+ 		uint32_t dest_ip, int dest_port) FAST_FUNC;
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 5ec8d39..c1ef195 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -389,7 +389,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 					if (state == RENEW_REQUESTED) /* unicast */
+ 						send_renew(xid, server_addr, requested_ip);
+ 					else /* broadcast */
+-						send_selecting(xid, server_addr, requested_ip);
++						send_select(xid, server_addr, requested_ip);
+ 
+ 					timeout = discover_timeout;
+ 					packet_num++;
+@@ -430,7 +430,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 				 * try to find DHCP server using broadcast */
+ 				if (timeout > 0) {
+ 					/* send a request packet */
+-					send_renew(xid, 0, requested_ip); /* broadcast */
++					send_renew(xid, 0 /* INADDR_ANY*/, requested_ip); /* broadcast */
+ 					timeout >>= 1;
+ 					continue;
+ 				}
+@@ -529,6 +529,8 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 						if (lease_seconds < 10) /* and not too small */
+ 							lease_seconds = 10;
+ 					}
++//FIXME: why do we check ARP only after we've got DHCPACK?
++//Shouldn't we do it immediately after DHCPOFFER?
+ #if ENABLE_FEATURE_UDHCPC_ARPING
+ 					if (opt & OPT_a) {
+ 						if (!arpping(packet.yiaddr,
+@@ -538,6 +540,8 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 						) {
+ 							bb_info_msg("offered address is in use "
+ 								"(got ARP reply), declining");
++//NB: not clear whether it should be unicast or bcast.
++//Currently it is a bcast. Why?
+ 							send_decline(xid, server_addr, packet.yiaddr);
+ 
+ 							if (state != REQUESTING)
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index 6ca4400..a934849 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -39,7 +39,7 @@ struct client_config_t {
+ 
+ uint32_t random_xid(void) FAST_FUNC;
+ int send_discover(uint32_t xid, uint32_t requested) FAST_FUNC;
+-int send_selecting(uint32_t xid, uint32_t server, uint32_t requested) FAST_FUNC;
++int send_select(uint32_t xid, uint32_t server, uint32_t requested) FAST_FUNC;
+ #if ENABLE_FEATURE_UDHCPC_ARPING
+ int send_decline(uint32_t xid, uint32_t server, uint32_t requested) FAST_FUNC;
+ #endif
+diff --git a/networking/udhcp/packet.c b/networking/udhcp/packet.c
+index 58f45e5..4eedbb5 100644
+--- a/networking/udhcp/packet.c
++++ b/networking/udhcp/packet.c
+@@ -118,7 +118,8 @@ uint16_t FAST_FUNC udhcp_checksum(void *addr, int count)
+ /* Construct a ip/udp header for a packet, send packet */
+ int FAST_FUNC udhcp_send_raw_packet(struct dhcpMessage *payload,
+ 		uint32_t source_ip, int source_port,
+-		uint32_t dest_ip, int dest_port, const uint8_t *dest_arp, int ifindex)
++		uint32_t dest_ip, int dest_port, const uint8_t *dest_arp,
++		int ifindex)
+ {
+ 	struct sockaddr_ll dest;
+ 	struct udp_dhcp_packet packet;
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index 2fcf930..5b1c615 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -59,8 +59,10 @@ static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcas
+ 		ciaddr = payload->yiaddr;
+ 		chaddr = payload->chaddr;
+ 	}
+-	return udhcp_send_raw_packet(payload, server_config.server, SERVER_PORT,
+-			ciaddr, CLIENT_PORT, chaddr, server_config.ifindex);
++	return udhcp_send_raw_packet(payload,
++		/*src*/ server_config.server, SERVER_PORT,
++		/*dst*/ ciaddr, CLIENT_PORT, chaddr,
++		server_config.ifindex);
+ }
+ 
+ 

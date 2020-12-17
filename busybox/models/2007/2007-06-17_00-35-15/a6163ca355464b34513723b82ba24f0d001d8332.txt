@@ -1,0 +1,58 @@
+2007-06-17 00:35:15 +0000
+diff --git a/coreutils/install.c b/coreutils/install.c
+index 7f168d2..5503b55 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -102,7 +102,8 @@ int install_main(int argc, char **argv)
+ 	opt_complementary = "?:s--d:d--s" USE_SELINUX(":Z--\xff:\xff--Z");
+ 	/* -c exists for backwards compatibility, it's needed */
+ 
+-	flags = getopt32(argc, argv, "cdpsg:m:o:" USE_SELINUX("Z:"), &gid_str, &mode_str, &uid_str USE_SELINUX(, &scontext));
++	flags = getopt32(argc, argv, "cdpsg:m:o:" USE_SELINUX("Z:"),
++			&gid_str, &mode_str, &uid_str USE_SELINUX(, &scontext));
+ 
+ #if ENABLE_SELINUX
+ 	if (flags & OPT_PRESERVE_SECURITY_CONTEXT) {
+@@ -165,7 +166,8 @@ int install_main(int argc, char **argv)
+ 		return ret;
+ 	}
+ 
+-	isdir = lstat(argv[argc - 1], &statbuf) < 0 ? 0 : S_ISDIR(statbuf.st_mode);
++	/* coreutils install resolves link in this case, don't use lstat */
++	isdir = stat(argv[argc - 1], &statbuf) < 0 ? 0 : S_ISDIR(statbuf.st_mode);
+ 
+ 	for (i = optind; i < argc - 1; i++) {
+ 		char *dest;
+@@ -192,7 +194,11 @@ int install_main(int argc, char **argv)
+ 			ret = EXIT_FAILURE;
+ 		}
+ 		if (flags & OPT_STRIP) {
+-			if (BB_EXECLP("strip", "strip", dest, NULL) == -1) {
++			char *args[3];
++			args[0] = (char*)"strip";
++			args[1] = dest;
++			args[2] = NULL;
++			if (spawn_and_wait(args)) {
+ 				bb_perror_msg("strip");
+ 				ret = EXIT_FAILURE;
+ 			}
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index 1d58eb2..4f78a14 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -11,9 +11,14 @@
+ // /proc/stat:
+ // disk_io: (3,0):(22272,17897,410702,4375,54750)
+ // btime 1059401962
++//TODO: use sysinfo libc call/syscall, if appropriate
++// (faster than open/read/close):
++// sysinfo({uptime=15017, loads=[5728, 15040, 16480]
++//  totalram=2107416576, freeram=211525632, sharedram=0, bufferram=157204480}
++//  totalswap=134209536, freeswap=134209536, procs=157})
+ 
+-#include "libbb.h"
+ #include <time.h>
++#include "libbb.h"
+ 
+ typedef unsigned long long ullong;
+ 

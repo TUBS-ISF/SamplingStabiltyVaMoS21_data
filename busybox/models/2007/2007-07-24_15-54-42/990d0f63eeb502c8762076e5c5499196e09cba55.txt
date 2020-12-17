@@ -1,0 +1,1645 @@
+2007-07-24 15:54:42 +0000
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 0c1f541..bd729a2 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -582,10 +582,9 @@ static int read_package_field(const char *package_buffer, char **field_name, cha
+ 
+ static unsigned fill_package_struct(char *control_buffer)
+ {
+-	static const char *const field_names[] = { "Package", "Version",
+-		"Pre-Depends", "Depends","Replaces", "Provides",
+-		"Conflicts", "Suggests", "Recommends", "Enhances", NULL
+-	};
++	static const char field_names[] = "Package\0""Version\0"
++		"Pre-Depends\0""Depends\0""Replaces\0""Provides\0"
++		"Conflicts\0""Suggests\0""Recommends\0""Enhances\0";
+ 
+ 	common_node_t *new_node = xzalloc(sizeof(common_node_t));
+ 	char *field_name;
+@@ -602,10 +601,10 @@ static unsigned fill_package_struct(char *control_buffer)
+ 				&field_name, &field_value);
+ 
+ 		if (field_name == NULL) {
+-			goto fill_package_struct_cleanup; /* Oh no, the dreaded goto statement ! */
++			goto fill_package_struct_cleanup; /* Oh no, the dreaded goto statement! */
+ 		}
+ 
+-		field_num = index_in_str_array(field_names, field_name);
++		field_num = index_in_strings(field_names, field_name);
+ 		switch (field_num) {
+ 		case 0: /* Package */
+ 			new_node->name = search_name_hashtable(field_value);
+diff --git a/archival/tar.c b/archival/tar.c
+index d03b18b..7d7bf79 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -752,7 +752,7 @@ static const char tar_longopts[] =
+ # if ENABLE_FEATURE_TAR_FROM
+ 	"exclude\0"             Required_argument "\xff"
+ # endif
+-	"\0";
++	;
+ #endif
+ 
+ int tar_main(int argc, char **argv);
+diff --git a/console-tools/setconsole.c b/console-tools/setconsole.c
+index 2e60c37..5908dad 100644
+--- a/console-tools/setconsole.c
++++ b/console-tools/setconsole.c
+@@ -13,7 +13,7 @@
+ #if ENABLE_FEATURE_SETCONSOLE_LONG_OPTIONS
+ static const char setconsole_longopts[] =
+ 	"reset\0" No_argument "r"
+-	"\0";
++	;
+ #endif
+ 
+ #define OPT_SETCONS_RESET 1
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index dd311d8..22ad192 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -51,7 +51,7 @@ static ssize_t full_write_or_warn(int fd, const void *buf, size_t len,
+ }
+ 
+ static bool write_and_stats(int fd, const void *buf, size_t len, size_t obs,
+-	const char * const filename)
++	const char *filename)
+ {
+ 	ssize_t n = full_write_or_warn(fd, buf, len, filename);
+ 	if (n < 0)
+@@ -78,13 +78,12 @@ int dd_main(int argc, char **argv)
+ 		TRUNC_FLAG   = 1 << 2,
+ 		TWOBUFS_FLAG = 1 << 3,
+ 	};
+-	static const char * const keywords[] = {
+-		"bs=", "count=", "seek=", "skip=", "if=", "of=",
++	static const char keywords[] =
++		"bs=\0""count=\0""seek=\0""skip=\0""if=\0""of=\0"
+ #if ENABLE_FEATURE_DD_IBS_OBS
+-		"ibs=", "obs=", "conv=", "notrunc", "sync", "noerror",
++		"ibs=\0""obs=\0""conv=\0""notrunc\0""sync\0""noerror\0"
+ #endif
+-		NULL
+-	};
++		;
+ 	enum {
+ 		OP_bs = 1,
+ 		OP_count,
+@@ -134,7 +133,7 @@ int dd_main(int argc, char **argv)
+ 			bb_show_usage();
+ 		key_len = key - arg + 1;
+ 		key = xstrndup(arg, key_len);
+-		what = index_in_str_array(keywords, key) + 1;
++		what = index_in_strings(keywords, key) + 1;
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			free(key);
+ 		if (what == 0)
+@@ -153,13 +152,13 @@ int dd_main(int argc, char **argv)
+ 			if (what == OP_conv) {
+ 				while (1) {
+ 					/* find ',', replace them with nil so we can use arg for
+-					 * index_in_str_array without copying.
++					 * index_in_strings() without copying.
+ 					 * We rely on arg being non-null, else strchr would fault.
+ 					 */
+ 					key = strchr(arg, ',');
+ 					if (key)
+ 						*key = '\0';
+-					what = index_in_str_array(keywords, arg) + 1;
++					what = index_in_strings(keywords, arg) + 1;
+ 					if (what < OP_conv_notrunc)
+ 						bb_error_msg_and_die(bb_msg_invalid_arg, arg, "conv");
+ 					if (what == OP_conv_notrunc)
+@@ -298,15 +297,15 @@ int dd_main(int argc, char **argv)
+ 			G.out_part++;
+ 	}
+ 	if (close(ifd) < 0) {
+-die_infile:
++ die_infile:
+ 		bb_perror_msg_and_die("%s", infile);
+ 	}
+ 
+ 	if (close(ofd) < 0) {
+-die_outfile:
++ die_outfile:
+ 		bb_perror_msg_and_die("%s", outfile);
+ 	}
+-out_status:
++ out_status:
+ 	dd_output_status(0);
+ 
+ 	return EXIT_SUCCESS;
+diff --git a/coreutils/env.c b/coreutils/env.c
+index 8d20eac..31167d0 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -38,7 +38,7 @@ extern char **environ;
+ static const char env_longopts[] =
+ 	"ignore-environment\0" No_argument       "i"
+ 	"unset\0"              Required_argument "u"
+-	"\0";
++	;
+ #endif
+ 
+ int env_main(int argc, char** argv);
+diff --git a/coreutils/expr.c b/coreutils/expr.c
+index ab182a8..6a4683d 100644
+--- a/coreutils/expr.c
++++ b/coreutils/expr.c
+@@ -277,14 +277,13 @@ static VALUE *eval7(void)
+ 
+ static VALUE *eval6(void)
+ {
+-	static const char * const keywords[] = {
+-		"quote", "length", "match", "index", "substr", NULL
+-	};
++	static const char keywords[] =
++		"quote\0""length\0""match\0""index\0""substr\0";
+ 
+ 	VALUE *r, *i1, *i2;
+ 	VALUE *l = l; /* silence gcc */
+ 	VALUE *v = v; /* silence gcc */
+-	int key = *G.args ? index_in_str_array(keywords, *G.args) + 1 : 0;
++	int key = *G.args ? index_in_strings(keywords, *G.args) + 1 : 0;
+ 
+ 	if (key == 0) /* not a keyword */
+ 		return eval7();
+diff --git a/coreutils/install.c b/coreutils/install.c
+index 8d54949..c2638f4 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -28,7 +28,7 @@ static const char install_longopts[] =
+ 	"preserve_context\0"    No_argument       "\xff"
+ 	"preserve-context\0"    No_argument       "\xff"
+ #endif
+-	"\0";
++	;
+ #endif
+ 
+ 
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 8545edd..f47ec20 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -122,7 +122,7 @@ static smallint show_color;
+  * equivalent */
+ static const char ls_color_opt[] =
+ 	"color\0" Optional_argument "\xff" /* no short equivalent */
+-	"\0";
++	;
+ #else
+ enum { show_color = 0 };
+ #endif
+diff --git a/coreutils/mkdir.c b/coreutils/mkdir.c
+index b0595b4..a6eaa96 100644
+--- a/coreutils/mkdir.c
++++ b/coreutils/mkdir.c
+@@ -31,7 +31,7 @@ static const char mkdir_longopts[] =
+ #if ENABLE_SELINUX
+ 	"context\0" Required_argument "Z"
+ #endif
+-	"\0";
++	;
+ #endif
+ 
+ int mkdir_main(int argc, char **argv);
+diff --git a/coreutils/mv.c b/coreutils/mv.c
+index bb96af8..0644078 100644
+--- a/coreutils/mv.c
++++ b/coreutils/mv.c
+@@ -24,7 +24,7 @@
+ static const char mv_longopts[] =
+ 	"interactive\0" No_argument "i"
+ 	"force\0"       No_argument "f"
+-	"\0";
++	;
+ #endif
+ 
+ #define OPT_FILEUTILS_FORCE       1
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 0b77f8b..8034072 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -1242,7 +1242,7 @@ int od_main(int argc, char **argv)
+ 		"strings\0"           Optional_argument "S"
+ 		"width\0"             Optional_argument "w"
+ 		"traditional\0"       No_argument       "\xff"
+-		"\0";
++		;
+ #endif
+ 	char *str_A, *str_N, *str_j, *str_S;
+ 	char *str_w = NULL;
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index 0983532..b73e2ea 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -562,18 +562,16 @@ enum {
+ 
+ static int find_param(const char * const name)
+ {
+-	static const char * const params[] = {
+-		"line",     /* 1 */
+-		"rows",     /* 2 */
+-		"cols",     /* 3 */
+-		"columns",  /* 4 */
+-		"size",     /* 5 */
+-		"ispeed"+1, /* 6 */
+-		"ispeed",
+-		"ospeed",
+-		NULL
+-	};
+-	int i = index_in_str_array(params, name) + 1;
++	static const char params[] =
++		"line\0"    /* 1 */
++		"rows\0"    /* 2 */
++		"cols\0"    /* 3 */
++		"columns\0" /* 4 */
++		"size\0"    /* 5 */
++		"speed\0"   /* 6 */
++		"ispeed\0"
++		"ospeed\0";
++	int i = index_in_strings(params, name) + 1;
+ 	if (i == 0)
+ 		return 0;
+ 	if (i != 5 && i != 6)
+diff --git a/coreutils/tr.c b/coreutils/tr.c
+index c0d0dfa..5945718 100644
+--- a/coreutils/tr.c
++++ b/coreutils/tr.c
+@@ -51,11 +51,10 @@ static unsigned int expand(const char *arg, char *buffer)
+ 	char *buffer_start = buffer;
+ 	unsigned i; /* XXX: FIXME: use unsigned char? */
+ 	unsigned char ac;
+-#define CLO ":]"
+-	static const char * const classes[] = {
+-		"alpha"CLO, "alnum"CLO, "digit"CLO, "lower"CLO, "upper"CLO, "space"CLO,
+-		"blank"CLO, "punct"CLO, "cntrl"CLO, NULL
+-	};
++#define CLO ":]\0"
++	static const char classes[] =
++		"alpha"CLO "alnum"CLO "digit"CLO "lower"CLO "upper"CLO "space"CLO
++		"blank"CLO "punct"CLO "cntrl"CLO;
+ #define CLASS_invalid 0 /* we increment the retval */
+ #define CLASS_alpha 1
+ #define CLASS_alnum 2
+@@ -90,7 +89,7 @@ static unsigned int expand(const char *arg, char *buffer)
+ 				smalluint j;
+ 				{ /* not really pretty.. */
+ 					char *tmp = xstrndup(arg, 7); // warning: xdigit needs 8, not 7
+-					j = index_in_str_array(classes, tmp) + 1;
++					j = index_in_strings(classes, tmp) + 1;
+ 					free(tmp);
+ 				}
+ 				if (j == CLASS_alnum || j == CLASS_digit) {
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index 4173987..8a1f38a 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -44,7 +44,7 @@ static const char runparts_longopts[] =
+ //TODO: "reverse\0" No_argument       "r"
+ //TODO: "verbose\0" No_argument       "v"
+ #endif
+-	"\0";
++	;
+ #endif
+ 
+ struct globals {
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 0c8dea7..1933e1c 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -215,7 +215,7 @@ static const char start_stop_daemon_longopts[] =
+ #if ENABLE_FEATURE_START_STOP_DAEMON_FANCY
+ 	"retry\0"        Required_argument "R"
+ #endif
+-	"\0";
++	;
+ #endif
+ 
+ enum {
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 2954cab..eb1fa84 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -79,29 +79,25 @@ struct fsck_instance {
+ 	char	*base_device; /* /dev/hda for /dev/hdaN etc */
+ };
+ 
+-static const char *const ignored_types[] = {
+-	"ignore",
+-	"iso9660",
+-	"nfs",
+-	"proc",
+-	"sw",
+-	"swap",
+-	"tmpfs",
+-	"devpts",
+-	NULL
+-};
++static const char ignored_types[] =
++	"ignore\0"
++	"iso9660\0"
++	"nfs\0"
++	"proc\0"
++	"sw\0"
++	"swap\0"
++	"tmpfs\0"
++	"devpts\0";
+ 
+ #if 0
+-static const char *const really_wanted[] = {
+-	"minix",
+-	"ext2",
+-	"ext3",
+-	"jfs",
+-	"reiserfs",
+-	"xiafs",
+-	"xfs",
+-	NULL
+-};
++static const char really_wanted[] =
++	"minix\0"
++	"ext2\0"
++	"ext3\0"
++	"jfs\0"
++	"reiserfs\0"
++	"xiafs\0"
++	"xfs\0";
+ #endif
+ 
+ #define BASE_MD "/dev/md"
+@@ -847,7 +843,7 @@ static int ignore(struct fs_info *fs)
+ 		return 1;
+ 
+ 	/* Are we ignoring this type? */
+-	if (index_in_str_array(ignored_types, fs->type) >= 0)
++	if (index_in_strings(ignored_types, fs->type) >= 0)
+ 		return 1;
+ 
+ 	/* We can and want to check this file system type. */
+diff --git a/findutils/find.c b/findutils/find.c
+index 6f2cbbc..eaf1d59 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -470,38 +470,37 @@ static action*** parse_params(char **argv)
+ 	USE_FEATURE_FIND_CONTEXT(PARM_context   ,)
+ 	};
+ 
+-	static const char *const params[] = {
+-	                         "-a"      ,
+-	                         "-o"      ,
+-	USE_FEATURE_FIND_NOT(    "!"       ,)
++	static const char params[] =
++	                         "-a\0"
++	                         "-o\0"
++	USE_FEATURE_FIND_NOT(    "!\0"       )
+ #if ENABLE_DESKTOP
+-	                         "-and"    ,
+-	                         "-or"     ,
+-	USE_FEATURE_FIND_NOT(	 "-not"    ,)
+-#endif
+-	                         "-print"  ,
+-	USE_FEATURE_FIND_PRINT0( "-print0" ,)
+-	USE_FEATURE_FIND_DEPTH(  "-depth"  ,)
+-	USE_FEATURE_FIND_PRUNE(  "-prune"  ,)
+-	USE_FEATURE_FIND_DELETE( "-delete" ,)
+-	USE_FEATURE_FIND_EXEC(   "-exec"   ,)
+-	USE_FEATURE_FIND_PAREN(  "("       ,)
++	                         "-and\0"  
++	                         "-or\0"   
++	USE_FEATURE_FIND_NOT(	 "-not\0"    )
++#endif
++	                         "-print\0"
++	USE_FEATURE_FIND_PRINT0( "-print0\0" )
++	USE_FEATURE_FIND_DEPTH(  "-depth\0"  )
++	USE_FEATURE_FIND_PRUNE(  "-prune\0"  )
++	USE_FEATURE_FIND_DELETE( "-delete\0" )
++	USE_FEATURE_FIND_EXEC(   "-exec\0"   )
++	USE_FEATURE_FIND_PAREN(  "(\0"       )
+ 	/* All options starting from here require argument */
+-	                         "-name"   ,
+-	USE_FEATURE_FIND_PATH(   "-path"   ,)
+-	USE_FEATURE_FIND_REGEX(  "-regex"  ,)
+-	USE_FEATURE_FIND_TYPE(   "-type"   ,)
+-	USE_FEATURE_FIND_PERM(   "-perm"   ,)
+-	USE_FEATURE_FIND_MTIME(  "-mtime"  ,)
+-	USE_FEATURE_FIND_MMIN(   "-mmin"   ,)
+-	USE_FEATURE_FIND_NEWER(  "-newer"  ,)
+-	USE_FEATURE_FIND_INUM(   "-inum"   ,)
+-	USE_FEATURE_FIND_USER(   "-user"   ,)
+-	USE_FEATURE_FIND_GROUP(  "-group"  ,)
+-	USE_FEATURE_FIND_SIZE(   "-size"   ,)
+-	USE_FEATURE_FIND_CONTEXT("-context",)
+-		NULL
+-	};
++	                         "-name\0" 
++	USE_FEATURE_FIND_PATH(   "-path\0"   )
++	USE_FEATURE_FIND_REGEX(  "-regex\0"  )
++	USE_FEATURE_FIND_TYPE(   "-type\0"   )
++	USE_FEATURE_FIND_PERM(   "-perm\0"   )
++	USE_FEATURE_FIND_MTIME(  "-mtime\0"  )
++	USE_FEATURE_FIND_MMIN(   "-mmin\0"   )
++	USE_FEATURE_FIND_NEWER(  "-newer\0"  )
++	USE_FEATURE_FIND_INUM(   "-inum\0"   )
++	USE_FEATURE_FIND_USER(   "-user\0"   )
++	USE_FEATURE_FIND_GROUP(  "-group\0"  )
++	USE_FEATURE_FIND_SIZE(   "-size\0"   )
++	USE_FEATURE_FIND_CONTEXT("-context\0")
++	                         ;
+ 
+ 	action*** appp;
+ 	unsigned cur_group = 0;
+@@ -541,7 +540,7 @@ static action*** parse_params(char **argv)
+  */
+ 	while (*argv) {
+ 		const char *arg = argv[0];
+-		int parm = index_in_str_array(params, arg);
++		int parm = index_in_strings(params, arg);
+ 		const char *arg1 = argv[1];
+ 
+ 		if (parm >= PARM_name) {
+@@ -795,14 +794,13 @@ static action*** parse_params(char **argv)
+ int find_main(int argc, char **argv);
+ int find_main(int argc, char **argv)
+ {
+-	static const char *const options[] = {
+-		"-follow",
+-USE_FEATURE_FIND_XDEV(    "-xdev"    ,)
+-USE_FEATURE_FIND_MAXDEPTH("-maxdepth",)
+-		NULL
+-	};
++	static const char options[] =
++	                  "-follow\0"
++USE_FEATURE_FIND_XDEV(    "-xdev\0"    )
++USE_FEATURE_FIND_MAXDEPTH("-maxdepth\0")
++	                  ;
+ 	enum {
+-		OPT_FOLLOW,
++	                  OPT_FOLLOW,
+ USE_FEATURE_FIND_XDEV(    OPT_XDEV    ,)
+ USE_FEATURE_FIND_MAXDEPTH(OPT_MAXDEPTH,)
+ 	};
+@@ -839,7 +837,7 @@ USE_FEATURE_FIND_MAXDEPTH(OPT_MAXDEPTH,)
+ 	/* (-a will be ignored by recursive parser later) */
+ 	argp = &argv[firstopt];
+ 	while ((arg = argp[0])) {
+-		int opt = index_in_str_array(options, arg);
++		int opt = index_in_strings(options, arg);
+ 		if (opt == OPT_FOLLOW) {
+ 			recurse_flags |= ACTION_FOLLOWLINKS;
+ 			argp[0] = (char*)"-a";
+diff --git a/include/libbb.h b/include/libbb.h
+index fe99e5e..8fb5520 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -773,8 +773,10 @@ extern int correct_password(const struct passwd *pw);
+ /* Returns a ptr to static storage */
+ extern char *pw_encrypt(const char *clear, const char *salt);
+ extern int obscure(const char *old, const char *newval, const struct passwd *pwdp);
+-extern int index_in_str_array(const char * const string_array[], const char *key);
+-extern int index_in_substr_array(const char * const string_array[], const char *key);
++extern int index_in_str_array(const char *const string_array[], const char *key);
++extern int index_in_strings(const char *strings, const char *key);
++extern int index_in_substr_array(const char *const string_array[], const char *key);
++extern int index_in_substrings(const char *strings, const char *key);
+ extern void print_login_issue(const char *issue_file, const char *tty);
+ extern void print_login_prompt(void);
+ 
+diff --git a/libbb/compare_string_array.c b/libbb/compare_string_array.c
+index 077a280..e873d7c 100644
+--- a/libbb/compare_string_array.c
++++ b/libbb/compare_string_array.c
+@@ -19,8 +19,23 @@ int index_in_str_array(const char * const string_array[], const char *key)
+ 	return -1;
+ }
+ 
++int index_in_strings(const char *strings, const char *key)
++{
++	int idx = 0;
++
++	while (strings[0]) {
++		if (strcmp(strings, key) == 0) {
++			return idx;
++		}
++		strings += strlen(strings) + 1; /* skip NUL */
++		idx++;
++	}
++	return -1;
++}
++
+ /* returns the array index of the string, even if it matches only a beginning */
+ /* (index of first match is returned, or -1) */
++#ifdef UNUSED
+ int index_in_substr_array(const char * const string_array[], const char *key)
+ {
+ 	int i;
+@@ -34,3 +49,21 @@ int index_in_substr_array(const char * const string_array[], const char *key)
+ 	}
+ 	return -1;
+ }
++#endif
++
++int index_in_substrings(const char *strings, const char *key)
++{
++	int len = strlen(key);
++
++	if (len) {
++		int idx = 0;
++		while (strings[0]) {
++			if (strncmp(strings, key, len) == 0) {
++				return idx;
++			}
++			strings += strlen(strings) + 1; /* skip NUL */
++			idx++;
++		}
++	}
++	return -1;
++}
+diff --git a/libbb/dump.c b/libbb/dump.c
+index 6dbbd9f..5ddbbaa 100644
+--- a/libbb/dump.c
++++ b/libbb/dump.c
+@@ -449,7 +449,7 @@ static const char conv_str[] =
+ 	"\r\\r\0"
+ 	"\t\\t\0"
+ 	"\v\\v\0"
+-	"\0";
++	;
+ 
+ 
+ static void conv_c(PR * pr, unsigned char * p)
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 25eb113..1071023 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -79,7 +79,7 @@ const char *applet_long_options
+         static const char applet_longopts[] =
+ 		//"name\0" has_arg val
+ 		"verbose\0" No_argument "v"
+-		"\0";
++		;
+         applet_long_options = applet_longopts;
+ 
+         The last member of struct option (val) typically is set to
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index 3e3e8d3..3e02c8e 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -14,7 +14,7 @@
+ static const char chpasswd_longopts[] =
+ 	"encrypted\0" No_argument "e"
+ 	"md5\0"       No_argument "m"
+-	"\0";
++	;
+ #endif
+ 
+ #define OPT_ENC		1
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 6db0c7b..848f2b3 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -509,12 +509,11 @@ static void process_config_line(const char *line, unsigned long *event_mask)
+ 	int i;
+ 
+ 	/* !!!! Only Uppercase Keywords in devsfd.conf */
+-	static const char *const options[] = {
+-		"CLEAR_CONFIG", "INCLUDE", "OPTIONAL_INCLUDE",
+-		"RESTORE", "PERMISSIONS", "MODLOAD", "EXECUTE",
+-		"COPY", "IGNORE", "MKOLDCOMPAT", "MKNEWCOMPAT",
+-		"RMOLDCOMPAT", "RMNEWCOMPAT", 0
+-	};
++	static const char options[] =
++		"CLEAR_CONFIG\0""INCLUDE\0""OPTIONAL_INCLUDE\0"
++		"RESTORE\0""PERMISSIONS\0""MODLOAD\0""EXECUTE\0"
++		"COPY\0""IGNORE\0""MKOLDCOMPAT\0""MKNEWCOMPAT\0"
++		"RMOLDCOMPAT\0""RMNEWCOMPAT\0";
+ 
+ 	for (count = 0; count < MAX_ARGS; ++count)
+ 		p[count][0] = '\0';
+@@ -522,9 +521,9 @@ static void process_config_line(const char *line, unsigned long *event_mask)
+ 			when, name, what,
+ 			p[0], p[1], p[2], p[3], p[4], p[5], p[6]);
+ 
+-	i = index_in_str_array(options, when);
++	i = index_in_strings(options, when);
+ 
+-	/*"CLEAR_CONFIG"*/
++	/* "CLEAR_CONFIG" */
+ 	if (i == 0) {
+ 		free_config();
+ 		*event_mask = 0;
+@@ -562,7 +561,7 @@ static void process_config_line(const char *line, unsigned long *event_mask)
+ 		goto process_config_line_err;
+ 	}
+ 
+-	i = index_in_str_array(options, what);
++	i = index_in_strings(options, what);
+ 
+ 	switch (i) {
+ 		case 4:	/* "PERMISSIONS" */
+@@ -1140,27 +1139,30 @@ static void signal_handler(int sig)
+ 
+ static const char *get_variable(const char *variable, void *info)
+ {
++	static char sbuf[sizeof(int)*3 + 2]; /* sign and NUL */
++
++	char hostname[STRING_LENGTH];
+ 	struct get_variable_info *gv_info = info;
+-	static char hostname[STRING_LENGTH], sbuf[STRING_LENGTH];
+-	const char *field_names[] = { "hostname", "mntpt", "devpath", "devname",
+-								   "uid", "gid", "mode", hostname, mount_point,
+-								   gv_info->devpath, gv_info->devname, 0 };
++	const char *field_names[] = {
++			"hostname", "mntpt", "devpath", "devname",
++			"uid", "gid", "mode", hostname, mount_point,
++			gv_info->devpath, gv_info->devname, NULL
++	};
+ 	int i;
+ 
+ 	if (gethostname(hostname, STRING_LENGTH - 1) != 0)
++		/* Here on error we should do exit(RV_SYS_ERROR), instead we do exit(EXIT_FAILURE) */
+ 		error_logger_and_die(LOG_ERR, "gethostname");
+ 
+-		/* Here on error we should do exit(RV_SYS_ERROR), instead we do exit(EXIT_FAILURE) */
+-		hostname[STRING_LENGTH - 1] = '\0';
++	hostname[STRING_LENGTH - 1] = '\0';
+ 
+ 	/* index_in_str_array returns i>=0  */
+ 	i = index_in_str_array(field_names, variable);
+ 
+ 	if (i > 6 || i < 0 || (i > 1 && gv_info == NULL))
+-			return NULL;
+-	if (i >= 0 && i <= 3) {
++		return NULL;
++	if (i >= 0 && i <= 3)
+ 		return field_names[i + 7];
+-	}
+ 
+ 	if (i == 4)
+ 		sprintf(sbuf, "%u", gv_info->info->uid);
+diff --git a/networking/arp.c b/networking/arp.c
+index e529257..907433b 100644
+--- a/networking/arp.c
++++ b/networking/arp.c
+@@ -46,17 +46,15 @@ static int sockfd;              /* active socket descriptor     */
+ static smallint hw_set;         /* flag if hw-type was set (-H) */
+ static const char *device = ""; /* current device               */
+ 
+-static const char *const options[] = {
+-	"pub",
+-	"priv",
+-	"temp",
+-	"trail",
+-	"dontpub",
+-	"auto",
+-	"dev",
+-	"netmask",
+-	NULL
+-};
++static const char options[] =
++	"pub\0"
++	"priv\0"
++	"temp\0"
++	"trail\0"
++	"dontpub\0"
++	"auto\0"
++	"dev\0"
++	"netmask\0";
+ 
+ /* Delete an entry from the ARP cache. */
+ /* Called only from main, once */
+@@ -85,7 +83,7 @@ static int arp_del(char **args)
+ 	req.arp_flags = ATF_PERM;
+ 	args++;
+ 	while (*args != NULL) {
+-		switch (index_in_str_array(options, *args)) {
++		switch (index_in_strings(options, *args)) {
+ 		case 0: /* "pub" */
+ 			flags |= 1;
+ 			args++;
+@@ -239,7 +237,7 @@ static int arp_set(char **args)
+ 	/* Check out any modifiers. */
+ 	flags = ATF_PERM | ATF_COM;
+ 	while (*args != NULL) {
+-		switch (index_in_str_array(options, *args)) {
++		switch (index_in_strings(options, *args)) {
+ 		case 0: /* "pub" */
+ 			flags |= ATF_PUBL;
+ 			args++;
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index 011fbac..02e7c52 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -293,7 +293,7 @@ static const char ftpgetput_longopts[] =
+ 	"username\0" Required_argument "u"
+ 	"password\0" Required_argument "p"
+ 	"port\0"     Required_argument "P"
+-	"\0";
++	;
+ #endif
+ 
+ int ftpgetput_main(int argc, char **argv);
+diff --git a/networking/ip.c b/networking/ip.c
+index 0105bd9..bf7e84c 100644
+--- a/networking/ip.c
++++ b/networking/ip.c
+@@ -82,14 +82,13 @@ int iptunnel_main(int argc, char **argv)
+ int ip_main(int argc, char **argv);
+ int ip_main(int argc, char **argv)
+ {
+-	const char * const keywords[] = {
+-		USE_FEATURE_IP_ADDRESS("address",)
+-		USE_FEATURE_IP_ROUTE("route",)
+-		USE_FEATURE_IP_LINK("link",)
+-		USE_FEATURE_IP_TUNNEL("tunnel", "tunl",)
+-		USE_FEATURE_IP_RULE("rule",)
+-		NULL
+-	};
++	static const char keywords[] =
++		USE_FEATURE_IP_ADDRESS("address\0")
++		USE_FEATURE_IP_ROUTE("route\0")
++		USE_FEATURE_IP_LINK("link\0")
++		USE_FEATURE_IP_TUNNEL("tunnel\0" "tunl\0")
++		USE_FEATURE_IP_RULE("rule\0")
++		;
+ 	enum {
+ 		USE_FEATURE_IP_ADDRESS(IP_addr,)
+ 		USE_FEATURE_IP_ROUTE(IP_route,)
+@@ -101,7 +100,7 @@ int ip_main(int argc, char **argv)
+ 
+ 	ip_parse_common_args(&argc, &argv);
+ 	if (argc > 1) {
+-		int key = index_in_substr_array(keywords, argv[1]);
++		int key = index_in_substrings(keywords, argv[1]);
+ 		argc -= 2;
+ 		argv += 2;
+ #if ENABLE_FEATURE_IP_ADDRESS
+@@ -125,7 +124,7 @@ int ip_main(int argc, char **argv)
+ 			ip_func = do_iprule;
+ #endif
+ 	}
+-	return (ip_func(argc, argv));
++	return ip_func(argc, argv);
+ }
+ 
+ #endif /* any of ENABLE_FEATURE_IP_xxx is 1 */
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index 32b939f..f3e3ad9 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -72,7 +72,7 @@ int get_prefix(unsigned long netmask);
+ 		"hostname\0"  No_argument "h"
+ 		"silent\0"    No_argument "s"
+ # endif
+-		"\0";
++		;
+ #endif
+ 
+ int ipcalc_main(int argc, char **argv);
+diff --git a/networking/libiproute/ip_parse_common_args.c b/networking/libiproute/ip_parse_common_args.c
+index 2d597ea..0e429a0 100644
+--- a/networking/libiproute/ip_parse_common_args.c
++++ b/networking/libiproute/ip_parse_common_args.c
+@@ -26,9 +26,9 @@ void ip_parse_common_args(int *argcp, char ***argvp)
+ {
+ 	int argc = *argcp;
+ 	char **argv = *argvp;
+-	static const char * const ip_common_commands[] =
+-		{"-family", "inet", "inet6", "link",
+-		 "-4", "-6", "-0", "-oneline", 0};
++	static const char ip_common_commands[] =
++		"-family\0""inet\0""inet6\0""link\0"
++		"-4\0""-6\0""-0\0""-oneline\0";
+ 	enum {
+ 		ARG_family = 1,
+ 		ARG_inet,
+@@ -53,13 +53,13 @@ void ip_parse_common_args(int *argcp, char ***argvp)
+ 			break;
+ 		if (opt[1] == '-')
+ 			opt++;
+-		arg = index_in_str_array(ip_common_commands, opt) + 1;
++		arg = index_in_strings(ip_common_commands, opt) + 1;
+ 		if (arg == ARG_family) {
+ 			argc--;
+ 			argv++;
+ 			if (!argv[1])
+ 				bb_show_usage();
+-			arg = index_in_str_array(ip_common_commands, argv[1]) + 1;
++			arg = index_in_strings(ip_common_commands, argv[1]) + 1;
+ 			if (arg == ARG_inet)
+ 				preferred_family = AF_INET;
+ 			else if (arg == ARG_inet6)
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index 955a9d9..8874fdb 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -412,7 +412,7 @@ static void ipaddr_reset_filter(int _oneline)
+ /* Return value becomes exitcode. It's okay to not return at all */
+ int ipaddr_list_or_flush(int argc, char **argv, int flush)
+ {
+-	static const char *const option[] = { "to", "scope", "up", "label", "dev", 0 };
++	static const char option[] = "to\0""scope\0""up\0""label\0""dev\0";
+ 
+ 	struct nlmsg_list *linfo = NULL;
+ 	struct nlmsg_list *ainfo = NULL;
+@@ -437,7 +437,7 @@ int ipaddr_list_or_flush(int argc, char **argv, int flush)
+ 	}
+ 
+ 	while (argc > 0) {
+-		const int option_num = index_in_str_array(option, *argv);
++		const int option_num = index_in_strings(option, *argv);
+ 		switch (option_num) {
+ 			case 0: /* to */
+ 				NEXT_ARG();
+@@ -599,18 +599,17 @@ static int default_scope(inet_prefix *lcl)
+ /* Return value becomes exitcode. It's okay to not return at all */
+ static int ipaddr_modify(int cmd, int argc, char **argv)
+ {
+-	static const char *const option[] = {
+-		"peer", "remote", "broadcast", "brd",
+-		"anycast", "scope", "dev", "label", "local", 0
+-	};
++	static const char option[] =
++		"peer\0""remote\0""broadcast\0""brd\0"
++		"anycast\0""scope\0""dev\0""label\0""local\0";
+ 	struct rtnl_handle rth;
+ 	struct {
+-		struct nlmsghdr		n;
+-		struct ifaddrmsg	ifa;
+-		char			buf[256];
++		struct nlmsghdr  n;
++		struct ifaddrmsg ifa;
++		char             buf[256];
+ 	} req;
+-	char  *d = NULL;
+-	char  *l = NULL;
++	char *d = NULL;
++	char *l = NULL;
+ 	inet_prefix lcl;
+ 	inet_prefix peer;
+ 	int local_len = 0;
+@@ -627,7 +626,7 @@ static int ipaddr_modify(int cmd, int argc, char **argv)
+ 	req.ifa.ifa_family = preferred_family;
+ 
+ 	while (argc > 0) {
+-		const int option_num = index_in_str_array(option, *argv);
++		const int option_num = index_in_strings(option, *argv);
+ 		switch (option_num) {
+ 			case 0: /* peer */
+ 			case 1: /* remote */
+@@ -769,14 +768,13 @@ static int ipaddr_modify(int cmd, int argc, char **argv)
+ /* Return value becomes exitcode. It's okay to not return at all */
+ int do_ipaddr(int argc, char **argv)
+ {
+-	static const char *const commands[] = {
+-		"add", "delete", "list", "show", "lst", "flush", 0
+-	};
++	static const char commands[] =
++		"add\0""delete\0""list\0""show\0""lst\0""flush\0";
+ 
+ 	int command_num = 2; /* default command is list */
+ 
+ 	if (*argv) {
+-		command_num = index_in_substr_array(commands, *argv);
++		command_num = index_in_substrings(commands, *argv);
+ 	}
+ 	if (command_num < 0 || command_num > 5)
+ 		bb_error_msg_and_die("unknown command %s", *argv);
+diff --git a/networking/libiproute/iplink.c b/networking/libiproute/iplink.c
+index 3d3ea2a..69ce84e 100644
+--- a/networking/libiproute/iplink.c
++++ b/networking/libiproute/iplink.c
+@@ -171,16 +171,15 @@ static int do_set(int argc, char **argv)
+ 	struct ifreq ifr0, ifr1;
+ 	char *newname = NULL;
+ 	int htype, halen;
+-	static const char * const keywords[] = {
+-		"up", "down", "name", "mtu", "multicast", "arp", "addr", "dev",
+-		"on", "off", NULL
+-	};
++	static const char keywords[] =
++		"up\0""down\0""name\0""mtu\0""multicast\0""arp\0""addr\0""dev\0"
++		"on\0""off\0";
+ 	enum { ARG_up = 1, ARG_down, ARG_name, ARG_mtu, ARG_multicast, ARG_arp,
+ 		ARG_addr, ARG_dev, PARM_on, PARM_off };
+ 	smalluint key;
+ 
+ 	while (argc > 0) {
+-		key = index_in_str_array(keywords, *argv) + 1;
++		key = index_in_strings(keywords, *argv) + 1;
+ 		if (key == ARG_up) {
+ 			mask |= IFF_UP;
+ 			flags |= IFF_UP;
+@@ -199,7 +198,7 @@ static int do_set(int argc, char **argv)
+ 		} else if (key == ARG_multicast) {
+ 			NEXT_ARG();
+ 			mask |= IFF_MULTICAST;
+-			key = index_in_str_array(keywords, *argv) + 1;
++			key = index_in_strings(keywords, *argv) + 1;
+ 			if (key == PARM_on) {
+ 				flags |= IFF_MULTICAST;
+ 			} else if (key == PARM_off) {
+@@ -209,7 +208,7 @@ static int do_set(int argc, char **argv)
+ 		} else if (key == ARG_arp) {
+ 			NEXT_ARG();
+ 			mask |= IFF_NOARP;
+-			key = index_in_str_array(keywords, *argv) + 1;
++			key = index_in_strings(keywords, *argv) + 1;
+ 			if (key == PARM_on) {
+ 				flags &= ~IFF_NOARP;
+ 			} else if (key == PARM_off) {
+@@ -276,13 +275,12 @@ static int ipaddr_list_link(int argc, char **argv)
+ /* Return value becomes exitcode. It's okay to not return at all */
+ int do_iplink(int argc, char **argv)
+ {
+-	static const char * const keywords[] = {
+-		"set", "show", "lst", "list", NULL
+-	};
++	static const char keywords[] =
++		"set\0""show\0""lst\0""list\0";
+ 	smalluint key;
+ 	if (argc <= 0)
+ 		return ipaddr_list_link(0, NULL);
+-	key = index_in_substr_array(keywords, *argv) + 1;
++	key = index_in_substrings(keywords, *argv) + 1;
+ 	if (key == 0)
+ 		bb_error_msg_and_die(bb_msg_invalid_arg, *argv, applet_name);
+ 	argc--; argv++;
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index 75e5293..0d171c7 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -294,6 +294,25 @@ static int print_route(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
+ /* Return value becomes exitcode. It's okay to not return at all */
+ static int iproute_modify(int cmd, unsigned flags, int argc, char **argv)
+ {
++	static const char keywords[] =
++		"src\0""via\0""mtu\0""lock\0""protocol\0"USE_FEATURE_IP_RULE("table\0")
++		"dev\0""oif\0""to\0";
++	enum {
++		ARG_src,
++		ARG_via,
++		ARG_mtu, PARM_lock,
++		ARG_protocol,
++USE_FEATURE_IP_RULE(ARG_table,)
++		ARG_dev,
++		ARG_oif,
++		ARG_to
++	};
++	enum {
++		gw_ok = 1 << 0,
++		dst_ok = 1 << 1,
++		proto_ok = 1 << 2,
++		type_ok = 1 << 3
++	};
+ 	struct rtnl_handle rth;
+ 	struct {
+ 		struct nlmsghdr		n;
+@@ -304,22 +323,7 @@ static int iproute_modify(int cmd, unsigned flags, int argc, char **argv)
+ 	struct rtattr * mxrta = (void*)mxbuf;
+ 	unsigned mxlock = 0;
+ 	char *d = NULL;
+-	enum { gw_ok = 1<<0, dst_ok = 1<<1, proto_ok = 1<<2, type_ok = 1<<3};
+ 	smalluint ok = 0;
+-	static const char * const keywords[] = {
+-		"src", "via", "mtu", "lock", "protocol", USE_FEATURE_IP_RULE("table",)
+-		"dev", "oif", "to", NULL
+-	};
+-	enum {
+-		ARG_src,
+-		ARG_via,
+-		ARG_mtu, PARM_lock,
+-		ARG_protocol,
+-USE_FEATURE_IP_RULE(ARG_table,)
+-		ARG_dev,
+-		ARG_oif,
+-		ARG_to
+-	};
+ 	int arg;
+ 
+ 	memset(&req, 0, sizeof(req));
+@@ -341,7 +345,7 @@ USE_FEATURE_IP_RULE(ARG_table,)
+ 	mxrta->rta_len = RTA_LENGTH(0);
+ 
+ 	while (argc > 0) {
+-		arg = index_in_substr_array(keywords, *argv);
++		arg = index_in_substrings(keywords, *argv);
+ 		if (arg == ARG_src) {
+ 			inet_prefix addr;
+ 			NEXT_ARG();
+@@ -361,7 +365,7 @@ USE_FEATURE_IP_RULE(ARG_table,)
+ 		} else if (arg == ARG_mtu) {
+ 			unsigned mtu;
+ 			NEXT_ARG();
+-			if (index_in_str_array(keywords, *argv) == PARM_lock) {
++			if (index_in_strings(keywords, *argv) == PARM_lock) {
+ 				mxlock |= (1<<RTAX_MTU);
+ 				NEXT_ARG();
+ 			}
+@@ -513,10 +517,9 @@ static int iproute_list_or_flush(int argc, char **argv, int flush)
+ 	struct rtnl_handle rth;
+ 	char *id = NULL;
+ 	char *od = NULL;
+-	static const char * const keywords[] = {
+-		"protocol", "all", "dev", "oif", "iif", "via", "table", "cache",/*all,*/
+-		"from", "root", "match", "exact", "to", /*root,match,exact*/ NULL
+-	};
++	static const char keywords[] =
++		"protocol\0""all\0""dev\0""oif\0""iif\0""via\0""table\0""cache\0" /*all*/
++		"from\0""root\0""match\0""exact\0""to\0"/*root match exact*/;
+ 	enum {
+ 		ARG_proto, PARM_all,
+ 		ARG_dev,
+@@ -535,13 +538,13 @@ static int iproute_list_or_flush(int argc, char **argv, int flush)
+ 		bb_error_msg_and_die(bb_msg_requires_arg, "\"ip route flush\"");
+ 
+ 	while (argc > 0) {
+-		arg = index_in_substr_array(keywords, *argv);
++		arg = index_in_substrings(keywords, *argv);
+ 		if (arg == ARG_proto) {
+ 			uint32_t prot = 0;
+ 			NEXT_ARG();
+ 			filter.protocolmask = -1;
+ 			if (rtnl_rtprot_a2n(&prot, *argv)) {
+-				if (index_in_str_array(keywords, *argv) != PARM_all)
++				if (index_in_strings(keywords, *argv) != PARM_all)
+ 					invarg(*argv, "protocol");
+ 				prot = 0;
+ 				filter.protocolmask = 0;
+@@ -558,7 +561,7 @@ static int iproute_list_or_flush(int argc, char **argv, int flush)
+ 			get_prefix(&filter.rvia, *argv, do_ipv6);
+ 		} else if (arg == ARG_table) {
+ 			NEXT_ARG();
+-			parm = index_in_substr_array(keywords, *argv);
++			parm = index_in_substrings(keywords, *argv);
+ 			if (parm == PARM_cache)
+ 				filter.tb = -1;
+ 			else if (parm == PARM_all)
+@@ -567,7 +570,7 @@ static int iproute_list_or_flush(int argc, char **argv, int flush)
+ 				invarg(*argv, "table");
+ 		} else if (arg == ARG_from) {
+ 			NEXT_ARG();
+-			parm = index_in_substr_array(keywords, *argv);
++			parm = index_in_substrings(keywords, *argv);
+ 			if (parm == PARM_root) {
+ 				NEXT_ARG();
+ 				get_prefix(&filter.rsrc, *argv, do_ipv6);
+@@ -584,7 +587,7 @@ static int iproute_list_or_flush(int argc, char **argv, int flush)
+ 			/* parm = arg; // would be more plausible, we reuse arg here */
+ 			if (arg == ARG_to) {
+ 				NEXT_ARG();
+-				arg = index_in_substr_array(keywords, *argv);
++				arg = index_in_substrings(keywords, *argv);
+ 			}
+ 			if (arg == PARM_root) {
+ 				NEXT_ARG();
+@@ -645,9 +648,8 @@ static int iproute_list_or_flush(int argc, char **argv, int flush)
+ 			xrtnl_wilddump_request(&rth, do_ipv6, RTM_GETROUTE);
+ 			filter.flushed = 0;
+ 			xrtnl_dump_filter(&rth, print_route, stdout);
+-			if (filter.flushed == 0) {
++			if (filter.flushed == 0)
+ 				return 0;
+-			}
+ 			if (flush_update())
+ 				return 1;
+ 		}
+@@ -655,10 +657,8 @@ static int iproute_list_or_flush(int argc, char **argv, int flush)
+ 
+ 	if (filter.tb != -1) {
+ 		xrtnl_wilddump_request(&rth, do_ipv6, RTM_GETROUTE);
+-	} else {
+-		if (rtnl_rtcache_request(&rth, do_ipv6) < 0) {
+-			bb_perror_msg_and_die("cannot send dump request");
+-		}
++	} else if (rtnl_rtcache_request(&rth, do_ipv6) < 0) {
++		bb_perror_msg_and_die("cannot send dump request");
+ 	}
+ 	xrtnl_dump_filter(&rth, print_route, stdout);
+ 
+@@ -671,16 +671,16 @@ static int iproute_get(int argc, char **argv)
+ {
+ 	struct rtnl_handle rth;
+ 	struct {
+-		struct nlmsghdr		n;
+-		struct rtmsg		r;
+-		char			buf[1024];
++		struct nlmsghdr n;
++		struct rtmsg    r;
++		char            buf[1024];
+ 	} req;
+-	char  *idev = NULL;
+-	char  *odev = NULL;
++	char *idev = NULL;
++	char *odev = NULL;
+ 	bool connected = 0;
+ 	bool from_ok = 0;
+-	static const char * const options[] =
+-		{ "from", "iif", "oif", "dev", "notify", "connected", "to", 0 };
++	static const char options[] =
++		"from\0""iif\0""oif\0""dev\0""notify\0""connected\0""to\0";
+ 
+ 	memset(&req, 0, sizeof(req));
+ 
+@@ -699,7 +699,7 @@ static int iproute_get(int argc, char **argv)
+ 	req.r.rtm_tos = 0;
+ 
+ 	while (argc > 0) {
+-		switch (index_in_str_array(options, *argv)) {
++		switch (index_in_strings(options, *argv)) {
+ 			case 0: /* from */
+ 			{
+ 				inet_prefix addr;
+@@ -824,19 +824,18 @@ static int iproute_get(int argc, char **argv)
+ /* Return value becomes exitcode. It's okay to not return at all */
+ int do_iproute(int argc, char **argv)
+ {
+-	static const char * const ip_route_commands[] = {
+-	/*0-3*/	"add", "append", "change", "chg",
+-	/*4-7*/	"delete", "get", "list", "show",
+-	/*8..*/	"prepend", "replace", "test", "flush", 0
+-	};
++	static const char ip_route_commands[] =
++	/*0-3*/	"add\0""append\0""change\0""chg\0"
++	/*4-7*/	"delete\0""get\0""list\0""show\0"
++	/*8..*/	"prepend\0""replace\0""test\0""flush\0";
+ 	int command_num = 6;
+-	unsigned int flags = 0;
++	unsigned flags = 0;
+ 	int cmd = RTM_NEWROUTE;
+ 
+ 	/* "Standard" 'ip r a' treats 'a' as 'add', not 'append' */
+ 	/* It probably means that it is using "first match" rule */
+ 	if (*argv) {
+-		command_num = index_in_substr_array(ip_route_commands, *argv);
++		command_num = index_in_substrings(ip_route_commands, *argv);
+ 	}
+ 	switch (command_num) {
+ 		case 0: /* add */
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index a62eae1..8e2a06f 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -187,6 +187,15 @@ static int iprule_list(int argc, char **argv)
+ /* Return value becomes exitcode. It's okay to not return at all */
+ static int iprule_modify(int cmd, int argc, char **argv)
+ {
++	static const char keywords[] =
++		"from\0""to\0""preference\0""order\0""priority\0"
++		"tos\0""fwmark\0""realms\0""table\0""lookup\0""dev\0"
++		"iif\0""nat\0""map-to\0""type\0""help\0";
++	enum {
++		ARG_from = 1, ARG_to, ARG_preference, ARG_order, ARG_priority,
++		ARG_tos, ARG_fwmark, ARG_realms, ARG_table, ARG_lookup, ARG_dev,
++		ARG_iif, ARG_nat, ARG_map_to, ARG_type, ARG_help
++	};
+ 	bool table_ok = 0;
+ 	struct rtnl_handle rth;
+ 	struct {
+@@ -194,13 +203,6 @@ static int iprule_modify(int cmd, int argc, char **argv)
+ 		struct rtmsg	r;
+ 		char		buf[1024];
+ 	} req;
+-	static const char * const keywords[] =
+-	{ "from", "to", "preference", "order", "priority", "tos", "fwmark",
+-	"realms", "table", "lookup", "dev", "iif", "nat", "map-to", "type",
+-	"help", NULL};
+-	enum { ARG_from = 1, ARG_to, ARG_preference, ARG_order, ARG_priority,
+-	ARG_tos, ARG_fwmark, ARG_realms, ARG_table, ARG_lookup, ARG_dev,
+-	ARG_iif, ARG_nat, ARG_map_to, ARG_type, ARG_help };
+ 	smalluint key;
+ 
+ 	memset(&req, 0, sizeof(req));
+@@ -220,7 +222,7 @@ static int iprule_modify(int cmd, int argc, char **argv)
+ 	}
+ 
+ 	while (argc > 0) {
+-		key = index_in_substr_array(keywords, *argv) + 1;
++		key = index_in_substrings(keywords, *argv) + 1;
+ 		if (key == 0) /* no match found in keywords array, bail out. */
+ 			bb_error_msg_and_die(bb_msg_invalid_arg, *argv, applet_name);
+ 		if (key == ARG_from) {
+@@ -311,14 +313,14 @@ static int iprule_modify(int cmd, int argc, char **argv)
+ /* Return value becomes exitcode. It's okay to not return at all */
+ int do_iprule(int argc, char **argv)
+ {
+-	static const char * const ip_rule_commands[] =
+-		{"add", "delete", "list", "show", 0};
++	static const char ip_rule_commands[] =
++		"add\0""delete\0""list\0""show\0";
+ 	int cmd = 2; /* list */
+ 
+ 	if (argc < 1)
+ 		return iprule_list(0, NULL);
+ 	if (*argv)
+-		cmd = index_in_substr_array(ip_rule_commands, *argv);
++		cmd = index_in_substrings(ip_rule_commands, *argv);
+ 
+ 	switch (cmd) {
+ 		case 0: /* add */
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index 90d0e11..a293387 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -128,16 +128,13 @@ static int do_del_ioctl(const char *basedev, struct ip_tunnel_parm *p)
+ /* Dies on error */
+ static void parse_args(int argc, char **argv, int cmd, struct ip_tunnel_parm *p)
+ {
+-	int count = 0;
+-	char medium[IFNAMSIZ];
+-	static const char * const keywords[] = {
+-		"mode", "ipip", "ip/ip", "gre", "gre/ip", "sit", "ipv6/ip",
+-		"key", "ikey", "okey", "seq", "iseq", "oseq",
+-		"csum", "icsum", "ocsum", "nopmtudisc", "pmtudisc",
+-		"remote", "any", "local", "dev",
+-		"ttl", "inherit", "tos", "dsfield",
+-		"name", NULL
+-	};
++	static const char keywords[] =
++		"mode\0""ipip\0""ip/ip\0""gre\0""gre/ip\0""sit\0""ipv6/ip\0"
++		"key\0""ikey\0""okey\0""seq\0""iseq\0""oseq\0"
++		"csum\0""icsum\0""ocsum\0""nopmtudisc\0""pmtudisc\0"
++		"remote\0""any\0""local\0""dev\0"
++		"ttl\0""inherit\0""tos\0""dsfield\0"
++		"name\0";
+ 	enum {
+ 		ARG_mode, ARG_ipip, ARG_ip_ip, ARG_gre, ARG_gre_ip, ARG_sit, ARG_ip6_ip,
+ 		ARG_key, ARG_ikey, ARG_okey, ARG_seq, ARG_iseq, ARG_oseq,
+@@ -146,22 +143,25 @@ static void parse_args(int argc, char **argv, int cmd, struct ip_tunnel_parm *p)
+ 		ARG_ttl, ARG_inherit, ARG_tos, ARG_dsfield,
+ 		ARG_name
+ 	};
++	int count = 0;
++	char medium[IFNAMSIZ];
+ 	int key;
++
+ 	memset(p, 0, sizeof(*p));
+ 	memset(&medium, 0, sizeof(medium));
+ 
+ 	p->iph.version = 4;
+ 	p->iph.ihl = 5;
+ #ifndef IP_DF
+-#define IP_DF		0x4000		/* Flag: "Don't Fragment"	*/
++#define IP_DF 0x4000  /* Flag: "Don't Fragment" */
+ #endif
+ 	p->iph.frag_off = htons(IP_DF);
+ 
+ 	while (argc > 0) {
+-		key = index_in_str_array(keywords, *argv);
++		key = index_in_strings(keywords, *argv);
+ 		if (key == ARG_mode) {
+ 			NEXT_ARG();
+-			key = index_in_str_array(keywords, *argv);
++			key = index_in_strings(keywords, *argv);
+ 			if (key == ARG_ipip ||
+ 			    key == ARG_ip_ip) {
+ 				if (p->iph.protocol && p->iph.protocol != IPPROTO_IPIP) {
+@@ -240,12 +240,12 @@ static void parse_args(int argc, char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			p->iph.frag_off = htons(IP_DF);
+ 		} else if (key == ARG_remote) {
+ 			NEXT_ARG();
+-			key = index_in_str_array(keywords, *argv);
++			key = index_in_strings(keywords, *argv);
+ 			if (key == ARG_any)
+ 				p->iph.daddr = get_addr32(*argv);
+ 		} else if (key == ARG_local) {
+ 			NEXT_ARG();
+-			key = index_in_str_array(keywords, *argv);
++			key = index_in_strings(keywords, *argv);
+ 			if (key == ARG_any)
+ 				p->iph.saddr = get_addr32(*argv);
+ 		} else if (key == ARG_dev) {
+@@ -254,7 +254,7 @@ static void parse_args(int argc, char **argv, int cmd, struct ip_tunnel_parm *p)
+ 		} else if (key == ARG_ttl) {
+ 			unsigned uval;
+ 			NEXT_ARG();
+-			key = index_in_str_array(keywords, *argv);
++			key = index_in_strings(keywords, *argv);
+ 			if (key != ARG_inherit) {
+ 				if (get_unsigned(&uval, *argv, 0))
+ 					invarg(*argv, "TTL");
+@@ -266,7 +266,7 @@ static void parse_args(int argc, char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			   key == ARG_dsfield) {
+ 			uint32_t uval;
+ 			NEXT_ARG();
+-			key = index_in_str_array(keywords, *argv);
++			key = index_in_strings(keywords, *argv);
+ 			if (key != ARG_inherit) {
+ 				if (rtnl_dsfield_a2n(&uval, *argv))
+ 					invarg(*argv, "TOS");
+@@ -519,14 +519,13 @@ static int do_show(int argc, char **argv)
+ /* Return value becomes exitcode. It's okay to not return at all */
+ int do_iptunnel(int argc, char **argv)
+ {
+-	static const char *const keywords[] = {
+-		"add", "change", "delete", "show", "list", "lst", NULL
+-	};
++	static const char keywords[] =
++		"add\0""change\0""delete\0""show\0""list\0""lst\0";
+ 	enum { ARG_add = 0, ARG_change, ARG_del, ARG_show, ARG_list, ARG_lst };
+ 	int key;
+ 
+ 	if (argc) {
+-		key = index_in_substr_array(keywords, *argv);
++		key = index_in_substrings(keywords, *argv);
+ 		if (key < 0)
+ 			bb_error_msg_and_die(bb_msg_invalid_arg, *argv, applet_name);
+ 		--argc;
+diff --git a/networking/libiproute/rtm_map.c b/networking/libiproute/rtm_map.c
+index 593017b..96b2d17 100644
+--- a/networking/libiproute/rtm_map.c
++++ b/networking/libiproute/rtm_map.c
+@@ -51,16 +51,16 @@ const char *rtnl_rtntype_n2a(int id, char *buf, int len)
+ 
+ int rtnl_rtntype_a2n(int *id, char *arg)
+ {
+-	static const char * const keywords[] = {
+-		"local", "nat", "broadcast", "brd", "anycast",
+-		"multicast", "prohibit", "unreachable", "blackhole",
+-		"xresolve", "unicast", "throw", NULL
+-	};
+-	enum { ARG_local = 1, ARG_nat, ARG_broadcast, ARG_brd, ARG_anycast,
++	static const char keywords[] =
++		"local\0""nat\0""broadcast\0""brd\0""anycast\0"
++		"multicast\0""prohibit\0""unreachable\0""blackhole\0"
++		"xresolve\0""unicast\0""throw\0";
++	enum {
++		ARG_local = 1, ARG_nat, ARG_broadcast, ARG_brd, ARG_anycast,
+ 		ARG_multicast, ARG_prohibit, ARG_unreachable, ARG_blackhole,
+ 		ARG_xresolve, ARG_unicast, ARG_throw
+ 	};
+-	const smalluint key = index_in_substr_array(keywords, arg) + 1;
++	const smalluint key = index_in_substrings(keywords, arg) + 1;
+ 	char *end;
+ 	unsigned long res;
+ 
+diff --git a/networking/slattach.c b/networking/slattach.c
+index 1a4423b..4bac879 100644
+--- a/networking/slattach.c
++++ b/networking/slattach.c
+@@ -16,16 +16,6 @@
+ #include "libbb.h"
+ #include "libiproute/utils.h" /* invarg() */
+ 
+-/* Line discipline code table */
+-static const char *const proto_names[] = {
+-	"cslip"+1,	/* 0 */
+-	"cslip",	/* 1 */
+-	"cslip6"+1,	/* 2 */
+-	"cslip6",	/* 3 */
+-	"adaptive",	/* 8 */
+-	NULL
+-};
+-
+ struct globals {
+ 	int handle;
+ 	int saved_disc;
+@@ -132,6 +122,15 @@ static void sig_handler(int signo)
+ int slattach_main(int argc, char **argv);
+ int slattach_main(int argc, char **argv)
+ {
++	/* Line discipline code table */
++	static const char proto_names[] =
++		"slip\0"        /* 0 */
++		"cslip\0"       /* 1 */
++		"slip6\0"       /* 2 */
++		"cslip6\0"      /* 3 */
++		"adaptive\0"    /* 8 */
++		;
++
+ 	int i, encap, opt;
+ 	struct termios state;
+ 	const char *proto = "cslip";
+@@ -160,7 +159,7 @@ int slattach_main(int argc, char **argv)
+ 	if (!*argv)
+ 		bb_show_usage();
+ 
+-	encap = index_in_str_array(proto_names, proto);
++	encap = index_in_strings(proto_names, proto);
+ 
+ 	if (encap < 0)
+ 		invarg(proto, "protocol");
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 2b95c32..b84a678 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -200,7 +200,7 @@ int udhcpc_main(int argc, char **argv)
+ 		"timeout\0"       Required_argument "T"
+ 		"version\0"       No_argument       "v"
+ 		"retries\0"       Required_argument "t"
+-		"\0";
++		;
+ #endif
+ 	/* Default options. */
+ 	client_config.interface = "eth0";
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index fb50d68..f9f9231 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -28,7 +28,7 @@ int dumpleases_main(int argc, char **argv)
+ 		"absolute\0"  No_argument       "a"
+ 		"remaining\0" No_argument       "r"
+ 		"file\0"      Required_argument "f"
+-		"\0";
++		;
+ 
+ 	applet_long_options = dumpleases_longopts;
+ #endif
+diff --git a/networking/wget.c b/networking/wget.c
+index ad09091..d944f01 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -114,9 +114,8 @@ int wget_main(int argc, char **argv)
+ 	bool use_proxy = 1;              /* Use proxies if env vars are set  */
+ 	const char *proxy_flag = "on";  /* Use proxies if env vars are set  */
+ 	const char *user_agent = "Wget";/* "User-Agent" header field        */
+-	static const char * const keywords[] = {
+-		"content-length", "transfer-encoding", "chunked", "location", NULL
+-	};
++	static const char keywords[] =
++		"content-length\0""transfer-encoding\0""chunked\0""location\0";
+ 	enum {
+ 		KEY_content_length = 1, KEY_transfer_encoding, KEY_chunked, KEY_location
+ 	};
+@@ -143,7 +142,7 @@ int wget_main(int argc, char **argv)
+ 		"user-agent\0"       Required_argument "U"
+ 		"passive-ftp\0"      No_argument       "\xff"
+ 		"header\0"           Required_argument "\xfe"
+-		"\0";
++		;
+ 	applet_long_options = wget_longopts;
+ #endif
+ 	/* server.allocated = target.allocated = NULL; */
+@@ -327,7 +326,7 @@ int wget_main(int argc, char **argv)
+ 			 */
+ 			while ((str = gethdr(buf, sizeof(buf), sfp, &n)) != NULL) {
+ 				/* gethdr did already convert the "FOO:" string to lowercase */
+-				smalluint key = index_in_str_array(keywords, *&buf) + 1;
++				smalluint key = index_in_strings(keywords, *&buf) + 1;
+ 				if (key == KEY_content_length) {
+ 					content_len = BB_STRTOOFF(str, NULL, 10);
+ 					if (errno || content_len < 0) {
+@@ -337,7 +336,7 @@ int wget_main(int argc, char **argv)
+ 					continue;
+ 				}
+ 				if (key == KEY_transfer_encoding) {
+-					if (index_in_str_array(keywords, str_tolower(str)) + 1 != KEY_chunked)
++					if (index_in_strings(keywords, str_tolower(str)) + 1 != KEY_chunked)
+ 						bb_error_msg_and_die("server wants to do %s transfer encoding", str);
+ 					chunked = got_clen = 1;
+ 				}
+diff --git a/selinux/chcon.c b/selinux/chcon.c
+index 689ec8c..6e98c4a 100644
+--- a/selinux/chcon.c
++++ b/selinux/chcon.c
+@@ -117,7 +117,7 @@ static const char chcon_longopts[] =
+ 	"range\0"          Required_argument "l"
+ 	"verbose\0"        No_argument       "v"
+ 	"reference\0"      Required_argument "\xff" /* no short option */
+-	"\0";
++	;
+ #endif
+ 
+ int chcon_main(int argc, char **argv);
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index 3502dcd..5f9e3fd 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -76,7 +76,7 @@ static const char runcon_options[] =
+ 	"range\0"   Required_argument "l"
+ 	"compute\0" No_argument "c"
+ 	"help\0"    No_argument "h"      
+-	"\0";
++	;
+ #endif
+ 
+ #define OPTS_ROLE	(1<<0)	/* r */
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 5ee13ec..41299d2 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -276,7 +276,7 @@ static const char getopt_longopts[] =
+ 	"unquoted\0"     No_argument       "u"
+ 	"alternative\0"  No_argument       "a"
+ 	"name\0"         Required_argument "n"
+-	"\0";
++	;
+ #endif
+ 
+ int getopt_main(int argc, char *argv[]);
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index ff696a3..ede95ec 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -185,7 +185,7 @@ int hwclock_main(int argc, char **argv)
+ 		"hctosys\0"   No_argument "s"
+ 		"systohc\0"   No_argument "w"
+ 		"file\0"      Required_argument "f"
+-		"\0";
++		;
+ 	applet_long_options = hwclock_longopts;
+ #endif
+ 	opt_complementary = "r--ws:w--rs:s--wr:l--u:u--l";
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 4dd1a85..7ee24ca 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -888,33 +888,31 @@ static int nfsmount(struct mntent *mp, int vfsflags, char *filteropts)
+ 	if (filteropts)	for (opt = strtok(filteropts, ","); opt; opt = strtok(NULL, ",")) {
+ 		char *opteq = strchr(opt, '=');
+ 		if (opteq) {
+-			static const char *const options[] = {
+-				/* 0 */ "rsize",
+-				/* 1 */ "wsize",
+-				/* 2 */ "timeo",
+-				/* 3 */ "retrans",
+-				/* 4 */ "acregmin",
+-				/* 5 */ "acregmax",
+-				/* 6 */ "acdirmin",
+-				/* 7 */ "acdirmax",
+-				/* 8 */ "actimeo",
+-				/* 9 */ "retry",
+-				/* 10 */ "port",
+-				/* 11 */ "mountport",
+-				/* 12 */ "mounthost",
+-				/* 13 */ "mountprog",
+-				/* 14 */ "mountvers",
+-				/* 15 */ "nfsprog",
+-				/* 16 */ "nfsvers",
+-				/* 17 */ "vers",
+-				/* 18 */ "proto",
+-				/* 19 */ "namlen",
+-				/* 20 */ "addr",
+-				NULL
+-			};
++			static const char options[] =
++				/* 0 */ "rsize\0"
++				/* 1 */ "wsize\0"
++				/* 2 */ "timeo\0"
++				/* 3 */ "retrans\0"
++				/* 4 */ "acregmin\0"
++				/* 5 */ "acregmax\0"
++				/* 6 */ "acdirmin\0"
++				/* 7 */ "acdirmax\0"
++				/* 8 */ "actimeo\0"
++				/* 9 */ "retry\0"
++				/* 10 */ "port\0"
++				/* 11 */ "mountport\0"
++				/* 12 */ "mounthost\0"
++				/* 13 */ "mountprog\0"
++				/* 14 */ "mountvers\0"
++				/* 15 */ "nfsprog\0"
++				/* 16 */ "nfsvers\0"
++				/* 17 */ "vers\0"
++				/* 18 */ "proto\0"
++				/* 19 */ "namlen\0"
++				/* 20 */ "addr\0";
+ 			int val = xatoi_u(opteq + 1);
+ 			*opteq = '\0';
+-			switch (index_in_str_array(options, opt)) {
++			switch (index_in_strings(options, opt)) {
+ 			case 0: // "rsize"
+ 				data.rsize = val;
+ 				break;
+@@ -993,26 +991,24 @@ static int nfsmount(struct mntent *mp, int vfsflags, char *filteropts)
+ 			}
+ 		}
+ 		else {
+-			static const char *const options[] = {
+-				"bg",
+-				"fg",
+-				"soft",
+-				"hard",
+-				"intr",
+-				"posix",
+-				"cto",
+-				"ac",
+-				"tcp",
+-				"udp",
+-				"lock",
+-				NULL
+-			};
++			static const char options[] =
++				"bg\0"
++				"fg\0"
++				"soft\0"
++				"hard\0"
++				"intr\0"
++				"posix\0"
++				"cto\0"
++				"ac\0"
++				"tcp\0"
++				"udp\0"
++				"lock\0";
+ 			int val = 1;
+ 			if (!strncmp(opt, "no", 2)) {
+ 				val = 0;
+ 				opt += 2;
+ 			}
+-			switch (index_in_str_array(options, opt)) {
++			switch (index_in_strings(options, opt)) {
+ 			case 0: // "bg"
+ 				bg = val;
+ 				break;

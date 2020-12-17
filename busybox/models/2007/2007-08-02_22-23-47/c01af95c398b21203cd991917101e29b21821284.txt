@@ -1,0 +1,113 @@
+2007-08-02 22:23:47 +0000
+diff --git a/include/applets.h b/include/applets.h
+index b5e1e4c..7eefa08 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -337,6 +337,7 @@ USE_TR(APPLET(tr, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_TRACEROUTE(APPLET(traceroute, _BB_DIR_USR_BIN, _BB_SUID_MAYBE))
+ USE_TRUE(APPLET_NOFORK(true, true, _BB_DIR_BIN, _BB_SUID_NEVER, true))
+ USE_TTY(APPLET(tty, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
++USE_TTYSIZE(APPLET(ttysize, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ //USE_TUNE2FS(APPLET(tune2fs, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_APP_UDHCPC(APPLET(udhcpc, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_APP_UDHCPD(APPLET(udhcpd, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index a17f5b1..d4d923b 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3606,14 +3606,19 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+ #define tty_trivial_usage \
+        ""
+ #define tty_full_usage \
+-       "Print the file name of the terminal connected to standard input" \
++       "Print file name of standard input's terminal" \
+ 	USE_INCLUDE_SUSv2( \
+        "\n\nOptions:\n" \
+-       "	-s	Print nothing, only return an exit status")
++       "	-s	Print nothing, only return exit status")
+ #define tty_example_usage \
+        "$ tty\n" \
+        "/dev/tty2\n"
+ 
++#define ttysize_trivial_usage \
++       "[w] [h]"
++#define ttysize_full_usage \
++       "Print dimension(s) of standard input's terminal, on error return 80x25"
++
+ #define tune2fs_trivial_usage \
+        "[-c max-mounts-count] [-e errors-behavior] [-g group] " \
+        "[-i interval[d|m|w]] [-j] [-J journal-options] [-l] [-s sparse-flag] " \
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 170310f..3dd2674 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -366,6 +366,14 @@ config TIME
+ 	  When the command finishes, time writes a message to standard output
+ 	  giving timing statistics about this program run.
+ 
++config TTYSIZE
++	bool "ttysize"
++	default n
++	help
++	  A replacement for "stty size". Unlike stty, can report only width,
++	  only height, or both, in any order. It also does not complain on error,
++	  but returns default 80x24. Usage in shell scripts: width=`ttysize w`.
++
+ config WATCHDOG
+ 	bool "watchdog"
+ 	default n
+diff --git a/miscutils/Kbuild b/miscutils/Kbuild
+index 22b4564..b420d68 100644
+--- a/miscutils/Kbuild
++++ b/miscutils/Kbuild
+@@ -27,4 +27,5 @@ lib-$(CONFIG_SETSID)      += setsid.o
+ lib-$(CONFIG_STRINGS)     += strings.o
+ lib-$(CONFIG_TASKSET)     += taskset.o
+ lib-$(CONFIG_TIME)        += time.o
++lib-$(CONFIG_TTYSIZE)     += ttysize.o
+ lib-$(CONFIG_WATCHDOG)    += watchdog.o
+diff --git a/miscutils/ttysize.c b/miscutils/ttysize.c
+new file mode 100644
+index 0000000..c1b702c
+--- /dev/null
++++ b/miscutils/ttysize.c
+@@ -0,0 +1,39 @@
++/*
++ * Replacement for "stty size", which is awkward for shell script use.
++ * - Allows to request width, height, or both, in any order.
++ * - Does not complain on error, but returns default 80x24.
++ * - Size: less than 200 bytes
++ */
++#include "libbb.h"
++
++int ttysize_main(int argc, char **argv);
++int ttysize_main(int argc, char **argv)
++{
++	unsigned w,h;
++	struct winsize wsz;
++    
++	w = 80;
++	h = 24;
++	if (!ioctl(0, TIOCGWINSZ, &wsz)) {
++		w = wsz.ws_col;
++		h = wsz.ws_row;
++	}
++
++	if (argc == 1) {
++		printf("%u %u", w, h);
++	} else {
++		const char *fmt, *arg;
++
++		fmt = "%u %u" + 3; /* "%u" */
++		while ((arg = *++argv) != NULL) {
++			char c = arg[0];
++			if (c == 'w')
++				printf(fmt, w);
++			if (c == 'h')
++				printf(fmt, h);
++			fmt = "%u %u" + 2; /* " %u" */
++		}
++	}
++	putchar('\n');
++	return 0;
++}

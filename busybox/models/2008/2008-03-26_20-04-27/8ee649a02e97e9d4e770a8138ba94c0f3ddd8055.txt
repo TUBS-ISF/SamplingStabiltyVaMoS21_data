@@ -1,0 +1,459 @@
+2008-03-26 20:04:27 +0000
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 7693342..1280ca0 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -1162,7 +1162,7 @@ static char **create_list(const char *filename)
+ 		return NULL;
+ 	}
+ 
+-	while ((line = xmalloc_getline(list_stream)) != NULL) {
++	while ((line = xmalloc_fgetline(list_stream)) != NULL) {
+ 		file_list = xrealloc(file_list, sizeof(char *) * (count + 2));
+ 		file_list[count] = line;
+ 		count++;
+diff --git a/archival/tar.c b/archival/tar.c
+index 7bd7955..0c90ac0 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -660,7 +660,7 @@ static llist_t *append_file_list_to_list(llist_t *list)
+ 		tmp = cur;
+ 		cur = cur->link;
+ 		free(tmp);
+-		while ((line = xmalloc_getline(src_stream)) != NULL) {
++		while ((line = xmalloc_fgetline(src_stream)) != NULL) {
+ 			/* kill trailing '/' unless the string is just "/" */
+ 			char *cp = last_char_is(line, '/');
+ 			if (cp > line)
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index e617ef2..7a44d10 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -51,7 +51,7 @@ static void cut_file(FILE *file, char delim)
+ 	unsigned int linenum = 0;	/* keep these zero-based to be consistent */
+ 
+ 	/* go through every line in the file */
+-	while ((line = xmalloc_getline(file)) != NULL) {
++	while ((line = xmalloc_fgetline(file)) != NULL) {
+ 
+ 		/* set up a list so we can keep track of what's been printed */
+ 		char * printed = xzalloc(strlen(line) * sizeof(char));
+diff --git a/coreutils/md5_sha1_sum.c b/coreutils/md5_sha1_sum.c
+index 080eac5..2e1c964 100644
+--- a/coreutils/md5_sha1_sum.c
++++ b/coreutils/md5_sha1_sum.c
+@@ -115,7 +115,7 @@ int md5_sha1_sum_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 		pre_computed_stream = xfopen_stdin(argv[0]);
+ 
+-		while ((line = xmalloc_getline(pre_computed_stream)) != NULL) {
++		while ((line = xmalloc_fgetline(pre_computed_stream)) != NULL) {
+ 			char *filename_ptr;
+ 
+ 			count_total++;
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index 15566ce..a54be72 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -150,9 +150,9 @@ static struct sort_key *add_key(void)
+ #define GET_LINE(fp) \
+ 	((option_mask32 & FLAG_z) \
+ 	? bb_get_chunk_from_file(fp, NULL) \
+-	: xmalloc_getline(fp))
++	: xmalloc_fgetline(fp))
+ #else
+-#define GET_LINE(fp) xmalloc_getline(fp)
++#define GET_LINE(fp) xmalloc_fgetline(fp)
+ #endif
+ 
+ /* Iterate through keys list and perform comparisons */
+diff --git a/coreutils/uniq.c b/coreutils/uniq.c
+index d072960..32327c6 100644
+--- a/coreutils/uniq.c
++++ b/coreutils/uniq.c
+@@ -71,7 +71,7 @@ int uniq_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		dups = 0;
+ 
+ 		/* gnu uniq ignores newlines */
+-		while ((s1 = xmalloc_getline(in)) != NULL) {
++		while ((s1 = xmalloc_fgetline(in)) != NULL) {
+ 			e1 = s1;
+ 			for (i = skip_fields; i; i--) {
+ 				e1 = skip_whitespace(e1);
+diff --git a/coreutils/uudecode.c b/coreutils/uudecode.c
+index 4c619de..c067476 100644
+--- a/coreutils/uudecode.c
++++ b/coreutils/uudecode.c
+@@ -18,7 +18,7 @@ static void read_stduu(FILE *src_stream, FILE *dst_stream)
+ {
+ 	char *line;
+ 
+-	while ((line = xmalloc_getline(src_stream)) != NULL) {
++	while ((line = xmalloc_fgetline(src_stream)) != NULL) {
+ 		int encoded_len, str_len;
+ 		char *line_ptr, *dst;
+ 
+@@ -151,7 +151,7 @@ int uudecode_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	src_stream = xfopen_stdin(*argv);
+ 
+ 	/* Search for the start of the encoding */
+-	while ((line = xmalloc_getline(src_stream)) != NULL) {
++	while ((line = xmalloc_fgetline(src_stream)) != NULL) {
+ 		void (*decode_fn_ptr)(FILE * src, FILE * dst);
+ 		char *line_ptr;
+ 		FILE *dst_stream;
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 178792f..0707d29 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -391,7 +391,7 @@ static void load_fs_info(const char *filename)
+ 	}
+ 	while (1) {
+ 		int r;
+-		char *buf = xmalloc_getline(f);
++		char *buf = xmalloc_fgetline(f);
+ 		if (!buf) break;
+ 		r = parse_fstab_line(buf, &fs);
+ 		free(buf);
+diff --git a/editors/patch.c b/editors/patch.c
+index 6f42b83..1c9e970 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -85,7 +85,7 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		patch_file = xfopen_stdin(i);
+ 	}
+ 
+-	patch_line = xmalloc_getline(patch_file);
++	patch_line = xmalloc_fgetline(patch_file);
+ 	while (patch_line) {
+ 		FILE *src_stream;
+ 		FILE *dst_stream;
+@@ -106,7 +106,7 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			/* Extract the filename used before the patch was generated */
+ 			new_filename = extract_filename(patch_line, patch_level, "--- ");
+ 			// was old_filename above
+-			patch_line = xmalloc_getline(patch_file);
++			patch_line = xmalloc_fgetline(patch_file);
+ 			if (!patch_line) goto quit;
+ 		} while (!new_filename);
+ 		free(new_filename); // "source" filename is irrelevant
+diff --git a/editors/sed.c b/editors/sed.c
+index 32911f8..f858845 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1028,7 +1028,7 @@ static void process_files(void)
+ 				if (rfile) {
+ 					char *line;
+ 
+-					while ((line = xmalloc_getline(rfile))
++					while ((line = xmalloc_fgetline(rfile))
+ 							!= NULL)
+ 						append(line);
+ 					xprint_and_close_file(rfile);
+@@ -1273,7 +1273,7 @@ int sed_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		char *line;
+ 		FILE *cmdfile;
+ 		cmdfile = xfopen(opt_f->data, "r");
+-		while ((line = xmalloc_getline(cmdfile)) != NULL) {
++		while ((line = xmalloc_fgetline(cmdfile)) != NULL) {
+ 			add_cmd(line);
+ 			free(line);
+ 		}
+diff --git a/findutils/grep.c b/findutils/grep.c
+index 259026e..b319e22 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -172,7 +172,7 @@ static int grep_file(FILE *file)
+ 	enum { print_n_lines_after = 0 };
+ #endif /* ENABLE_FEATURE_GREP_CONTEXT */
+ 
+-	while ((line = xmalloc_getline(file)) != NULL) {
++	while ((line = xmalloc_fgetline(file)) != NULL) {
+ 		llist_t *pattern_ptr = pattern_head;
+ 		grep_list_data_t *gl = gl; /* for gcc */
+ 
+@@ -364,7 +364,7 @@ static void load_regexes_from_file(llist_t *fopt)
+ 		fopt = cur->link;
+ 		free(cur);
+ 		f = xfopen(ffile, "r");
+-		while ((line = xmalloc_getline(f)) != NULL) {
++		while ((line = xmalloc_fgetline(f)) != NULL) {
+ 			llist_add_to(&pattern_head,
+ 				new_grep_list_data(line, PATTERN_MEM_A));
+ 		}
+diff --git a/include/libbb.h b/include/libbb.h
+index 07f74e4..3638b7e 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -524,15 +524,16 @@ extern ssize_t nonblock_safe_read(int fd, void *buf, size_t count);
+ extern ssize_t full_read(int fd, void *buf, size_t count);
+ extern void xread(int fd, void *buf, size_t count);
+ extern unsigned char xread_char(int fd);
+-// Read one line a-la fgets. Uses one read(), works only on seekable streams
++// Reads one line a-la fgets (but doesn't save terminating '\n').
++// Uses single full_read() call, works only on seekable streams.
+ extern char *reads(int fd, char *buf, size_t count);
+-// Read one line a-la fgets. Reads byte-by-byte.
+-// Useful when it is important to not read ahead.
++// Reads one line a-la fgets (but doesn't save terminating '\n').
++// Reads byte-by-byte. Useful when it is important to not read ahead.
+ // Bytes are appended to pfx (which must be malloced, or NULL).
+ extern char *xmalloc_reads(int fd, char *pfx, size_t *maxsz_p);
+-extern ssize_t read_close(int fd, void *buf, size_t count);
+-extern ssize_t open_read_close(const char *filename, void *buf, size_t count);
+-extern void *xmalloc_open_read_close(const char *filename, size_t *sizep);
++extern ssize_t read_close(int fd, void *buf, size_t maxsz);
++extern ssize_t open_read_close(const char *filename, void *buf, size_t maxsz);
++extern void *xmalloc_open_read_close(const char *filename, size_t *maxsz_p);
+ 
+ extern ssize_t safe_write(int fd, const void *buf, size_t count);
+ // NB: will return short write on error, not -1,
+@@ -549,7 +550,7 @@ extern char *xmalloc_fgetline_str(FILE *file, const char *terminating_string);
+ /* Reads up to (and including) "\n" or NUL byte */
+ extern char *xmalloc_fgets(FILE *file);
+ /* Chops off '\n' from the end, unlike fgets: */
+-extern char *xmalloc_getline(FILE *file);
++extern char *xmalloc_fgetline(FILE *file);
+ extern char *bb_get_chunk_from_file(FILE *file, int *end);
+ extern void die_if_ferror(FILE *file, const char *msg);
+ extern void die_if_ferror_stdout(void);
+diff --git a/include/usage.h b/include/usage.h
+index f950a0a..f830fb3 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -133,6 +133,8 @@
+      "\n	-f	Control pipe (else exit after drawing image)" \
+      "\n			commands: 'NN' (% for progress bar) or 'exit'" \
+ 
++
++
+ #define brctl_trivial_usage \
+        "COMMAND [BRIDGE [INTERFACE]]"
+ #define brctl_full_usage \
+diff --git a/libbb/get_line_from_file.c b/libbb/get_line_from_file.c
+index ac4d14b..b88872d 100644
+--- a/libbb/get_line_from_file.c
++++ b/libbb/get_line_from_file.c
+@@ -57,7 +57,7 @@ char *xmalloc_fgets(FILE *file)
+ }
+ 
+ /* Get line.  Remove trailing \n */
+-char *xmalloc_getline(FILE *file)
++char *xmalloc_fgetline(FILE *file)
+ {
+ 	int i;
+ 	char *c = bb_get_chunk_from_file(file, &i);
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 5d65665..4ba61c1 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -969,7 +969,7 @@ static void load_history(const char *fromfile)
+ 		}
+ 
+ 		for (hi = 0; hi < MAX_HISTORY;) {
+-			char *hl = xmalloc_getline(fp);
++			char *hl = xmalloc_fgetline(fp);
+ 			int l;
+ 
+ 			if (!hl)
+diff --git a/libbb/read.c b/libbb/read.c
+index 9c025e3..1d31fb0 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -141,7 +141,7 @@ char *reads(int fd, char *buffer, size_t size)
+ 		off_t offset;
+ 		*p++ = '\0';
+ 		// avoid incorrect (unsigned) widening
+-		offset = (off_t)(p-buffer) - (off_t)size;
++		offset = (off_t)(p - buffer) - (off_t)size;
+ 		// set fd position right after '\n'
+ 		if (offset && lseek(fd, offset, SEEK_CUR) == (off_t)-1)
+ 			return NULL;
+@@ -149,8 +149,8 @@ char *reads(int fd, char *buffer, size_t size)
+ 	return buffer;
+ }
+ 
+-// Read one line a-la fgets. Reads byte-by-byte.
+-// Useful when it is important to not read ahead.
++// Reads one line a-la fgets (but doesn't save terminating '\n').
++// Reads byte-by-byte. Useful when it is important to not read ahead.
+ // Bytes are appended to pfx (which must be malloced, or NULL).
+ char *xmalloc_reads(int fd, char *buf, size_t *maxsz_p)
+ {
+@@ -178,9 +178,10 @@ char *xmalloc_reads(int fd, char *buf, size_t *maxsz_p)
+ 			break;
+ 		p++;
+ 	}
+-	*p++ = '\0';
++	*p = '\0';
+ 	if (maxsz_p)
+-		*maxsz_p  = p - buf - 1;
++		*maxsz_p  = p - buf;
++	p++;
+ 	return xrealloc(buf, p - buf);
+ }
+ 
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index 367c6b9..c9495b2 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -83,7 +83,7 @@ static void add_user_to_group(char **args,
+ 
+ 	if (!group_file) return;
+ 
+-	while ((line = xmalloc_getline(group_file))) {
++	while ((line = xmalloc_fgetline(group_file)) != NULL) {
+ 		/* Find the group */
+ 		if (!strncmp(line, args[1], len)
+ 		 && line[len] == ':'
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index cb13ebb..5dc7a9b 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -33,7 +33,7 @@ int chpasswd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	USE_GETOPT_LONG(applet_long_options = chpasswd_longopts;)
+ 	opt = getopt32(argv, "em");
+ 
+-	while ((name = xmalloc_getline(stdin)) != NULL) {
++	while ((name = xmalloc_fgetline(stdin)) != NULL) {
+ 		pass = strchr(name, ':');
+ 		if (!pass)
+ 			bb_error_msg_and_die("missing new password");
+diff --git a/loginutils/cryptpw.c b/loginutils/cryptpw.c
+index c5170c6..68f5e80 100644
+--- a/loginutils/cryptpw.c
++++ b/loginutils/cryptpw.c
+@@ -22,7 +22,7 @@ int cryptpw_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		crypt_make_salt(salt, 1, 0);     /* des */
+ 	}
+ 
+-	puts(pw_encrypt(argv[optind] ? argv[optind] : xmalloc_getline(stdin), salt));
++	puts(pw_encrypt(argv[optind] ? argv[optind] : xmalloc_fgetline(stdin), salt));
+ 
+ 	return 0;
+ }
+diff --git a/miscutils/dc.c b/miscutils/dc.c
+index 6129375..193929c 100644
+--- a/miscutils/dc.c
++++ b/miscutils/dc.c
+@@ -204,7 +204,7 @@ int dc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		char *line;
+ 		char *cursor;
+ 		char *token;
+-		while ((line = xmalloc_getline(stdin)) != NULL) {
++		while ((line = xmalloc_fgetline(stdin)) != NULL) {
+ 			cursor = line;
+ 			while (1) {
+ 				token = get_token(&cursor);
+diff --git a/miscutils/makedevs.c b/miscutils/makedevs.c
+index 1f88f34..43e4b8c 100644
+--- a/miscutils/makedevs.c
++++ b/miscutils/makedevs.c
+@@ -97,7 +97,7 @@ int makedevs_main(int argc, char **argv)
+ 		printf("table=<stdin>\n");
+ 	}
+ 
+-	while ((line = xmalloc_getline(table))) {
++	while ((line = xmalloc_fgetline(table)) != NULL) {
+ 		char type;
+ 		unsigned int mode = 0755;
+ 		unsigned int major = 0;
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 20bb709..7c31448 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -693,13 +693,13 @@ static struct interfaces_file_t *read_interfaces(const char *filename)
+ 	defn = xzalloc(sizeof(*defn));
+ 	f = xfopen(filename, "r");
+ 
+-	while ((buf = xmalloc_getline(f)) != NULL) {
++	while ((buf = xmalloc_fgetline(f)) != NULL) {
+ #if ENABLE_DESKTOP
+ 		/* Trailing "\" concatenates lines */
+ 		char *p;
+ 		while ((p = last_char_is(buf, '\\')) != NULL) {
+ 			*p = '\0';
+-			rest_of_line = xmalloc_getline(f);
++			rest_of_line = xmalloc_fgetline(f);
+ 			if (!rest_of_line)
+ 				break;
+ 			p = xasprintf("%s%s", buf, rest_of_line);
+@@ -1051,7 +1051,7 @@ static char *run_mapping(char *physical, struct mapping_defn_t *map)
+ 		/* If the mapping script exited successfully, try to
+ 		 * grab a line of output and use that as the name of the
+ 		 * logical interface. */
+-		char *new_logical = xmalloc_getline(out);
++		char *new_logical = xmalloc_fgetline(out);
+ 
+ 		if (new_logical) {
+ 			/* If we are able to read a line of output from the script,
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index 378c4bb..973d712 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -170,7 +170,7 @@ static int smtp_checkp(const char *fmt, const char *param, int code)
+ 	// if code = -1 then just return this number
+ 	// if code != -1 then checks whether the number equals the code
+ 	// if not equal -> die saying msg
+-	while ((answer = xmalloc_getline(stdin)) != NULL)
++	while ((answer = xmalloc_fgetline(stdin)) != NULL)
+ 		if (strlen(answer) <= 3 || '-' != answer[3])
+ 			break;
+ 	if (answer) {
+@@ -211,7 +211,7 @@ static char *sane(char *str)
+ static void pop3_checkr(const char *fmt, const char *param, char **ret)
+ {
+ 	const char *msg = command(fmt, param);
+-	char *answer = xmalloc_getline(stdin);
++	char *answer = xmalloc_fgetline(stdin);
+ 	if (answer && '+' == *answer) {
+ 		alarm(0);
+ 		if (ret)
+diff --git a/util-linux/hexdump.c b/util-linux/hexdump.c
+index 10c57fd..7630153 100644
+--- a/util-linux/hexdump.c
++++ b/util-linux/hexdump.c
+@@ -23,7 +23,7 @@ static void bb_dump_addfile(char *name)
+ 
+ 	fp = xfopen(name, "r");
+ 
+-	while ((buf = xmalloc_getline(fp)) != NULL) {
++	while ((buf = xmalloc_fgetline(fp)) != NULL) {
+ 		p = skip_whitespace(buf);
+ 
+ 		if (*p && (*p != '#')) {
+@@ -135,7 +135,7 @@ int hexdump_main(int argc, char **argv)
+ 		char *buf;
+ 		fp = xfopen(*argv, "r");
+  jump_in:
+-		while ((buf = xmalloc_getline(fp)) != NULL) {
++		while ((buf = xmalloc_fgetline(fp)) != NULL) {
+ 			p = buf;
+ 			while (1) {
+ 				/* skip address or previous byte */
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 0edaf10..5a8f1d9 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -68,7 +68,7 @@ static void make_device(char *path, int delete)
+ 		if (!fp)
+ 			goto end_parse;
+ 
+-		while ((vline = line = xmalloc_getline(fp)) != NULL) {
++		while ((vline = line = xmalloc_fgetline(fp)) != NULL) {
+ 			int field;
+ 
+ 			/* A pristine copy for command execution. */
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index bd5f27b..351a31a 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -362,7 +362,7 @@ static llist_t *get_block_backed_filesystems(void)
+ 		f = fopen(filesystems[i], "r");
+ 		if (!f) continue;
+ 
+-		while ((buf = xmalloc_getline(f)) != 0) {
++		while ((buf = xmalloc_fgetline(f)) != NULL) {
+ 			if (!strncmp(buf, "nodev", 5) && isspace(buf[5]))
+ 				continue;
+ 			fs = skip_whitespace(buf);

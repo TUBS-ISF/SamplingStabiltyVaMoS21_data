@@ -1,0 +1,95 @@
+2008-07-06 07:00:11 +0000
+diff --git a/init/init.c b/init/init.c
+index 2328967..4b2bd9c 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -221,20 +221,7 @@ static void console_init(void)
+ 	} else {
+ 		/* Make sure fd 0,1,2 are not closed
+ 		 * (so that they won't be used by future opens) */
+-
+-		/* bb_sanitize_stdio(); - WRONG.
+-		 * It fails if "/dev/null" doesnt exist, and for init
+-		 * this is a real possibility! Open code it instead. */
+-
+-		int fd = open(bb_dev_null, O_RDWR);
+-		if (fd < 0) {
+-			/* Give me _ANY_ open descriptor! */
+-			fd = xopen("/", O_RDONLY); /* we don't believe this can fail */
+-		}
+-		while ((unsigned)fd < 2)
+-			fd = dup(fd);
+-		if (fd > 2)
+-			close(fd);
++		bb_sanitize_stdio();
+ 	}
+ 
+ 	s = getenv("TERM");
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 37d4c27..da0dc03 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -265,7 +265,14 @@ void FAST_FUNC bb_daemonize_or_rexec(int flags, char **argv)
+ 		close(2);
+ 	}
+ 
+-	fd = xopen(bb_dev_null, O_RDWR);
++	fd = open(bb_dev_null, O_RDWR);
++	if (fd < 0) {
++		/* NB: we can be called as bb_sanitize_stdio() from init
++		 * or mdev, and there /dev/null may legitimately not (yet) exist!
++		 * Do not use xopen above, but obtain _ANY_ open descriptor,
++		 * even bogus one as below. */
++		fd = xopen("/", O_RDONLY); /* don't believe this can fail */
++	}
+ 
+ 	while ((unsigned)fd < 2)
+ 		fd = dup(fd); /* have 0,1,2 open at least to /dev/null */
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index c710937..9c4938a 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -19,7 +19,8 @@ struct globals {
+ #define root_major (G.root_major)
+ #define root_minor (G.root_minor)
+ 
+-#define MAX_SYSFS_DEPTH 3 /* prevent infinite loops in /sys symlinks */
++/* Prevent infinite loops in /sys symlinks */
++#define MAX_SYSFS_DEPTH 3
+ 
+ /* We use additional 64+ bytes in make_device() */
+ #define SCRATCH_SIZE 80
+@@ -392,11 +393,17 @@ int mdev_main(int argc, char **argv)
+ 	char *env_path;
+ 	RESERVE_CONFIG_BUFFER(temp, PATH_MAX + SCRATCH_SIZE);
+ 
+-#ifdef YOU_WANT_TO_DEBUG_HOTPLUG_EVENTS
++	/* We can be called as hotplug helper */
+ 	/* Kernel cannot provide suitable stdio fds for us, do it ourself */
++#if 1
++	bb_sanitize_stdio();
++#else
++	/* Debug code */
+ 	/* Replace LOGFILE by other file or device name if you need */
+ #define LOGFILE "/dev/console"
+-	xmove_fd(xopen("/dev/null", O_RDONLY), STDIN_FILENO);
++	/* Just making sure fd 0 is not closed,
++	 * we don't really intend to read from it */
++	xmove_fd(xopen("/", O_RDONLY), STDIN_FILENO);
+ 	xmove_fd(xopen(LOGFILE, O_WRONLY|O_APPEND), STDOUT_FILENO);
+ 	xmove_fd(xopen(LOGFILE, O_WRONLY|O_APPEND), STDERR_FILENO);
+ #endif
+@@ -414,11 +421,11 @@ int mdev_main(int argc, char **argv)
+ 		root_minor = minor(st.st_dev);
+ 
+ 		recursive_action("/sys/block",
+-			ACTION_RECURSE | ACTION_FOLLOWLINKS,
++			ACTION_RECURSE /* no ACTION_FOLLOWLINKS! */,
+ 			fileAction, dirAction, temp, 0);
+ 
+ 		recursive_action("/sys/class",
+-			ACTION_RECURSE | ACTION_FOLLOWLINKS,
++			ACTION_RECURSE /* no ACTION_FOLLOWLINKS! */,
+ 			fileAction, dirAction, temp, 0);
+ 
+ 	} else {

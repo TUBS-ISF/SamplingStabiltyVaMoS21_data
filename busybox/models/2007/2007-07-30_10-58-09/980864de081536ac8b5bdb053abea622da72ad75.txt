@@ -1,0 +1,17 @@
+2007-07-30 10:58:09 +0000
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index b7979d6..3b4b1d7 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -38,8 +38,9 @@ struct globals {
+ 
+ static void dd_output_status(int ATTRIBUTE_UNUSED cur_signal)
+ {
+-	fprintf(stderr, "%"OFF_FMT"d+%"OFF_FMT"d records in\n"
+-			"%"OFF_FMT"d+%"OFF_FMT"d records out\n",
++	/* Deliberately using %u, not %d */
++	fprintf(stderr, "%"OFF_FMT"u+%"OFF_FMT"u records in\n"
++			"%"OFF_FMT"u+%"OFF_FMT"u records out\n",
+ 			G.in_full, G.in_part,
+ 			G.out_full, G.out_part);
+ }

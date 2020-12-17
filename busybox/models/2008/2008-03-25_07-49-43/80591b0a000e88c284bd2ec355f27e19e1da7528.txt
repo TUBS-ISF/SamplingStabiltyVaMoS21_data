@@ -1,0 +1,204 @@
+2008-03-25 07:49:43 +0000
+diff --git a/shell/ash.c b/shell/ash.c
+index 9024d78..3651929 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -8470,8 +8470,10 @@ static const struct builtincmd builtintab[] = {
+ 	{ BUILTIN_SPEC_REG      ":", truecmd },
+ #if ENABLE_ASH_BUILTIN_TEST
+ 	{ BUILTIN_REGULAR	"[", testcmd },
++#if ENABLE_ASH_BASH_COMPAT
+ 	{ BUILTIN_REGULAR	"[[", testcmd },
+ #endif
++#endif
+ #if ENABLE_ASH_ALIAS
+ 	{ BUILTIN_REG_ASSG      "alias", aliascmd },
+ #endif
+@@ -8534,17 +8536,25 @@ static const struct builtincmd builtintab[] = {
+ 	{ BUILTIN_REGULAR       "wait", waitcmd },
+ };
+ 
+-
+-#define COMMANDCMD (builtintab + 5 + \
+-	2 * ENABLE_ASH_BUILTIN_TEST + \
+-	ENABLE_ASH_ALIAS + \
+-	ENABLE_ASH_JOB_CONTROL)
+-#define EXECCMD (builtintab + 7 + \
+-	2 * ENABLE_ASH_BUILTIN_TEST + \
+-	ENABLE_ASH_ALIAS + \
+-	ENABLE_ASH_JOB_CONTROL + \
+-	ENABLE_ASH_CMDCMD + \
+-	ENABLE_ASH_BUILTIN_ECHO)
++/* Should match the above table! */
++#define COMMANDCMD (builtintab + \
++	2 + \
++	1 * ENABLE_ASH_BUILTIN_TEST + \
++	1 * ENABLE_ASH_BUILTIN_TEST * ENABLE_ASH_BASH_COMPAT + \
++	1 * ENABLE_ASH_ALIAS + \
++	1 * ENABLE_ASH_JOB_CONTROL + \
++	3)
++#define EXECCMD (builtintab + \
++	2 + \
++	1 * ENABLE_ASH_BUILTIN_TEST + \
++	1 * ENABLE_ASH_BUILTIN_TEST * ENABLE_ASH_BASH_COMPAT + \
++	1 * ENABLE_ASH_ALIAS + \
++	1 * ENABLE_ASH_JOB_CONTROL + \
++	3 + \
++	1 * ENABLE_ASH_CMDCMD + \
++	1 + \
++	ENABLE_ASH_BUILTIN_ECHO + \
++	1)
+ 
+ /*
+  * Search the table of builtin commands.
+@@ -10048,6 +10058,9 @@ simplecmd(void)
+ 	union node *vars, **vpp;
+ 	union node **rpp, *redir;
+ 	int savecheckkwd;
++#if ENABLE_ASH_BASH_COMPAT
++	smallint double_brackets_flag = 0;
++#endif
+ 
+ 	args = NULL;
+ 	app = &args;
+@@ -10058,13 +10071,30 @@ simplecmd(void)
+ 
+ 	savecheckkwd = CHKALIAS;
+ 	for (;;) {
++		int t;
+ 		checkkwd = savecheckkwd;
+-		switch (readtoken()) {
++		t = readtoken();
++		switch (t) {
++#if ENABLE_ASH_BASH_COMPAT
++		case TAND: /* "&&" */
++		case TOR: /* "||" */
++			if (!double_brackets_flag) {
++				tokpushback = 1;
++				goto out;
++			}
++			wordtext = (char *) (t == TAND ? "-a" : "-o");
++#endif
+ 		case TWORD:
+ 			n = stzalloc(sizeof(struct narg));
+ 			n->type = NARG;
+ 			/*n->narg.next = NULL; - stzalloc did it */
+ 			n->narg.text = wordtext;
++#if ENABLE_ASH_BASH_COMPAT
++			if (strcmp("[[", wordtext) == 0)
++				double_brackets_flag = 1;
++			else if (strcmp("]]", wordtext) == 0)
++				double_brackets_flag = 0;
++#endif
+ 			n->narg.backquote = backquotelist;
+ 			if (savecheckkwd && isassignment(wordtext)) {
+ 				*vpp = n;
+diff --git a/shell/ash_test/ash-arith/arith-bash1.right b/shell/ash_test/ash-arith/arith-bash1.right
+new file mode 100644
+index 0000000..b261da1
+--- /dev/null
++++ b/shell/ash_test/ash-arith/arith-bash1.right
+@@ -0,0 +1,2 @@
++1
++0
+diff --git a/shell/ash_test/ash-arith/arith-bash1.tests b/shell/ash_test/ash-arith/arith-bash1.tests
+new file mode 100755
+index 0000000..b37b730
+--- /dev/null
++++ b/shell/ash_test/ash-arith/arith-bash1.tests
+@@ -0,0 +1,5 @@
++# checks for [[ ]]
++
++# && and ||
++[[ a && "" ]]; echo $?
++[[ a || "" ]]; echo $?
+diff --git a/shell/ash_test/ash-vars/var_bash1.right b/shell/ash_test/ash-vars/var_bash1.right
+new file mode 100644
+index 0000000..c0a0769
+--- /dev/null
++++ b/shell/ash_test/ash-vars/var_bash1.right
+@@ -0,0 +1,14 @@
++
++
++f
++bcdef
++abcdef
++abcdef
++bcde
++abcd
++abcd
++abcdef
++bcdef
++abcdef
++abcdef
++abcdef
+diff --git a/shell/ash_test/ash-vars/var_bash1.tests b/shell/ash_test/ash-vars/var_bash1.tests
+new file mode 100755
+index 0000000..24d3c9a
+--- /dev/null
++++ b/shell/ash_test/ash-vars/var_bash1.tests
+@@ -0,0 +1,18 @@
++var=abcdef
++
++echo ${var:7}
++echo ${var:6}
++echo ${var:5}
++echo ${var:1}
++echo ${var:0}
++echo ${var:-1}
++
++echo ${var:1:4}
++echo ${var:0:4}
++echo ${var::4}
++echo ${var:-1:4}
++
++echo ${var:1:7}
++echo ${var:0:7}
++echo ${var::7}
++echo ${var:-1:7}
+diff --git a/shell/ash_test/ash-vars/var_bash2.right b/shell/ash_test/ash-vars/var_bash2.right
+new file mode 100644
+index 0000000..acba5c6
+--- /dev/null
++++ b/shell/ash_test/ash-vars/var_bash2.right
+@@ -0,0 +1,10 @@
++abc123xcba123
++abx123dcba123
++abx123dxba123
++abcx23dcba123
++abcxxxdcbaxxx
++abx
++xba123
++abx23
++abc23dcba123
++abcdcba
+diff --git a/shell/ash_test/ash-vars/var_bash2.tests b/shell/ash_test/ash-vars/var_bash2.tests
+new file mode 100755
+index 0000000..29c526c
+--- /dev/null
++++ b/shell/ash_test/ash-vars/var_bash2.tests
+@@ -0,0 +1,24 @@
++var=abc123dcba123
++
++echo ${var/d/x}
++echo ${var/c/x}
++echo ${var//c/x}
++echo ${var/[123]/x}
++echo ${var//[123]/x}
++echo ${var/c*/x}
++echo ${var/*c/x}
++
++# must match longest match: result is "abx23"
++echo ${var/c*1/x}
++
++# empty replacement - 2nd slash can be omitted
++echo ${var/[123]}
++echo ${var//[123]}
++
++### ash doesn't support
++### # match only at the beginning:
++### echo ${var/#a/x}
++### echo ${var/#b/x} # should not match
++### echo ${var//#b/x} # should not match
++### # match only at the end:
++### echo ${var/%3/x}

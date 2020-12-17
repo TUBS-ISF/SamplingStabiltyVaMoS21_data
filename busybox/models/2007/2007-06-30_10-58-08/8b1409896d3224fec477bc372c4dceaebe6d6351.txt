@@ -1,0 +1,25 @@
+2007-06-30 10:58:08 +0000
+diff --git a/libbb/bb_basename.c b/libbb/bb_basename.c
+new file mode 100644
+index 0000000..e19156d
+--- /dev/null
++++ b/libbb/bb_basename.c
+@@ -0,0 +1,18 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Utility routines.
++ *
++ * Copyright (C) 2007 Denis Vlasenko
++ *
++ * Licensed under GPL version 2, see file LICENSE in this tarball for details.
++ */
++
++#include "libbb.h"
++
++const char *bb_basename(const char *name)
++{
++	const char *cp = strrchr(name, '/');
++	if (cp)
++		return cp + 1;
++	return name;
++}

@@ -1,0 +1,14 @@
+2007-10-21 23:24:42 +0000
+diff --git a/networking/httpd.c b/networking/httpd.c
+index e4922e5..b31b736 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -626,7 +626,7 @@ static void parse_conf(const char *path, int flag)
+ 			}
+ 			*host_port++ = '\0';
+ 			if (strncmp(host_port, "http://", 7) == 0)
+-				c += 7;
++				host_port += 7;
+ 			if (*host_port == '\0') {
+ 				bb_error_msg("config error '%s' in '%s'", buf, cf);
+ 				continue;

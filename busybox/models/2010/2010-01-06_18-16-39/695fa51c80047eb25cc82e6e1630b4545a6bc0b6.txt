@@ -1,0 +1,193 @@
+2010-01-06 18:16:39 +0100
+diff --git a/libbb/rtc.c b/libbb/rtc.c
+index 51834f8..2f38b8a 100644
+--- a/libbb/rtc.c
++++ b/libbb/rtc.c
+@@ -19,7 +19,7 @@ int FAST_FUNC rtc_adjtime_is_utc(void)
+ 	FILE *f = fopen_for_read(ADJTIME_PATH);
+ 
+ 	if (f) {
+-		RESERVE_CONFIG_BUFFER(buffer, 128);
++		char buffer[128];
+ 
+ 		while (fgets(buffer, sizeof(buffer), f)) {
+ 			int len = strlen(buffer);
+@@ -35,8 +35,6 @@ int FAST_FUNC rtc_adjtime_is_utc(void)
+ 			}
+ 		}
+ 		fclose(f);
+-
+-		RELEASE_CONFIG_BUFFER(buffer);
+ 	}
+ 
+ 	return utc;
+diff --git a/networking/tc.c b/networking/tc.c
+index 3115a52..dbdba33 100644
+--- a/networking/tc.c
++++ b/networking/tc.c
+@@ -191,8 +191,8 @@ static int cbq_print_opt(struct rtattr *opt)
+ 	struct tc_cbq_wrropt *wrr = NULL;
+ 	struct tc_cbq_fopt *fopt = NULL;
+ 	struct tc_cbq_ovl *ovl = NULL;
+-	const char * const error = "CBQ: too short %s opt";
+-	RESERVE_CONFIG_BUFFER(buf, 64);
++	const char *const error = "CBQ: too short %s opt";
++	char buf[64];
+ 
+ 	if (opt == NULL)
+ 		goto done;
+@@ -272,7 +272,6 @@ static int cbq_print_opt(struct rtattr *opt)
+ 		}
+ 	}
+  done:
+-	RELEASE_CONFIG_BUFFER(buf);
+ 	return 0;
+ }
+ 
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 082d726..1a68eb7 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -104,7 +104,7 @@ static NOINLINE void edir(const char *directory_name)
+ 	xchdir(directory_name);
+ 	dir = xopendir(".");
+ 	for (;;) {
+-		RESERVE_CONFIG_BUFFER(buf, 256);
++		char buf[256];
+ 		char *tail;
+ 		int size;
+ 
+@@ -148,7 +148,6 @@ static NOINLINE void edir(const char *directory_name)
+ 				break;
+ 		}
+ 		xsetenv(d->d_name, buf);
+-		RELEASE_CONFIG_BUFFER(buf);
+ 	}
+ 	closedir(dir);
+ 	if (fchdir(wdir) == -1)
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index 6dff57f..08e5bd7 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -27,27 +27,12 @@ static time_t read_rtc(int utc)
+ 
+ 	fd = rtc_xopen(&rtcname, O_RDONLY);
+ 	ret = rtc_read_time(fd, utc);
+-	close(fd);
++	if (ENABLE_FEATURE_CLEAN_UP)
++		close(fd);
+ 
+ 	return ret;
+ }
+ 
+-static void write_rtc(time_t t, int utc)
+-{
+-	struct tm tm;
+-	int rtc = rtc_xopen(&rtcname, O_WRONLY);
+-
+-	if (utc)
+-		gmtime_r(&t, &tm);
+-	else
+-		localtime_r(&t, &tm);
+-	tm.tm_isdst = 0;
+-
+-	xioctl(rtc, RTC_SET_TIME, &tm);
+-
+-	close(rtc);
+-}
+-
+ static void show_clock(int utc)
+ {
+ 	//struct tm *ptm;
+@@ -58,10 +43,10 @@ static void show_clock(int utc)
+ 	//ptm = localtime(&t);  /* Sets 'tzname[]' */
+ 
+ 	cp = ctime(&t);
+-	if (cp[0])
+-		cp[strlen(cp) - 1] = '\0';
++	strchrnul(cp, '\n')[0] = '\0';
+ 
+-	//printf("%s  %.6f seconds %s\n", cp, 0.0, utc ? "" : (ptm->tm_isdst ? tzname[1] : tzname[0]));
++	//printf("%s  0.000000 seconds %s\n", cp, utc ? "" : (ptm->tm_isdst ? tzname[1] : tzname[0]));
++	/* 0.000000 stand for unimplemented difference between RTC and system clock */
+ 	printf("%s  0.000000 seconds\n", cp);
+ }
+ 
+@@ -81,12 +66,73 @@ static void to_sys_clock(int utc)
+ 
+ static void from_sys_clock(int utc)
+ {
++#define TWEAK_USEC 200
++	struct tm tm;
+ 	struct timeval tv;
++	unsigned adj = TWEAK_USEC;
++	int rtc = rtc_xopen(&rtcname, O_WRONLY);
++
++	/* Try to catch the moment when whole second is close */
++	while (1) {
++		unsigned rem_usec;
++		time_t t;
++
++		gettimeofday(&tv, NULL);
++
++		rem_usec = 1000000 - tv.tv_usec;
++		if (rem_usec < 1024) {
++			/* Less than 1ms to next second. Good enough */
++ small_rem:
++			tv.tv_sec++;
++		}
++
++		/* Prepare tm */
++		t = tv.tv_sec;
++		if (utc)
++			gmtime_r(&t, &tm); /* may read /etc/xxx (it takes time) */
++		else
++			localtime_r(&t, &tm); /* same */
++		tm.tm_isdst = 0;
++
++		/* gmtime/localtime took some time, re-get cur time */
++		gettimeofday(&tv, NULL);
++
++		if (tv.tv_sec < t /* may happen if rem_usec was < 1024 */
++		 || (tv.tv_sec == t && tv.tv_usec < 1024)
++		) {
++			/* We are not too far into next second. Good. */
++			break;
++		}
++		adj += 32; /* 2^(10-5) = 2^5 = 32 iterations max */
++		if (adj >= 1024) {
++			/* Give up trying to sync */
++			break;
++		}
++
++		/* Try to sync up by sleeping */
++		rem_usec = 1000000 - tv.tv_usec;
++		if (rem_usec < 1024) {
++			goto small_rem; /* already close, don't sleep */
++		}
++		/* Need to sleep.
++		 * Note that small adj on slow processors can make us
++		 * to always overshoot tv.tv_usec < 1024 check on next
++		 * iteration. That's why adj is increased on each iteration.
++		 * This also allows it to be reused as a loop limiter.
++		 */
++		usleep(rem_usec - adj);
++	}
++
++	xioctl(rtc, RTC_SET_TIME, &tm);
++
++	/* Debug aid to find "good" TWEAK_USEC.
++	 * Look for a value which makes tv_usec close to 999999 or 0.
++	 * for 2.20GHz Intel Core 2: TWEAK_USEC ~= 200
++	 */
++	//bb_error_msg("tv.tv_usec:%d adj:%d", (int)tv.tv_usec, adj);
+ 
+-	gettimeofday(&tv, NULL);
+-	//if (gettimeofday(&tv, NULL))
+-	//	bb_perror_msg_and_die("gettimeofday() failed");
+-	write_rtc(tv.tv_sec, utc);
++	if (ENABLE_FEATURE_CLEAN_UP)
++		close(rtc);
+ }
+ 
+ #define HWCLOCK_OPT_LOCALTIME   0x01

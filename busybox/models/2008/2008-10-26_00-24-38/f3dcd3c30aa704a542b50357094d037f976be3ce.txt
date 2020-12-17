@@ -1,0 +1,28 @@
+2008-10-26 00:24:38 +0000
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 40edf23..074e6c4 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -318,7 +318,7 @@ config FEATURE_LESS_REGEXP
+ config FEATURE_LESS_LINENUMS
+ 	bool "Enable dynamic switching of line numbers"
+ 	default n
+-	depends on LESS
++	depends on FEATURE_LESS_DASHCMD
+ 	help
+ 	  Enable "-N" command.
+ 
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 6f28200..4f00fad 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -192,7 +192,8 @@ static void less_exit(int code)
+ 	exit(code);
+ }
+ 
+-#if ENABLE_FEATURE_LESS_LINENUMS || ENABLE_FEATURE_LESS_WINCH
++#if (ENABLE_FEATURE_LESS_DASHCMD && ENABLE_FEATURE_LESS_LINENUMS) \
++ || ENABLE_FEATURE_LESS_WINCH
+ static void re_wrap(void)
+ {
+ 	int w = width;

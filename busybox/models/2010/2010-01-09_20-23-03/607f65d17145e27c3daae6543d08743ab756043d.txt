@@ -1,0 +1,104 @@
+2010-01-09 20:23:03 +0100
+diff --git a/archival/cpio.c b/archival/cpio.c
+index be9fbd0..5eb393d 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -298,6 +298,10 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 		;
+ #endif
+ 
++	archive_handle = init_handle();
++	/* archive_handle->src_fd = STDIN_FILENO; - done by init_handle */
++	archive_handle->ah_flags = ARCHIVE_EXTRACT_NEWER;
++
+ 	/* As of now we do not enforce this: */
+ 	/* -i,-t,-o,-p are mutually exclusive */
+ 	/* -u,-d,-m make sense only with -i or -p */
+@@ -307,11 +311,17 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 	/* no parameters */
+ 	opt_complementary = "=0";
+ 	opt = getopt32(argv, OPTION_STR, &cpio_filename);
++	if (opt & CPIO_OPT_FILE) { /* -F */
++		archive_handle->src_fd = xopen(cpio_filename, O_RDONLY);
++	}
+ #else
+ 	/* _exactly_ one parameter for -p, thus <= 1 param if -p is allowed */
+ 	opt_complementary = ENABLE_FEATURE_CPIO_P ? "?1" : "=0";
+ 	opt = getopt32(argv, OPTION_STR "oH:" IF_FEATURE_CPIO_P("p"), &cpio_filename, &cpio_fmt);
+ 	argv += optind;
++	if ((opt & (CPIO_OPT_FILE|CPIO_OPT_CREATE)) == CPIO_OPT_FILE) { /* -F without -o */
++		xmove_fd(xopen(cpio_filename, O_RDONLY), STDIN_FILENO);
++	}
+ 	if (opt & CPIO_OPT_PASSTHROUGH) {
+ 		pid_t pid;
+ 		struct fd_pair pp;
+@@ -367,11 +377,6 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+  skip:
+ #endif
+ 
+-	archive_handle = init_handle();
+-	/* archive_handle->src_fd = STDIN_FILENO; - done by init_handle */
+-	archive_handle->seek = seek_by_read;
+-	archive_handle->ah_flags = ARCHIVE_EXTRACT_NEWER;
+-
+ 	/* One of either extract or test options must be given */
+ 	if ((opt & (CPIO_OPT_TEST | CPIO_OPT_EXTRACT)) == 0) {
+ 		bb_show_usage();
+@@ -398,10 +403,6 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 			archive_handle->action_header = header_list;
+ 		}
+ 	}
+-	if (opt & CPIO_OPT_FILE) { /* -F */
+-		archive_handle->src_fd = xopen(cpio_filename, O_RDONLY);
+-		archive_handle->seek = seek_by_jump;
+-	}
+ 	if (opt & CPIO_OPT_CREATE_LEADING_DIR) {
+ 		archive_handle->ah_flags |= ARCHIVE_CREATE_LEADING_DIRS;
+ 	}
+@@ -422,8 +423,9 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	if (archive_handle->cpio__blocks != (off_t)-1
+ 	 && !(opt & CPIO_OPT_QUIET)
+-	)
++	) {
+ 		printf("%"OFF_FMT"u blocks\n", archive_handle->cpio__blocks);
++	}
+ 
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/include/usage.h b/include/usage.h
+index 65836d8..7a5cbcc 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -560,8 +560,8 @@
+      "\n	-l,-s	Create (sym)links" \
+ 
+ #define cpio_trivial_usage \
+-       "[-ti" IF_FEATURE_CPIO_O("o") "]" IF_FEATURE_CPIO_P(" [-p DIR]") \
+-       " [-dmvu] [-F FILE]" IF_FEATURE_CPIO_O(" [-H newc]")
++       "[-dmvu] [-F FILE]" IF_FEATURE_CPIO_O(" [-H newc]") \
++       " [-ti"IF_FEATURE_CPIO_O("o")"]" IF_FEATURE_CPIO_P(" [-p DIR]")
+ #define cpio_full_usage "\n\n" \
+        "Extract or list files from a cpio archive" \
+ 	IF_FEATURE_CPIO_O(", or" \
+@@ -573,7 +573,7 @@
+      "\n	-t	List" \
+      "\n	-i	Extract" \
+ 	IF_FEATURE_CPIO_O( \
+-     "\n	-o	Create" \
++     "\n	-o	Create (requires -H newc)" \
+ 	) \
+ 	IF_FEATURE_CPIO_P( \
+      "\n	-p DIR	Copy files to DIR" \
+@@ -583,9 +583,9 @@
+      "\n	-m	Preserve mtime" \
+      "\n	-v	Verbose" \
+      "\n	-u	Overwrite" \
+-     "\n	-F	Input file" \
++     "\n	-F FILE	Input (-t,-i,-p) or output (-o) file" \
+ 	IF_FEATURE_CPIO_O( \
+-     "\n	-H	Define format" \
++     "\n	-H newc	Archive format" \
+ 	) \
+ 
+ #define crond_trivial_usage \

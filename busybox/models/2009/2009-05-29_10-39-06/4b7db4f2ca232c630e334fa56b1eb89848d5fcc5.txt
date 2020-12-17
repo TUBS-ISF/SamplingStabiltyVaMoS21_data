@@ -1,0 +1,183 @@
+2009-05-29 10:39:06 +0200
+diff --git a/include/libbb.h b/include/libbb.h
+index 788140d..963e2af 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -933,54 +933,6 @@ void bb_displayroutes(int noresolve, int netstatfmt) FAST_FUNC;
+ #endif
+ 
+ 
+-/* "Keycodes" that report an escape sequence.
+- * We use something which fits into signed char,
+- * yet doesn't represent any valid Unicode characher.
+- * Also, -1 is reserved for error indication and we don't use it. */
+-enum {
+-	KEYCODE_UP       =  -2,
+-	KEYCODE_DOWN     =  -3,
+-	KEYCODE_RIGHT    =  -4,
+-	KEYCODE_LEFT     =  -5,
+-	KEYCODE_HOME     =  -6,
+-	KEYCODE_END      =  -7,
+-	KEYCODE_INSERT   =  -8,
+-	KEYCODE_DELETE   =  -9,
+-	KEYCODE_PAGEUP   = -10,
+-	KEYCODE_PAGEDOWN = -11,
+-#if 0
+-	KEYCODE_FUN1     = -12,
+-	KEYCODE_FUN2     = -13,
+-	KEYCODE_FUN3     = -14,
+-	KEYCODE_FUN4     = -15,
+-	KEYCODE_FUN5     = -16,
+-	KEYCODE_FUN6     = -17,
+-	KEYCODE_FUN7     = -18,
+-	KEYCODE_FUN8     = -19,
+-	KEYCODE_FUN9     = -20,
+-	KEYCODE_FUN10    = -21,
+-	KEYCODE_FUN11    = -22,
+-	KEYCODE_FUN12    = -23,
+-#endif
+-	KEYCODE_CURSOR_POS = -0x100,
+-	/* How long is the longest ESC sequence we know?
+-	 * We want it big enough to be able to contain
+-	 * cursor position sequence "ESC [ 9999 ; 9999 R"
+-	 */
+-	KEYCODE_BUFFER_SIZE = 16
+-};
+-/* Note: fd may be in blocking or non-blocking mode, both make sense.
+- * For one, less uses non-blocking mode.
+- * Only the first read syscall inside read_key may block indefinitely
+- * (unless fd is in non-blocking mode),
+- * subsequent reads will time out after a few milliseconds.
+- * Return of -1 means EOF or error (errno == 0 on EOF).
+- * buffer[0] is used as a counter of buffered chars and must be 0
+- * on first call.
+- */
+-int64_t read_key(int fd, char *buffer) FAST_FUNC;
+-
+-
+ /* Networking */
+ int create_icmp_socket(void) FAST_FUNC;
+ int create_icmp6_socket(void) FAST_FUNC;
+@@ -1209,6 +1161,54 @@ unsigned long long bb_makedev(unsigned int major, unsigned int minor) FAST_FUNC;
+ #endif
+ 
+ 
++/* "Keycodes" that report an escape sequence.
++ * We use something which fits into signed char,
++ * yet doesn't represent any valid Unicode characher.
++ * Also, -1 is reserved for error indication and we don't use it. */
++enum {
++	KEYCODE_UP       =  -2,
++	KEYCODE_DOWN     =  -3,
++	KEYCODE_RIGHT    =  -4,
++	KEYCODE_LEFT     =  -5,
++	KEYCODE_HOME     =  -6,
++	KEYCODE_END      =  -7,
++	KEYCODE_INSERT   =  -8,
++	KEYCODE_DELETE   =  -9,
++	KEYCODE_PAGEUP   = -10,
++	KEYCODE_PAGEDOWN = -11,
++#if 0
++	KEYCODE_FUN1     = -12,
++	KEYCODE_FUN2     = -13,
++	KEYCODE_FUN3     = -14,
++	KEYCODE_FUN4     = -15,
++	KEYCODE_FUN5     = -16,
++	KEYCODE_FUN6     = -17,
++	KEYCODE_FUN7     = -18,
++	KEYCODE_FUN8     = -19,
++	KEYCODE_FUN9     = -20,
++	KEYCODE_FUN10    = -21,
++	KEYCODE_FUN11    = -22,
++	KEYCODE_FUN12    = -23,
++#endif
++	KEYCODE_CURSOR_POS = -0x100,
++	/* How long is the longest ESC sequence we know?
++	 * We want it big enough to be able to contain
++	 * cursor position sequence "ESC [ 9999 ; 9999 R"
++	 */
++	KEYCODE_BUFFER_SIZE = 16
++};
++/* Note: fd may be in blocking or non-blocking mode, both make sense.
++ * For one, less uses non-blocking mode.
++ * Only the first read syscall inside read_key may block indefinitely
++ * (unless fd is in non-blocking mode),
++ * subsequent reads will time out after a few milliseconds.
++ * Return of -1 means EOF or error (errno == 0 on EOF).
++ * buffer[0] is used as a counter of buffered chars and must be 0
++ * on first call.
++ */
++int64_t read_key(int fd, char *buffer) FAST_FUNC;
++
++
+ #if ENABLE_FEATURE_EDITING
+ /* It's NOT just ENABLEd or disabled. It's a number: */
+ # ifdef CONFIG_FEATURE_EDITING_HISTORY
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index a0b1bcf..81f6fde 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1451,10 +1451,13 @@ static int lineedit_read_key(char *read_key_buffer)
+ 	pfd.events = POLLIN;
+ 	do {
+  poll_again:
+-		/* Wait for input. Can't just call read_key, it will return
+-		 * at once if stdin is in non-blocking mode. */
+-		safe_poll(&pfd, 1, -1);
+-		/* note: read_key sets errno to 0 on success: */
++		if (read_key_buffer[0] == 0) {
++			/* Wait for input. Can't just call read_key,
++			 * it returns at once if stdin
++			 * is in non-blocking mode. */
++			safe_poll(&pfd, 1, -1);
++		}
++		/* Note: read_key sets errno to 0 on success: */
+ 		ic = read_key(STDIN_FILENO, read_key_buffer);
+ 		if (ENABLE_FEATURE_EDITING_ASK_TERMINAL
+ 		 && (int32_t)ic == KEYCODE_CURSOR_POS
+diff --git a/libbb/read_key.c b/libbb/read_key.c
+index 3771045..6f6c39e 100644
+--- a/libbb/read_key.c
++++ b/libbb/read_key.c
+@@ -69,11 +69,14 @@ int64_t FAST_FUNC read_key(int fd, char *buffer)
+ 	errno = 0;
+ 	n = (unsigned char) *buffer++;
+ 	if (n == 0) {
+-		/* If no data, block waiting for input. If we read more
+-		 * than the minimal ESC sequence size, the "n=0" below
+-		 * would instead have to figure out how much to keep,
+-		 * resulting in larger code. */
+-		n = safe_read(fd, buffer, 3);
++		/* If no data, block waiting for input.
++		 * It is tempting to read more than one byte here,
++		 * but it breaks pasting. Example: at shell prompt,
++		 * user presses "c","a","t" and then pastes "\nline\n".
++		 * When we were reading 3 bytes here, we were eating
++		 * "li" too, and cat was getting wrong input.
++		 */
++		n = safe_read(fd, buffer, 1);
+ 		if (n <= 0)
+ 			return -1;
+ 	}
+diff --git a/shell/hush.c b/shell/hush.c
+index add40eb..5fa693b 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1006,7 +1006,7 @@ static void restore_G_args(save_arg_t *sv, char **argv)
+  * Commands run in command substitution ("`cmd`")
+  * have SIGTTIN, SIGTTOU, SIGTSTP set to SIG_IGN.
+  *
+- * Ordinary commands have signals set to SIG_IGN/DFL set as inherited
++ * Ordinary commands have signals set to SIG_IGN/DFL as inherited
+  * by the shell from its parent.
+  *
+  * Siganls which differ from SIG_DFL action
+@@ -1285,7 +1285,7 @@ static int set_local_var(char *str, int flg_export, int flg_read_only)
+ 		if (strncmp(cur->varstr, str, name_len) != 0) {
+ 			if (!cur->next) {
+ 				/* Bail out. Note that now cur points
+-				 * to last var in linked list */
++				 * to the last var in the linked list */
+ 				break;
+ 			}
+ 			cur = cur->next;

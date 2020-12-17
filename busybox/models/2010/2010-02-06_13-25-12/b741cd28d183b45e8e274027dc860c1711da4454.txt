@@ -1,0 +1,13 @@
+2010-02-06 13:25:12 +0100
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 0bad597..4392363 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -267,7 +267,6 @@ struct globals {
+ #endif
+ 	llist_t *fslist;
+ 	char getmntent_buf[1];
+-
+ } FIX_ALIASING;
+ enum { GETMNTENT_BUFSIZE = COMMON_BUFSIZE - offsetof(struct globals, getmntent_buf) };
+ #define G (*(struct globals*)&bb_common_bufsiz1)

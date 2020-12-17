@@ -1,0 +1,225 @@
+2007-10-14 04:55:59 +0000
+diff --git a/archival/bz/LICENSE b/archival/bz/LICENSE
+index f01f080..da43465 100644
+--- a/archival/bz/LICENSE
++++ b/archival/bz/LICENSE
+@@ -15,16 +15,16 @@ are met:
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+ 
+-2. The origin of this software must not be misrepresented; you must 
+-   not claim that you wrote the original software.  If you use this 
+-   software in a product, an acknowledgment in the product 
++2. The origin of this software must not be misrepresented; you must
++   not claim that you wrote the original software.  If you use this
++   software in a product, an acknowledgment in the product
+    documentation would be appreciated but is not required.
+ 
+ 3. Altered source versions must be plainly marked as such, and must
+    not be misrepresented as being the original software.
+ 
+-4. The name of the author may not be used to endorse or promote 
+-   products derived from this software without specific prior written 
++4. The name of the author may not be used to endorse or promote
++   products derived from this software without specific prior written
+    permission.
+ 
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
+diff --git a/archival/bz/README b/archival/bz/README
+index ef06d67..3015342 100644
+--- a/archival/bz/README
++++ b/archival/bz/README
+@@ -25,12 +25,12 @@ Please read and be aware of the following:
+ 
+ WARNING:
+ 
+-   This program and library (attempts to) compress data by 
+-   performing several non-trivial transformations on it.  
+-   Unless you are 100% familiar with *all* the algorithms 
+-   contained herein, and with the consequences of modifying them, 
+-   you should NOT meddle with the compression or decompression 
+-   machinery.  Incorrect changes can and very likely *will* 
++   This program and library (attempts to) compress data by
++   performing several non-trivial transformations on it.
++   Unless you are 100% familiar with *all* the algorithms
++   contained herein, and with the consequences of modifying them,
++   you should NOT meddle with the compression or decompression
++   machinery.  Incorrect changes can and very likely *will*
+    lead to disastrous loss of data.
+ 
+ 
+@@ -50,16 +50,16 @@ DISCLAIMER:
+    PROGRAM UNLESS YOU ARE PREPARED TO ACCEPT THE POSSIBILITY, HOWEVER
+    SMALL, THAT THE DATA WILL NOT BE RECOVERABLE.
+ 
+-   That is not to say this program is inherently unreliable.  
+-   Indeed, I very much hope the opposite is true.  bzip2/libbzip2 
++   That is not to say this program is inherently unreliable.
++   Indeed, I very much hope the opposite is true.  bzip2/libbzip2
+    has been carefully constructed and extensively tested.
+ 
+ 
+ PATENTS:
+ 
+-   To the best of my knowledge, bzip2/libbzip2 does not use any 
+-   patented algorithms.  However, I do not have the resources 
+-   to carry out a patent search.  Therefore I cannot give any 
++   To the best of my knowledge, bzip2/libbzip2 does not use any
++   patented algorithms.  However, I do not have the resources
++   to carry out a patent search.  Therefore I cannot give any
+    guarantee of the above statement.
+ 
+ 
+diff --git a/archival/bz/bzlib.c b/archival/bz/bzlib.c
+index 57a6974..f27050a 100644
+--- a/archival/bz/bzlib.c
++++ b/archival/bz/bzlib.c
+@@ -259,7 +259,7 @@ void /*Bool*/ handle_compress(bz_stream *strm)
+ 	/*Bool progress_in  = False;*/
+ 	/*Bool progress_out = False;*/
+ 	EState* s = strm->state;
+-	
++
+ 	while (1) {
+ 		if (s->state == BZ_S_OUTPUT) {
+ 			/*progress_out |=*/ copy_output_until_stop(s);
+diff --git a/archival/bz/compress.c b/archival/bz/compress.c
+index 4bd364e..3e2fbd8 100644
+--- a/archival/bz/compress.c
++++ b/archival/bz/compress.c
+@@ -414,7 +414,7 @@ void sendMTFValues(EState* s)
+ 			/*
+ 			 * Increment the symbol frequencies for the selected table.
+ 			 */
+-/* 1% faster compress. +800 bytes */ 
++/* 1% faster compress. +800 bytes */
+ #if CONFIG_BZIP2_FEATURE_SPEED >= 4
+ 			if (nGroups == 6 && 50 == ge-gs+1) {
+ 				/*--- fast track the common case ---*/
+diff --git a/archival/bz/huffman.c b/archival/bz/huffman.c
+index f016c96..3f80c99 100644
+--- a/archival/bz/huffman.c
++++ b/archival/bz/huffman.c
+@@ -133,7 +133,7 @@ void BZ2_hbMakeCodeLengths(uint8_t *len,
+ 		}
+ 
+ 		AssertH(nHeap < (BZ_MAX_ALPHA_SIZE+2), 2001);
+-	
++
+ 		while (nHeap > 1) {
+ 			n1 = heap[1]; heap[1] = heap[nHeap]; nHeap--; DOWNHEAP1(heap, weight, nHeap);
+ 			n2 = heap[1]; heap[1] = heap[nHeap]; nHeap--; DOWNHEAP1(heap, weight, nHeap);
+@@ -160,7 +160,7 @@ void BZ2_hbMakeCodeLengths(uint8_t *len,
+ 			if (j > maxLen)
+ 				tooLong = True;
+ 		}
+-		
++
+ 		if (!tooLong)
+ 			break;
+ 
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index 98b075f..fc29274 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -45,7 +45,7 @@ struct globals {
+ 	unsigned max_per_host;
+ 	unsigned cur_per_host;
+ 	unsigned cnum;
+-	unsigned cmax;       
++	unsigned cmax;
+ };
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define verbose      (G.verbose     )
+diff --git a/libbb/messages.c b/libbb/messages.c
+index 06e9a58..2a011f8 100644
+--- a/libbb/messages.c
++++ b/libbb/messages.c
+@@ -47,7 +47,7 @@ const char bb_busybox_exec_path[] ALIGN1 = CONFIG_BUSYBOX_EXEC_PATH;
+ const char bb_default_login_shell[] ALIGN1 = LIBBB_DEFAULT_LOGIN_SHELL;
+ /* util-linux manpage says /sbin:/bin:/usr/sbin:/usr/bin,
+  * but I want to save a few bytes here. Check libbb.h before changing! */
+-const char bb_PATH_root_path[] ALIGN1 = 
++const char bb_PATH_root_path[] ALIGN1 =
+ 	"PATH=/sbin:/usr/sbin:/bin:/usr/bin" BB_ADDITIONAL_PATH;
+ 
+ 
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 82755a0..9207021 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -175,7 +175,7 @@ static const uint16_t http_response_type[] ALIGN2 = {
+ 	HTTP_MOVED_TEMPORARILY,
+ 	HTTP_REQUEST_TIMEOUT,
+ 	HTTP_NOT_IMPLEMENTED,
+-#if ENABLE_FEATURE_HTTPD_BASIC_AUTH 
++#if ENABLE_FEATURE_HTTPD_BASIC_AUTH
+ 	HTTP_UNAUTHORIZED,
+ #endif
+ 	HTTP_NOT_FOUND,
+@@ -1405,7 +1405,7 @@ static void send_cgi_and_exit(
+ 
+ /*
+  * Send a file response to a HTTP request, and exit
+- * 
++ *
+  * Parameters:
+  * const char *url    The requested URL (with leading /).
+  * headers            Don't send headers before if FALSE.
+@@ -1992,7 +1992,7 @@ static void mini_httpd(int server_socket)
+ 	while (1) {
+ 		int n;
+ 		len_and_sockaddr fromAddr;
+-		
++
+ 		/* Wait for connections... */
+ 		fromAddr.len = LSA_SIZEOF_SA;
+ 		n = accept(server_socket, &fromAddr.sa, &fromAddr.len);
+@@ -2037,7 +2037,7 @@ static void mini_httpd_nommu(int server_socket, int argc, char **argv)
+ 	while (1) {
+ 		int n;
+ 		len_and_sockaddr fromAddr;
+-		
++
+ 		/* Wait for connections... */
+ 		fromAddr.len = LSA_SIZEOF_SA;
+ 		n = accept(server_socket, &fromAddr.sa, &fromAddr.len);
+diff --git a/networking/nameif.c b/networking/nameif.c
+index 0369c08..a951970 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -4,7 +4,7 @@
+  *
+  * Written 2000 by Andi Kleen.
+  * Busybox port 2002 by Nick Fedchik <nick@fedchik.org.ua>
+- *			Glenn McGrath 
++ *			Glenn McGrath
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+diff --git a/selinux/Config.in b/selinux/Config.in
+index c2fc08d..c9b48fb 100644
+--- a/selinux/Config.in
++++ b/selinux/Config.in
+@@ -109,7 +109,7 @@ config SETSEBOOL
+ 	default n
+ 	depends on SELINUX
+ 	help
+-	  Enable support for change boolean. 
++	  Enable support for change boolean.
+ 	  semanage and -P option is not supported yet.
+ 
+ endmenu
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 7c58aef..fee2f6e 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -675,7 +675,7 @@ find_kernel_nfs_mount_version(void)
+ 	}
+ }
+ 
+-static void 
++static void
+ get_mountport(struct pmap *pm_mnt,
+ 	struct sockaddr_in *server_addr,
+ 	long unsigned prog,

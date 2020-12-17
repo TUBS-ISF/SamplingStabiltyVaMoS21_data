@@ -1,0 +1,14 @@
+2008-10-26 19:07:43 +0000
+diff --git a/miscutils/devmem.c b/miscutils/devmem.c
+index 4903b5d..e13dedc 100644
+--- a/miscutils/devmem.c
++++ b/miscutils/devmem.c
+@@ -119,7 +119,7 @@ int devmem_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	if (ENABLE_FEATURE_CLEAN_UP) {
+-		if (munmap(map_base, page_size) == -1)
++		if (munmap(map_base, page_size * 2) == -1)
+ 			bb_perror_msg_and_die("munmap");
+ 		close(fd);
+ 	}

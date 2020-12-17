@@ -1,0 +1,110 @@
+2009-08-08 03:20:12 +0200
+diff --git a/include/fix_u32.h b/include/fix_u32.h
+new file mode 100644
+index 0000000..4674e1c
+--- /dev/null
++++ b/include/fix_u32.h
+@@ -0,0 +1,38 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * This header makes it easier to include kernel headers
++ * which use u32 and such.
++ *
++ * Licensed under the GPL version 2, see the file LICENSE in this tarball.
++ */
++#ifndef FIX_U32_H
++#define FIX_U32_H 1
++
++#undef u64
++#undef u32
++#undef u16
++#undef u8
++#undef s64
++#undef s32
++#undef s16
++#undef s8
++
++#define u64 bb_hack_u64
++#define u32 bb_hack_u32
++#define u16 bb_hack_u16
++#define u8  bb_hack_u8
++#define s64 bb_hack_s64
++#define s32 bb_hack_s32
++#define s16 bb_hack_s16
++#define s8  bb_hack_s8
++
++typedef uint64_t u64;
++typedef uint32_t u32;
++typedef uint16_t u16;
++typedef uint8_t u8;
++typedef int64_t s64;
++typedef int32_t s32;
++typedef int16_t s16;
++typedef int8_t s8;
++
++#endif
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index 16fcd54..2180007 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -105,16 +105,13 @@
+ #include <linux/if_bonding.h>
+ #include <linux/sockios.h>
+ 
++#include "fix_u32.h" /* hack, so we may include kernel's ethtool.h */
++#include <linux/ethtool.h>
++
+ #ifndef IFNAMSIZ
+-#define IFNAMSIZ 16
++# define IFNAMSIZ 16
+ #endif
+ 
+-typedef uint64_t u64; /* hack, so we may include kernel's ethtool.h */
+-typedef uint32_t u32; /* ditto */
+-typedef uint16_t u16; /* ditto */
+-typedef uint8_t u8;   /* ditto */
+-#include <linux/ethtool.h>
+-
+ 
+ struct dev_data {
+ 	struct ifreq mtu, flags, hwaddr;
+diff --git a/networking/ifplugd.c b/networking/ifplugd.c
+index 62bc9d6..8abecb9 100644
+--- a/networking/ifplugd.c
++++ b/networking/ifplugd.c
+@@ -8,6 +8,7 @@
+  */
+ #include "libbb.h"
+ 
++#include "fix_u32.h"
+ #include <linux/if.h>
+ #include <linux/mii.h>
+ #include <linux/ethtool.h>
+diff --git a/networking/tc.c b/networking/tc.c
+index 4e84faa..fc47e95 100644
+--- a/networking/tc.c
++++ b/networking/tc.c
+@@ -516,7 +516,7 @@ int tc_main(int argc UNUSED_PARAM, char **argv)
+ 				duparg(*argv, "priority");
+ 			filter_prio = get_u32(*argv, "priority");
+ 		} else if (arg == ARG_proto) { /* filter::list */
+-			__u16 tmp;
++			uint16_t tmp;
+ 			if (filter_proto)
+ 				duparg(*argv, "protocol");
+ 			if (ll_proto_a2n(&tmp, *argv))
+diff --git a/scripts/randomtest b/scripts/randomtest
+index eebf1c5..bd5ef4b 100755
+--- a/scripts/randomtest
++++ b/scripts/randomtest
+@@ -35,6 +35,10 @@ cat .config \
+ | grep -v ^CONFIG_SELINUX= \
+ | grep -v ^CONFIG_EFENCE= \
+ | grep -v ^CONFIG_DMALLOC= \
++| grep -v ^CONFIG_ACPID= \
++| grep -v ^CONFIG_FLASH_ERASEALL= \
++| grep -v ^CONFIG_FLASH_LOCK= \
++| grep -v ^CONFIG_FLASH_UNLOCK= \
+ | cat >.config.new
+ mv .config.new .config
+ }

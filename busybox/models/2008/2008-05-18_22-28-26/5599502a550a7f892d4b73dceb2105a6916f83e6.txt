@@ -1,0 +1,290 @@
+2008-05-18 22:28:26 +0000
+diff --git a/Makefile b/Makefile
+index f110fed..9c1b496 100644
+--- a/Makefile
++++ b/Makefile
+@@ -498,12 +498,6 @@ all: busybox
+ #bbox# NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
+ CHECKFLAGS += $(NOSTDINC_FLAGS)
+ 
+-# warn about C99 declaration after statement
+-CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
+-
+-# disable pointer signedness warnings in gcc 4.0
+-CFLAGS += $(call cc-option,-Wno-pointer-sign,)
+-
+ # Default kernel image to build when no specific target is given.
+ # KBUILD_IMAGE may be overruled on the commandline or
+ # set in the environment
+diff --git a/Makefile.flags b/Makefile.flags
+index 3889df0..9525889 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -17,11 +17,15 @@ CPPFLAGS += \
+ 	$(if $(CONFIG_LFS),-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64) \
+ 	-D"BB_VER=KBUILD_STR($(BB_VER))" -DBB_BT=AUTOCONF_TIMESTAMP
+ 
+-# flag checks are grouped together to speed the checks up a bit..
+-CFLAGS += $(call cc-option,-Wall -Wshadow -Wwrite-strings,)
+-CFLAGS += $(call cc-option,-Wundef -Wstrict-prototypes,)
++CFLAGS += $(call cc-option,-Wall,)
++CFLAGS += $(call cc-option,-Wshadow,)
++CFLAGS += $(call cc-option,-Wwrite-strings,)
++CFLAGS += $(call cc-option,-Wundef,)
++CFLAGS += $(call cc-option,-Wstrict-prototypes,)
+ CFLAGS += $(call cc-option,-Wunused -Wunused-parameter,)
+ CFLAGS += $(call cc-option,-Wmissing-prototypes -Wmissing-declarations,)
++# warn about C99 declaration after statement
++CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
+ # If you want to add more -Wsomething above, make sure that it is
+ # still possible to build bbox without warnings.
+ 
+diff --git a/coreutils/cksum.c b/coreutils/cksum.c
+index 6512ccc..074d068 100644
+--- a/coreutils/cksum.c
++++ b/coreutils/cksum.c
+@@ -34,7 +34,7 @@ int cksum_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ #define read_buf bb_common_bufsiz1
+ 		while ((bytes_read = safe_read(fd, read_buf, sizeof(read_buf))) > 0) {
+-			cp = read_buf;
++			cp = (uint8_t *) read_buf;
+ 			length += bytes_read;
+ 			do {
+ 				crc = (crc << 8) ^ crc32_table[(crc >> 24) ^ *cp++];
+diff --git a/editors/vi.c b/editors/vi.c
+index 5013d0d..dded6ed 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -136,7 +136,7 @@ static smallint last_file_modified = -1;
+ static int fn_start;            // index of first cmd line file name
+ static int save_argc;           // how many file names on cmd line
+ static int cmdcnt;              // repetition count
+-static int rows, columns;       // the terminal screen is this size
++static unsigned rows, columns;	 // the terminal screen is this size
+ static int crow, ccol;          // cursor is on Crow x Ccol
+ static int offset;              // chars scrolled off the screen to the left
+ static char *status_buffer;     // mesages to the user
+@@ -2837,7 +2837,7 @@ static void refresh(int full_screen)
+ 	char *tp, *sp;		// pointer into text[] and screen[]
+ 
+ 	if (ENABLE_FEATURE_VI_WIN_RESIZE) {
+-		int c = columns, r = rows;
++		unsigned c = columns, r = rows;
+ 		get_terminal_width_height(0, &columns, &rows);
+ 		if (rows > MAX_SCR_ROWS) rows = MAX_SCR_ROWS;
+ 		if (columns > MAX_SCR_COLS) columns = MAX_SCR_COLS;
+diff --git a/include/libbb.h b/include/libbb.h
+index 6f41184..4067063 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1048,7 +1048,7 @@ extern int update_passwd(const char *filename, const char *username,
+ 			const char *new_pw);
+ 
+ /* NB: typically you want to pass fd 0, not 1. Think 'applet | grep something' */
+-int get_terminal_width_height(int fd, int *width, int *height);
++int get_terminal_width_height(int fd, unsigned *width, unsigned *height);
+ 
+ /* NB: "unsigned request" is crucial! "int request" will break some arches! */
+ int ioctl_or_perror(int fd, unsigned request, void *argp, const char *fmt,...) __attribute__ ((format (printf, 4, 5)));
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 3d5aef8..464280b 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -73,7 +73,7 @@ static const char *unpack_usage_messages(void)
+ 
+ 	i = start_bunzip(&bd,
+ 			/* src_fd: */ -1,
+-			/* inbuf:  */ packed_usage,
++			/* inbuf:  */ (void *)packed_usage,
+ 			/* len:    */ sizeof(packed_usage));
+ 	/* read_bunzip can longjmp to start_bunzip, and ultimately
+ 	 * end up here with i != 0 on read data errors! Not trivial */
+@@ -628,7 +628,7 @@ static int busybox_main(char **argv)
+ 	if (!argv[1]) {
+ 		/* Called without arguments */
+ 		const char *a;
+-		int col, output_width;
++		unsigned col, output_width;
+  help:
+ 		output_width = 80;
+ 		if (ENABLE_FEATURE_AUTOWIDTH) {
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 9c802a3..c91efd4 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1318,7 +1318,7 @@ static void cmdedit_setwidth(unsigned w, int redraw_flg)
+ 
+ static void win_changed(int nsig)
+ {
+-	int width;
++	unsigned width;
+ 	get_terminal_width_height(0, &width, NULL);
+ 	cmdedit_setwidth(width, nsig /* - just a yes/no flag */);
+ 	if (nsig == SIGWINCH)
+@@ -1353,7 +1353,7 @@ int read_line_input(const char *prompt, char *command, int maxsize, line_input_t
+ #if ENABLE_FEATURE_TAB_COMPLETION
+ 	smallint lastWasTab = FALSE;
+ #endif
+-	unsigned int ic;
++	unsigned ic;
+ 	unsigned char c;
+ 	smallint break_out = 0;
+ #if ENABLE_FEATURE_EDITING_VI
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 915b74d..fe3c647 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -262,7 +262,7 @@ off_t fdlength(int fd)
+ 
+ /* It is perfectly ok to pass in a NULL for either width or for
+  * height, in which case that value will not be set.  */
+-int get_terminal_width_height(int fd, int *width, int *height)
++int get_terminal_width_height(int fd, unsigned *width, unsigned *height)
+ {
+ 	struct winsize win = { 0, 0, 0, 0 };
+ 	int ret = ioctl(fd, TIOCGWINSZ, &win);
+diff --git a/networking/telnet.c b/networking/telnet.c
+index 78229cd..32e9993 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -68,7 +68,7 @@ struct globals {
+ 	const char *autologin;
+ #endif
+ #if ENABLE_FEATURE_AUTOWIDTH
+-	int	win_width, win_height;
++	unsigned win_width, win_height;
+ #endif
+ 	/* same buffer used both for network and console read/write */
+ 	char    buf[DATABUFSIZE];
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 1432797..36e63e0 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -246,7 +246,7 @@ static int tftp_protocol(
+ 		local_fd = open_or_warn(local_file, open_mode);
+ 		if (local_fd < 0) {
+ 			/*error_pkt_reason = ERR_NOFILE/ERR_ACCESS?*/
+-			strcpy(error_pkt_str, "can't open file");
++			strcpy((char*)error_pkt_str, "can't open file");
+ 			goto send_err_pkt;
+ 		}
+ 	}
+@@ -479,7 +479,7 @@ static int tftp_protocol(
+ 			if (recv_blk == block_nr) {
+ 				int sz = full_write(local_fd, &rbuf[4], len - 4);
+ 				if (sz != len - 4) {
+-					strcpy(error_pkt_str, bb_msg_write_error);
++					strcpy((char*)error_pkt_str, bb_msg_write_error);
+ 					error_pkt_reason = ERR_WRITE;
+ 					goto send_err_pkt;
+ 				}
+@@ -525,12 +525,12 @@ static int tftp_protocol(
+ 	return finished == 0; /* returns 1 on failure */
+ 
+  send_read_err_pkt:
+-	strcpy(error_pkt_str, bb_msg_read_error);
++	strcpy((char*)error_pkt_str, bb_msg_read_error);
+  send_err_pkt:
+ 	if (error_pkt_str[0])
+-		bb_error_msg(error_pkt_str);
++		bb_error_msg((char*)error_pkt_str);
+ 	error_pkt[1] = TFTP_ERROR;
+-	xsendto(socket_fd, error_pkt, 4 + 1 + strlen(error_pkt_str),
++	xsendto(socket_fd, error_pkt, 4 + 1 + strlen((char*)error_pkt_str),
+ 			&peer_lsa->u.sa, peer_lsa->len);
+ 	return EXIT_FAILURE;
+ }
+@@ -715,7 +715,7 @@ int tftpd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	return result;
+  err:
+-	strcpy(error_pkt_str, error_msg);
++	strcpy((char*)error_pkt_str, error_msg);
+ 	goto do_proto;
+ }
+ 
+diff --git a/networking/wget.c b/networking/wget.c
+index 7dd1d36..84ee1ca 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -54,9 +54,9 @@ enum {
+ 	STALLTIME = 5                   /* Seconds when xfer considered "stalled" */
+ };
+ 
+-static int getttywidth(void)
++static unsigned int getttywidth(void)
+ {
+-	int width;
++	unsigned width;
+ 	get_terminal_width_height(0, &width, NULL);
+ 	return width;
+ }
+diff --git a/procps/top.c b/procps/top.c
+index ca43376..ed74879 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -742,9 +742,10 @@ enum {
+ int top_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int top_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	int count, lines, col;
+-	unsigned interval;
++	int count;
+ 	int iterations;
++	unsigned lines, col;
++	unsigned interval;
+ 	char *sinterval;
+ 	SKIP_FEATURE_TOPMEM(const) unsigned scan_mask = TOP_MASK;
+ #if ENABLE_FEATURE_USE_TERMIOS
+diff --git a/procps/watch.c b/procps/watch.c
+index 5b774e8..7d8e0de 100644
+--- a/procps/watch.c
++++ b/procps/watch.c
+@@ -28,7 +28,7 @@ int watch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned opt;
+ 	unsigned period = 2;
+-	int width, new_width;
++	unsigned width, new_width;
+ 	char *header;
+ 	char *cmd;
+ 
+@@ -43,19 +43,19 @@ int watch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	while (*++argv)
+ 		cmd = xasprintf("%s %s", cmd, *argv); // leaks cmd
+ 
+-	width = -1; // make sure first time new_width != width
++	width = (unsigned)-1; // make sure first time new_width != width
+ 	header = NULL;
+ 	while (1) {
+ 		printf("\033[H\033[J");
+ 		if (!(opt & 0x2)) { // no -t
+-			const int time_len = sizeof("1234-67-90 23:56:89");
++			const unsigned time_len = sizeof("1234-67-90 23:56:89");
+ 			time_t t;
+ 
+ 			get_terminal_width_height(STDIN_FILENO, &new_width, NULL);
+ 			if (new_width != width) {
+ 				width = new_width;
+ 				free(header);
+-				header = xasprintf("Every %us: %-*s", period, width, cmd);
++				header = xasprintf("Every %us: %-*s", period, (int)width, cmd);
+ 			}
+ 			time(&t);
+ 			if (time_len < width)
+diff --git a/util-linux/more.c b/util-linux/more.c
+index 257f401..2577a67 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -62,8 +62,8 @@ int more_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	FILE *file;
+ 	FILE *cin;
+ 	int len;
+-	int terminal_width;
+-	int terminal_height;
++	unsigned terminal_width;
++	unsigned terminal_height;
+ 
+ 	INIT_G();
+ 

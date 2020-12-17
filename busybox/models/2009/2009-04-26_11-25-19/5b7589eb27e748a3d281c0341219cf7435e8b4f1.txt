@@ -1,0 +1,228 @@
+2009-04-26 11:25:19 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index fcbd96c..2ad8eba 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1990,12 +1990,9 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 	 * (expansion of right-hand side of assignment == 1-element expand.
+ 	 * It will also do no globbing, and thus we must not backslash-quote!) */
+ 
+-	char first_ch, ored_ch;
+-	int i;
+-	const char *val;
+-	char *dyn_val, *p;
++	char ored_ch;
++	char *p;
+ 
+-	dyn_val = NULL;
+ 	ored_ch = 0;
+ 
+ 	debug_printf_expand("expand_vars_to_list: arg '%s'\n", arg);
+@@ -2004,6 +2001,10 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 	debug_print_list("expand_vars_to_list[0]", output, n);
+ 
+ 	while ((p = strchr(arg, SPECIAL_VAR_SYMBOL)) != NULL) {
++		char first_ch;
++		int i;
++		char *dyn_val = NULL;
++		const char *val = NULL;
+ #if ENABLE_HUSH_TICK
+ 		o_string subst_result = NULL_O_STRING;
+ #endif
+@@ -2021,7 +2022,6 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 		if ((first_ch & 0x7f) != '@')
+ 			ored_ch |= first_ch;
+ 
+-		val = NULL;
+ 		switch (first_ch & 0x7f) {
+ 		/* Highest bit in first_ch indicates that var is double-quoted */
+ 		case '$': /* pid */
+@@ -2194,16 +2194,16 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 				if (exp_op == '%' || exp_op == '#') {
+ 					if (val) {
+ 						/* we need to do a pattern match */
+-						bool zero;
++						bool match_at_left;
+ 						char *loc;
+-						scan_t scan = pick_scan(exp_op, *exp_word, &zero);
++						scan_t scan = pick_scan(exp_op, *exp_word, &match_at_left);
+ 						if (exp_op == *exp_word)	/* ## or %% */
+ 							++exp_word;
+ 						val = dyn_val = xstrdup(val);
+-						loc = scan(dyn_val, exp_word, zero);
+-						if (zero)
++						loc = scan(dyn_val, exp_word, match_at_left);
++						if (match_at_left) /* # or ## */
+ 							val = loc;
+-						else
++						else if (loc) /* % or %% and match was found */
+ 							*loc = '\0';
+ 					}
+ 				} else {
+@@ -2263,11 +2263,11 @@ static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ 			}
+ 		} /* default: */
+ 		} /* switch (char after <SPECIAL_VAR_SYMBOL>) */
++
+ 		if (val) {
+ 			o_addQstr(output, val, strlen(val));
+ 		}
+ 		free(dyn_val);
+-		dyn_val = NULL;
+ 		/* Do the check to avoid writing to a const string */
+ 		if (*p != SPECIAL_VAR_SYMBOL)
+ 			*p = SPECIAL_VAR_SYMBOL;
+diff --git a/shell/hush_test/hush-arith/arith.right b/shell/hush_test/hush-arith/arith.right
+index 8cde0ee..83155fb 100644
+--- a/shell/hush_test/hush-arith/arith.right
++++ b/shell/hush_test/hush-arith/arith.right
+@@ -63,9 +63,9 @@ hush: error in arithmetic
+ 40 40
+ hush: error in arithmetic
+ hush: divide by 0
+-hush: can't exec 'let': No such file or directory
++hush: can't execute 'let': No such file or directory
+ hush: error in arithmetic
+-hush: can't exec 'let': No such file or directory
++hush: can't execute 'let': No such file or directory
+ abc
+ def
+ ghi
+@@ -135,4 +135,4 @@ hush: error in arithmetic
+ 42
+ 42
+ 42
+-hush: can't exec 'a[b[c]d]=e': No such file or directory
++hush: can't execute 'a[b[c]d]=e': No such file or directory
+diff --git a/shell/hush_test/hush-vars/var_posix1.right b/shell/hush_test/hush-vars/var_posix1.right
+index 47d52a6..e6cba27 100644
+--- a/shell/hush_test/hush-vars/var_posix1.right
++++ b/shell/hush_test/hush-vars/var_posix1.right
+@@ -32,4 +32,5 @@ ababcdc
+ ababcdcd
+ Empty:
+ ababcdcd}_tail
++ababcdcd
+ end
+diff --git a/shell/hush_test/hush-vars/var_posix1.tests b/shell/hush_test/hush-vars/var_posix1.tests
+index 3069360..c1f6409 100755
+--- a/shell/hush_test/hush-vars/var_posix1.tests
++++ b/shell/hush_test/hush-vars/var_posix1.tests
+@@ -43,5 +43,6 @@ echo ${var%*}
+ echo Empty:${var%%*}
+ echo ${var#}}_tail
+ # UNFIXED BUG: echo ${var#\}}_tail
++echo ${var%\\*}
+ 
+ echo end
+diff --git a/shell/match.c b/shell/match.c
+index 47038d6..a7101ef 100644
+--- a/shell/match.c
++++ b/shell/match.c
+@@ -11,8 +11,6 @@
+  * Kenneth Almquist.
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+- *
+- * Original BSD copyright notice is retained at the end of this file.
+  */
+ #ifdef STANDALONE
+ # include <stdbool.h>
+@@ -28,7 +26,7 @@
+ 
+ #define pmatch(a, b) !fnmatch((a), (b), 0)
+ 
+-char *scanleft(char *string, char *pattern, bool zero)
++char *scanleft(char *string, char *pattern, bool match_at_left)
+ {
+ 	char c;
+ 	char *loc = string;
+@@ -38,7 +36,7 @@ char *scanleft(char *string, char *pattern, bool zero)
+ 		const char *s;
+ 
+ 		c = *loc;
+-		if (zero) {
++		if (match_at_left) {
+ 			*loc = '\0';
+ 			s = string;
+ 		} else
+@@ -55,7 +53,7 @@ char *scanleft(char *string, char *pattern, bool zero)
+ 	return NULL;
+ }
+ 
+-char *scanright(char *string, char *pattern, bool zero)
++char *scanright(char *string, char *pattern, bool match_at_left)
+ {
+ 	char c;
+ 	char *loc = string + strlen(string);
+@@ -65,7 +63,7 @@ char *scanright(char *string, char *pattern, bool zero)
+ 		const char *s;
+ 
+ 		c = *loc;
+-		if (zero) {
++		if (match_at_left) {
+ 			*loc = '\0';
+ 			s = string;
+ 		} else
+@@ -88,7 +86,7 @@ int main(int argc, char *argv[])
+ 	char *string;
+ 	char *op;
+ 	char *pattern;
+-	bool zero;
++	bool match_at_left;
+ 	char *loc;
+ 
+ 	int i;
+@@ -117,15 +115,15 @@ int main(int argc, char *argv[])
+ 			continue;
+ 		}
+ 		op = string + off;
+-		scan = pick_scan(op[0], op[1], &zero);
++		scan = pick_scan(op[0], op[1], &match_at_left);
+ 		pattern = op + 1;
+ 		if (op[0] == op[1])
+ 			op[1] = '\0', ++pattern;
+ 		op[0] = '\0';
+ 
+-		loc = scan(string, pattern, zero);
++		loc = scan(string, pattern, match_at_left);
+ 
+-		if (zero) {
++		if (match_at_left) {
+ 			printf("'%s'\n", loc);
+ 		} else {
+ 			*loc = '\0';
+diff --git a/shell/match.h b/shell/match.h
+index 3fc4de3..90597ee 100644
+--- a/shell/match.h
++++ b/shell/match.h
+@@ -2,12 +2,12 @@
+ 
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+-typedef char *(*scan_t)(char *string, char *match, bool zero);
++typedef char *(*scan_t)(char *string, char *match, bool match_at_left);
+ 
+-char *scanleft(char *string, char *match, bool zero);
+-char *scanright(char *string, char *match, bool zero);
++char *scanleft(char *string, char *match, bool match_at_left);
++char *scanright(char *string, char *match, bool match_at_left);
+ 
+-static inline scan_t pick_scan(char op1, char op2, bool *zero)
++static inline scan_t pick_scan(char op1, char op2, bool *match_at_left)
+ {
+ 	/* #  - scanleft
+ 	 * ## - scanright
+@@ -15,10 +15,10 @@ static inline scan_t pick_scan(char op1, char op2, bool *zero)
+ 	 * %% - scanleft
+ 	 */
+ 	if (op1 == '#') {
+-		*zero = true;
++		*match_at_left = true;
+ 		return op1 == op2 ? scanright : scanleft;
+ 	} else {
+-		*zero = false;
++		*match_at_left = false;
+ 		return op1 == op2 ? scanleft : scanright;
+ 	}
+ }

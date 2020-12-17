@@ -1,0 +1,171 @@
+2007-09-10 13:15:28 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index a4aa90d..e5f0351 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -780,6 +780,7 @@ char *bb_simplify_path(const char *path);
+ extern void bb_do_delay(int seconds);
+ extern void change_identity(const struct passwd *pw);
+ extern const char *change_identity_e2str(const struct passwd *pw);
++extern void run_shell(const char *shell, int loginshell, const char *command, const char **additional_args) ATTRIBUTE_NORETURN;
+ extern void run_shell(const char *shell, int loginshell, const char *command, const char **additional_args);
+ #if ENABLE_SELINUX
+ extern void renew_current_security_context(void);
+@@ -790,6 +791,21 @@ extern void setfscreatecon_or_die(security_context_t scontext);
+ #endif
+ extern void selinux_or_die(void);
+ extern int restricted_shell(const char *shell);
++
++/* setup_environment:
++ * if loginshell = 1: cd(pw->pw_dir), clear environment, then set
++ *   TERM=(old value)
++ *   USER=pw->pw_name, LOGNAME=pw->pw_name
++ *   PATH=bb_default_[root_]path
++ *   HOME=pw->pw_dir
++ *   SHELL=shell
++ * else if changeenv = 1:
++ *   if not root (if pw->pw_uid != 0):
++ *     USER=pw->pw_name, LOGNAME=pw->pw_name
++ *   HOME=pw->pw_dir
++ *   SHELL=shell
++ * else does nothing
++ */
+ extern void setup_environment(const char *shell, int loginshell, int changeenv, const struct passwd *pw);
+ extern int correct_password(const struct passwd *pw);
+ /* Returns a ptr to static storage */
+diff --git a/libbb/setup_environment.c b/libbb/setup_environment.c
+index a6f44f7..19a2c6d 100644
+--- a/libbb/setup_environment.c
++++ b/libbb/setup_environment.c
+@@ -36,36 +36,35 @@ void setup_environment(const char *shell, int loginshell, int changeenv, const s
+ 		const char *term;
+ 
+ 		/* Change the current working directory to be the home directory
+-		 * of the user.  It is a fatal error for this process to be unable
+-		 * to change to that directory.  There is no "default" home
+-		 * directory.
+-		 * Some systems default to HOME=/
+-		 */
++		 * of the user */
+ 		if (chdir(pw->pw_dir)) {
+ 			xchdir("/");
+ 			fputs("warning: cannot change to home directory\n", stderr);
+ 		}
+ 
+-		/* Leave TERM unchanged.  Set HOME, SHELL, USER, LOGNAME, PATH.
++		/* Leave TERM unchanged. Set HOME, SHELL, USER, LOGNAME, PATH.
+ 		   Unset all other environment variables.  */
+ 		term = getenv("TERM");
+ 		clearenv();
+ 		if (term)
+ 			xsetenv("TERM", term);
+-		xsetenv("HOME",    pw->pw_dir);
+-		xsetenv("SHELL",   shell);
+-		xsetenv("USER",    pw->pw_name);
+-		xsetenv("LOGNAME", pw->pw_name);
+-		xsetenv("PATH",   (pw->pw_uid ? bb_default_path : bb_default_root_path));
++		xsetenv("PATH", (pw->pw_uid ? bb_default_path : bb_default_root_path));
++		goto shortcut;
++		// No, gcc (4.2.1) is not clever enougn to do it itself.
++		//xsetenv("USER",    pw->pw_name);
++		//xsetenv("LOGNAME", pw->pw_name);
++		//xsetenv("HOME",    pw->pw_dir);
++		//xsetenv("SHELL",   shell);
+ 	}
+ 	else if (changeenv) {
+ 		/* Set HOME, SHELL, and if not becoming a super-user,
+ 		   USER and LOGNAME.  */
+-		xsetenv("HOME",  pw->pw_dir);
+-		xsetenv("SHELL", shell);
+ 		if (pw->pw_uid) {
++ shortcut:
+ 			xsetenv("USER",    pw->pw_name);
+ 			xsetenv("LOGNAME", pw->pw_name);
+ 		}
++		xsetenv("HOME",    pw->pw_dir);
++		xsetenv("SHELL",   shell);
+ 	}
+ }
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 5d50538..7f89075 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -432,7 +432,9 @@ int login_main(int argc, char **argv)
+ 	tmp = pw->pw_shell;
+ 	if (!tmp || !*tmp)
+ 		tmp = DEFAULT_SHELL;
++	/* setup_environment params: shell, loginshell, changeenv, pw */
+ 	setup_environment(tmp, 1, !(opt & LOGIN_OPT_p), pw);
++	/* FIXME: login shell = 1 -> 3rd parameter is ignored! */
+ 
+ 	motd();
+ 
+@@ -463,7 +465,8 @@ int login_main(int argc, char **argv)
+ 	 * should it leave SIGINT etc enabled or disabled? */
+ 	signal(SIGINT, SIG_DFL);
+ 
+-	run_shell(tmp, 1, 0, 0);	/* exec the shell finally */
++	/* Exec login shell with no additional parameters */
++	run_shell(tmp, 1, NULL, NULL);
+ 
+-	return EXIT_FAILURE;
++	/* return EXIT_FAILURE; - not reached */
+ }
+diff --git a/loginutils/su.c b/loginutils/su.c
+index b4681fb..123907e 100644
+--- a/loginutils/su.c
++++ b/loginutils/su.c
+@@ -36,7 +36,7 @@ int su_main(int argc, char **argv)
+ 	/* get user if specified */
+ 	if (argc) {
+ 		opt_username = argv[0];
+-//		argc--;
++		//argc--; - not used below anyway
+ 		argv++;
+ 	}
+ 
+@@ -86,18 +86,19 @@ int su_main(int argc, char **argv)
+ 		   compromise the account by allowing access with a standard
+ 		   shell.  */
+ 		bb_error_msg("using restricted shell");
+-		opt_shell = 0;
++		opt_shell = NULL;
+ 	}
+ #endif
+ 	if (!opt_shell)
+ 		opt_shell = pw->pw_shell;
+ 
+ 	change_identity(pw);
++	/* setup_environment params: shell, loginshell, changeenv, pw */
+ 	setup_environment(opt_shell, flags & SU_OPT_l, !(flags & SU_OPT_mp), pw);
+ 	USE_SELINUX(set_current_security_context(NULL);)
+ 
+ 	/* Never returns */
+ 	run_shell(opt_shell, flags & SU_OPT_l, opt_command, (const char**)argv);
+ 
+-	return EXIT_FAILURE;
++	/* return EXIT_FAILURE; - not reached */
+ }
+diff --git a/loginutils/sulogin.c b/loginutils/sulogin.c
+index 5f0a408..5c73bda 100644
+--- a/loginutils/sulogin.c
++++ b/loginutils/sulogin.c
+@@ -112,14 +112,15 @@ int sulogin_main(int argc, char **argv)
+ 	USE_SELINUX(renew_current_security_context());
+ 
+ 	shell = getenv("SUSHELL");
+-	if (!shell) shell = getenv("sushell");
++	if (!shell)
++		shell = getenv("sushell");
+ 	if (!shell) {
+ 		shell = "/bin/sh";
+ 		if (pwd->pw_shell[0])
+ 			shell = pwd->pw_shell;
+ 	}
+-	run_shell(shell, 1, 0, 0);
+-	/* never returns */
++	/* Exec login shell with no additional parameters. Never returns. */
++	run_shell(shell, 1, NULL, NULL);
+ 
+ auth_error:
+ 	bb_error_msg_and_die("no password entry for 'root'");

@@ -1,0 +1,14 @@
+2009-10-06 22:13:37 +0200
+diff --git a/shell/Config.in b/shell/Config.in
+index cf15193..8d989b7 100644
+--- a/shell/Config.in
++++ b/shell/Config.in
+@@ -187,7 +187,7 @@ config HUSH_INTERACTIVE
+ 	help
+ 	  Enable interactive mode (prompt and command editing).
+ 	  Without this, hush simply reads and executes commands
+-	  from stdin just like a shell script from the file.
++	  from stdin just like a shell script from a file.
+ 	  No prompt, no PS1/PS2 magic shell variables.
+ 
+ config HUSH_JOB

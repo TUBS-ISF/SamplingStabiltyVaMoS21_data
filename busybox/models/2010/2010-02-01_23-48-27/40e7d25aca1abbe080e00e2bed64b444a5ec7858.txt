@@ -1,0 +1,231 @@
+2010-02-01 23:48:27 +0100
+diff --git a/include/libbb.h b/include/libbb.h
+index a86d644..09852d0 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -412,6 +412,11 @@ int rename_or_warn(const char *oldpath, const char *newpath) FAST_FUNC;
+ off_t xlseek(int fd, off_t offset, int whence) FAST_FUNC;
+ off_t fdlength(int fd) FAST_FUNC;
+ 
++uoff_t FAST_FUNC get_volume_size_in_bytes(int fd,
++                const char *override,
++                unsigned override_units,
++                int extend);
++
+ void xpipe(int filedes[2]) FAST_FUNC;
+ /* In this form code with pipes is much more readable */
+ struct fd_pair { int rd; int wr; };
+diff --git a/include/usage.h b/include/usage.h
+index 44cc834..683d53f 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2844,7 +2844,7 @@
+        "$ mknod -m 644 /tmp/pipe p\n"
+ 
+ #define mkswap_trivial_usage \
+-       "[OPTIONS] BLOCKDEV" /* [SIZE_IN_KB] */
++       "[OPTIONS] BLOCKDEV [KBYTES]"
+ #define mkswap_full_usage "\n\n" \
+        "Prepare BLOCKDEV to be used as swap partition\n" \
+      "\nOptions:" \
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 7e79310..c205ceb 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -42,6 +42,7 @@ lib-y += get_last_path_component.o
+ lib-y += get_line_from_file.o
+ lib-y += getopt32.o
+ lib-y += getpty.o
++lib-y += get_volsize.o
+ lib-y += herror_msg.o
+ lib-y += herror_msg_and_die.o
+ lib-y += human_readable.o
+diff --git a/libbb/get_volsize.c b/libbb/get_volsize.c
+new file mode 100644
+index 0000000..5b02709
+--- /dev/null
++++ b/libbb/get_volsize.c
+@@ -0,0 +1,48 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Utility routines.
++ *
++ * Copyright (C) 2010 Denys Vlasenko
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
++#include "libbb.h"
++
++uoff_t FAST_FUNC get_volume_size_in_bytes(int fd,
++		const char *override,
++		unsigned override_units,
++		int extend)
++{
++	uoff_t result;
++
++	if (override) {
++		result = XATOOFF(override);
++		if (result >= (uoff_t)(MAXINT(off_t)) / override_units)
++			bb_error_msg_and_die("image size is too big");
++		result *= override_units;
++		/* seek past end fails on block devices but works on files */
++		if (lseek(fd, result - 1, SEEK_SET) != (off_t)-1) {
++			if (extend)
++				xwrite(fd, "", 1); /* file grows if needed */
++		}
++		//else {
++		//	bb_error_msg("warning, block device is smaller");
++		//}
++	} else {
++		/* more portable than BLKGETSIZE[64] */
++		result = xlseek(fd, 0, SEEK_END);
++	}
++
++	xlseek(fd, 0, SEEK_SET);
++
++	/* Prevent things like this:
++	 * $ dd if=/dev/zero of=foo count=1 bs=1024
++	 * $ mkswap foo
++	 * Setting up swapspace version 1, size = 18446744073709548544 bytes
++	 *
++	 * Picked 16k arbitrarily: */
++	if (result < 16*1024)
++		bb_error_msg_and_die("image is too small");
++
++	return result;
++}
+diff --git a/util-linux/mkfs_ext2.c b/util-linux/mkfs_ext2.c
+index 19c3c67..44fb402 100644
+--- a/util-linux/mkfs_ext2.c
++++ b/util-linux/mkfs_ext2.c
+@@ -230,19 +230,7 @@ int mkfs_ext2_main(int argc UNUSED_PARAM, char **argv)
+ 		bb_error_msg_and_die("can't format mounted filesystem");
+ 
+ 	// open the device, get size in kbytes
+-	if (argv[1]) {
+-		kilobytes = xatoull(argv[1]);
+-		// seek past end fails on block devices but works on files
+-		if (lseek(fd, kilobytes * 1024 - 1, SEEK_SET) != (off_t)-1) {
+-			if (!(option_mask32 & OPT_n))
+-				xwrite(fd, "", 1); // file grows if needed
+-		}
+-		//else {
+-		//	bb_error_msg("warning, block device is smaller");
+-		//}
+-	} else {
+-		kilobytes = (uoff_t)xlseek(fd, 0, SEEK_END) / 1024;
+-	}
++	kilobytes = get_volume_size_in_bytes(fd, argv[1], 1024, /*extend:*/ !(option_mask32 & OPT_n)) / 1024;
+ 
+ 	bytes_per_inode = 16384;
+ 	if (kilobytes < 512*1024)
+diff --git a/util-linux/mkfs_reiser.c b/util-linux/mkfs_reiser.c
+index 7f37eb8..eb2c94d 100644
+--- a/util-linux/mkfs_reiser.c
++++ b/util-linux/mkfs_reiser.c
+@@ -175,23 +175,12 @@ int mkfs_reiser_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	// check if it is mounted
+ 	// N.B. what if we format a file? find_mount_point will return false negative since
+-	// it is loop block device which mounted!
++	// it is loop block device which is mounted!
+ 	if (find_mount_point(argv[0], 0))
+ 		bb_error_msg_and_die("can't format mounted filesystem");
+ 
+ 	// open the device, get size in blocks
+-	if (argv[1]) {
+-		blocks = xatoull(argv[1]);
+-		// seek past end fails on block devices but works on files
+-		if (lseek(fd, blocks * blocksize - 1, SEEK_SET) != (off_t)-1) {
+-			xwrite(fd, "", 1); // file grows if needed
+-		}
+-		//else {
+-		//	bb_error_msg("warning, block device is smaller");
+-		//}
+-	} else {
+-		blocks = (uoff_t)xlseek(fd, 0, SEEK_END) / blocksize;
+-	}
++	blocks = get_volume_size_in_bytes(fd, argv[1], blocksize, /*extend:*/ 1) / blocksize;
+ 
+ 	// block number sanity check
+ 	// we have a limit: skipped area, super block, journal and root block
+diff --git a/util-linux/mkfs_vfat.c b/util-linux/mkfs_vfat.c
+index a9a65aa..1363612 100644
+--- a/util-linux/mkfs_vfat.c
++++ b/util-linux/mkfs_vfat.c
+@@ -244,7 +244,7 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 	// default volume ID = creation time
+ 	volume_id = time(NULL);
+ 
+-	dev = xopen(device_name, O_EXCL | O_RDWR);
++	dev = xopen(device_name, O_RDWR);
+ 	if (fstat(dev, &st) < 0)
+ 		bb_simple_perror_msg_and_die(device_name);
+ 
+@@ -252,7 +252,6 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 	// Get image size and sector size
+ 	//
+ 	bytes_per_sect = SECTOR_SIZE;
+-	volume_size_bytes = st.st_size;
+ 	if (!S_ISBLK(st.st_mode)) {
+ 		if (!S_ISREG(st.st_mode)) {
+ 			if (!argv[1])
+@@ -262,10 +261,6 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 		opts &= ~OPT_c;
+ 	} else {
+ 		int min_bytes_per_sect;
+-
+-		// more portable than BLKGETSIZE[64]
+-		volume_size_bytes = xlseek(dev, 0, SEEK_END);
+-		xlseek(dev, 0, SEEK_SET);
+ #if 0
+ 		unsigned device_num;
+ 		// for true block devices we do check sanity
+@@ -290,12 +285,7 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 			bb_error_msg("for this device sector size is %u", min_bytes_per_sect);
+ 		}
+ 	}
+-	if (argv[1]) {
+-		volume_size_bytes = XATOOFF(argv[1]);
+-		if (volume_size_bytes >= MAXINT(off_t) / 1024)
+-			bb_error_msg_and_die("image size is too big");
+-		volume_size_bytes *= 1024;
+-	}
++	volume_size_bytes = get_volume_size_in_bytes(dev, argv[1], 1024, /*extend:*/ 1);
+ 	volume_size_sect = volume_size_bytes / bytes_per_sect;
+ 
+ 	//
+diff --git a/util-linux/mkswap.c b/util-linux/mkswap.c
+index 289692d..949c71a 100644
+--- a/util-linux/mkswap.c
++++ b/util-linux/mkswap.c
+@@ -86,23 +86,19 @@ int mkswap_main(int argc UNUSED_PARAM, char **argv)
+ 	off_t len;
+ 	const char *label = "";
+ 
+-	opt_complementary = "=1";
+-	/* TODO: -p PAGESZ, -U UUID,
+-	 * optional SIZE_IN_KB 2nd param
+-	 */
++	opt_complementary = "-1"; /* at least one param */
++	/* TODO: -p PAGESZ, -U UUID */
+ 	getopt32(argv, "L:", &label);
+ 	argv += optind;
+ 
+ 	fd = xopen(argv[0], O_WRONLY);
+ 
+-	/* Figure out how big the device is and announce our intentions */
+-	/* fdlength was reported to be unreliable - use seek */
+-	len = xlseek(fd, 0, SEEK_END);
+-	if (ENABLE_SELINUX)
+-		xlseek(fd, 0, SEEK_SET);
+-
++	/* Figure out how big the device is */
++	len = get_volume_size_in_bytes(fd, argv[1], 1024, /*extend:*/ 1);
+ 	pagesize = getpagesize();
+ 	len -= pagesize;
++
++	/* Announce our intentions */
+ 	printf("Setting up swapspace version 1, size = %"OFF_FMT"u bytes\n", len);
+ 	mkswap_selinux_setcontext(fd, argv[0]);
+ 

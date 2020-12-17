@@ -1,0 +1,13 @@
+2008-07-11 15:05:51 +0000
+diff --git a/miscutils/time.c b/miscutils/time.c
+index d8b8aa0..dbc92d1 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -402,6 +402,7 @@ int time_main(int argc UNUSED_PARAM, char **argv)
+ 	const char *output_format = default_format;
+ 	int opt;
+ 
++	opt_complementary = "-1"; /* at least one arg */
+ 	/* "+": stop on first non-option */
+ 	opt = getopt32(argv, "+vp");
+ 	argv += optind;

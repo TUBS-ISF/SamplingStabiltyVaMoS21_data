@@ -1,0 +1,14 @@
+2008-01-24 01:30:36 +0000
+diff --git a/findutils/grep.c b/findutils/grep.c
+index c2a6a21..4c9582e 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -376,7 +376,7 @@ static int file_action_grep(const char *filename, struct stat *statbuf, void* ma
+ 	FILE *file = fopen(filename, "r");
+ 	if (file == NULL) {
+ 		if (!SUPPRESS_ERR_MSGS)
+-			bb_simple_perror_msg(cur_file);
++			bb_simple_perror_msg(filename);
+ 		open_errors = 1;
+ 		return 0;
+ 	}

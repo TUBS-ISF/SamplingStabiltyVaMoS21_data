@@ -1,0 +1,41 @@
+2010-02-21 01:26:42 +0100
+diff --git a/shell/ash.c b/shell/ash.c
+index 798d15a..7f14bed 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -4539,7 +4539,7 @@ forkchild(struct job *jp, union node *n, int mode)
+ 	if (mode == FORK_NOJOB          /* is it `xxx` ? */
+ 	 && n && n->type == NCMD        /* is it single cmd? */
+ 	/* && n->ncmd.args->type == NARG - always true? */
+-	 && strcmp(n->ncmd.args->narg.text, "trap") == 0
++	 && n->ncmd.args && strcmp(n->ncmd.args->narg.text, "trap") == 0
+ 	 && n->ncmd.args->narg.next == NULL /* "trap" with no arguments */
+ 	/* && n->ncmd.args->narg.backquote == NULL - do we need to check this? */
+ 	) {
+@@ -4627,7 +4627,7 @@ forkchild(struct job *jp, union node *n, int mode)
+ 	}
+ #if JOBS
+ 	if (n && n->type == NCMD
+-	 && strcmp(n->ncmd.args->narg.text, "jobs") == 0
++	 && n->ncmd.args && strcmp(n->ncmd.args->narg.text, "jobs") == 0
+ 	) {
+ 		TRACE(("Job hack\n"));
+ 		/* "jobs": we do not want to clear job list for it,
+diff --git a/shell/ash_test/ash-misc/nulltick1.right b/shell/ash_test/ash-misc/nulltick1.right
+new file mode 100644
+index 0000000..f90b820
+--- /dev/null
++++ b/shell/ash_test/ash-misc/nulltick1.right
+@@ -0,0 +1,3 @@
++Test 1
++Test 2
++Done
+diff --git a/shell/ash_test/ash-misc/nulltick1.tests b/shell/ash_test/ash-misc/nulltick1.tests
+new file mode 100755
+index 0000000..f81923d
+--- /dev/null
++++ b/shell/ash_test/ash-misc/nulltick1.tests
+@@ -0,0 +1,3 @@
++echo Test ` ` 1
++echo Test `</dev/null` 2
++echo Done

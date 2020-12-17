@@ -1,0 +1,66 @@
+2008-02-03 23:52:41 +0000
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index d236b77..e97f840 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -392,9 +392,11 @@ config FEATURE_MOUNT_HELPERS
+ 	depends on MOUNT
+ 	help
+ 	  Enable mounting of virtual file systems via external helpers.
+-	  E.g. mount obexfs#-b00.11.22.33.44.55 /mnt will in effect call
+-	  obexfs -b00.11.22.33.44.55 /mnt
+-	  The idea is to use such virtual filesystems in /etc/fstab
++	  E.g. "mount obexfs#-b00.11.22.33.44.55 /mnt" will in effect call
++	  "obexfs -b00.11.22.33.44.55 /mnt"
++	  Also "mount -t sometype [-o opts] fs /mnt" will try
++	  "sometype [-o opts] fs /mnt" if simple mount syscall fails.
++	  The idea is to use such virtual filesystems in /etc/fstab.
+ 
+ config FEATURE_MOUNT_NFS
+ 	bool "Support mounting NFS file systems"
+diff --git a/util-linux/mkswap.c b/util-linux/mkswap.c
+index f047cce..31d5773 100644
+--- a/util-linux/mkswap.c
++++ b/util-linux/mkswap.c
+@@ -66,7 +66,9 @@ int mkswap_main(int argc, char **argv)
+ 	fd = xopen(argv[1], O_RDWR);
+ 	/* fdlength was reported to be unreliable - use seek */
+ 	len = xlseek(fd, 0, SEEK_END);
++#if ENABLE_SELINUX
+ 	xlseek(fd, 0, SEEK_SET);
++#endif
+ 	pagesize = getpagesize();
+ 	printf("Setting up swapspace version 1, size = %"OFF_FMT"u bytes\n",
+ 			len - pagesize);
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 4ac52cd..5e6c3ba 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -309,6 +309,27 @@ static int mount_it_now(struct mntent *mp, int vfsflags, char *filteropts)
+ 	for (;;) {
+ 		rc = mount(mp->mnt_fsname, mp->mnt_dir, mp->mnt_type,
+ 				vfsflags, filteropts);
++
++		// If mount failed, try
++		// helper program <mnt_type>
++		if (ENABLE_FEATURE_MOUNT_HELPERS && rc) {
++			char *args[6];
++			int errno_save = errno;
++			args[0] = mp->mnt_type;
++			rc = 1;
++			if (filteropts) {
++				args[rc++] = (char *)"-o";
++				args[rc++] = filteropts;
++			}
++			args[rc++] = mp->mnt_fsname;
++			args[rc++] = mp->mnt_dir;
++			args[rc] = NULL;
++			rc = wait4pid(spawn(args));
++			if (!rc)
++				break;
++			errno = errno_save;
++		}
++
+ 		if (!rc || (vfsflags & MS_RDONLY) || (errno != EACCES && errno != EROFS))
+ 			break;
+ 		if (!(vfsflags & MS_SILENT))

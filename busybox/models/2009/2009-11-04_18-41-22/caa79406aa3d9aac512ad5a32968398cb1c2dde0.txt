@@ -1,0 +1,460 @@
+2009-11-04 18:41:22 -0500
+diff --git a/testsuite/all_sourcecode.tests b/testsuite/all_sourcecode.tests
+index 5b3f038..c0a1f86 100755
+--- a/testsuite/all_sourcecode.tests
++++ b/testsuite/all_sourcecode.tests
+@@ -5,7 +5,7 @@
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+ [ -n "$srcdir" ] || srcdir=$(pwd)
+-. testing.sh
++. ./testing.sh
+ 
+ 
+ #
+diff --git a/testsuite/awk.tests b/testsuite/awk.tests
+index 0db99ab..2c7642c 100755
+--- a/testsuite/awk.tests
++++ b/testsuite/awk.tests
+@@ -3,7 +3,7 @@
+ # Copyright 2007 by Denys Vlasenko <vda.linux@googlemail.com>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "description" "command" "result" "infile" "stdin"
+ 
+diff --git a/testsuite/busybox.tests b/testsuite/busybox.tests
+index 26536c6..7c44b1e 100755
+--- a/testsuite/busybox.tests
++++ b/testsuite/busybox.tests
+@@ -4,7 +4,7 @@
+ # Copyright 2005 by Rob Landley <rob@landley.net>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ HELPDUMP=`busybox`
+ 
+diff --git a/testsuite/comm.tests b/testsuite/comm.tests
+index 44169f9..753db21 100755
+--- a/testsuite/comm.tests
++++ b/testsuite/comm.tests
+@@ -3,7 +3,7 @@
+ # Copyright 2008 by Denys Vlasenko <vda.linux@googlemail.com>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "description" "command" "result" "infile" "stdin"
+ 
+diff --git a/testsuite/cpio.tests b/testsuite/cpio.tests
+index fa0b65a..f21ba18 100755
+--- a/testsuite/cpio.tests
++++ b/testsuite/cpio.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # ls -ln shows date. Need to remove that, it's variable.
+ # sed: coalesce spaces
+diff --git a/testsuite/cut.tests b/testsuite/cut.tests
+index 2788d1f..0fd79f2 100755
+--- a/testsuite/cut.tests
++++ b/testsuite/cut.tests
+@@ -3,7 +3,7 @@
+ # Copyright 2007 by Denys Vlasenko <vda.linux@googlemail.com>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ #   file input will be file called "input"
+diff --git a/testsuite/diff.tests b/testsuite/diff.tests
+index ac68a08..bf24b77 100755
+--- a/testsuite/diff.tests
++++ b/testsuite/diff.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+diff --git a/testsuite/expand.tests b/testsuite/expand.tests
+index 3f4cda3..57498a2 100755
+--- a/testsuite/expand.tests
++++ b/testsuite/expand.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+diff --git a/testsuite/fold.tests b/testsuite/fold.tests
+index 5e1f345..ca0e511 100755
+--- a/testsuite/fold.tests
++++ b/testsuite/fold.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2009 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+diff --git a/testsuite/grep.tests b/testsuite/grep.tests
+index 7e3dff0..6e14f91 100755
+--- a/testsuite/grep.tests
++++ b/testsuite/grep.tests
+@@ -5,7 +5,7 @@
+ 
+ # AUDIT:
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ #   file input will be file called "input"
+diff --git a/testsuite/makedevs.tests b/testsuite/makedevs.tests
+index 9e068bd..b41614f 100755
+--- a/testsuite/makedevs.tests
++++ b/testsuite/makedevs.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # ls -ln is showing date. Need to remove that, it's variable
+ # sed: (1) "maj, min" -> "maj,min" (2) coalesce spaces
+diff --git a/testsuite/mdev.tests b/testsuite/mdev.tests
+index d52f3b1..319c670 100755
+--- a/testsuite/mdev.tests
++++ b/testsuite/mdev.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # ls -ln is showing date. Need to remove that, it's variable
+ # sed: (1) "maj, min" -> "maj,min" (2) coalesce spaces
+diff --git a/testsuite/mkfs.minix.tests b/testsuite/mkfs.minix.tests
+index 90df931..7cad7da 100755
+--- a/testsuite/mkfs.minix.tests
++++ b/testsuite/mkfs.minix.tests
+@@ -4,7 +4,7 @@
+ # Copyright 2007 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+diff --git a/testsuite/mount.tests b/testsuite/mount.tests
+index f4a2cc2..8bd60ea 100755
+--- a/testsuite/mount.tests
++++ b/testsuite/mount.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2007 by Denys Vlasenko <vda.linux@googlemail.com>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ test "`id -u`" = 0 || {
+ 	echo "SKIPPED: must be root to test this"
+diff --git a/testsuite/od.tests b/testsuite/od.tests
+index f136bb5..0bf1f4c 100755
+--- a/testsuite/od.tests
++++ b/testsuite/od.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+diff --git a/testsuite/parse.tests b/testsuite/parse.tests
+index f1ee7b8..999efef 100755
+--- a/testsuite/parse.tests
++++ b/testsuite/parse.tests
+@@ -3,7 +3,7 @@
+ # Copyright 2008 by Denys Vlasenko <vda.linux@googlemail.com>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ COLLAPSE=$(( 0x00010000))
+ TRIM=$((     0x00020000))
+diff --git a/testsuite/patch.tests b/testsuite/patch.tests
+index 1bdc0c2..f3e6071 100755
+--- a/testsuite/patch.tests
++++ b/testsuite/patch.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+diff --git a/testsuite/pidof.tests b/testsuite/pidof.tests
+index a05a302..45df1a9 100755
+--- a/testsuite/pidof.tests
++++ b/testsuite/pidof.tests
+@@ -6,7 +6,7 @@
+ 
+ # AUDIT:
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+diff --git a/testsuite/printf.tests b/testsuite/printf.tests
+index 0a63f0f..95f8110 100755
+--- a/testsuite/printf.tests
++++ b/testsuite/printf.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # Need this in order to not execute shell builtin
+ bb="busybox "
+diff --git a/testsuite/readlink.tests b/testsuite/readlink.tests
+index 0faa6ed..e6822df 100755
+--- a/testsuite/readlink.tests
++++ b/testsuite/readlink.tests
+@@ -4,7 +4,7 @@
+ # Copyright 2006 by Natanael Copa <n@tanael.org>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ TESTDIR=readlink_testdir
+ TESTFILE="$TESTDIR/testfile"
+diff --git a/testsuite/rx.tests b/testsuite/rx.tests
+index 417f04b..c2b8814 100755
+--- a/testsuite/rx.tests
++++ b/testsuite/rx.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2009 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+diff --git a/testsuite/sed.tests b/testsuite/sed.tests
+index 696d980..875c946 100755
+--- a/testsuite/sed.tests
++++ b/testsuite/sed.tests
+@@ -4,7 +4,7 @@
+ # Copyright 2005 by Rob Landley <rob@landley.net>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "description" "arguments" "result" "infile" "stdin"
+ 
+diff --git a/testsuite/seq.tests b/testsuite/seq.tests
+index 817e1a7..7a55374 100755
+--- a/testsuite/seq.tests
++++ b/testsuite/seq.tests
+@@ -6,7 +6,7 @@
+ 
+ # AUDIT: Full SUSv3 coverage (except internationalization).
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ #   file input will be file called "input"
+diff --git a/testsuite/sort.tests b/testsuite/sort.tests
+index 627ca51..5ed29fb 100755
+--- a/testsuite/sort.tests
++++ b/testsuite/sort.tests
+@@ -1,10 +1,10 @@
+-#!/bin/bash
++#!/bin/sh
+ 
+ # SUSv3 compliant sort tests.
+ # Copyright 2005 by Rob Landley <rob@landley.net>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # The basic tests.  These should work even with the small busybox.
+ 
+diff --git a/testsuite/start-stop-daemon.tests b/testsuite/start-stop-daemon.tests
+index ba77cde..76b0be0 100755
+--- a/testsuite/start-stop-daemon.tests
++++ b/testsuite/start-stop-daemon.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "cmd" "expected result" "file input" "stdin"
+ 
+diff --git a/testsuite/sum.tests b/testsuite/sum.tests
+index e537cf6..da278c7 100755
+--- a/testsuite/sum.tests
++++ b/testsuite/sum.tests
+@@ -6,7 +6,7 @@
+ 
+ # AUDIT: Unit tests for sum
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ #   file input will be file called "input"
+diff --git a/testsuite/tail.tests b/testsuite/tail.tests
+index d97bf7b..d2427d4 100755
+--- a/testsuite/tail.tests
++++ b/testsuite/tail.tests
+@@ -3,7 +3,7 @@
+ # Copyright 2009 by Denys Vlasenko <vda.linux@googlemail.com>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "command" "expected result" "file input" "stdin"
+ #   file input will be file called "input"
+diff --git a/testsuite/taskset.tests b/testsuite/taskset.tests
+index 53d7f10..1a19285 100755
+--- a/testsuite/taskset.tests
++++ b/testsuite/taskset.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2006 Bernhard Reutner-Fischer
+ # Licensed under GPL v2 or later, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ a="taskset"
+ 
+ # testing "test name"              "opts" "expected result" "file inp" "stdin"
+diff --git a/testsuite/test.tests b/testsuite/test.tests
+index b7c84d9..7d80444 100755
+--- a/testsuite/test.tests
++++ b/testsuite/test.tests
+@@ -3,7 +3,7 @@
+ # Copyright 2007 by Denys Vlasenko <vda.linux@googlemail.com>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "command" "expected result" "file input" "stdin"
+ #   file input will be file called "input"
+diff --git a/testsuite/tr.tests b/testsuite/tr.tests
+index f91cc1f..9706056 100755
+--- a/testsuite/tr.tests
++++ b/testsuite/tr.tests
+@@ -3,7 +3,7 @@
+ # Copyright 2009 by Denys Vlasenko <vda.linux@googlemail.com>
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "description" "arguments" "result" "infile" "stdin"
+ 
+diff --git a/testsuite/unexpand.tests b/testsuite/unexpand.tests
+index e7f42c5..5c82a1e 100755
+--- a/testsuite/unexpand.tests
++++ b/testsuite/unexpand.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ 
+diff --git a/testsuite/uniq.tests b/testsuite/uniq.tests
+index 94c4559..02c595a 100755
+--- a/testsuite/uniq.tests
++++ b/testsuite/uniq.tests
+@@ -6,7 +6,7 @@
+ 
+ # AUDIT: Full SUSv3 coverage (except internationalization).
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ #   file input will be file called "input"
+diff --git a/testsuite/unzip.tests b/testsuite/unzip.tests
+index 975079d..0ce5da2 100755
+--- a/testsuite/unzip.tests
++++ b/testsuite/unzip.tests
+@@ -5,7 +5,7 @@
+ # Copyright 2006 Glenn McGrath
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ #   file input will be file called "input"
+diff --git a/testsuite/uuencode.tests b/testsuite/uuencode.tests
+index cb658db..6556e60 100755
+--- a/testsuite/uuencode.tests
++++ b/testsuite/uuencode.tests
+@@ -6,7 +6,7 @@
+ 
+ # AUDIT: Unit tests for uuencode
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "options" "expected result" "file input" "stdin"
+ #   file input will be file called "input"
+diff --git a/testsuite/xargs.tests b/testsuite/xargs.tests
+index 3652449..17f4e7a 100755
+--- a/testsuite/xargs.tests
++++ b/testsuite/xargs.tests
+@@ -2,7 +2,7 @@
+ # Copyright 2008 by Denys Vlasenko
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+-. testing.sh
++. ./testing.sh
+ 
+ # testing "test name" "command" "expected result" "file input" "stdin"
+ 

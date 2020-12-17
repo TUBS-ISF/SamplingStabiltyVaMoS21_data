@@ -1,0 +1,17 @@
+2007-08-26 16:39:47 +0000
+diff --git a/docs/busybox.net/header.html b/docs/busybox.net/header.html
+index 081f18c..73beea2 100644
+--- a/docs/busybox.net/header.html
++++ b/docs/busybox.net/header.html
+@@ -80,7 +80,10 @@
+     <ul>
+         <li><a href="http://busybox.net/~landley">Rob</a></li>
+         <li><a href="http://busybox.net/~aldot">Bernhard</a></li>
+-	<li><a href="http://busybox.net/~vda">Denis</a></li>
++	<li><a href="http://busybox.net/~vda">Denis</a>
++	  (<a href=http://busybox.net/~vda/mboot/>mboot</a>,
++	  <a href=http://busybox.net/~vda/linld/>linld</a>)
++	</li>
+     </ul>
+ 
+ <!--

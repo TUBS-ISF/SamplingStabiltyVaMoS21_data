@@ -1,0 +1,62 @@
+2007-06-19 11:24:47 +0000
+diff --git a/libbb/Config.in b/libbb/Config.in
+index 0a3769d..5f4e416 100644
+--- a/libbb/Config.in
++++ b/libbb/Config.in
+@@ -26,6 +26,14 @@ config MD5_SIZE_VS_SPEED
+ 	  2                   3.0                5088
+ 	  3 (smallest)        5.1                4912
+ 
++config FEATURE_ETC_NETWORKS
++	bool "Support for /etc/networks"
++	default n
++	help
++	  Enable support for network names in /etc/networks. This is
++	  a rarely used feature which allows you to use names
++	  instead of IP/mask pairs in route command.
++
+ config FEATURE_EDITING
+ 	bool "Command line editing"
+ 	default n
+diff --git a/libbb/inet_common.c b/libbb/inet_common.c
+index 8449201..ec3c3f9 100644
+--- a/libbb/inet_common.c
++++ b/libbb/inet_common.c
+@@ -14,7 +14,9 @@
+ int INET_resolve(const char *name, struct sockaddr_in *s_in, int hostfirst)
+ {
+ 	struct hostent *hp;
++#if ENABLE_FEATURE_ETC_NETWORKS
+ 	struct netent *np;
++#endif
+ 
+ 	/* Grmpf. -FvK */
+ 	s_in->sin_family = AF_INET;
+@@ -43,6 +45,7 @@ int INET_resolve(const char *name, struct sockaddr_in *s_in, int hostfirst)
+ 			return 0;
+ 		}
+ 	}
++#if ENABLE_FEATURE_ETC_NETWORKS
+ 	/* Try the NETWORKS database to see if this is a known network. */
+ #ifdef DEBUG
+ 	bb_error_msg("getnetbyname(%s)", name);
+@@ -52,6 +55,7 @@ int INET_resolve(const char *name, struct sockaddr_in *s_in, int hostfirst)
+ 		s_in->sin_addr.s_addr = htonl(np->n_net);
+ 		return 1;
+ 	}
++#endif
+ 	if (hostfirst) {
+ 		/* Don't try again */
+ 		return -1;
+@@ -140,10 +144,7 @@ char *INET_rresolve(struct sockaddr_in *s_in, int numeric, uint32_t netmask)
+ 		ent = gethostbyaddr((char *) &ad, 4, AF_INET);
+ 		if (ent)
+ 			name = xstrdup(ent->h_name);
+-	} else {
+-		/* Hmmm... this is very rare to have named nets,
+-		 * and this getnetbyaddr() call is the only one in bbox.
+-		 * Maybe get rid of or make configurable? */
++	} else if (ENABLE_FEATURE_ETC_NETWORKS) {
+ 		struct netent *np;
+ #ifdef DEBUG
+ 		bb_error_msg("getnetbyaddr (%08x)", (unsigned)host_ad);

@@ -1,0 +1,100 @@
+2009-07-04 16:50:43 +0200
+diff --git a/e2fsprogs/old_e2fsprogs/e2fsck.c b/e2fsprogs/old_e2fsprogs/e2fsck.c
+index d1f8d1e..6531f5d 100644
+--- a/e2fsprogs/old_e2fsprogs/e2fsck.c
++++ b/e2fsprogs/old_e2fsprogs/e2fsck.c
+@@ -1886,7 +1886,7 @@ static void e2fsck_journal_reset_super(e2fsck_t ctx, journal_superblock_t *jsb,
+ 	int i;
+ 
+ 	/* Leave a valid existing V1 superblock signature alone.
+-	 * Anything unrecognisable we overwrite with a new V2
++	 * Anything unrecognizable we overwrite with a new V2
+ 	 * signature. */
+ 
+ 	if (jsb->s_header.h_magic != htonl(JFS_MAGIC_NUMBER) ||
+diff --git a/editors/vi.c b/editors/vi.c
+index b5696fb..31a1edc 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -687,7 +687,7 @@ static char *get_one_address(char *p, int *addr)	// get colon addr, if present
+ 		sscanf(p, "%d%n", addr, &st);
+ 		p += st;
+ 	} else {
+-		// unrecognised address - assume -1
++		// unrecognized address - assume -1
+ 		*addr = -1;
+ 	}
+ 	return p;
+@@ -2979,7 +2979,7 @@ static void do_cmd(int c)
+ 		//case '`':	// `-
+ 		//case 'u':	// u- FIXME- there is no undo
+ 		//case 'v':	// v-
+-	default:			// unrecognised command
++	default:			// unrecognized command
+ 		buf[0] = c;
+ 		buf[1] = '\0';
+ 		if (c < ' ') {
+@@ -3356,7 +3356,7 @@ static void do_cmd(int c)
+ 		} else if (sscanf(p, "%d", &j) > 0) {
+ 			dot = find_line(j);		// go to line # j
+ 			dot_skip_over_ws();
+-		} else {		// unrecognised cmd
++		} else {		// unrecognized cmd
+ 			not_implemented(p);
+ 		}
+ #endif /* !FEATURE_VI_COLON */
+diff --git a/examples/inittab b/examples/inittab
+index 5f2af87..64fc4fc 100644
+--- a/examples/inittab
++++ b/examples/inittab
+@@ -30,7 +30,7 @@
+ #       console." and then waits for the user to press enter before starting
+ #       the specified process.
+ #
+-#       Note: unrecognised actions (like initdefault) will cause init to emit
++#       Note: unrecognized actions (like initdefault) will cause init to emit
+ #       an error message, and then go along with its business.
+ #
+ # <process>: Specifies the process to be executed and it's command line.
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 0d374ca..e8a4838 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -675,7 +675,7 @@ static void identify(uint16_t *val)
+ 	swab(val, buf, sizeof(buf));
+ 	val = buf;
+ #endif
+-	/* check if we recognise the device type */
++	/* check if we recognize the device type */
+ 	bb_putchar('\n');
+ 	if (!(val[GEN_CONFIG] & NOT_ATA)) {
+ 		dev = ATA_DEV;
+diff --git a/networking/arping.c b/networking/arping.c
+index ab39c71..71690cf 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -169,7 +169,7 @@ static bool recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 	 && FROM->sll_pkttype != PACKET_MULTICAST)
+ 		return false;
+ 
+-	/* Only these types are recognised */
++	/* Only these types are recognized */
+ 	if (ah->ar_op != htons(ARPOP_REQUEST) && ah->ar_op != htons(ARPOP_REPLY))
+ 		return false;
+ 
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 559e4c1..5f5adc0 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -253,9 +253,9 @@ config GETOPT
+ config FEATURE_GETOPT_LONG
+ 	bool "Support option -l"
+ 	default y if LONG_OPTS
++	depends on GETOPT
+ 	help
+-	  Enable support for recognising long options using the -l option to
+-	  getopt.
++	  Enable support for long options (option -l).
+ 
+ config HEXDUMP
+ 	bool "hexdump"

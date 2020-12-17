@@ -1,0 +1,31 @@
+2008-05-26 18:41:35 +0000
+diff --git a/scripts/memusage b/scripts/memusage
+index 863b0cb..4ef5608 100755
+--- a/scripts/memusage
++++ b/scripts/memusage
+@@ -3,7 +3,7 @@
+ busybox=../busybox
+ 
+ i=4000
+-echo "Before we started $i copies of 'busybox sleep 10':"
++echo "Before we started $i copies of '$busybox sleep 10':"
+ $busybox nmeter '%t %[pn] %m' | head -3
+ 
+ while test $i != 0; do
+diff --git a/scripts/sample_pmap b/scripts/sample_pmap
+new file mode 100755
+index 0000000..e7fb457
+--- /dev/null
++++ b/scripts/sample_pmap
+@@ -0,0 +1,11 @@
++#!/bin/sh
++
++busybox=../busybox
++
++$busybox sleep 10 &
++pid=$!
++sleep 1
++
++echo "Memory map of '$busybox sleep 10':"
++size $busybox
++pmap $pid | env - grep "^[0-9a-f][0-9a-f]* " | sort -r -t " " -k2,999

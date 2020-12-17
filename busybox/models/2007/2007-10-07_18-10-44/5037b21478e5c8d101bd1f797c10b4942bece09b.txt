@@ -1,0 +1,13 @@
+2007-10-07 18:10:44 +0000
+diff --git a/docs/busybox.net/header.html b/docs/busybox.net/header.html
+index 2b4673a..ad89d6c 100644
+--- a/docs/busybox.net/header.html
++++ b/docs/busybox.net/header.html
+@@ -48,7 +48,6 @@
+         <li><a href="about.html">About BusyBox</a></li>
+         <li><a href="screenshot.html">Screenshot</a></li>
+         <li><a href="news.html">Announcements</a></li>
+-	<li><a href="downloads/news">BusyBox Weekly News</a></li>
+     </ul>
+     <b>Documentation</b>
+     <ul>

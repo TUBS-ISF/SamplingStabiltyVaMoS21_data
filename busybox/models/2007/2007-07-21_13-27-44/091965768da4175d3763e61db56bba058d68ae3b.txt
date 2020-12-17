@@ -1,0 +1,310 @@
+2007-07-21 13:27:44 +0000
+diff --git a/archival/ar.c b/archival/ar.c
+index 31e96de..e85ca5c 100644
+--- a/archival/ar.c
++++ b/archival/ar.c
+@@ -50,7 +50,7 @@ int ar_main(int argc, char **argv)
+ 	archive_handle = init_handle();
+ 
+ 	/* Prepend '-' to the first argument if required */
+-	opt_complementary = "--:p:t:x:-1:?:p--tx:t--px:x--pt";
++	opt_complementary = "--:p:t:x:-1:p--tx:t--px:x--pt";
+ 	opt = getopt32(argc, argv, "ptxovcr");
+ 
+ 	if (opt & AR_CTX_PRINT) {
+diff --git a/coreutils/cp.c b/coreutils/cp.c
+index f98f281..78bd73c 100644
+--- a/coreutils/cp.c
++++ b/coreutils/cp.c
+@@ -44,7 +44,7 @@ int cp_main(int argc, char **argv)
+ 	// -P and -d are the same (-P is POSIX, -d is GNU)
+ 	// -r and -R are the same
+ 	// -a = -pdR
+-	opt_complementary = "?:l--s:s--l:Pd:rR:apdR";
++	opt_complementary = "l--s:s--l:Pd:rR:apdR";
+ 	flags = getopt32(argc, argv, FILEUTILS_CP_OPTSTR "arPHL");
+ 	/* Default behavior of cp is to dereference, so we don't have to do
+ 	 * anything special when we are given -L.
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index 084f7be..435b210 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -176,8 +176,6 @@ int cut_main(int argc, char **argv)
+ 	argv += optind;
+ 	if (!(option_mask32 & (CUT_OPT_BYTE_FLGS | CUT_OPT_CHAR_FLGS | CUT_OPT_FIELDS_FLGS)))
+ 		bb_error_msg_and_die("expected a list of bytes, characters, or fields");
+-	if (option_mask32 & BB_GETOPT_ERROR)
+-		bb_error_msg_and_die("only one type of list may be specified");
+ 
+ 	if (option_mask32 & CUT_OPT_DELIM_FLGS) {
+ 		if (strlen(ltok) > 1) {
+diff --git a/coreutils/date.c b/coreutils/date.c
+index 1b20cd4..5e2bcee 100644
+--- a/coreutils/date.c
++++ b/coreutils/date.c
+@@ -51,7 +51,7 @@ int date_main(int argc, char **argv)
+ 	char *isofmt_arg;
+ 	char *hintfmt_arg;
+ 
+-	opt_complementary = "?:d--s:s--d"
++	opt_complementary = "d--s:s--d"
+ 		USE_FEATURE_DATE_ISOFMT(":R--I:I--R");
+ 	opt = getopt32(argc, argv, "Rs:ud:r:"
+ 			USE_FEATURE_DATE_ISOFMT("I::D:"),
+diff --git a/coreutils/dos2unix.c b/coreutils/dos2unix.c
+index 86adcd9..115632f 100644
+--- a/coreutils/dos2unix.c
++++ b/coreutils/dos2unix.c
+@@ -20,7 +20,7 @@ enum {
+ };
+ 
+ /* if fn is NULL then input is stdin and output is stdout */
+-static int convert(char *fn, int ConvType)
++static int convert(char *fn, int conv_type)
+ {
+ 	FILE *in, *out;
+ 	int i;
+@@ -52,7 +52,7 @@ static int convert(char *fn, int ConvType)
+ 		if (i == '\r')
+ 			continue;
+ 		if (i == '\n') {
+-			if (ConvType == CT_UNIX2DOS)
++			if (conv_type == CT_UNIX2DOS)
+ 				fputc('\r', out);
+ 			fputc('\n', out);
+ 			continue;
+@@ -81,29 +81,27 @@ static int convert(char *fn, int ConvType)
+ int dos2unix_main(int argc, char **argv);
+ int dos2unix_main(int argc, char **argv)
+ {
+-	int o, ConvType;
++	int o, conv_type;
+ 
+ 	/* See if we are supposed to be doing dos2unix or unix2dos */
+ 	if (applet_name[0] == 'd') {
+-		ConvType = CT_DOS2UNIX;	/* 2 */
++		conv_type = CT_DOS2UNIX;	/* 2 */
+ 	} else {
+-		ConvType = CT_UNIX2DOS;	/* 1 */
++		conv_type = CT_UNIX2DOS;	/* 1 */
+ 	}
+-	/* -u and -d are mutally exclusive */
+-	opt_complementary = "?:u--d:d--u";
+-	/* process parameters */
+-	/* -u convert to unix */
+-	/* -d convert to dos  */
++	
++	/* -u convert to unix, -d convert to dos */
++	opt_complementary = "u--d:d--u"; /* mutally exclusive */
+ 	o = getopt32(argc, argv, "du");
+ 
+ 	/* Do the conversion requested by an argument else do the default
+ 	 * conversion depending on our name.  */
+ 	if (o)
+-		ConvType = o;
++		conv_type = o;
+ 
+ 	do {
+ 		/* might be convert(NULL) if there is no filename given */
+-		o = convert(argv[optind], ConvType);
++		o = convert(argv[optind], conv_type);
+ 		if (o < 0)
+ 			break;
+ 		optind++;
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 9dd5b48..27fb26e 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -49,7 +49,7 @@ int id_main(int argc, char **argv)
+ #endif
+ 	/* Don't allow -n -r -nr -ug -rug -nug -rnug */
+ 	/* Don't allow more than one username */
+-	opt_complementary = "?1:?:u--g:g--u:r?ug:n?ug" USE_SELINUX(":u--Z:Z--u:g--Z:Z--g");
++	opt_complementary = "?1:u--g:g--u:r?ug:n?ug" USE_SELINUX(":u--Z:Z--u:g--Z:Z--g");
+ 	flags = getopt32(argc, argv, "rnug" USE_SELINUX("Z"));
+ 
+ 	/* This values could be overwritten later */
+diff --git a/coreutils/install.c b/coreutils/install.c
+index 5503b55..8d71fa0 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -99,7 +99,7 @@ int install_main(int argc, char **argv)
+ #if ENABLE_FEATURE_INSTALL_LONG_OPTIONS
+ 	applet_long_options = install_long_options;
+ #endif
+-	opt_complementary = "?:s--d:d--s" USE_SELINUX(":Z--\xff:\xff--Z");
++	opt_complementary = "s--d:d--s" USE_SELINUX(":Z--\xff:\xff--Z");
+ 	/* -c exists for backwards compatibility, it's needed */
+ 
+ 	flags = getopt32(argc, argv, "cdpsg:m:o:" USE_SELINUX("Z:"),
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index f41bd63..6371139 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -288,7 +288,7 @@ int sort_main(int argc, char **argv)
+ 
+ 	/* Parse command line options */
+ 	/* -o and -t can be given at most once */
+-	opt_complementary = "?:o--o:t--t:" /* -t, -o: maximum one of each */
++	opt_complementary = "o--o:t--t:" /* -t, -o: maximum one of each */
+ 			"k::"; /* -k takes list */
+ 	getopt32(argc, argv, OPT_STR, &str_ignored, &str_ignored, &str_o, &lst_k, &str_t);
+ #if ENABLE_FEATURE_SORT_BIG
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 0681a08..fd9f60c 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -254,7 +254,7 @@ int start_stop_daemon_main(int argc, char **argv)
+ #endif
+ 
+ 	/* Check required one context option was given */
+-	opt_complementary = "K:S:?:K--S:S--K:m?p:K?xpun:S?xa";
++	opt_complementary = "K:S:K--S:S--K:m?p:K?xpun:S?xa";
+ 	opt = getopt32(argc, argv, "KSbqma:n:s:u:c:x:p:"
+ 		USE_FEATURE_START_STOP_DAEMON_FANCY("ovN:"),
+ //		USE_FEATURE_START_STOP_DAEMON_FANCY("ovN:R:"),
+diff --git a/editors/cmp.c b/editors/cmp.c
+index e5dda80..da431f3 100644
+--- a/editors/cmp.c
++++ b/editors/cmp.c
+@@ -57,7 +57,7 @@ int cmp_main(int argc, char **argv)
+ 
+ 	xfunc_error_retval = 2;	/* 1 is returned if files are different. */
+ 
+-	opt_complementary = "?:-1"
++	opt_complementary = "-1"
+ 			USE_DESKTOP(":?4")
+ 			SKIP_DESKTOP(":?2")
+ 			":l--s:s--l";
+diff --git a/include/libbb.h b/include/libbb.h
+index a8b9b5b..b8ec839 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -588,8 +588,6 @@ void bb_daemonize_or_rexec(int flags, char **argv);
+ void bb_sanitize_stdio(void);
+ 
+ 
+-// TODO: always error out?
+-enum { BB_GETOPT_ERROR = 0x80000000 };
+ extern const char *opt_complementary;
+ #if ENABLE_GETOPT_LONG
+ extern const struct option *applet_long_options;
+diff --git a/ipsvd/tcpudp.c b/ipsvd/tcpudp.c
+index bc3d3a2..492808a 100644
+--- a/ipsvd/tcpudp.c
++++ b/ipsvd/tcpudp.c
+@@ -150,7 +150,7 @@ int tcpudpsvd_main(int argc, char **argv)
+ 	tcp = (applet_name[0] == 't');
+ 
+ 	/* 3+ args, -i at most once, -p implies -h, -v is counter */
+-	opt_complementary = "-3:?:i--i:ph:vv";
++	opt_complementary = "-3:i--i:ph:vv";
+ #ifdef SSLSVD
+ 	getopt32(argc, argv, "+c:C:i:x:u:l:Eb:hpt:vU:/:Z:K:",
+ 		&str_c, &str_C, &instructs, &instructs, &user, &local_hostname,
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index d4465f8..f5aaa70 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -217,20 +217,12 @@ Special characters:
+         -b, -c and -f are mutally exclusive and should raise an error
+         if specified together.  In this case you must set
+         opt_complementary = "b--cf:c--bf:f--bc".  If two of the
+-        mutually exclusive options are found, getopt32's
+-        return value will have the error flag set (BB_GETOPT_ERROR) so
+-        that we can check for it:
+-
+-        if (flags & BB_GETOPT_ERROR)
+-        	bb_show_usage();
++        mutually exclusive options are found, getopt32 will call
++	bb_show_usage() and die.
+ 
+  "x--x" Variation of the above, it means that -x option should occur
+         at most once.
+ 
+- "?"    A "?" as the first char in a opt_complementary group means:
+-        if BB_GETOPT_ERROR is detected, don't return, call bb_show_usage
+-        and exit instead. Next char after '?' can't be a digit.
+-
+  "::"   A double colon after a char in opt_complementary means that the
+         option can occur multiple times. Each occurrence will be saved as
+         a llist_t element instead of char*.
+@@ -476,11 +468,8 @@ getopt32(int argc, char **argv, const char *applet_opts, ...)
+ 			if (on_off->opt == 0 && c != 0)
+ 				bb_show_usage();
+ 		}
+-		if (flags & on_off->incongruously) {
+-			if ((spec_flgs & SHOW_USAGE_IF_ERROR))
+-				bb_show_usage();
+-			flags |= BB_GETOPT_ERROR;
+-		}
++		if (flags & on_off->incongruously)
++			bb_show_usage();
+ 		trigger = on_off->switch_on & on_off->switch_off;
+ 		flags &= ~(on_off->switch_off ^ trigger);
+ 		flags |= on_off->switch_on ^ trigger;
+diff --git a/miscutils/eject.c b/miscutils/eject.c
+index ba7da5c..8d062d1 100644
+--- a/miscutils/eject.c
++++ b/miscutils/eject.c
+@@ -32,7 +32,7 @@ int eject_main(int argc, char **argv)
+ 	const char *device;
+ 	int dev, cmd;
+ 
+-	opt_complementary = "?:?1:t--T:T--t";
++	opt_complementary = "?1:t--T:T--t";
+ 	flags = getopt32(argc, argv, "tT");
+ 	device = argv[optind] ? : "/dev/cdrom";
+ 
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 6909e84..3165c2d 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -210,7 +210,7 @@ int udhcpc_main(int argc, char **argv)
+ 	client_config.timeout = 3;
+ 
+ 	/* Parse command line */
+-	opt_complementary = "?:c--C:C--c" // mutually exclusive
++	opt_complementary = "c--C:C--c" // mutually exclusive
+ 	                    ":hH:Hh"; // -h and -H are the same
+ #if ENABLE_GETOPT_LONG
+ 	applet_long_options = arg_options;
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 01c7c27..95df7ea 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -33,7 +33,7 @@ int dumpleases_main(int argc, char **argv)
+ 
+ 	applet_long_options = options;
+ #endif
+-	opt_complementary = "=0:?:a--r:r--a";
++	opt_complementary = "=0:a--r:r--a";
+ 	opt = getopt32(argc, argv, "arf:", &file);
+ 
+ 	fd = xopen(file, O_RDONLY);
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 06c3488..a5e6743 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -318,7 +318,7 @@ int getopt_main(int argc, char *argv[])
+ 	opt = getopt32(argc, argv, "+o:n:qQs:Tu", &optstr, &name, &s_arg);
+ #else
+ 	applet_long_options = longopts;
+-	opt_complementary = "?:l::";
++	opt_complementary = "l::";
+ 	opt = getopt32(argc, argv, "+o:n:qQs:Tual:",
+ 					&optstr, &name, &s_arg, &l_arg);
+ 	/* Effectuate the read options for the applet itself */
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index 8b65df6..882a0c5 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -189,7 +189,7 @@ int hwclock_main(int argc, char **argv)
+ 	};
+ 	applet_long_options = hwclock_long_options;
+ #endif
+-	opt_complementary = "?:r--ws:w--rs:s--wr:l--u:u--l";
++	opt_complementary = "r--ws:w--rs:s--wr:l--u:u--l";
+ 	opt = getopt32(argc, argv, "lurswf:", &rtcname);
+ 
+ 	/* If -u or -l wasn't given check if we are using utc */

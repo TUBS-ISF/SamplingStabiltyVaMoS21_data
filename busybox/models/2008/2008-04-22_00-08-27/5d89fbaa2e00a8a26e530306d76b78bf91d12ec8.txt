@@ -1,0 +1,172 @@
+2008-04-22 00:08:27 +0000
+diff --git a/coreutils/Kbuild b/coreutils/Kbuild
+index 253eb6d..cb45439 100644
+--- a/coreutils/Kbuild
++++ b/coreutils/Kbuild
+@@ -71,10 +71,10 @@ lib-$(CONFIG_SYNC)      += sync.o
+ lib-$(CONFIG_TAC)       += tac.o
+ lib-$(CONFIG_TAIL)      += tail.o
+ lib-$(CONFIG_TEE)       += tee.o
+-lib-$(CONFIG_TEST)      += test.o
+-lib-$(CONFIG_ASH)       += test.o # used by ash
+-lib-$(CONFIG_HUSH)      += test.o # used by hush
+-lib-$(CONFIG_MSH)       += test.o # used by msh
++lib-$(CONFIG_TEST)      += test.o test_ptr_hack.o
++lib-$(CONFIG_ASH)       += test.o test_ptr_hack.o # used by ash
++lib-$(CONFIG_HUSH)      += test.o test_ptr_hack.o # used by hush
++lib-$(CONFIG_MSH)       += test.o test_ptr_hack.o # used by msh
+ lib-$(CONFIG_TOUCH)     += touch.o
+ lib-$(CONFIG_TR)        += tr.o
+ lib-$(CONFIG_TRUE)      += true.o
+diff --git a/coreutils/test.c b/coreutils/test.c
+index 2f5b6b8..3c725a2 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -159,7 +159,7 @@ typedef int arith_t;
+ 
+ 
+ /* We try to minimize both static and stack usage. */
+-struct statics {
++struct test_statics {
+ 	char **t_wp;
+ 	const struct t_op *t_wp_op;
+ 	gid_t *group_array;
+@@ -167,11 +167,10 @@ struct statics {
+ 	jmp_buf leaving;
+ };
+ 
+-/* Make it reside in writable memory, yet make compiler understand
+- * that it is not going to change. */
+-static struct statics *const ptr_to_statics __attribute__ ((section (".data")));
++/* See test_ptr_hack.c */
++extern struct test_statics *const test_ptr_to_statics;
+ 
+-#define S (*ptr_to_statics)
++#define S (*test_ptr_to_statics)
+ #define t_wp            (S.t_wp         )
+ #define t_wp_op         (S.t_wp_op      )
+ #define group_array     (S.group_array  )
+@@ -179,11 +178,11 @@ static struct statics *const ptr_to_statics __attribute__ ((section (".data")));
+ #define leaving         (S.leaving      )
+ 
+ #define INIT_S() do { \
+-	(*(struct statics**)&ptr_to_statics) = xzalloc(sizeof(S)); \
++	(*(struct test_statics**)&test_ptr_to_statics) = xzalloc(sizeof(S)); \
+ 	barrier(); \
+ } while (0)
+ #define DEINIT_S() do { \
+-	free(ptr_to_statics); \
++	free(test_ptr_to_statics); \
+ } while (0)
+ 
+ static arith_t primary(enum token n);
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 3a68efc..d943628 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -50,7 +50,7 @@ lib-y += inode_hash.o
+ lib-y += isdirectory.o
+ lib-y += kernel_version.o
+ lib-y += last_char_is.o
+-lib-y += lineedit.o
++lib-y += lineedit.o lineedit_ptr_hack.o
+ lib-y += llist.o
+ lib-y += login.o
+ lib-y += make_directory.o
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index ed7d391..90fca8c 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -177,11 +177,6 @@ int find_applet_by_name(const char *name)
+ }
+ 
+ 
+-#ifdef __GLIBC__
+-/* Make it reside in R/W memory: */
+-int *const bb_errno __attribute__ ((section (".data")));
+-#endif
+-
+ void lbb_prepare(const char *applet
+ 		USE_FEATURE_INDIVIDUAL(, char **argv))
+ 				MAIN_EXTERNALLY_VISIBLE;
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 4ba61c1..6de66ba 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -74,7 +74,7 @@ static const char null_str[] ALIGN1 = "";
+ #endif
+ 
+ /* We try to minimize both static and stack usage. */
+-struct statics {
++struct lineedit_statics {
+ 	line_input_t *state;
+ 
+ 	volatile unsigned cmdedit_termw; /* = 80; */ /* actual terminal width */
+@@ -120,11 +120,10 @@ struct statics {
+ #endif
+ };
+ 
+-/* Make it reside in writable memory, yet make compiler understand
+- * that it is not going to change. */
+-static struct statics *const ptr_to_statics __attribute__ ((section (".data")));
++/* See lineedit_ptr_hack.c */
++extern struct lineedit_statics *const lineedit_ptr_to_statics;
+ 
+-#define S (*ptr_to_statics)
++#define S (*lineedit_ptr_to_statics)
+ #define state            (S.state           )
+ #define cmdedit_termw    (S.cmdedit_termw   )
+ #define previous_SIGWINCH_handler (S.previous_SIGWINCH_handler)
+@@ -145,7 +144,7 @@ static struct statics *const ptr_to_statics __attribute__ ((section (".data")));
+ #define delbuf           (S.delbuf          )
+ 
+ #define INIT_S() do { \
+-	(*(struct statics**)&ptr_to_statics) = xzalloc(sizeof(S)); \
++	(*(struct lineedit_statics**)&lineedit_ptr_to_statics) = xzalloc(sizeof(S)); \
+ 	barrier(); \
+ 	cmdedit_termw = 80; \
+ 	USE_FEATURE_EDITING_FANCY_PROMPT(num_ok_lines = 1;) \
+@@ -163,7 +162,7 @@ static void deinit_S(void)
+ 	if (home_pwd_buf != null_str)
+ 		free(home_pwd_buf);
+ #endif
+-	free(ptr_to_statics);
++	free(lineedit_ptr_to_statics);
+ }
+ #define DEINIT_S() deinit_S()
+ 
+diff --git a/libbb/ptr_to_globals.c b/libbb/ptr_to_globals.c
+index 48cf8d8..5f30e2a 100644
+--- a/libbb/ptr_to_globals.c
++++ b/libbb/ptr_to_globals.c
+@@ -5,6 +5,8 @@
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+ 
++#include <errno.h>
++
+ struct globals;
+ 
+ #ifndef GCC_COMBINE
+@@ -13,12 +15,21 @@ struct globals;
+  * but here we make it live in R/W memory */
+ struct globals *ptr_to_globals;
+ 
++#ifdef __GLIBC__
++int *bb_errno;
++#endif
++
++
+ #else
+ 
++
+ /* gcc -combine will see through and complain */
+ /* Using alternative method which is more likely to break
+  * on weird architectures, compilers, linkers and so on */
+ struct globals *const ptr_to_globals __attribute__ ((section (".data")));
+ 
++#ifdef __GLIBC__
++int *const bb_errno __attribute__ ((section (".data")));
+ #endif
+ 
++#endif

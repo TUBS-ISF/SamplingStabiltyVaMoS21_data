@@ -1,0 +1,67 @@
+2007-09-25 18:35:28 +0000
+diff --git a/editors/ed.c b/editors/ed.c
+index f5b9c39..cd3836a 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -82,7 +82,6 @@ static int bad_nums(int num1, int num2, const char *for_what)
+ 
+ static char *skip_blank(const char *cp)
+ {
+-// NB: fix comment in skip_whitespace!
+ 	while (isblank(*cp))
+ 		cp++;
+ 	return (char *)cp;
+@@ -125,7 +124,6 @@ static void doCommands(void)
+ 	smallint have1, have2;
+ 
+ 	while (TRUE) {
+-// NB: fix comment in lineedit.c!
+ 		/* Returns:
+ 		 * -1 on read errors or EOF, or on bare Ctrl-D.
+ 		 * 0  on ctrl-C,
+diff --git a/include/libbb.h b/include/libbb.h
+index 25b2e44..407b723 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -892,6 +892,12 @@ enum {
+ 	FOR_SHELL = DO_HISTORY | SAVE_HISTORY | TAB_COMPLETION | USERNAME_COMPLETION,
+ };
+ line_input_t *new_line_input_t(int flags);
++/* Returns:
++ * -1 on read errors or EOF, or on bare Ctrl-D.
++ * 0  on ctrl-C,
++ * >0 length of input string, including terminating '\n'
++ * [is this true? stores "" in 'command' if return value is 0 or -1]
++ */
+ int read_line_input(const char* prompt, char* command, int maxsize, line_input_t *state);
+ #else
+ int read_line_input(const char* prompt, char* command, int maxsize);
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 62f8949..a018a53 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -1253,6 +1253,11 @@ static void win_changed(int nsig)
+ #undef CTRL
+ #define CTRL(a) ((a) & ~0x40)
+ 
++/* Returns:
++ * -1 on read errors or EOF, or on bare Ctrl-D.
++ * 0  on ctrl-C,
++ * >0 length of input string, including terminating '\n'
++ */
+ int read_line_input(const char* prompt, char* command, int maxsize, line_input_t *st)
+ {
+ 	int lastWasTab = FALSE;
+diff --git a/libbb/skip_whitespace.c b/libbb/skip_whitespace.c
+index bdfb97d..87b5f23 100644
+--- a/libbb/skip_whitespace.c
++++ b/libbb/skip_whitespace.c
+@@ -11,7 +11,7 @@
+ 
+ char *skip_whitespace(const char *s)
+ {
+-	/* NB: isspace('0') returns 0 */
++	/* NB: isspace('\0') returns 0 */
+ 	while (isspace(*s)) ++s;
+ 
+ 	return (char *) s;

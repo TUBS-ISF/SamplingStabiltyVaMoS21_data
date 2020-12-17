@@ -1,0 +1,113 @@
+2007-07-19 22:50:47 +0000
+diff --git a/editors/vi.c b/editors/vi.c
+index 6faaef3..97efe0c 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -414,7 +414,7 @@ static int init_text_buffer(char *fn)
+ 	if (text_size < 10240)
+ 		text_size = 10240;	// have a minimum size for new files
+ 	screenbegin = dot = end = text = xzalloc(text_size);
+-	
++
+ 	if (fn != current_filename) {
+ 		free(current_filename);
+ 		current_filename = xstrdup(fn);
+@@ -434,7 +434,7 @@ static int init_text_buffer(char *fn)
+ 	memset(mark, 0, sizeof(mark));
+ #endif
+ 	return rc;
+-}	
++}
+ 
+ static void edit_file(char * fn)
+ {
+@@ -2210,7 +2210,7 @@ static char readit(void)	// read (maybe cursor) key from stdin
+ 			if (errno == EINTR)
+ 				goto ri0;	// interrupted sys call
+ 			if (errno == EBADF || errno == EFAULT || errno == EINVAL
+-					|| errno == EIO)	
++					|| errno == EIO)
+ 				editing = 0;
+ 			errno = 0;
+ 		}
+@@ -2426,7 +2426,7 @@ static int file_insert(const char * fn, char *p
+ 			 * so we check fileperms too */
+ 			!(statbuf.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH))))
+ 	{
+-		SET_READONLY_FILE(readonly_mode);	
++		SET_READONLY_FILE(readonly_mode);
+ 	}
+ 	return cnt;
+ }
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 9817a12..3759370 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -170,8 +170,8 @@ procps_status_t *procps_scan(procps_status_t* sp, int flags)
+ 		if (flags & PSSCAN_CONTEXT) {
+ 			if (getpidcon(sp->pid, &sp->context) < 0)
+ 				sp->context = NULL;
+-		}	
+-#endif	
++		}
++#endif
+ 
+ 		filename_tail = filename + sprintf(filename, "/proc/%d", pid);
+ 
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index fad111a..177247c 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -670,7 +670,7 @@ int ioctl_or_perror(int fd, int request, void *argp, const char *fmt,...)
+ int bb_ioctl_or_warn(int fd, int request, void *argp, const char *ioctl_name)
+ {
+ 	int ret;
+-	
++
+ 	ret = ioctl(fd, request, argp);
+ 	if (ret < 0)
+ 		bb_perror_msg("%s", ioctl_name);
+@@ -685,7 +685,7 @@ void bb_xioctl(int fd, int request, void *argp, const char *ioctl_name)
+ int bb_ioctl_or_warn(int fd, int request, void *argp)
+ {
+ 	int ret;
+-	
++
+ 	ret = ioctl(fd, request, argp);
+ 	if (ret < 0)
+ 		bb_perror_msg("ioctl %#x failed", request);
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 49eee9b..d873045 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -416,7 +416,7 @@ int devfsd_main(int argc, char **argv)
+ 
+ 	if (ENABLE_DEVFSD_FG_NP && no_polling)
+ 		exit(0);
+-	
++
+ 	if (ENABLE_DEVFSD_VERBOSE || ENABLE_DEBUG)
+ 		logmode = LOGMODE_BOTH;
+ 	else if (do_daemon == TRUE)
+@@ -432,7 +432,7 @@ int devfsd_main(int argc, char **argv)
+ 	} else if (ENABLE_DEVFSD_FG_NP) {
+ 		setpgid(0, 0);  /*  Become process group leader                    */
+ 	}
+-	
++
+ 	while (TRUE) {
+ 		do_scan = do_servicing(fd, event_mask);
+ 
+diff --git a/miscutils/runlevel.c b/miscutils/runlevel.c
+index 0aabfb0..f51a647 100644
+--- a/miscutils/runlevel.c
++++ b/miscutils/runlevel.c
+@@ -36,7 +36,7 @@ int runlevel_main(int argc, char **argv)
+ 	}
+ 
+ 	puts("unknown");
+-	
++
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		endutent();
+ 	return 1;

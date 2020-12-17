@@ -1,0 +1,4 @@
+2007-05-23 00:26:32 +0000
+diff --git a/shell/hush_test/hush-misc/shift.tests b/shell/hush_test/hush-misc/shift.tests
+old mode 100644
+new mode 100755

@@ -1,0 +1,115 @@
+2008-05-02 13:21:24 +0000
+diff --git a/testsuite/mdev.tests b/testsuite/mdev.tests
+index 81c440d..572609e 100755
+--- a/testsuite/mdev.tests
++++ b/testsuite/mdev.tests
+@@ -18,6 +18,8 @@ mkdir mdev.testdir
+ # We need mdev executable to be in chroot jail!
+ # (will still fail with dynamically linked one, though...)
+ cp ../busybox mdev.testdir/mdev
++mkdir mdev.testdir/bin
++cp ../busybox mdev.testdir/bin/sh 2>/dev/null # for testing cmd feature
+ mkdir mdev.testdir/etc
+ mkdir mdev.testdir/dev
+ mkdir -p mdev.testdir/sys/block/sda
+@@ -93,6 +95,20 @@ brw-r--r-- 1 0 0 a_sda
+ " \
+ 	"" ""
+ 
++# continuing to use directory structure from prev test
++rm -rf mdev.testdir/dev/*
++# here we complicate things by having non-matching group 1 and using %0
++echo "sda 0:0 644 @echo @echo TEST" >mdev.testdir/etc/mdev.conf
++testing "mdev command" \
++	"env - ACTION=add DEVPATH=/block/sda chroot mdev.testdir /mdev 2>&1;
++	ls -lnR mdev.testdir/dev | $FILTER_LS" \
++"\
++@echo TEST
++mdev.testdir/dev:
++brw-r--r-- 1 0 0 8,0 sda
++" \
++	"" ""
++
+ # clean up
+ rm -rf mdev.testdir
+ 
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 9d37b6c..5e1cd36 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -156,43 +156,45 @@ static void make_device(char *path, int delete)
+ 			mode = strtoul(val, NULL, 8);
+ 
+ 			/* 4th field (opt): >alias */
+-			if (ENABLE_FEATURE_MDEV_RENAME) {
+-				if (!next)
+-					break;
++#if ENABLE_FEATURE_MDEV_RENAME
++			if (!next)
++				break;
++			if (*next == '>') {
++#if ENABLE_FEATURE_MDEV_RENAME_REGEXP
++				char *s, *p;
++				unsigned i, n;
++
+ 				val = next;
+ 				next = next_field(val);
+-				if (*val == '>') {
+-#if ENABLE_FEATURE_MDEV_RENAME_REGEXP
+-					/* substitute %1..9 with off[1..9], if any */
+-					char *s, *p;
+-					unsigned i, n;
+-
+-					n = 0;
+-					s = val;
+-					while (*s && *s++ == '%')
+-						n++;
+-
+-					p = alias = xzalloc(strlen(val) + n * strlen(device_name));
+-					s = val + 1;
+-					while (*s) {
+-						*p = *s;
+-						if ('%' == *s) {
+-							i = (s[1] - '0');
+-							if (i <= 9 && off[i].rm_so >= 0) {
+-								n = off[i].rm_eo - off[i].rm_so;
+-								strncpy(p, device_name + off[i].rm_so, n);
+-								p += n - 1;
+-								s++;
+-							}
++				/* substitute %1..9 with off[1..9], if any */
++				n = 0;
++				s = val;
++				while (*s && *s++ == '%')
++					n++;
++
++				p = alias = xzalloc(strlen(val) + n * strlen(device_name));
++				s = val + 1;
++				while (*s) {
++					*p = *s;
++					if ('%' == *s) {
++						i = (s[1] - '0');
++						if (i <= 9 && off[i].rm_so >= 0) {
++							n = off[i].rm_eo - off[i].rm_so;
++							strncpy(p, device_name + off[i].rm_so, n);
++							p += n - 1;
++							s++;
+ 						}
+-						p++;
+-						s++;
+ 					}
++					p++;
++					s++;
++				}
+ #else
+-					alias = xstrdup(val + 1);
++				val = next;
++				next = next_field(val);
++				alias = xstrdup(val + 1);
+ #endif
+-				}
+ 			}
++#endif /* ENABLE_FEATURE_MDEV_RENAME */
+ 
+ 			/* The rest (opt): command to run */
+ 			if (!next)

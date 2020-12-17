@@ -1,0 +1,13 @@
+2008-11-01 13:40:32 +0000
+diff --git a/include/platform.h b/include/platform.h
+index b311082..8657ba4 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -132,6 +132,7 @@
+ # define BB_LITTLE_ENDIAN 1
+ #endif
+ 
++/* SWAP_LEnn means "convert CPU<->little_endian by swapping bytes" */
+ #if BB_BIG_ENDIAN
+ #define SWAP_BE16(x) (x)
+ #define SWAP_BE32(x) (x)

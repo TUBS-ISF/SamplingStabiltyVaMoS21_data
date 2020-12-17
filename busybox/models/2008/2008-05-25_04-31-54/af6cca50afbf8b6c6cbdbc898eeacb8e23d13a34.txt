@@ -1,0 +1,34 @@
+2008-05-25 04:31:54 +0000
+diff --git a/include/grp_.h b/include/grp_.h
+index 45ee22b..23c4dcc 100644
+--- a/include/grp_.h
++++ b/include/grp_.h
+@@ -36,11 +36,6 @@ struct group {
+ 	char **gr_mem;          /* Member list. */
+ };
+ 
+-/* We don't reimplement this, just supplying prototype */
+-/* The function itself is in libc */
+-/* Set the group set for the current user to GROUPS (N of them).  */
+-extern int setgroups(size_t __n, __const gid_t *__groups);
+-
+ 
+ #define setgrent     bb_internal_setgrent
+ #define endgrent     bb_internal_endgrent
+diff --git a/include/libbb.h b/include/libbb.h
+index f50ae36..0d6e3af 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -79,9 +79,11 @@
+ # endif
+ #endif
+ 
+-/* Some libc's forget to declare these, help them */
++/* Some libc's forget to declare these, do it ourself */
+ extern char **environ;
+ 
++/* Set the group set for the current user to GROUPS (N of them).  */
++int setgroups(size_t n, const gid_t *groups);
+ #if defined(__GLIBC__) && __GLIBC__ < 2
+ int vdprintf(int d, const char *format, va_list ap);
+ #endif

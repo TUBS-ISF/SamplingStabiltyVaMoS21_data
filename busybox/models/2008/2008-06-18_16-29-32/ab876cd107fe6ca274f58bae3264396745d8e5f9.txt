@@ -1,0 +1,223 @@
+2008-06-18 16:29:32 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index cb28976..f81203e 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -287,7 +287,7 @@ struct redir_struct {
+ 	redir_type type;            /* type of redirection */
+ 	int fd;                     /* file descriptor being redirected */
+ 	int dup;                    /* -1, or file descriptor being duplicated */
+-	char **glob_word;           /* *word.gl_pathv is the filename */
++	char *rd_filename;          /* filename */
+ };
+ 
+ struct child_prog {
+@@ -1304,14 +1304,14 @@ static int setup_redirects(struct child_prog *prog, int squirrel[])
+ 	struct redir_struct *redir;
+ 
+ 	for (redir = prog->redirects; redir; redir = redir->next) {
+-		if (redir->dup == -1 && redir->glob_word == NULL) {
++		if (redir->dup == -1 && redir->rd_filename == NULL) {
+ 			/* something went wrong in the parse.  Pretend it didn't happen */
+ 			continue;
+ 		}
+ 		if (redir->dup == -1) {
+ 			char *p;
+ 			mode = redir_table[redir->type].mode;
+-			p = expand_string_to_string(redir->glob_word[0]);
++			p = expand_string_to_string(redir->rd_filename);
+ 			openfd = open_or_warn(p, mode);
+ 			free(p);
+ 			if (openfd < 0) {
+@@ -2227,10 +2227,10 @@ static int free_pipe(struct pipe *pi, int indent)
+ 			debug_printf_clean("%s   redirect %d%s", indenter(indent), r->fd, redir_table[r->type].descrip);
+ 			if (r->dup == -1) {
+ 				/* guard against the case >$FOO, where foo is unset or blank */
+-				if (r->glob_word) {
+-					debug_printf_clean(" %s\n", r->glob_word[0]);
+-					free_strings(r->glob_word);
+-					r->glob_word = NULL;
++				if (r->rd_filename) {
++					debug_printf_clean(" %s\n", r->rd_filename);
++					free(r->rd_filename);
++					r->rd_filename = NULL;
+ 				}
+ 			} else {
+ 				debug_printf_clean("&%d\n", r->dup);
+@@ -2680,7 +2680,7 @@ static int setup_redirect(struct p_context *ctx, int fd, redir_type style,
+ 	}
+ 	redir = xzalloc(sizeof(struct redir_struct));
+ 	/* redir->next = NULL; */
+-	/* redir->glob_word = NULL; */
++	/* redir->rd_filename = NULL; */
+ 	if (last_redir) {
+ 		last_redir->next = redir;
+ 	} else {
+@@ -2857,17 +2857,17 @@ static int reserved_word(const o_string *word, struct p_context *ctx)
+ static int done_word(o_string *word, struct p_context *ctx)
+ {
+ 	struct child_prog *child = ctx->child;
+-	char ***glob_target;
+ 
+ 	debug_printf_parse("done_word entered: '%s' %p\n", word->data, child);
+-	if (word->length == 0) {
+-		if (!word->nonnull) {
+-			debug_printf_parse("done_word return 0: true null, ignored\n");
+-			return 0;
+-		}
++	if (word->length == 0 && word->nonnull == 0) {
++		debug_printf_parse("done_word return 0: true null, ignored\n");
++		return 0;
+ 	}
+ 	if (ctx->pending_redirect) {
+-		glob_target = &ctx->pending_redirect->glob_word;
++		/* We do not glob in e.g. >*.tmp case. bash seems to glob here
++		 * only if run as "bash", not "sh" */
++		ctx->pending_redirect->rd_filename = xstrdup(word->data);
++		debug_printf("word stored in rd_filename: '%s'\n", word->data);
+ 	} else {
+ 		if (child->group) { /* TODO: example how to trigger? */
+ 			syntax(NULL);
+@@ -2882,46 +2882,25 @@ static int done_word(o_string *word, struct p_context *ctx)
+ 				return (ctx->res_w == RES_SNTX);
+ 			}
+ 		}
+-		if (word->nonnull) {
++		if (word->nonnull
++		/* && word->data[0] != */
++		) {
+ 			/* Insert "empty variable" reference, this makes e.g. "", '',
+ 			 * $empty"" etc to not disappear */
+ 			o_addchr(word, SPECIAL_VAR_SYMBOL);
+ 			o_addchr(word, SPECIAL_VAR_SYMBOL);
+ 		}
+-		glob_target = &child->argv;
+-	}
+-
+-//FIXME: we had globbing here, but now it's moved! Do we glob in e.g. ">*.tmp" now!?
+-
+-	/*if (word->length || word->nonnull) - true */ {
+-		*glob_target = add_malloced_string_to_strings(*glob_target, xstrdup(word->data));
+-		debug_print_strings("glob_target appended", *glob_target);
++		child->argv = add_malloced_string_to_strings(child->argv, xstrdup(word->data));
++		debug_print_strings("word appended to argv", child->argv);
+ 	}
+ 
+ 	o_reset(word);
+-	if (ctx->pending_redirect) {
+-		/* NB: don't free_strings(ctx->pending_redirect->glob_word) here */
+-		if (ctx->pending_redirect->glob_word
+-		 && ctx->pending_redirect->glob_word[0]
+-		 && ctx->pending_redirect->glob_word[1]
+-		) {
+-			/* more than one word resulted from globbing redir */
+-			ctx->pending_redirect = NULL;
+-			bb_error_msg("ambiguous redirect");
+-			debug_printf_parse("done_word return 1: ambiguous redirect\n");
+-			return 1;
+-		}
+-		ctx->pending_redirect = NULL;
+-	}
++	ctx->pending_redirect = NULL;
++
+ #if ENABLE_HUSH_LOOPS
+-	/* comment? is it forcing "for" to have just one word (variable name)? */
+-	if (ctx->res_w == RES_FOR) {
+-//TESTING
+-//looks like (word->length == 0 && !word->nonnull) is true here, always
+-//(due to o_reset). done_word would return at once. Why then?
+-//		done_word(word, ctx);
++	/* Force FOR to have just one word (variable name) */
++	if (ctx->res_w == RES_FOR)
+ 		done_pipe(ctx, PIPE_SEQ);
+-	}
+ #endif
+ 	debug_printf_parse("done_word return 0\n");
+ 	return 0;
+diff --git a/shell/hush_test/hush-glob/glob_redir.right b/shell/hush_test/hush-glob/glob_redir.right
+new file mode 100644
+index 0000000..fbd0309
+--- /dev/null
++++ b/shell/hush_test/hush-glob/glob_redir.right
+@@ -0,0 +1,2 @@
++z.tmp:
++?.tmp: TEST
+diff --git a/shell/hush_test/hush-glob/glob_redir.tests b/shell/hush_test/hush-glob/glob_redir.tests
+new file mode 100755
+index 0000000..621d120
+--- /dev/null
++++ b/shell/hush_test/hush-glob/glob_redir.tests
+@@ -0,0 +1,9 @@
++# Redirections are not globbed.
++# bash:
++# if run as "sh", they are not globbed, but
++# if run as "bash", they are!
++>z.tmp
++echo TEST >?.tmp
++echo 'z.tmp:' `cat 'z.tmp'`
++echo '?.tmp:' `cat '?.tmp'`
++rm 'z.tmp' '?.tmp'
+diff --git a/shell/hush_test/hush-parsing/escape3.right b/shell/hush_test/hush-parsing/escape3.right
+new file mode 100644
+index 0000000..da02a97
+--- /dev/null
++++ b/shell/hush_test/hush-parsing/escape3.right
+@@ -0,0 +1,23 @@
++v: a \ b \\ c \\\ d \\\\ e
++v: a \ b \\ c \\\ d \\\\ e
++Unquoted:
++.a.
++.\.
++.b.
++.\\.
++.c.
++.\\\.
++.d.
++.\\\\.
++.e.
++Quoted:
++.a.
++.\.
++.b.
++.\\.
++.c.
++.\\\.
++.d.
++.\\\\.
++.e.
++done
+diff --git a/shell/hush_test/hush-parsing/escape3.tests b/shell/hush_test/hush-parsing/escape3.tests
+new file mode 100755
+index 0000000..111ed40
+--- /dev/null
++++ b/shell/hush_test/hush-parsing/escape3.tests
+@@ -0,0 +1,8 @@
++v='a \ b \\ c \\\ d \\\\ e'
++echo v: $v
++echo v: "$v"
++echo Unquoted:
++for a in $v; do echo .$a.; done
++echo Quoted:
++for a in $v; do echo ".$a."; done
++echo done
+diff --git a/shell/hush_test/hush-parsing/redir_space.right b/shell/hush_test/hush-parsing/redir_space.right
+new file mode 100644
+index 0000000..0842952
+--- /dev/null
++++ b/shell/hush_test/hush-parsing/redir_space.right
+@@ -0,0 +1,3 @@
++z1.tmp: 1
++z2.tmp: 1
++"z1.tmp z2.tmp": TEST 0
+diff --git a/shell/hush_test/hush-parsing/redir_space.tests b/shell/hush_test/hush-parsing/redir_space.tests
+new file mode 100755
+index 0000000..c0b5430
+--- /dev/null
++++ b/shell/hush_test/hush-parsing/redir_space.tests
+@@ -0,0 +1,6 @@
++v='z1.tmp z2.tmp'
++echo TEST >$v
++echo 'z1.tmp:' `cat 'z1.tmp' 2>/dev/null; echo $?`
++echo 'z2.tmp:' `cat 'z2.tmp' 2>/dev/null; echo $?`
++echo '"z1.tmp z2.tmp":' `cat 'z1.tmp z2.tmp' 2>/dev/null; echo $?`
++rm z*.tmp

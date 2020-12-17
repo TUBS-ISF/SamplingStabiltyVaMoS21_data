@@ -1,0 +1,24 @@
+2009-03-21 19:58:58 +0000
+diff --git a/shell/msh_test/msh-execution/exitcode_EACCES.right b/shell/msh_test/msh-execution/exitcode_EACCES.right
+index b13682c..6e5480b 100644
+--- a/shell/msh_test/msh-execution/exitcode_EACCES.right
++++ b/shell/msh_test/msh-execution/exitcode_EACCES.right
+@@ -1,2 +1,2 @@
+-./: cannot execute
++./: can't execute
+ 126
+diff --git a/shell/msh_test/run-all b/shell/msh_test/run-all
+index 43bc9fc..29f62a5 100755
+--- a/shell/msh_test/run-all
++++ b/shell/msh_test/run-all
+@@ -1,8 +1,8 @@
+ #!/bin/sh
+ 
+ test -x msh || {
+-    echo "No ./msh?! Perhaps you want to run 'ln -s ../../busybox msh'"
+-    exit
++    echo "No ./msh - creating a link to ../../busybox"
++    ln -s ../../busybox msh
+ }
+ 
+ PATH="$PWD:$PATH" # for msh

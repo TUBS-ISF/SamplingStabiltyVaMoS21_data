@@ -1,0 +1,76 @@
+2008-02-20 22:29:52 +0000
+diff --git a/networking/udhcp/Config.in b/networking/udhcp/Config.in
+index ff0e4e2..bbc1220 100644
+--- a/networking/udhcp/Config.in
++++ b/networking/udhcp/Config.in
+@@ -42,6 +42,15 @@ config FEATURE_UDHCPD_WRITE_LEASES_EARLY
+ 	  to send SIGUSR1 for the initial writing, or updating. Any timed
+ 	  rewriting remains undisturbed
+ 
++config DHCPD_LEASES_FILE
++	string "Absolute path to lease file"
++	default "/var/lib/misc/udhcpd.leases"
++	depends on APP_UDHCPD
++	help
++	  The udhcpd stores address in lease files. Normaly it is save
++	  to leave it untouched.
++
++
+ config APP_UDHCPC
+ 	bool "udhcp Client (udhcpc)"
+ 	default n
+@@ -90,6 +99,16 @@ config FEATURE_RFC3397
+ 	  If selected, both client and server will support passing of domain
+ 	  search lists via option 119, specified in RFC3397.
+ 
++config DHCPC_DEFAULT_SCRIPT
++	string "Absolute path to config script"
++	default "/usr/share/udhcpc/default.script"
++	depends on APP_UDHCPC
++	help
++	  This script is called after udhcpc receives and answer. See
++	  examples/udhcp for a working example. Normaly it is save
++	  to leave this untouched.
++
++
+ config UDHCPC_SLACK_FOR_BUGGY_SERVERS
+ 	int "DHCP options slack buffer size"
+ 	default 80
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 9b26678..d44bca4 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -12,7 +12,7 @@
+ 
+ #include "libbb.h"
+ 
+-#define DEFAULT_SCRIPT  "/usr/share/udhcpc/default.script"
++#define DEFAULT_SCRIPT   CONFIG_DHCPC_DEFAULT_SCRIPT
+ 
+ extern const uint8_t MAC_BCAST_ADDR[6]; /* six all-ones */
+ 
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index d97c8b8..0596e06 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -10,7 +10,7 @@
+ 
+ /* the period of time the client is allowed to use that address */
+ #define LEASE_TIME              (60*60*24*10) /* 10 days of seconds */
+-#define LEASES_FILE		"/var/lib/misc/udhcpd.leases"
++#define LEASES_FILE		CONFIG_DHCPD_LEASES_FILE
+ 
+ /* where to find the DHCP server configuration file */
+ #define DHCPD_CONF_FILE         "/etc/udhcpd.conf"
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index bed1816..0d98351 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -613,7 +613,6 @@ int syslogd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int syslogd_main(int argc, char **argv)
+ {
+ 	char OPTION_DECL;
+-	char *p;
+ 
+ 	INIT_G();
+ #if ENABLE_FEATURE_REMOTE_LOG

@@ -1,0 +1,14 @@
+2008-05-02 13:26:18 +0000
+diff --git a/testsuite/grep.tests b/testsuite/grep.tests
+index 4703ae5..34c0fe4 100755
+--- a/testsuite/grep.tests
++++ b/testsuite/grep.tests
+@@ -26,7 +26,7 @@ testing "grep - (specify stdin)" "grep two -" "two\n" "" \
+ testing "grep input (specify file)" "grep two input" "two\n" \
+ 	"one\ntwo\nthree\nthree\nthree\n" ""
+ 
+-# GNU grep (version?) outputs a new line character after the located string
++# GNU grep 2.5.3 outputs a new line character after the located string
+ # even if there is no new line character in the input
+ testing "grep (no newline at EOL)" "grep bug input" "bug\n" "bug" ""
+ 

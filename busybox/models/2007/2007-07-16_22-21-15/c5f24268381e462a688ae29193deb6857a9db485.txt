@@ -1,0 +1,13 @@
+2007-07-16 22:21:15 +0000
+diff --git a/docs/busybox.net/about.html b/docs/busybox.net/about.html
+index e3b937b..475dd80 100644
+--- a/docs/busybox.net/about.html
++++ b/docs/busybox.net/about.html
+@@ -19,6 +19,6 @@ nodes in /dev, a few configuration files in /etc, and a Linux kernel.</p>
+ <p>BusyBox is maintained by
+ <a href="mailto:vda.linux@googlemail.com">Denis Vlasenko</a>,
+ and licensed under the <a href="/license.html">GNU GENERAL PUBLIC LICENSE</a>
+-version 2 or later.</p>
++version 2.</p>
+ 
+ <!--#include file="footer.html" -->

@@ -1,0 +1,14 @@
+2009-06-17 11:58:11 +0200
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 41bb0b0..2f8cee3 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -41,7 +41,7 @@ static smallint state;
+ /* just a little helper */
+ static void change_listen_mode(int new_mode)
+ {
+-	log1("entering %s listen mode",
++	log1("Entering listen mode: %s",
+ 		new_mode ? (new_mode == 1 ? "kernel" : "raw") : "none");
+ 
+ 	listen_mode = new_mode;

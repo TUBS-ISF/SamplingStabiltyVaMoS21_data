@@ -1,0 +1,286 @@
+2009-11-15 23:28:11 +0100
+diff --git a/coreutils/dos2unix.c b/coreutils/dos2unix.c
+index 309cbc3..baf879e 100644
+--- a/coreutils/dos2unix.c
++++ b/coreutils/dos2unix.c
+@@ -42,10 +42,10 @@ static void convert(char *fn, int conv_type)
+ 		i = mkstemp(temp_fn);
+ 		if (i == -1
+ 		 || fchmod(i, st.st_mode) == -1
+-		 || !(out = fdopen(i, "w+"))
+ 		) {
+ 			bb_simple_perror_msg_and_die(temp_fn);
+ 		}
++		out = xfdopen_for_write(i);
+ 	}
+ 
+ 	while ((i = fgetc(in)) != EOF) {
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/read.c b/e2fsprogs/old_e2fsprogs/blkid/read.c
+index 67bc8ee..f795a5d 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/read.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/read.c
+@@ -374,9 +374,7 @@ void blkid_read_cache(blkid_cache cache)
+ 	DBG(DEBUG_CACHE, printf("reading cache file %s\n",
+ 				cache->bic_filename));
+ 
+-	file = fdopen(fd, "r");
+-	if (!file)
+-		goto errout;
++	file = xfdopen_for_read(fd);
+ 
+ 	while (fgets(buf, sizeof(buf), file)) {
+ 		blkid_dev dev;
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/save.c b/e2fsprogs/old_e2fsprogs/blkid/save.c
+index 3600260..e60cca4 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/save.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/save.c
+@@ -95,7 +95,7 @@ int blkid_flush_cache(blkid_cache cache)
+ 		sprintf(tmp, "%s-XXXXXX", filename);
+ 		fd = mkstemp(tmp);
+ 		if (fd >= 0) {
+-			file = fdopen(fd, "w");
++			file = xfdopen_for_write(fd);
+ 			opened = tmp;
+ 		}
+ 		fchmod(fd, 0644);
+diff --git a/editors/sed.c b/editors/sed.c
+index c1ee750..19e7683 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1338,7 +1338,7 @@ int sed_main(int argc UNUSED_PARAM, char **argv)
+ 			nonstdoutfd = mkstemp(G.outname);
+ 			if (-1 == nonstdoutfd)
+ 				bb_perror_msg_and_die("can't create temp file %s", G.outname);
+-			G.nonstdout = fdopen(nonstdoutfd, "w");
++			G.nonstdout = xfdopen_for_write(nonstdoutfd);
+ 
+ 			/* Set permissions/owner of output file */
+ 			fstat(fileno(file), &statbuf);
+diff --git a/include/libbb.h b/include/libbb.h
+index 89d7a7b..d95be5c 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -658,21 +658,23 @@ extern char *xmalloc_fgetline(FILE *file) FAST_FUNC RETURNS_MALLOC;
+ /* Same, but doesn't try to conserve space (may have some slack after the end) */
+ /* extern char *xmalloc_fgetline_fast(FILE *file) FAST_FUNC RETURNS_MALLOC; */
+ 
+-extern void die_if_ferror(FILE *file, const char *msg) FAST_FUNC;
+-extern void die_if_ferror_stdout(void) FAST_FUNC;
+-extern int fflush_all(void) FAST_FUNC;
+-extern void fflush_stdout_and_exit(int retval) NORETURN FAST_FUNC;
+-extern int fclose_if_not_stdin(FILE *file) FAST_FUNC;
+-extern FILE *xfopen(const char *filename, const char *mode) FAST_FUNC;
++void die_if_ferror(FILE *file, const char *msg) FAST_FUNC;
++void die_if_ferror_stdout(void) FAST_FUNC;
++int fflush_all(void) FAST_FUNC;
++void fflush_stdout_and_exit(int retval) NORETURN FAST_FUNC;
++int fclose_if_not_stdin(FILE *file) FAST_FUNC;
++FILE* xfopen(const char *filename, const char *mode) FAST_FUNC;
+ /* Prints warning to stderr and returns NULL on failure: */
+-extern FILE *fopen_or_warn(const char *filename, const char *mode) FAST_FUNC;
++FILE* fopen_or_warn(const char *filename, const char *mode) FAST_FUNC;
+ /* "Opens" stdin if filename is special, else just opens file: */
+-extern FILE *xfopen_stdin(const char *filename) FAST_FUNC;
+-extern FILE *fopen_or_warn_stdin(const char *filename) FAST_FUNC;
+-extern FILE* fopen_for_read(const char *path) FAST_FUNC;
+-extern FILE* xfopen_for_read(const char *path) FAST_FUNC;
+-extern FILE* fopen_for_write(const char *path) FAST_FUNC;
+-extern FILE* xfopen_for_write(const char *path) FAST_FUNC;
++FILE* xfopen_stdin(const char *filename) FAST_FUNC;
++FILE* fopen_or_warn_stdin(const char *filename) FAST_FUNC;
++FILE* fopen_for_read(const char *path) FAST_FUNC;
++FILE* xfopen_for_read(const char *path) FAST_FUNC;
++FILE* fopen_for_write(const char *path) FAST_FUNC;
++FILE* xfopen_for_write(const char *path) FAST_FUNC;
++FILE* xfdopen_for_read(int fd) FAST_FUNC;
++FILE* xfdopen_for_write(int fd) FAST_FUNC;
+ 
+ int bb_pstrcmp(const void *a, const void *b) /* not FAST_FUNC! */;
+ void qsort_string_vector(char **sv, unsigned count) FAST_FUNC;
+diff --git a/libbb/update_passwd.c b/libbb/update_passwd.c
+index ba773fc..301893b 100644
+--- a/libbb/update_passwd.c
++++ b/libbb/update_passwd.c
+@@ -137,12 +137,7 @@ int FAST_FUNC update_passwd(const char *filename,
+ 		fchown(new_fd, sb.st_uid, sb.st_gid);
+ 	}
+ 	errno = 0;
+-	new_fp = fdopen(new_fd, "w");
+-	if (!new_fp) {
+-		bb_perror_nomsg();
+-		close(new_fd);
+-		goto unlink_new;
+-	}
++	new_fp = xfdopen_for_write(new_fd);
+ 
+ 	/* Backup file is "/etc/passwd-" */
+ 	*sfx_char = '-';
+diff --git a/libbb/wfopen.c b/libbb/wfopen.c
+index 1cb871e..deec79a 100644
+--- a/libbb/wfopen.c
++++ b/libbb/wfopen.c
+@@ -38,3 +38,19 @@ FILE* FAST_FUNC xfopen_for_write(const char *path)
+ {
+ 	return xfopen(path, "w");
+ }
++
++static FILE* xfdopen_helper(unsigned fd_and_rw_bit)
++{
++	FILE* fp = fdopen(fd_and_rw_bit >> 1, fd_and_rw_bit & 1 ? "w" : "r");
++	if (!fp)
++		bb_error_msg_and_die(bb_msg_memory_exhausted);
++	return fp;
++}
++FILE* FAST_FUNC xfdopen_for_read(int fd)
++{
++	return xfdopen_helper(fd << 1);
++}
++FILE* FAST_FUNC xfdopen_for_write(int fd)
++{
++	return xfdopen_helper((fd << 1) + 1);
++}
+diff --git a/mailutils/mime.c b/mailutils/mime.c
+index dd81139..17d0f9d 100644
+--- a/mailutils/mime.c
++++ b/mailutils/mime.c
+@@ -293,7 +293,7 @@ static int parse(const char *boundary, char **argv)
+ 				}
+ 				// parent dumps to fd[1]
+ 				close(fd[0]);
+-				fp = fdopen(fd[1], "w");
++				fp = xfdopen_for_write(fd[1]);
+ 				signal(SIGPIPE, SIG_IGN); // ignore EPIPE
+ 			// or create a file for dump
+ 			} else {
+diff --git a/mailutils/sendmail.c b/mailutils/sendmail.c
+index 2f99df6..4b58a78 100644
+--- a/mailutils/sendmail.c
++++ b/mailutils/sendmail.c
+@@ -93,7 +93,7 @@ int sendmail_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	// save initial stdin since body is piped!
+ 	xdup2(STDIN_FILENO, 3);
+-	G.fp0 = fdopen(3, "r");
++	G.fp0 = xfdopen_for_read(3);
+ 
+ 	// parse options
+ 	// -f is required. -H and -S are mutually exclusive
+diff --git a/miscutils/fbsplash.c b/miscutils/fbsplash.c
+index 0afd189..4560bb2 100644
+--- a/miscutils/fbsplash.c
++++ b/miscutils/fbsplash.c
+@@ -227,7 +227,7 @@ static void fb_drawimage(void)
+ 		int fd = open_zipped(G.image_filename);
+ 		if (fd < 0)
+ 			bb_simple_perror_msg_and_die(G.image_filename);
+-		theme_file = fdopen(fd, "r");
++		theme_file = xfdopen_for_read(fd);
+ 	}
+ 	head = xmalloc(256);
+ 
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index 8ef9101..53b7c94 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -384,11 +384,7 @@ static void write_out_dep_bb(int fd)
+ 	FILE *fp;
+ 
+ 	/* We want good error reporting. fdprintf is not good enough. */
+-	fp = fdopen(fd, "w");
+-	if (!fp) {
+-		close(fd);
+-		goto err;
+-	}
++	fp = xfdopen_for_write(fd);
+ 	i = 0;
+ 	while (modinfo[i].pathname) {
+ 		fprintf(fp, "%s%s%s\n" "%s%s\n",
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index 9937cc3..df8188c 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -691,9 +691,7 @@ handle_dir_common(int opts)
+ 	/* -n prevents user/groupname display,
+ 	 * which can be problematic in chroot */
+ 	ls_fd = popen_ls((opts & LONG_LISTING) ? "-l" : "-1");
+-	ls_fp = fdopen(ls_fd, "r");
+-	if (!ls_fp) /* never happens. paranoia */
+-		bb_perror_msg_and_die("fdopen");
++	ls_fp = xfdopen_for_read(ls_fd);
+ 
+ 	if (opts & USE_CTRL_CONN) {
+ 		/* STAT <filename> */
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 88d1944..b16186e 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -1056,8 +1056,8 @@ static int popen2(FILE **in, FILE **out, char *command, char *param)
+ 	/* parent */
+ 	close(infd.rd);
+ 	close(outfd.wr);
+-	*in = fdopen(infd.wr, "w");
+-	*out = fdopen(outfd.rd, "r");
++	*in = xfdopen_for_write(infd.wr);
++	*out = xfdopen_for_read(outfd.rd);
+ 	return pid;
+ }
+ 
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 9a00fad..fe40cd8 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -761,8 +761,8 @@ static NOINLINE unsigned logdir_open(struct logdir *ld, const char *fn)
+ 	}
+ 	while ((ld->fdcur = open("current", O_WRONLY|O_NDELAY|O_APPEND|O_CREAT, 0600)) == -1)
+ 		pause2cannot("open current", ld->name);
+-	/* we presume this cannot fail */
+-	ld->filecur = fdopen(ld->fdcur, "a"); ////
++	while ((ld->filecur = fdopen(ld->fdcur, "a")) == NULL)
++		pause2cannot("open current", ld->name); ////
+ 	setvbuf(ld->filecur, NULL, _IOFBF, linelen); ////
+ 
+ 	close_on_exec_on(ld->fdcur);
+diff --git a/shell/hush.c b/shell/hush.c
+index 6f394d1..ede8d68 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -5301,25 +5301,22 @@ static FILE *generate_stream_from_string(const char *s, pid_t *pid_p)
+ 	free(to_free);
+ # endif
+ 	close(channel[1]);
+-//TODO: libbb: fdopen_or_die?
+-	return fdopen(channel[0], "r");
++	close_on_exec_on(channel[0]);
++	return xfdopen_for_read(channel[0]);
+ }
+ 
+ /* Return code is exit status of the process that is run. */
+ static int process_command_subs(o_string *dest, const char *s)
+ {
+-	FILE *pf;
++	FILE *fp;
+ 	struct in_str pipe_str;
+ 	pid_t pid;
+ 	int status, ch, eol_cnt;
+ 
+-	pf = generate_stream_from_string(s, &pid);
+-	if (pf == NULL)
+-		return 1;
+-	close_on_exec_on(fileno(pf));
++	fp = generate_stream_from_string(s, &pid);
+ 
+ 	/* Now send results of command back into original context */
+-	setup_file_in_str(&pipe_str, pf);
++	setup_file_in_str(&pipe_str, fp);
+ 	eol_cnt = 0;
+ 	while ((ch = i_getch(&pipe_str)) != EOF) {
+ 		if (ch == '\n') {
+@@ -5334,7 +5331,7 @@ static int process_command_subs(o_string *dest, const char *s)
+ 	}
+ 
+ 	debug_printf("done reading from `cmd` pipe, closing it\n");
+-	fclose(pf);
++	fclose(fp);
+ 	/* We need to extract exitcode. Test case
+ 	 * "true; echo `sleep 1; false` $?"
+ 	 * should print 1 */

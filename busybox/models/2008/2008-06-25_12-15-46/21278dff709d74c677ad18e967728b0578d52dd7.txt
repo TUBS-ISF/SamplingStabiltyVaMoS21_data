@@ -1,0 +1,13 @@
+2008-06-25 12:15:46 +0000
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 86f8508..06a83e5 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -638,6 +638,7 @@ static int busybox_main(char **argv)
+ 		/* leading tab and room to wrap */
+ 		output_width -= MAX_APPLET_NAME_LEN + 8;
+ 
++		dup2(1, 2);
+ 		full_write2_str(bb_banner); /* reuse const string... */
+ 		full_write2_str(" multi-call binary\n"
+ 		       "Copyright (C) 1998-2008 Erik Andersen, Rob Landley, Denys Vlasenko\n"

@@ -1,0 +1,36 @@
+2008-02-22 22:43:22 +0000
+diff --git a/applets/applet_tables.c b/applets/applet_tables.c
+index 3353f36..6c3492b 100644
+--- a/applets/applet_tables.c
++++ b/applets/applet_tables.c
+@@ -32,7 +32,7 @@ struct bb_applet {
+ /* Define struct bb_applet applets[] */
+ #include "../include/applets.h"
+ 
+-enum { NUM_APPLETS = sizeof(applets)/sizeof(applets[0]) };
++enum { NUM_APPLETS = ARRAY_SIZE(applets) };
+ 
+ static int offset[NUM_APPLETS];
+ 
+@@ -92,7 +92,7 @@ int main(int argc, char **argv)
+ 			+ (applets[i].noexec << 13)
+ #endif
+ #if ENABLE_FEATURE_SUID
+-			+ (applets[i].need_suid   << 14) /* 2 bits */
++			+ (applets[i].need_suid << 14) /* 2 bits */
+ #endif
+ 		);
+ 	}
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 993618e..793e3dc 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -34,7 +34,7 @@ static const char usage_messages[] ALIGN1 = ""
+ #endif /* SHOW_USAGE */
+ 
+ 
+-/* Include generated applet names, pointers to <apllet>_main, etc */
++/* Include generated applet names, pointers to <applet>_main, etc */
+ #include "applet_tables.h"
+ 
+ 

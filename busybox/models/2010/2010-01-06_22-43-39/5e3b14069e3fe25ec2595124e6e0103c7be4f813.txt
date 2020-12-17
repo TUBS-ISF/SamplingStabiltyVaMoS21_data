@@ -1,0 +1,171 @@
+2010-01-06 22:43:39 +0100
+diff --git a/include/rtc_.h b/include/rtc_.h
+index 74bb695..2b4ae77 100644
+--- a/include/rtc_.h
++++ b/include/rtc_.h
+@@ -11,9 +11,11 @@
+ 
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+-extern int rtc_adjtime_is_utc(void) FAST_FUNC;
+-extern int rtc_xopen(const char **default_rtc, int flags) FAST_FUNC;
+-extern time_t rtc_read_time(int fd, int utc) FAST_FUNC;
++int rtc_adjtime_is_utc(void) FAST_FUNC;
++int rtc_xopen(const char **default_rtc, int flags) FAST_FUNC;
++void rtc_read_tm(struct tm *tm, int fd) FAST_FUNC;
++time_t rtc_tm2time(struct tm *tm, int utc) FAST_FUNC;
++
+ 
+ /*
+  * Everything below this point has been copied from linux/rtc.h
+diff --git a/libbb/rtc.c b/libbb/rtc.c
+index 2f38b8a..9807e1c 100644
+--- a/libbb/rtc.c
++++ b/libbb/rtc.c
+@@ -59,15 +59,17 @@ int FAST_FUNC rtc_xopen(const char **default_rtc, int flags)
+ 	return xopen(*default_rtc, flags);
+ }
+ 
+-time_t FAST_FUNC rtc_read_time(int fd, int utc)
++void FAST_FUNC rtc_read_tm(struct tm *tm, int fd)
+ {
+-	struct tm tm;
+-	char *oldtz = 0;
+-	time_t t = 0;
++	memset(tm, 0, sizeof(*tm));
++	xioctl(fd, RTC_RD_TIME, tm);
++	tm->tm_isdst = -1; /* "not known" */
++}
+ 
+-	memset(&tm, 0, sizeof(struct tm));
+-	xioctl(fd, RTC_RD_TIME, &tm);
+-	tm.tm_isdst = -1; /* not known */
++time_t FAST_FUNC rtc_tm2time(struct tm *tm, int utc)
++{
++	char *oldtz = oldtz; /* for compiler */
++	time_t t;
+ 
+ 	if (utc) {
+ 		oldtz = getenv("TZ");
+@@ -75,7 +77,7 @@ time_t FAST_FUNC rtc_read_time(int fd, int utc)
+ 		tzset();
+ 	}
+ 
+-	t = mktime(&tm);
++	t = mktime(tm);
+ 
+ 	if (utc) {
+ 		unsetenv("TZ");
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index 08e5bd7..606721e 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -20,34 +20,54 @@
+ 
+ static const char *rtcname;
+ 
+-static time_t read_rtc(int utc)
++static time_t read_rtc(struct timeval *sys_tv, int utc)
+ {
+-	time_t ret;
++	struct tm tm;
+ 	int fd;
++	int before;
+ 
+ 	fd = rtc_xopen(&rtcname, O_RDONLY);
+-	ret = rtc_read_time(fd, utc);
++
++	rtc_read_tm(&tm, fd);
++	before = tm.tm_sec;
++	while (1) {
++		rtc_read_tm(&tm, fd);
++		gettimeofday(sys_tv, NULL);
++		if (before != tm.tm_sec)
++			break;
++	}
++
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		close(fd);
+ 
+-	return ret;
++	return rtc_tm2time(&tm, utc);
+ }
+ 
+ static void show_clock(int utc)
+ {
+-	//struct tm *ptm;
++	struct timeval sys_tv;
+ 	time_t t;
++	long diff;
+ 	char *cp;
+ 
+-	t = read_rtc(utc);
+-	//ptm = localtime(&t);  /* Sets 'tzname[]' */
++	t = read_rtc(&sys_tv, utc);
+ 
+ 	cp = ctime(&t);
+ 	strchrnul(cp, '\n')[0] = '\0';
+ 
+ 	//printf("%s  0.000000 seconds %s\n", cp, utc ? "" : (ptm->tm_isdst ? tzname[1] : tzname[0]));
+-	/* 0.000000 stand for unimplemented difference between RTC and system clock */
+-	printf("%s  0.000000 seconds\n", cp);
++	diff = sys_tv.tv_sec - t;
++	if (diff < 0 /*&& tv.tv_usec != 0*/) {
++		/* Why? */
++		/* diff >= 0 is ok:   diff < 0, can't just use tv.tv_usec: */
++		/*   45.520820          43.520820 */
++		/* - 44.000000        - 45.000000 */
++		/* =  0.520820        = -1.479180, not -2.520820! */
++		diff++;
++		/* should be 1000000 - tv.tv_usec, but then we must check tv.tv_usec != 0 */
++		sys_tv.tv_usec = 999999 - sys_tv.tv_usec;
++	}
++	printf("%s  %ld.%06lu seconds\n", cp, diff, (unsigned long)sys_tv.tv_usec);
+ }
+ 
+ static void to_sys_clock(int utc)
+@@ -58,7 +78,7 @@ static void to_sys_clock(int utc)
+ 	tz.tz_minuteswest = timezone/60 - 60*daylight;
+ 	tz.tz_dsttime = 0;
+ 
+-	tv.tv_sec = read_rtc(utc);
++	tv.tv_sec = read_rtc(NULL, utc);
+ 	tv.tv_usec = 0;
+ 	if (settimeofday(&tv, &tz))
+ 		bb_perror_msg_and_die("settimeofday() failed");
+@@ -79,15 +99,15 @@ static void from_sys_clock(int utc)
+ 
+ 		gettimeofday(&tv, NULL);
+ 
++		t = tv.tv_sec;
+ 		rem_usec = 1000000 - tv.tv_usec;
+ 		if (rem_usec < 1024) {
+ 			/* Less than 1ms to next second. Good enough */
+  small_rem:
+-			tv.tv_sec++;
++			t++;
+ 		}
+ 
+ 		/* Prepare tm */
+-		t = tv.tv_sec;
+ 		if (utc)
+ 			gmtime_r(&t, &tm); /* may read /etc/xxx (it takes time) */
+ 		else
+diff --git a/util-linux/rtcwake.c b/util-linux/rtcwake.c
+index 049f699..64c3e7e 100644
+--- a/util-linux/rtcwake.c
++++ b/util-linux/rtcwake.c
+@@ -160,7 +160,12 @@ int rtcwake_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* relative or absolute alarm time, normalized to time_t */
+ 	sys_time = time(NULL);
+-	rtc_time = rtc_read_time(fd, utc);
++	{
++		struct tm tm;
++		rtc_read_tm(&tm, fd);
++		rtc_time = rtc_tm2time(&tm, utc);
++	}
++
+ 
+ 	if (alarm_time) {
+ 		if (alarm_time < sys_time)

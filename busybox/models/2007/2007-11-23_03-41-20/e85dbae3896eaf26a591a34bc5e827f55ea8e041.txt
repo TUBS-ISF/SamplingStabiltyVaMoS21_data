@@ -1,0 +1,14 @@
+2007-11-23 03:41:20 +0000
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index 51fb7a0..6284646 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -75,6 +75,8 @@ int logread_main(int argc, char **argv)
+ 	int log_shmid; /* ipc shared memory id */
+ 	smallint follow = getopt32(argv, "f");
+ 
++	INIT_G();
++
+ 	log_shmid = shmget(KEY_ID, 0, 0);
+ 	if (log_shmid == -1)
+ 		bb_perror_msg_and_die("can't find syslogd buffer");

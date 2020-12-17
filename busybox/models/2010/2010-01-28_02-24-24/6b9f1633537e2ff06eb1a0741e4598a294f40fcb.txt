@@ -1,0 +1,954 @@
+2010-01-28 02:24:24 +0100
+diff --git a/archival/bz/bzlib.c b/archival/bz/bzlib.c
+index 9957c2f..8341794 100644
+--- a/archival/bz/bzlib.c
++++ b/archival/bz/bzlib.c
+@@ -393,10 +393,12 @@ int BZ2_bzBuffToBuffCompress(char* dest,
+ 	bz_stream strm;
+ 	int ret;
+ 
+-	if (dest == NULL || destLen == NULL ||
+-		 source == NULL ||
+-		 blockSize100k < 1 || blockSize100k > 9)
++	if (dest == NULL || destLen == NULL
++	 || source == NULL
++	 || blockSize100k < 1 || blockSize100k > 9
++	) {
+ 		return BZ_PARAM_ERROR;
++	}
+ 
+ 	BZ2_bzCompressInit(&strm, blockSize100k);
+ 
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 9f58b54..7187ad6 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -858,8 +858,9 @@ static void write_status_file(deb_file_t **deb_file)
+ 						if (field_name == NULL) {
+ 							break;
+ 						}
+-						if ((strcmp(field_name, "Priority") == 0) ||
+-							(strcmp(field_name, "Section") == 0)) {
++						if ((strcmp(field_name, "Priority") == 0)
++						 || (strcmp(field_name, "Section") == 0)
++						) {
+ 							fprintf(new_status_file, "%s: %s\n", field_name, field_value);
+ 						}
+ 					}
+@@ -1079,8 +1080,9 @@ static int check_deps(deb_file_t **deb_file, int deb_start /*, int dep_max_count
+ 
+ 			package_num = search_package_hashtable(package_edge->name, package_edge->version, package_edge->operator);
+ 
+-			if (package_edge->type == EDGE_PRE_DEPENDS ||
+-			    package_edge->type == EDGE_DEPENDS) {
++			if (package_edge->type == EDGE_PRE_DEPENDS
++			 || package_edge->type == EDGE_DEPENDS
++			) {
+ 				int result=1;
+ 				status_num = 0;
+ 
+diff --git a/archival/gzip.c b/archival/gzip.c
+index 139eaac..f9c8e4d 100644
+--- a/archival/gzip.c
++++ b/archival/gzip.c
+@@ -620,10 +620,12 @@ static int longest_match(IPos cur_match)
+ 		/* Skip to next match if the match length cannot increase
+ 		 * or if the match length is less than 2:
+ 		 */
+-		if (match[best_len] != scan_end ||
+-			match[best_len - 1] != scan_end1 ||
+-			*match != *scan || *++match != scan[1])
++		if (match[best_len] != scan_end
++		 || match[best_len - 1] != scan_end1
++		 || *match != *scan || *++match != scan[1]
++		) {
+ 			continue;
++		}
+ 
+ 		/* The check at best_len-1 can be removed because it will be made
+ 		 * again later. (This heuristic is not always a win.)
+diff --git a/archival/lzo1x_9x.c b/archival/lzo1x_9x.c
+index f2d4fac..0baed54 100644
+--- a/archival/lzo1x_9x.c
++++ b/archival/lzo1x_9x.c
+@@ -176,7 +176,7 @@ static int swd_init(lzo_swd_p s)
+ 	if (s->look > 0) {
+ 		if (s->look > SWD_F)
+ 			s->look = SWD_F;
+-		memcpy(&s->b[s->ip],s->c->ip,s->look);
++		memcpy(&s->b[s->ip], s->c->ip, s->look);
+ 		s->c->ip += s->look;
+ 		s->ip += s->look;
+ 	}
+@@ -256,8 +256,8 @@ static void swd_accept(lzo_swd_p s, unsigned n)
+ 		swd_remove_node(s,s->rp);
+ 
+ 		/* add bp into HEAD3 */
+-		key = HEAD3(s->b,s->bp);
+-		s->succ3[s->bp] = s_get_head3(s,key);
++		key = HEAD3(s->b, s->bp);
++		s->succ3[s->bp] = s_get_head3(s, key);
+ 		s->head3[key] = s->bp;
+ 		s->best3[s->bp] = SWD_F + 1;
+ 		s->llen3[key]++;
+@@ -265,7 +265,7 @@ static void swd_accept(lzo_swd_p s, unsigned n)
+ 
+ #ifdef HEAD2
+ 		/* add bp into HEAD2 */
+-		key = HEAD2(s->b,s->bp);
++		key = HEAD2(s->b, s->bp);
+ 		s->head2[key] = s->bp;
+ #endif
+ 
+@@ -298,18 +298,19 @@ static void swd_search(lzo_swd_p s, unsigned node, unsigned cnt)
+ 
+ 		assert(m_len < s->look);
+ 
+-		if (p2[m_len - 1] == scan_end1 &&
+-		    p2[m_len] == p1[m_len] &&
+-		    p2[0] == p1[0] &&
+-		    p2[1] == p1[1]) {
++		if (p2[m_len - 1] == scan_end1
++		 && p2[m_len] == p1[m_len]
++		 && p2[0] == p1[0]
++		 && p2[1] == p1[1]
++		) {
+ 			unsigned i;
+-			assert(lzo_memcmp(bp,&b[node],3) == 0);
++			assert(lzo_memcmp(bp, &b[node], 3) == 0);
+ 
+ 			p1 += 2; p2 += 2;
+ 			do {} while (++p1 < px && *p1 == *++p2);
+ 			i = p1-bp;
+ 
+-			assert(lzo_memcmp(bp,&b[node],i) == 0);
++			assert(lzo_memcmp(bp, &b[node], i) == 0);
+ 
+ #if defined(SWD_BEST_OFF)
+ 			if (i < SWD_BEST_OFF) {
+@@ -345,10 +346,10 @@ static int swd_search2(lzo_swd_p s)
+ 	assert(s->look >= 2);
+ 	assert(s->m_len > 0);
+ 
+-	key = s->head2[ HEAD2(s->b,s->bp) ];
++	key = s->head2[HEAD2(s->b, s->bp)];
+ 	if (key == NIL2)
+ 		return 0;
+-	assert(lzo_memcmp(&s->b[s->bp],&s->b[key],2) == 0);
++	assert(lzo_memcmp(&s->b[s->bp], &s->b[key], 2) == 0);
+ #if defined(SWD_BEST_OFF)
+ 	if (s->best_pos[2] == 0)
+ 		s->best_pos[2] = key + 1;
+@@ -377,7 +378,7 @@ static void swd_findbest(lzo_swd_p s)
+ 
+ 	/* get current head, add bp into HEAD3 */
+ 	key = HEAD3(s->b,s->bp);
+-	node = s->succ3[s->bp] = s_get_head3(s,key);
++	node = s->succ3[s->bp] = s_get_head3(s, key);
+ 	cnt = s->llen3[key]++;
+ 	assert(s->llen3[key] <= SWD_N + SWD_F);
+ 	if (cnt > s->max_chain)
+@@ -396,7 +397,7 @@ static void swd_findbest(lzo_swd_p s)
+ 		if (swd_search2(s))
+ #endif
+ 			if (s->look >= 3)
+-				swd_search(s,node,cnt);
++				swd_search(s, node, cnt);
+ 		if (s->m_len > len)
+ 			s->m_off = swd_pos2off(s,s->m_pos);
+ 		s->best3[s->bp] = s->m_len;
+@@ -404,11 +405,12 @@ static void swd_findbest(lzo_swd_p s)
+ #if defined(SWD_BEST_OFF)
+ 		if (s->use_best_off) {
+ 			int i;
+-			for (i = 2; i < SWD_BEST_OFF; i++)
++			for (i = 2; i < SWD_BEST_OFF; i++) {
+ 				if (s->best_pos[i] > 0)
+-					s->best_off[i] = swd_pos2off(s,s->best_pos[i]-1);
++					s->best_off[i] = swd_pos2off(s, s->best_pos[i]-1);
+ 				else
+ 					s->best_off[i] = 0;
++			}
+ 		}
+ #endif
+ 	}
+@@ -417,7 +419,7 @@ static void swd_findbest(lzo_swd_p s)
+ 
+ #ifdef HEAD2
+ 	/* add bp into HEAD2 */
+-	key = HEAD2(s->b,s->bp);
++	key = HEAD2(s->b, s->bp);
+ 	s->head2[key] = s->bp;
+ #endif
+ }
+@@ -467,7 +469,7 @@ static int find_match(lzo1x_999_t *c, lzo_swd_p s,
+ 	s->m_len = 1;
+ #ifdef SWD_BEST_OFF
+ 	if (s->use_best_off)
+-		memset(s->best_pos,0,sizeof(s->best_pos));
++		memset(s->best_pos, 0, sizeof(s->best_pos));
+ #endif
+ 	swd_findbest(s);
+ 	c->m_len = s->m_len;
+@@ -505,7 +507,8 @@ static uint8_t *code_match(lzo1x_999_t *c,
+ 	assert(op > c->out);
+ 	if (m_len == 2) {
+ 		assert(m_off <= M1_MAX_OFFSET);
+-		assert(c->r1_lit > 0); assert(c->r1_lit < 4);
++		assert(c->r1_lit > 0);
++		assert(c->r1_lit < 4);
+ 		m_off -= 1;
+ 		*op++ = M1_MARKER | ((m_off & 3) << 2);
+ 		*op++ = m_off >> 2;
+@@ -529,11 +532,10 @@ static uint8_t *code_match(lzo1x_999_t *c,
+ 		else {
+ 			m_len -= M3_MAX_LEN;
+ 			*op++ = M3_MARKER | 0;
+-			while (m_len > 255)
+-				{
+-					m_len -= 255;
+-					*op++ = 0;
+-				}
++			while (m_len > 255) {
++				m_len -= 255;
++				*op++ = 0;
++			}
+ 			assert(m_len > 0);
+ 			*op++ = m_len;
+ 		}
+@@ -543,7 +545,8 @@ static uint8_t *code_match(lzo1x_999_t *c,
+ 		unsigned k;
+ 
+ 		assert(m_len >= 3);
+-		assert(m_off > 0x4000); assert(m_off <= 0xbfff);
++		assert(m_off > 0x4000);
++		assert(m_off <= 0xbfff);
+ 		m_off -= 0x4000;
+ 		k = (m_off & 0x4000) >> 11;
+ 		if (m_len <= M4_MAX_LEN)
+@@ -551,11 +554,10 @@ static uint8_t *code_match(lzo1x_999_t *c,
+ 		else {
+ 			m_len -= M4_MAX_LEN;
+ 			*op++ = M4_MARKER | k | 0;
+-			while (m_len > 255)
+-				{
+-					m_len -= 255;
+-					*op++ = 0;
+-				}
++			while (m_len > 255) {
++				m_len -= 255;
++				*op++ = 0;
++			}
+ 			assert(m_len > 0);
+ 			*op++ = m_len;
+ 		}
+@@ -598,7 +600,7 @@ static uint8_t *code_run(lzo1x_999_t *c, uint8_t *op, const uint8_t *ii,
+ {
+ 	if (lit > 0) {
+ 		assert(m_len >= 2);
+-		op = STORE_RUN(c,op,ii,lit);
++		op = STORE_RUN(c, op, ii, lit);
+ 	} else {
+ 		assert(m_len >= 3);
+ 	}
+@@ -681,32 +683,32 @@ static void better_match(const lzo_swd_p swd,
+ 		return;
+ 
+ 	/* M3/M4 -> M2 */
+-	if (*m_off > M2_MAX_OFFSET &&
+-	    *m_len >= M2_MIN_LEN + 1 && *m_len <= M2_MAX_LEN + 1 &&
+-	    swd->best_off[*m_len-1] && swd->best_off[*m_len-1] <= M2_MAX_OFFSET)
+-		{
+-			*m_len = *m_len - 1;
+-			*m_off = swd->best_off[*m_len];
+-			return;
+-		}
++	if (*m_off > M2_MAX_OFFSET
++	 && *m_len >= M2_MIN_LEN + 1 && *m_len <= M2_MAX_LEN + 1
++	 && swd->best_off[*m_len-1] && swd->best_off[*m_len-1] <= M2_MAX_OFFSET
++	) {
++		*m_len = *m_len - 1;
++		*m_off = swd->best_off[*m_len];
++		return;
++	}
+ 
+ 	/* M4 -> M2 */
+-	if (*m_off > M3_MAX_OFFSET &&
+-	    *m_len >= M4_MAX_LEN + 1 && *m_len <= M2_MAX_LEN + 2 &&
+-	    swd->best_off[*m_len-2] && swd->best_off[*m_len-2] <= M2_MAX_OFFSET)
+-		{
+-			*m_len = *m_len - 2;
+-			*m_off = swd->best_off[*m_len];
+-			return;
+-		}
++	if (*m_off > M3_MAX_OFFSET
++	 && *m_len >= M4_MAX_LEN + 1 && *m_len <= M2_MAX_LEN + 2
++	 && swd->best_off[*m_len-2] && swd->best_off[*m_len-2] <= M2_MAX_OFFSET
++	) {
++		*m_len = *m_len - 2;
++		*m_off = swd->best_off[*m_len];
++		return;
++	}
+ 	/* M4 -> M3 */
+-	if (*m_off > M3_MAX_OFFSET &&
+-	    *m_len >= M4_MAX_LEN + 1 && *m_len <= M3_MAX_LEN + 1 &&
+-	    swd->best_off[*m_len-1] && swd->best_off[*m_len-1] <= M3_MAX_OFFSET)
+-		{
+-			*m_len = *m_len - 1;
+-			*m_off = swd->best_off[*m_len];
+-		}
++	if (*m_off > M3_MAX_OFFSET
++	 && *m_len >= M4_MAX_LEN + 1 && *m_len <= M3_MAX_LEN + 1
++	 && swd->best_off[*m_len-1] && swd->best_off[*m_len-1] <= M3_MAX_OFFSET
++	) {
++		*m_len = *m_len - 1;
++		*m_off = swd->best_off[*m_len];
++	}
+ }
+ 
+ #endif
+@@ -728,8 +730,8 @@ static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
+ 	unsigned lit;
+ 	unsigned m_len, m_off;
+ 	lzo1x_999_t cc;
+-	lzo1x_999_t * const c = &cc;
+-	lzo_swd_p const swd = (lzo_swd_p) wrkmem;
++	lzo1x_999_t *const c = &cc;
++	const lzo_swd_p swd = (lzo_swd_p) wrkmem;
+ 	int r;
+ 
+ 	c->init = 0;
+@@ -766,18 +768,18 @@ static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
+ 		assert(ii + lit == c->bp);
+ 		assert(swd->b_char == *(c->bp));
+ 
+-		if ( m_len < 2 ||
+-		     (m_len == 2 && (m_off > M1_MAX_OFFSET || lit == 0 || lit >= 4)) ||
+-		     /* Do not accept this match for compressed-data compatibility
+-		      * with LZO v1.01 and before
+-		      * [ might be a problem for decompress() and optimize() ]
+-		      */
+-		     (m_len == 2 && op == out) ||
+-		     (op == out && lit == 0))
+-			{
+-				/* a literal */
+-				m_len = 0;
+-			}
++		if (m_len < 2
++		 || (m_len == 2 && (m_off > M1_MAX_OFFSET || lit == 0 || lit >= 4))
++		    /* Do not accept this match for compressed-data compatibility
++		     * with LZO v1.01 and before
++		     * [ might be a problem for decompress() and optimize() ]
++		     */
++		 || (m_len == 2 && op == out)
++		 || (op == out && lit == 0)
++		) {
++			/* a literal */
++			m_len = 0;
++		}
+ 		else if (m_len == M2_MIN_LEN) {
+ 			/* compression ratio improves if we code a literal in some cases */
+ 			if (m_off > MX_MAX_OFFSET && lit >= 4)
+@@ -788,7 +790,7 @@ static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
+ 			/* a literal */
+ 			lit++;
+ 			swd->max_chain = max_chain;
+-			r = find_match(c,swd,1,0);
++			r = find_match(c, swd, 1, 0);
+ 			assert(r == 0);
+ 			continue;
+ 		}
+@@ -796,7 +798,7 @@ static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
+ 		/* a match */
+ #if defined(SWD_BEST_OFF)
+ 		if (swd->use_best_off)
+-			better_match(swd,&m_len,&m_off);
++			better_match(swd, &m_len, &m_off);
+ #endif
+ 
+ 		/* shall we try a lazy match ? */
+@@ -807,7 +809,7 @@ static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
+ 			max_ahead = 0;
+ 		} else {
+ 			/* yes, try a lazy match */
+-			l1 = len_of_coded_match(m_len,m_off,lit);
++			l1 = len_of_coded_match(m_len, m_off, lit);
+ 			assert(l1 > 0);
+ 			max_ahead = LZO_MIN(2, (unsigned)l1 - 1);
+ 		}
+@@ -820,7 +822,7 @@ static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
+ 				swd->max_chain = max_chain >> 2;
+ 			else
+ 				swd->max_chain = max_chain;
+-			r = find_match(c,swd,1,0);
++			r = find_match(c, swd, 1, 0);
+ 			ahead++;
+ 
+ 			assert(r == 0);
+@@ -833,23 +835,23 @@ static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
+ 				continue;
+ #if defined(SWD_BEST_OFF)
+ 			if (swd->use_best_off)
+-				better_match(swd,&c->m_len,&c->m_off);
++				better_match(swd, &c->m_len, &c->m_off);
+ #endif
+-			l2 = len_of_coded_match(c->m_len,c->m_off,lit+ahead);
++			l2 = len_of_coded_match(c->m_len, c->m_off, lit+ahead);
+ 			if (l2 < 0)
+ 				continue;
+ 
+ 			/* compressed-data compatibility [see above] */
+-			l3 = (op == out) ? -1 : len_of_coded_match(ahead,m_off,lit);
++			l3 = (op == out) ? -1 : len_of_coded_match(ahead, m_off, lit);
+ 
+-			lazy_match_min_gain = min_gain(ahead,lit,lit+ahead,l1,l2,l3);
++			lazy_match_min_gain = min_gain(ahead, lit, lit+ahead, l1, l2, l3);
+ 			if (c->m_len >= m_len + lazy_match_min_gain) {
+ 				if (l3 > 0) {
+ 					/* code previous run */
+-					op = code_run(c,op,ii,lit);
++					op = code_run(c, op, ii, lit);
+ 					lit = 0;
+ 					/* code shortened match */
+-					op = code_match(c,op,ahead,m_off);
++					op = code_match(c, op, ahead, m_off);
+ 				} else {
+ 					lit += ahead;
+ 					assert(ii + lit == c->bp);
+@@ -861,13 +863,13 @@ static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
+ 		assert(ii + lit + ahead == c->bp);
+ 
+ 		/* 1 - code run */
+-		op = code_run(c,op,ii,lit);
++		op = code_run(c, op, ii, lit);
+ 		lit = 0;
+ 
+ 		/* 2 - code match */
+-		op = code_match(c,op,m_len,m_off);
++		op = code_match(c, op, m_len, m_off);
+ 		swd->max_chain = max_chain;
+-		r = find_match(c,swd,m_len,1+ahead);
++		r = find_match(c, swd, m_len, 1+ahead);
+ 		assert(r == 0);
+ 
+  lazy_match_done: ;
+@@ -875,7 +877,7 @@ static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
+ 
+ 	/* store final run */
+ 	if (lit > 0)
+-		op = STORE_RUN(c,op,ii,lit);
++		op = STORE_RUN(c, op, ii, lit);
+ 
+ #if defined(LZO_EOF_CODE)
+ 	*op++ = M4_MARKER | 1;
+diff --git a/archival/lzop.c b/archival/lzop.c
+index 46aa2d3..a752a9d 100644
+--- a/archival/lzop.c
++++ b/archival/lzop.c
+@@ -166,9 +166,12 @@ static NOINLINE int lzo1x_optimize(uint8_t *in, unsigned in_len,
+ 					o_m1_a++;
+ 				}
+ 				/* test if a literal run follows */
+-				else if (nl == 0 && ip[0] < 16 && ip[0] != 0 &&
+-						 (lit + 2 + ip[0] < 16))
+-				{
++				else
++				if (nl == 0
++				 && ip[0] < 16
++				 && ip[0] != 0
++				 && (lit + 2 + ip[0] < 16)
++				) {
+ 					t = *ip++;
+ 					/* remove short run */
+ 					*litp &= ~3;
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index f1e63fd..8173d40 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -301,9 +301,12 @@ int dd_main(int argc UNUSED_PARAM, char **argv)
+ 			if (ftruncate(ofd, seek * obs) < 0) {
+ 				struct stat st;
+ 
+-				if (fstat(ofd, &st) < 0 || S_ISREG(st.st_mode) ||
+-						S_ISDIR(st.st_mode))
++				if (fstat(ofd, &st) < 0
++				 || S_ISREG(st.st_mode)
++				 || S_ISDIR(st.st_mode)
++				) {
+ 					goto die_outfile;
++				}
+ 			}
+ 		}
+ 	} else {
+diff --git a/editors/vi.c b/editors/vi.c
+index 58c6f5a..c4bca2a 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -1158,9 +1158,11 @@ static void colon(char *buf)
+ 				file_modified = 0;
+ 				last_file_modified = -1;
+ 			}
+-			if ((cmd[0] == 'x' || cmd[1] == 'q' || cmd[1] == 'n' ||
+-			     cmd[0] == 'X' || cmd[1] == 'Q' || cmd[1] == 'N')
+-			     && l == ch) {
++			if ((cmd[0] == 'x' || cmd[1] == 'q' || cmd[1] == 'n'
++			    || cmd[0] == 'X' || cmd[1] == 'Q' || cmd[1] == 'N'
++			    )
++			 && l == ch
++			) {
+ 				editing = 0;
+ 			}
+ 		}
+diff --git a/modutils/depmod.c b/modutils/depmod.c
+index d6cc8ed..4718c4d 100644
+--- a/modutils/depmod.c
++++ b/modutils/depmod.c
+@@ -80,9 +80,11 @@ static int FAST_FUNC parse_module(const char *fname, struct stat *sb UNUSED_PARA
+ 		 && strncmp(ptr, "__ksymtab_", 10) == 0
+ 		) {
+ 			ptr += 10;
+-			if (strncmp(ptr, "gpl", 3) == 0 ||
+-			    strcmp(ptr, "strings") == 0)
++			if (strncmp(ptr, "gpl", 3) == 0
++			 || strcmp(ptr, "strings") == 0
++			) {
+ 				continue;
++			}
+ 			llist_add_to(&info->symbols, xstrdup(ptr));
+ 			ptr += strlen(ptr);
+ 		}
+diff --git a/modutils/modutils-24.c b/modutils/modutils-24.c
+index a878e74..4ede01f 100644
+--- a/modutils/modutils-24.c
++++ b/modutils/modutils-24.c
+@@ -865,19 +865,23 @@ arch_apply_relocation(struct obj_file *f,
+ 			break;
+ 		case R_H8_PCREL16:
+ 			v -= dot + 2;
+-			if ((ElfW(Sword))v > 0x7fff ||
+-			    (ElfW(Sword))v < -(ElfW(Sword))0x8000)
++			if ((ElfW(Sword))v > 0x7fff
++			 || (ElfW(Sword))v < -(ElfW(Sword))0x8000
++			) {
+ 				ret = obj_reloc_overflow;
+-			else
++			} else {
+ 				*(unsigned short *)loc = v;
++			}
+ 			break;
+ 		case R_H8_PCREL8:
+ 			v -= dot + 1;
+-			if ((ElfW(Sword))v > 0x7f ||
+-			    (ElfW(Sword))v < -(ElfW(Sword))0x80)
++			if ((ElfW(Sword))v > 0x7f
++			 || (ElfW(Sword))v < -(ElfW(Sword))0x80
++			) {
+ 				ret = obj_reloc_overflow;
+-			else
++			} else {
+ 				*(unsigned char *)loc = v;
++			}
+ 			break;
+ 
+ #elif defined(__i386__)
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index c4b3450..520cc82 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -163,20 +163,27 @@ static int FAST_FUNC print_route(const struct sockaddr_nl *who UNUSED_PARAM,
+ 	memset(tb, 0, sizeof(tb));
+ 	parse_rtattr(tb, RTA_MAX, RTM_RTA(r), len);
+ 
+-	if (G_filter.rdst.family && inet_addr_match(&dst, &G_filter.rdst, G_filter.rdst.bitlen))
++	if (G_filter.rdst.family
++	 && inet_addr_match(&dst, &G_filter.rdst, G_filter.rdst.bitlen)
++	) {
+ 		return 0;
+-	if (G_filter.mdst.family && G_filter.mdst.bitlen >= 0 &&
+-	    inet_addr_match(&dst, &G_filter.mdst, r->rtm_dst_len))
++	}
++	if (G_filter.mdst.family
++	 && G_filter.mdst.bitlen >= 0
++	 && inet_addr_match(&dst, &G_filter.mdst, r->rtm_dst_len)
++	) {
+ 		return 0;
+-
+-	if (G_filter.rsrc.family && inet_addr_match(&src, &G_filter.rsrc, G_filter.rsrc.bitlen))
++	}
++	if (G_filter.rsrc.family
++	 && inet_addr_match(&src, &G_filter.rsrc, G_filter.rsrc.bitlen)
++	) {
+ 		return 0;
++	}
+ 	if (G_filter.msrc.family && G_filter.msrc.bitlen >= 0
+ 	 && inet_addr_match(&src, &G_filter.msrc, r->rtm_src_len)
+ 	) {
+ 		return 0;
+ 	}
+-
+ 	if (G_filter.flushb
+ 	 && r->rtm_family == AF_INET6
+ 	 && r->rtm_dst_len == 0
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index e767453..535019d 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -233,7 +233,8 @@ static int iprule_modify(int cmd, char **argv)
+ 			addattr_l(&req.n, sizeof(req), RTA_DST, &dst.data, dst.bytelen);
+ 		} else if (key == ARG_preference ||
+ 			   key == ARG_order ||
+-			   key == ARG_priority) {
++			   key == ARG_priority
++		) {
+ 			uint32_t pref;
+ 			NEXT_ARG();
+ 			pref = get_u32(*argv, "preference");
+@@ -256,7 +257,8 @@ static int iprule_modify(int cmd, char **argv)
+ 				invarg(*argv, "realms");
+ 			addattr32(&req.n, sizeof(req), RTA_FLOW, realm);
+ 		} else if (key == ARG_table ||
+-			   key == ARG_lookup) {
++			   key == ARG_lookup
++		) {
+ 			uint32_t tid;
+ 			NEXT_ARG();
+ 			if (rtnl_rttable_a2n(&tid, *argv))
+@@ -264,11 +266,13 @@ static int iprule_modify(int cmd, char **argv)
+ 			req.r.rtm_table = tid;
+ 			table_ok = 1;
+ 		} else if (key == ARG_dev ||
+-			   key == ARG_iif) {
++			   key == ARG_iif
++		) {
+ 			NEXT_ARG();
+ 			addattr_l(&req.n, sizeof(req), RTA_IIF, *argv, strlen(*argv)+1);
+ 		} else if (key == ARG_nat ||
+-			   key == ARG_map_to) {
++			   key == ARG_map_to
++		) {
+ 			NEXT_ARG();
+ 			addattr32(&req.n, sizeof(req), RTA_GATEWAY, get_addr32(*argv));
+ 			req.r.rtm_type = RTN_NAT;
+diff --git a/networking/libiproute/iptunnel.c b/networking/libiproute/iptunnel.c
+index 67afd1b..c36c713 100644
+--- a/networking/libiproute/iptunnel.c
++++ b/networking/libiproute/iptunnel.c
+@@ -204,19 +204,22 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 			NEXT_ARG();
+ 			key = index_in_strings(keywords, *argv);
+ 			if (key == ARG_ipip ||
+-			    key == ARG_ip_ip) {
++			    key == ARG_ip_ip
++			) {
+ 				if (p->iph.protocol && p->iph.protocol != IPPROTO_IPIP) {
+ 					bb_error_msg_and_die("%s tunnel mode", "you managed to ask for more than one");
+ 				}
+ 				p->iph.protocol = IPPROTO_IPIP;
+ 			} else if (key == ARG_gre ||
+-				   key == ARG_gre_ip) {
++				   key == ARG_gre_ip
++			) {
+ 				if (p->iph.protocol && p->iph.protocol != IPPROTO_GRE) {
+ 					bb_error_msg_and_die("%s tunnel mode", "you managed to ask for more than one");
+ 				}
+ 				p->iph.protocol = IPPROTO_GRE;
+ 			} else if (key == ARG_sit ||
+-				   key == ARG_ip6_ip) {
++				   key == ARG_ip6_ip
++			) {
+ 				if (p->iph.protocol && p->iph.protocol != IPPROTO_IPV6) {
+ 					bb_error_msg_and_die("%s tunnel mode", "you managed to ask for more than one");
+ 				}
+@@ -297,7 +300,8 @@ static void parse_args(char **argv, int cmd, struct ip_tunnel_parm *p)
+ 				p->iph.ttl = uval;
+ 			}
+ 		} else if (key == ARG_tos ||
+-			   key == ARG_dsfield) {
++			   key == ARG_dsfield
++		) {
+ 			uint32_t uval;
+ 			NEXT_ARG();
+ 			key = index_in_strings(keywords, *argv);
+@@ -485,7 +489,8 @@ static void do_tunnels_list(struct ip_tunnel_parm *p)
+ 		/*buf[sizeof(buf) - 1] = 0; - fgets is safe anyway */
+ 		ptr = strchr(buf, ':');
+ 		if (ptr == NULL ||
+-		    (*ptr++ = 0, sscanf(buf, "%s", name) != 1)) {
++		    (*ptr++ = 0, sscanf(buf, "%s", name) != 1)
++		) {
+ 			bb_error_msg("wrong format of /proc/net/dev");
+ 			return;
+ 		}
+@@ -511,8 +516,10 @@ static void do_tunnels_list(struct ip_tunnel_parm *p)
+ 		    (p->name[0] && strcmp(p1.name, p->name)) ||
+ 		    (p->iph.daddr && p1.iph.daddr != p->iph.daddr) ||
+ 		    (p->iph.saddr && p1.iph.saddr != p->iph.saddr) ||
+-		    (p->i_key && p1.i_key != p->i_key))
++		    (p->i_key && p1.i_key != p->i_key)
++		) {
+ 			continue;
++		}
+ 		print_tunnel(&p1);
+ 		bb_putchar('\n');
+ 	}
+diff --git a/networking/libiproute/libnetlink.c b/networking/libiproute/libnetlink.c
+index 9e6467d..ba24832 100644
+--- a/networking/libiproute/libnetlink.c
++++ b/networking/libiproute/libnetlink.c
+@@ -147,7 +147,8 @@ static int rtnl_dump_filter(struct rtnl_handle *rth,
+ 
+ 			if (nladdr.nl_pid != 0 ||
+ 			    h->nlmsg_pid != rth->local.nl_pid ||
+-			    h->nlmsg_seq != rth->dump) {
++			    h->nlmsg_seq != rth->dump
++			) {
+ //				if (junk) {
+ //					err = junk(&nladdr, h, arg2);
+ //					if (err < 0) {
+@@ -281,7 +282,8 @@ int FAST_FUNC rtnl_talk(struct rtnl_handle *rtnl, struct nlmsghdr *n,
+ 
+ 			if (nladdr.nl_pid != peer ||
+ 			    h->nlmsg_pid != rtnl->local.nl_pid ||
+-			    h->nlmsg_seq != seq) {
++			    h->nlmsg_seq != seq
++			) {
+ //				if (junk) {
+ //					l_err = junk(&nladdr, h, jarg);
+ //					if (l_err < 0) {
+diff --git a/networking/libiproute/ll_addr.c b/networking/libiproute/ll_addr.c
+index f59831c..c2c0130 100644
+--- a/networking/libiproute/ll_addr.c
++++ b/networking/libiproute/ll_addr.c
+@@ -22,8 +22,9 @@ const char* FAST_FUNC ll_addr_n2a(unsigned char *addr, int alen, int type, char
+ 	int i;
+ 	int l;
+ 
+-	if (alen == 4 &&
+-	    (type == ARPHRD_TUNNEL || type == ARPHRD_SIT || type == ARPHRD_IPGRE)) {
++	if (alen == 4
++	 && (type == ARPHRD_TUNNEL || type == ARPHRD_SIT || type == ARPHRD_IPGRE)
++	) {
+ 		return inet_ntop(AF_INET, addr, buf, blen);
+ 	}
+ 	l = 0;
+diff --git a/networking/tc.c b/networking/tc.c
+index dbdba33..541a0f8 100644
+--- a/networking/tc.c
++++ b/networking/tc.c
+@@ -470,17 +470,22 @@ int tc_main(int argc UNUSED_PARAM, char **argv)
+ 			msg.tcm_ifindex = xll_name_to_index(dev);
+ 			if (cmd >= CMD_show)
+ 				filter_ifindex = msg.tcm_ifindex;
+-		} else if ((arg == ARG_qdisc && obj == OBJ_class && cmd >= CMD_show)
+-				   || (arg == ARG_handle && obj == OBJ_qdisc
+-					   && cmd == CMD_change)) {
++		} else
++		if ((arg == ARG_qdisc && obj == OBJ_class && cmd >= CMD_show)
++		 || (arg == ARG_handle && obj == OBJ_qdisc && cmd == CMD_change)
++		) {
+ 			NEXT_ARG();
+ 			/* We don't care about duparg2("qdisc handle",*argv) for now */
+ 			if (get_qdisc_handle(&filter_qdisc, *argv))
+ 				invarg(*argv, "qdisc");
+-		} else if (obj != OBJ_qdisc &&
+-				   (arg == ARG_root
+-					 || arg == ARG_parent
+-					 || (obj == OBJ_filter && arg >= ARG_pref))) {
++		} else
++		if (obj != OBJ_qdisc
++		 && (arg == ARG_root
++		    || arg == ARG_parent
++		    || (obj == OBJ_filter && arg >= ARG_pref)
++		    )
++		) {
++			/* nothing */
+ 		} else {
+ 			invarg(*argv, "command");
+ 		}
+diff --git a/procps/pgrep.c b/procps/pgrep.c
+index 3a717ec..45de8bc 100644
+--- a/procps/pgrep.c
++++ b/procps/pgrep.c
+@@ -129,9 +129,10 @@ int pgrep_main(int argc UNUSED_PARAM, char **argv)
+ 			continue;
+ 
+ 		/* NB: OPT_INVERT is always 0 or 1 */
+-		if (!argv[0] ||
+-		    (regexec(&re_buffer, cmd, 1, re_match, 0) == 0 /* match found */
+-		     && (!OPT_ANCHOR || (re_match[0].rm_so == 0 && re_match[0].rm_eo == (regoff_t)strlen(cmd)))) ^ OPT_INVERT
++		if (!argv[0]
++		 || (regexec(&re_buffer, cmd, 1, re_match, 0) == 0 /* match found */
++		    && (!OPT_ANCHOR || (re_match[0].rm_so == 0 && re_match[0].rm_eo == (regoff_t)strlen(cmd)))
++		    ) ^ OPT_INVERT
+ 		) {
+ 			matched_pid = proc->pid;
+ 			if (OPT_LAST) {
+diff --git a/shell/lash_unused.c b/shell/lash_unused.c
+index 107ce88..5139189 100644
+--- a/shell/lash_unused.c
++++ b/shell/lash_unused.c
+@@ -950,8 +950,12 @@ static int parse_command(char **command_ptr, struct job *job, int *inbg)
+ 					*buf++ = '\\';
+ 					*buf++ = '\\';
+ 				}
+-			} else if (*src == '*' || *src == '?' || *src == '[' ||
+-					   *src == ']') *buf++ = '\\';
++			} else
++			if (*src == '*' || *src == '?'
++			 || *src == '[' || *src == ']'
++			) {
++				*buf++ = '\\';
++			}
+ 			*buf++ = *src;
+ 		} else if (isspace(*src)) {
+ 			if (*prog->argv[argc_l] || (flag & LASH_OPT_SAW_QUOTE)) {
+@@ -1365,8 +1369,9 @@ static int busy_loop(FILE *input)
+ 				continue;
+ 			}
+ 
+-			if (!parse_command(&next_command, &newjob, &inbg) &&
+-				newjob.num_progs) {
++			if (!parse_command(&next_command, &newjob, &inbg)
++			 && newjob.num_progs
++			) {
+ 				int pipefds[2] = { -1, -1 };
+ 				debug_printf("job=%p fed to run_command by busy_loop()'\n",
+ 						&newjob);
+diff --git a/shell/msh_unused.c b/shell/msh_unused.c
+index d4fe3db..5468022 100644
+--- a/shell/msh_unused.c
++++ b/shell/msh_unused.c
+@@ -3873,9 +3873,10 @@ static char *blank(int f)
+ 		scanequals = 0;
+ 	for (;;) {
+ 		c = subgetc('"', foundequals);
+-		if (c == 0 ||
+-			f & (DOBLANK && any(c, ifs->value)) ||
+-			(!INSUB() && any(c, "\"'"))) {
++		if (c == 0
++		 || f & (DOBLANK && any(c, ifs->value))
++		 || (!INSUB() && any(c, "\"'"))
++		) {
+ 			scanequals = 0;
+ 			unget(c);
+ 			if (any(c, "\"'"))
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index 18ea05f..feece99 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -898,8 +898,12 @@ static void check_zones(unsigned i)
+ 	if (inode_count[i] > 1)		/* have we counted this file already? */
+ 		return;
+ 	inode = Inode1 + i;
+-	if (!S_ISDIR(inode->i_mode) && !S_ISREG(inode->i_mode) &&
+-		!S_ISLNK(inode->i_mode)) return;
++	if (!S_ISDIR(inode->i_mode)
++	 && !S_ISREG(inode->i_mode)
++	 && !S_ISLNK(inode->i_mode)
++	) {
++		return;
++	}
+ 	for (i = 0; i < 7; i++)
+ 		add_zone(i + inode->i_zone, &changed);
+ 	add_zone_ind(7 + inode->i_zone, &changed);
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 52ced7a..23a3459 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -907,10 +907,12 @@ get_mountport(struct pmap *pm_mnt,
+ 			goto next;
+ 		if (version && version <= 2 && pmap->pml_map.pm_vers > 2)
+ 			goto next;
+-		if (pmap->pml_map.pm_vers > MAX_NFSPROT ||
+-		    (proto && pm_mnt->pm_prot && pmap->pml_map.pm_prot != proto) ||
+-		    (port && pmap->pml_map.pm_port != port))
++		if (pmap->pml_map.pm_vers > MAX_NFSPROT
++		 || (proto && pm_mnt->pm_prot && pmap->pml_map.pm_prot != proto)
++		 || (port && pmap->pml_map.pm_port != port)
++		) {
+ 			goto next;
++		}
+ 		memcpy(pm_mnt, &pmap->pml_map, sizeof(*pm_mnt));
+  next:
+ 		pmap = pmap->pml_next;
+diff --git a/util-linux/readprofile.c b/util-linux/readprofile.c
+index 1f5ba2e..2196544 100644
+--- a/util-linux/readprofile.c
++++ b/util-linux/readprofile.c
+@@ -176,9 +176,11 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
+ 		/* ignore any LEADING (before a '[tT]' symbol is found)
+ 		   Absolute symbols */
+ 		if ((*mode == 'A' || *mode == '?') && total == 0) continue;
+-		if (*mode != 'T' && *mode != 't' &&
+-		    *mode != 'W' && *mode != 'w')
++		if (*mode != 'T' && *mode != 't'
++		 && *mode != 'W' && *mode != 'w'
++		) {
+ 			break;	/* only text is profiled */
++		}
+ 
+ 		if (indx >= len / sizeof(*buf))
+ 			bb_error_msg_and_die("profile address out of range. "
+diff --git a/util-linux/volume_id/fat.c b/util-linux/volume_id/fat.c
+index 6173ba9..b0f427c 100644
+--- a/util-linux/volume_id/fat.c
++++ b/util-linux/volume_id/fat.c
+@@ -173,18 +173,22 @@ int FAST_FUNC volume_id_probe_vfat(struct volume_id *id /*,uint64_t fat_partitio
+ 	 */
+ 
+ 	/* boot jump address check */
+-	if ((vs->boot_jump[0] != 0xeb || vs->boot_jump[2] != 0x90) &&
+-	     vs->boot_jump[0] != 0xe9)
++	if ((vs->boot_jump[0] != 0xeb || vs->boot_jump[2] != 0x90)
++	 && vs->boot_jump[0] != 0xe9
++	) {
+ 		return -1;
++	}
+ 
+ 	/* heads check */
+ 	if (vs->heads == 0)
+ 		return -1;
+ 
+ 	/* cluster size check */
+-	if (vs->sectors_per_cluster == 0 ||
+-	    (vs->sectors_per_cluster & (vs->sectors_per_cluster-1)))
++	if (vs->sectors_per_cluster == 0
++	 || (vs->sectors_per_cluster & (vs->sectors_per_cluster-1))
++	) {
+ 		return -1;
++	}
+ 
+ 	/* media check */
+ 	if (vs->media < 0xf8 && vs->media != 0xf0)
+@@ -197,9 +201,11 @@ int FAST_FUNC volume_id_probe_vfat(struct volume_id *id /*,uint64_t fat_partitio
+  valid:
+ 	/* sector size check */
+ 	sector_size_bytes = le16_to_cpu(vs->sector_size_bytes);
+-	if (sector_size_bytes != 0x200 && sector_size_bytes != 0x400 &&
+-	    sector_size_bytes != 0x800 && sector_size_bytes != 0x1000)
++	if (sector_size_bytes != 0x200 && sector_size_bytes != 0x400
++	 && sector_size_bytes != 0x800 && sector_size_bytes != 0x1000
++	) {
+ 		return -1;
++	}
+ 
+ 	dbg("sector_size_bytes 0x%x", sector_size_bytes);
+ 	dbg("sectors_per_cluster 0x%x", vs->sectors_per_cluster);
+diff --git a/util-linux/volume_id/unused_msdos.c b/util-linux/volume_id/unused_msdos.c
+index ccec72c..65fb885 100644
+--- a/util-linux/volume_id/unused_msdos.c
++++ b/util-linux/volume_id/unused_msdos.c
+@@ -73,9 +73,11 @@ int FAST_FUNC volume_id_probe_msdos_part_table(struct volume_id *id, uint64_t of
+ 	/* check flags on all entries for a valid partition table */
+ 	part = (struct msdos_partition_entry*) &buf[MSDOS_PARTTABLE_OFFSET];
+ 	for (i = 0; i < 4; i++) {
+-		if (part[i].boot_ind != 0 &&
+-		    part[i].boot_ind != 0x80)
++		if (part[i].boot_ind != 0
++		 && part[i].boot_ind != 0x80
++		) {
+ 			return -1;
++		}
+ 
+ 		if (part[i].nr_sects != 0)
+ 			empty = 0;

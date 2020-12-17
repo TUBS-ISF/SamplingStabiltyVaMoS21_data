@@ -1,0 +1,25 @@
+2009-10-17 23:27:29 +0200
+diff --git a/util-linux/mkfs_ext2.c b/util-linux/mkfs_ext2.c
+index 41f37c2..83e8105 100644
+--- a/util-linux/mkfs_ext2.c
++++ b/util-linux/mkfs_ext2.c
+@@ -59,16 +59,16 @@ struct ext2_dir {
+ 	char     name3[12];
+ };
+ 
+-static inline int int_log2(int arg)
++static unsigned int_log2(unsigned arg)
+ {
+-	int r = 0;
++	unsigned r = 0;
+ 	while ((arg >>= 1) != 0)
+ 		r++;
+ 	return r;
+ }
+ 
+ // taken from mkfs_minix.c. libbb candidate?
+-static ALWAYS_INLINE unsigned div_roundup(uint32_t size, uint32_t n)
++static unsigned div_roundup(uint32_t size, uint32_t n)
+ {
+ 	return (size + n-1) / n;
+ }

@@ -1,0 +1,84 @@
+2008-11-07 01:12:16 +0000
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 8732b99..861382f 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -118,18 +118,25 @@ static void die_if_nologin(void)
+ {
+ 	FILE *fp;
+ 	int c;
++	int empty = 1;
+ 
+-	if (access("/etc/nologin", F_OK))
++	fp = fopen_for_read("/etc/nologin");
++	if (!fp) /* assuming it does not exist */
+ 		return;
+ 
+-	fp = fopen_for_read("/etc/nologin");
+-	if (fp) {
+-		while ((c = getc(fp)) != EOF)
+-			bb_putchar((c=='\n') ? '\r' : c);
+-		fflush(stdout);
+-		fclose(fp);
+-	} else
++	while ((c = getc(fp)) != EOF) {
++		if (c == '\n')
++			bb_putchar('\r');
++		bb_putchar(c);
++		empty = 0;
++	}
++	if (empty)
+ 		puts("\r\nSystem closed for routine maintenance\r");
++
++	fclose(fp);
++	fflush(NULL);
++	/* Users say that they do need this prior to exit: */
++	tcdrain(STDOUT_FILENO);
+ 	exit(EXIT_FAILURE);
+ }
+ #else
+diff --git a/mailutils/Config.in b/mailutils/Config.in
+index b8d6977..4edb0ae 100644
+--- a/mailutils/Config.in
++++ b/mailutils/Config.in
+@@ -17,15 +17,18 @@ config POPMAILDIR
+ 	bool "popmaildir"
+ 	default n
+ 	help
+-	  Simple yet powerful POP3 mail popper. Delivers content of remote mailboxes to local Maildir.
++	  Simple yet powerful POP3 mail popper. Delivers content
++	  of remote mailboxes to local Maildir.
+ 
+ config FEATURE_POPMAILDIR_DELIVERY
+ 	bool "Allow message filters and custom delivery program"
+ 	default n
+ 	depends on POPMAILDIR
+ 	help
+-	  Allow to use a custom program to filter the content of the message before actual delivery (-F "prog [args...]").
+-	  Allow to use a custom program for message actual delivery (-M "prog [args...]").
++	  Allow to use a custom program to filter the content
++	  of the message before actual delivery (-F "prog [args...]").
++	  Allow to use a custom program for message actual delivery
++	  (-M "prog [args...]").
+ 
+ config REFORMIME
+ 	bool "reformime"
+@@ -38,7 +41,8 @@ config FEATURE_REFORMIME_COMPAT
+ 	default y
+ 	depends on REFORMIME
+ 	help
+-	  Accept (for compatibility only) and ignore options other than -x and -X.
++	  Accept (for compatibility only) and ignore options
++	  other than -x and -X.
+ 
+ config SENDMAIL
+ 	bool "sendmail"
+@@ -59,6 +63,7 @@ config FEATURE_SENDMAIL_MAILXX
+ 	default n
+ 	depends on FEATURE_SENDMAIL_MAILX
+ 	help
+-	  Allow to specify Cc: addresses and some additional headers: Errors-To:.
++	  Allow to specify Cc: addresses and some additional headers:
++	  Errors-To:
+ 
+ endmenu

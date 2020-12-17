@@ -1,0 +1,86 @@
+2008-07-12 23:02:43 +0000
+diff --git a/Makefile b/Makefile
+index b4491e3..fb3e52d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -960,7 +960,7 @@ clean: archclean $(clean-dirs)
+ 	$(call cmd,rmdirs)
+ 	$(call cmd,rmfiles)
+ 	@find . $(RCS_FIND_IGNORE) \
+-	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
++		\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
+ 		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \) \
+ 		-type f -print | xargs rm -f
+ 
+@@ -984,9 +984,9 @@ PHONY += distclean
+ 
+ distclean: mrproper
+ 	@find $(srctree) $(RCS_FIND_IGNORE) \
+-	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
++		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
+ 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
+-	 	-o -name '.*.rej' -o -name '*.tmp' -o -size 0 \
++		-o -name '.*.rej' -o -name '*.tmp' -o -size 0 \
+ 		-o -name '*%' -o -name '.*.cmd' -o -name 'core' \) \
+ 		-type f -print | xargs rm -f
+ 
+@@ -1090,7 +1090,7 @@ clean:	rm-dirs := $(MODVERDIR)
+ clean: $(clean-dirs)
+ 	$(call cmd,rmdirs)
+ 	@find $(KBUILD_EXTMOD) $(RCS_FIND_IGNORE) \
+-	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
++		\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
+ 		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \) \
+ 		-type f -print | xargs rm -f
+ 
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 28913d2..671aae7 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -1169,7 +1169,7 @@ static char **create_list(const char *filename)
+ 	file_list = NULL;
+ 	count = 0;
+ 	while ((line = xmalloc_fgetline(list_stream)) != NULL) {
+-//TODO: zeroing xrealloc_vector? 
++//TODO: zeroing xrealloc_vector?
+ 		file_list = xrealloc_vector(file_list, 2, count);
+ 		file_list[count++] = line;
+ 		file_list[count] = NULL;
+diff --git a/scripts/fix_ws.sh b/scripts/fix_ws.sh
+index 89fce95..e7cf529 100755
+--- a/scripts/fix_ws.sh
++++ b/scripts/fix_ws.sh
+@@ -27,13 +27,11 @@ find "$@" -type f \
+     # shell testsuite entries are not to be touched too
+     test "YES" = "${name/*.right/YES}" && continue
+ 
+-    if test "YES" = "${name/*.[ch]/YES}" \
++    if test "YES" = "${name/*.[chsS]/YES}" \
+ 	-o "YES" = "${name/*.sh/YES}" \
+ 	-o "YES" = "${name/*.txt/YES}" \
+ 	-o "YES" = "${name/*.html/YES}" \
+ 	-o "YES" = "${name/*.htm/YES}" \
+-	-o "YES" = "${name/*Makefile*/YES}" \
+-	-o "YES" = "${name/*Kbuild*/YES}" \
+ 	-o "YES" = "${name/*Config.in*/YES}" \
+     ; then
+     # More aggressive whitespace fixes for known file types
+@@ -46,6 +44,18 @@ find "$@" -type f \
+ 	      -e "$tab17sptab_tabtab" -e "$tab17sptab_tabtab" \
+ 	      -e "$tab17sptab_tabtab" -e "$tab17sptab_tabtab" \
+ 	| sed "$trailingws_"
++    elif test "YES" = "${name/*Makefile*/YES}" \
++	-o "YES" = "${name/*Kbuild*/YES}" \
++    ; then
++    # For Makefiles, never convert "1-7spaces+tab" into "tabtab"
++	echo "Makefile: $name" >&2
++	cat "$name" \
++	| sed -e "$tab8sptab_tabtabtab" -e "$tab8sptab_tabtabtab" \
++	      -e "$tab8sptab_tabtabtab" -e "$tab8sptab_tabtabtab" \
++	| sed -e "$tab17sptab_tabtab" -e "$tab17sptab_tabtab" \
++	      -e "$tab17sptab_tabtab" -e "$tab17sptab_tabtab" \
++	      -e "$tab17sptab_tabtab" -e "$tab17sptab_tabtab" \
++	| sed "$trailingws_"
+     else
+     # Only remove trailing WS for the rest
+ 	echo "Removing trailing whitespace: $name" >&2

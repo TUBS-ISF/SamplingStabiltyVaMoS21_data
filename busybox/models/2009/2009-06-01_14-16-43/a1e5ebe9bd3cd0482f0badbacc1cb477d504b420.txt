@@ -1,0 +1,16 @@
+2009-06-01 14:16:43 -0400
+diff --git a/.gitignore b/.gitignore
+index 1618712..b7840e4 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -25,3 +25,10 @@
+ *.orig
+ *.rej
+ /*.patch
++
++#
++# debugging stuff
++#
++core
++.gdb_history
++.gdbinit

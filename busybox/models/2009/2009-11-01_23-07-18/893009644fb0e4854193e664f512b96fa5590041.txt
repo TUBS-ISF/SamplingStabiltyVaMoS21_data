@@ -1,0 +1,578 @@
+2009-11-01 23:07:18 +0100
+diff --git a/util-linux/volume_id/btrfs.c b/util-linux/volume_id/btrfs.c
+index 98f1507..53bac74 100644
+--- a/util-linux/volume_id/btrfs.c
++++ b/util-linux/volume_id/btrfs.c
+@@ -78,7 +78,7 @@ struct btrfs_super_block {
+ 	// ...
+ } PACKED;
+ 
+-int volume_id_probe_btrfs(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_btrfs(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t) (64 * 1024))
+ 	struct btrfs_super_block *sb;
+diff --git a/util-linux/volume_id/cramfs.c b/util-linux/volume_id/cramfs.c
+index 37b9911..b84a6f0 100644
+--- a/util-linux/volume_id/cramfs.c
++++ b/util-linux/volume_id/cramfs.c
+@@ -35,7 +35,7 @@ struct cramfs_super {
+ 	uint8_t		name[16];
+ } PACKED;
+ 
+-int volume_id_probe_cramfs(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_cramfs(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct cramfs_super *cs;
+diff --git a/util-linux/volume_id/ext.c b/util-linux/volume_id/ext.c
+index e409773..80c217f 100644
+--- a/util-linux/volume_id/ext.c
++++ b/util-linux/volume_id/ext.c
+@@ -43,7 +43,7 @@ struct ext2_super_block {
+ #define EXT3_FEATURE_INCOMPAT_JOURNAL_DEV	0x00000008
+ #define EXT_SUPERBLOCK_OFFSET			0x400
+ 
+-int volume_id_probe_ext(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_ext(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct ext2_super_block *es;
+diff --git a/util-linux/volume_id/fat.c b/util-linux/volume_id/fat.c
+index 8cf429e..6173ba9 100644
+--- a/util-linux/volume_id/fat.c
++++ b/util-linux/volume_id/fat.c
+@@ -119,7 +119,7 @@ static uint8_t *get_attr_volume_id(struct vfat_dir_entry *dir, int count)
+ 	return NULL;
+ }
+ 
+-int volume_id_probe_vfat(struct volume_id *id /*,uint64_t fat_partition_off*/)
++int FAST_FUNC volume_id_probe_vfat(struct volume_id *id /*,uint64_t fat_partition_off*/)
+ {
+ #define fat_partition_off ((uint64_t)0)
+ 	struct vfat_super_block *vs;
+diff --git a/util-linux/volume_id/hfs.c b/util-linux/volume_id/hfs.c
+index 71a5e8b..cf75851 100644
+--- a/util-linux/volume_id/hfs.c
++++ b/util-linux/volume_id/hfs.c
+@@ -131,7 +131,7 @@ struct hfsplus_vol_header {
+ #define HFS_NODE_LEAF			0xff
+ #define HFSPLUS_POR_CNID		1
+ 
+-int volume_id_probe_hfs_hfsplus(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_hfs_hfsplus(struct volume_id *id /*,uint64_t off*/)
+ {
+ 	uint64_t off = 0;
+ 	unsigned blocksize;
+diff --git a/util-linux/volume_id/iso9660.c b/util-linux/volume_id/iso9660.c
+index 76fa546..1519de4 100644
+--- a/util-linux/volume_id/iso9660.c
++++ b/util-linux/volume_id/iso9660.c
+@@ -47,7 +47,7 @@ struct high_sierra_volume_descriptor {
+ 	uint8_t		version;
+ } PACKED;
+ 
+-int volume_id_probe_iso9660(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_iso9660(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	uint8_t *buf;
+diff --git a/util-linux/volume_id/jfs.c b/util-linux/volume_id/jfs.c
+index eb6008f..eb7a448 100644
+--- a/util-linux/volume_id/jfs.c
++++ b/util-linux/volume_id/jfs.c
+@@ -35,7 +35,7 @@ struct jfs_super_block {
+ 
+ #define JFS_SUPERBLOCK_OFFSET			0x8000
+ 
+-int volume_id_probe_jfs(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_jfs(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct jfs_super_block *js;
+diff --git a/util-linux/volume_id/linux_raid.c b/util-linux/volume_id/linux_raid.c
+index b691f20..d1bf0c3 100644
+--- a/util-linux/volume_id/linux_raid.c
++++ b/util-linux/volume_id/linux_raid.c
+@@ -42,7 +42,7 @@ struct mdp_super_block {
+ #define MD_RESERVED_BYTES		0x10000
+ #define MD_MAGIC			0xa92b4efc
+ 
+-int volume_id_probe_linux_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size)
++int FAST_FUNC volume_id_probe_linux_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size)
+ {
+ #define off ((uint64_t)0)
+ 	uint64_t sboff;
+diff --git a/util-linux/volume_id/linux_swap.c b/util-linux/volume_id/linux_swap.c
+index 7ae4516..1b5488f 100644
+--- a/util-linux/volume_id/linux_swap.c
++++ b/util-linux/volume_id/linux_swap.c
+@@ -31,7 +31,7 @@ struct swap_header_v1_2 {
+ 
+ #define LARGEST_PAGESIZE			0x4000
+ 
+-int volume_id_probe_linux_swap(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_linux_swap(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct swap_header_v1_2 *sw;
+diff --git a/util-linux/volume_id/luks.c b/util-linux/volume_id/luks.c
+index ebc7d16..8ab09e3 100644
+--- a/util-linux/volume_id/luks.c
++++ b/util-linux/volume_id/luks.c
+@@ -80,7 +80,7 @@ struct BUG_bad_size_luks_phdr {
+ 		1 : -1];
+ };
+ 
+-int volume_id_probe_luks(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_luks(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct luks_phdr *header;
+diff --git a/util-linux/volume_id/ntfs.c b/util-linux/volume_id/ntfs.c
+index 3b3e973..17b1fe8 100644
+--- a/util-linux/volume_id/ntfs.c
++++ b/util-linux/volume_id/ntfs.c
+@@ -84,7 +84,7 @@ struct volume_info {
+ #define MFT_RECORD_ATTR_OBJECT_ID		0x40
+ #define MFT_RECORD_ATTR_END			0xffffffffu
+ 
+-int volume_id_probe_ntfs(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_ntfs(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	unsigned sector_size;
+diff --git a/util-linux/volume_id/ocfs2.c b/util-linux/volume_id/ocfs2.c
+index 14573ca..e6c4559 100644
+--- a/util-linux/volume_id/ocfs2.c
++++ b/util-linux/volume_id/ocfs2.c
+@@ -80,7 +80,7 @@ struct ocfs2_super_block {
+ 	uint8_t		s_uuid[OCFS2_VOL_UUID_LEN];	/* 128-bit uuid */
+ } PACKED;
+ 
+-int volume_id_probe_ocfs2(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_ocfs2(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct ocfs2_super_block *os;
+diff --git a/util-linux/volume_id/reiserfs.c b/util-linux/volume_id/reiserfs.c
+index 1298f86..3120b29 100644
+--- a/util-linux/volume_id/reiserfs.c
++++ b/util-linux/volume_id/reiserfs.c
+@@ -48,7 +48,7 @@ struct reiser4_super_block {
+ #define REISERFS1_SUPERBLOCK_OFFSET		0x2000
+ #define REISERFS_SUPERBLOCK_OFFSET		0x10000
+ 
+-int volume_id_probe_reiserfs(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_reiserfs(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct reiserfs_super_block *rs;
+diff --git a/util-linux/volume_id/romfs.c b/util-linux/volume_id/romfs.c
+index f5005cd..228e77a 100644
+--- a/util-linux/volume_id/romfs.c
++++ b/util-linux/volume_id/romfs.c
+@@ -27,7 +27,7 @@ struct romfs_super {
+ 	uint8_t name[];
+ } PACKED;
+ 
+-int volume_id_probe_romfs(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_romfs(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct romfs_super *rfs;
+diff --git a/util-linux/volume_id/sysv.c b/util-linux/volume_id/sysv.c
+index 0e65072..e0fa20a 100644
+--- a/util-linux/volume_id/sysv.c
++++ b/util-linux/volume_id/sysv.c
+@@ -82,7 +82,7 @@ struct xenix_super {
+ #define XENIX_MAGIC				0x2b5544
+ #define SYSV_MAX_BLOCKSIZE			0x800
+ 
+-int volume_id_probe_sysv(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_sysv(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct sysv_super *vs;
+diff --git a/util-linux/volume_id/udf.c b/util-linux/volume_id/udf.c
+index a6e719a..dd25731 100644
+--- a/util-linux/volume_id/udf.c
++++ b/util-linux/volume_id/udf.c
+@@ -55,7 +55,7 @@ struct volume_structure_descriptor {
+ 
+ #define UDF_VSD_OFFSET			0x8000
+ 
+-int volume_id_probe_udf(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_udf(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct volume_descriptor *vd;
+diff --git a/util-linux/volume_id/unused_highpoint.c b/util-linux/volume_id/unused_highpoint.c
+index 6fd58b7..17b7b32 100644
+--- a/util-linux/volume_id/unused_highpoint.c
++++ b/util-linux/volume_id/unused_highpoint.c
+@@ -37,7 +37,7 @@ struct hpt45x_meta {
+ #define HPT45X_MAGIC_BAD		0x5a7816fd
+ 
+ 
+-int volume_id_probe_highpoint_37x_raid(struct volume_id *id, uint64_t off)
++int FAST_FUNC volume_id_probe_highpoint_37x_raid(struct volume_id *id, uint64_t off)
+ {
+ 	struct hpt37x_meta *hpt;
+ 	uint32_t magic;
+@@ -58,7 +58,7 @@ int volume_id_probe_highpoint_37x_raid(struct volume_id *id, uint64_t off)
+ 	return 0;
+ }
+ 
+-int volume_id_probe_highpoint_45x_raid(struct volume_id *id, uint64_t off, uint64_t size)
++int FAST_FUNC volume_id_probe_highpoint_45x_raid(struct volume_id *id, uint64_t off, uint64_t size)
+ {
+ 	struct hpt45x_meta *hpt;
+ 	uint64_t meta_off;
+diff --git a/util-linux/volume_id/unused_hpfs.c b/util-linux/volume_id/unused_hpfs.c
+index 8c7897a..4429524 100644
+--- a/util-linux/volume_id/unused_hpfs.c
++++ b/util-linux/volume_id/unused_hpfs.c
+@@ -27,7 +27,7 @@ struct hpfs_super {
+ 
+ #define HPFS_SUPERBLOCK_OFFSET			0x2000
+ 
+-int volume_id_probe_hpfs(struct volume_id *id, uint64_t off)
++int FAST_FUNC volume_id_probe_hpfs(struct volume_id *id, uint64_t off)
+ {
+ 	struct hpfs_super *hs;
+ 
+diff --git a/util-linux/volume_id/unused_isw_raid.c b/util-linux/volume_id/unused_isw_raid.c
+index b31a124..7ab47b3 100644
+--- a/util-linux/volume_id/unused_isw_raid.c
++++ b/util-linux/volume_id/unused_isw_raid.c
+@@ -31,7 +31,7 @@ struct isw_meta {
+ #define ISW_SIGNATURE		"Intel Raid ISM Cfg Sig. "
+ 
+ 
+-int volume_id_probe_intel_software_raid(struct volume_id *id, uint64_t off, uint64_t size)
++int FAST_FUNC volume_id_probe_intel_software_raid(struct volume_id *id, uint64_t off, uint64_t size)
+ {
+ 	uint64_t meta_off;
+ 	struct isw_meta *isw;
+diff --git a/util-linux/volume_id/unused_lsi_raid.c b/util-linux/volume_id/unused_lsi_raid.c
+index 6899900..e6cc8ed 100644
+--- a/util-linux/volume_id/unused_lsi_raid.c
++++ b/util-linux/volume_id/unused_lsi_raid.c
+@@ -26,7 +26,7 @@ struct lsi_meta {
+ 
+ #define LSI_SIGNATURE		"$XIDE$"
+ 
+-int volume_id_probe_lsi_mega_raid(struct volume_id *id, uint64_t off, uint64_t size)
++int FAST_FUNC volume_id_probe_lsi_mega_raid(struct volume_id *id, uint64_t off, uint64_t size)
+ {
+ 	uint64_t meta_off;
+ 	struct lsi_meta *lsi;
+diff --git a/util-linux/volume_id/unused_lvm.c b/util-linux/volume_id/unused_lvm.c
+index c327068..2206498 100644
+--- a/util-linux/volume_id/unused_lvm.c
++++ b/util-linux/volume_id/unused_lvm.c
+@@ -34,7 +34,7 @@ struct lvm2_super_block {
+ 
+ #define LVM1_SB_OFF			0x400
+ 
+-int volume_id_probe_lvm1(struct volume_id *id, uint64_t off)
++int FAST_FUNC volume_id_probe_lvm1(struct volume_id *id, uint64_t off)
+ {
+ 	struct lvm1_super_block *lvm;
+ 
+@@ -56,7 +56,7 @@ int volume_id_probe_lvm1(struct volume_id *id, uint64_t off)
+ #define LVM2_LABEL_ID			"LABELONE"
+ #define LVM2LABEL_SCAN_SECTORS		4
+ 
+-int volume_id_probe_lvm2(struct volume_id *id, uint64_t off)
++int FAST_FUNC volume_id_probe_lvm2(struct volume_id *id, uint64_t off)
+ {
+ 	const uint8_t *buf;
+ 	unsigned soff;
+diff --git a/util-linux/volume_id/unused_mac.c b/util-linux/volume_id/unused_mac.c
+index c4732ee..e8deb97 100644
+--- a/util-linux/volume_id/unused_mac.c
++++ b/util-linux/volume_id/unused_mac.c
+@@ -36,7 +36,7 @@ struct mac_partition {
+ 	uint8_t		type[32];
+ } PACKED;
+ 
+-int volume_id_probe_mac_partition_map(struct volume_id *id, uint64_t off)
++int FAST_FUNC volume_id_probe_mac_partition_map(struct volume_id *id, uint64_t off)
+ {
+ 	const uint8_t *buf;
+ 	struct mac_driver_desc *driver;
+diff --git a/util-linux/volume_id/unused_minix.c b/util-linux/volume_id/unused_minix.c
+index 4f4f8a7..a3e1077 100644
+--- a/util-linux/volume_id/unused_minix.c
++++ b/util-linux/volume_id/unused_minix.c
+@@ -35,7 +35,7 @@ struct minix_super_block {
+ 
+ #define MINIX_SUPERBLOCK_OFFSET			0x400
+ 
+-int volume_id_probe_minix(struct volume_id *id, uint64_t off)
++int FAST_FUNC volume_id_probe_minix(struct volume_id *id, uint64_t off)
+ {
+ 	struct minix_super_block *ms;
+ 
+diff --git a/util-linux/volume_id/unused_msdos.c b/util-linux/volume_id/unused_msdos.c
+index 465f22d..ccec72c 100644
+--- a/util-linux/volume_id/unused_msdos.c
++++ b/util-linux/volume_id/unused_msdos.c
+@@ -47,7 +47,7 @@ struct msdos_partition_entry {
+ #define is_raid(type) \
+ 	(type == LINUX_RAID_PARTITION)
+ 
+-int volume_id_probe_msdos_part_table(struct volume_id *id, uint64_t off)
++int FAST_FUNC volume_id_probe_msdos_part_table(struct volume_id *id, uint64_t off)
+ {
+ 	const uint8_t *buf;
+ 	int i;
+diff --git a/util-linux/volume_id/unused_nvidia_raid.c b/util-linux/volume_id/unused_nvidia_raid.c
+index b65cec4..9e84729 100644
+--- a/util-linux/volume_id/unused_nvidia_raid.c
++++ b/util-linux/volume_id/unused_nvidia_raid.c
+@@ -29,7 +29,7 @@ struct nvidia_meta {
+ 
+ #define NVIDIA_SIGNATURE		"NVIDIA"
+ 
+-int volume_id_probe_nvidia_raid(struct volume_id *id, uint64_t off, uint64_t size)
++int FAST_FUNC volume_id_probe_nvidia_raid(struct volume_id *id, uint64_t off, uint64_t size)
+ {
+ 	uint64_t meta_off;
+ 	struct nvidia_meta *nv;
+diff --git a/util-linux/volume_id/unused_promise_raid.c b/util-linux/volume_id/unused_promise_raid.c
+index 4a15dda..0b0d006 100644
+--- a/util-linux/volume_id/unused_promise_raid.c
++++ b/util-linux/volume_id/unused_promise_raid.c
+@@ -27,7 +27,7 @@ struct promise_meta {
+ #define PDC_CONFIG_OFF		0x1200
+ #define PDC_SIGNATURE		"Promise Technology, Inc."
+ 
+-int volume_id_probe_promise_fasttrack_raid(struct volume_id *id, uint64_t off, uint64_t size)
++int FAST_FUNC volume_id_probe_promise_fasttrack_raid(struct volume_id *id, uint64_t off, uint64_t size)
+ {
+ 	static const unsigned short sectors[] = {
+ 		63, 255, 256, 16, 399
+diff --git a/util-linux/volume_id/unused_silicon_raid.c b/util-linux/volume_id/unused_silicon_raid.c
+index 6ce4037..d1c439e 100644
+--- a/util-linux/volume_id/unused_silicon_raid.c
++++ b/util-linux/volume_id/unused_silicon_raid.c
+@@ -41,7 +41,7 @@ struct silicon_meta {
+ 
+ #define SILICON_MAGIC		0x2F000000
+ 
+-int volume_id_probe_silicon_medley_raid(struct volume_id *id, uint64_t off, uint64_t size)
++int FAST_FUNC volume_id_probe_silicon_medley_raid(struct volume_id *id, uint64_t off, uint64_t size)
+ {
+ 	uint64_t meta_off;
+ 	struct silicon_meta *sil;
+diff --git a/util-linux/volume_id/unused_ufs.c b/util-linux/volume_id/unused_ufs.c
+index e05e933..9f925d9 100644
+--- a/util-linux/volume_id/unused_ufs.c
++++ b/util-linux/volume_id/unused_ufs.c
+@@ -162,7 +162,7 @@ struct ufs_super_block {
+ #define UFS_MAGIC_FEA			0x00195612
+ #define UFS_MAGIC_LFN			0x00095014
+ 
+-int volume_id_probe_ufs(struct volume_id *id, uint64_t off)
++int FAST_FUNC volume_id_probe_ufs(struct volume_id *id, uint64_t off)
+ {
+ 	static const short offsets[] = { 0, 8, 64, 256 };
+ 
+diff --git a/util-linux/volume_id/unused_via_raid.c b/util-linux/volume_id/unused_via_raid.c
+index 21ed315..a11eec1 100644
+--- a/util-linux/volume_id/unused_via_raid.c
++++ b/util-linux/volume_id/unused_via_raid.c
+@@ -36,7 +36,7 @@ struct via_meta {
+ 
+ #define VIA_SIGNATURE		0xAA55
+ 
+-int volume_id_probe_via_raid(struct volume_id *id, uint64_t off, uint64_t size)
++int FAST_FUNC volume_id_probe_via_raid(struct volume_id *id, uint64_t off, uint64_t size)
+ {
+ 	uint64_t meta_off;
+ 	struct via_meta *via;
+diff --git a/util-linux/volume_id/volume_id.c b/util-linux/volume_id/volume_id.c
+index 590f51d..4826c2e 100644
+--- a/util-linux/volume_id/volume_id.c
++++ b/util-linux/volume_id/volume_id.c
+@@ -45,8 +45,8 @@
+ #define ENABLE_FEATURE_VOLUMEID_UFS           0
+ 
+ 
+-typedef int (*raid_probe_fptr)(struct volume_id *id, /*uint64_t off,*/ uint64_t size);
+-typedef int (*probe_fptr)(struct volume_id *id /*, uint64_t off*/);
++typedef int FAST_FUNC (*raid_probe_fptr)(struct volume_id *id, /*uint64_t off,*/ uint64_t size);
++typedef int FAST_FUNC (*probe_fptr)(struct volume_id *id /*, uint64_t off*/);
+ 
+ static const raid_probe_fptr raid1[] = {
+ #if ENABLE_FEATURE_VOLUMEID_LINUXRAID
+@@ -153,7 +153,7 @@ static const probe_fptr fs2[] = {
+ #endif
+ };
+ 
+-int volume_id_probe_all(struct volume_id *id, /*uint64_t off,*/ uint64_t size)
++int FAST_FUNC volume_id_probe_all(struct volume_id *id, /*uint64_t off,*/ uint64_t size)
+ {
+ 	unsigned i;
+ 
+@@ -199,7 +199,7 @@ int volume_id_probe_all(struct volume_id *id, /*uint64_t off,*/ uint64_t size)
+ }
+ 
+ /* open volume by device node */
+-struct volume_id *volume_id_open_node(int fd)
++struct volume_id* FAST_FUNC volume_id_open_node(int fd)
+ {
+ 	struct volume_id *id;
+ 
+@@ -212,7 +212,7 @@ struct volume_id *volume_id_open_node(int fd)
+ 
+ #ifdef UNUSED
+ /* open volume by major/minor */
+-struct volume_id *volume_id_open_dev_t(dev_t devt)
++struct volume_id* FAST_FUNC volume_id_open_dev_t(dev_t devt)
+ {
+ 	struct volume_id *id;
+ 	char *tmp_node[VOLUME_ID_PATH_MAX];
+@@ -232,7 +232,7 @@ struct volume_id *volume_id_open_dev_t(dev_t devt)
+ }
+ #endif
+ 
+-void free_volume_id(struct volume_id *id)
++void FAST_FUNC free_volume_id(struct volume_id *id)
+ {
+ 	if (id == NULL)
+ 		return;
+diff --git a/util-linux/volume_id/volume_id_internal.h b/util-linux/volume_id/volume_id_internal.h
+index 65575b7..9b808ff 100644
+--- a/util-linux/volume_id/volume_id_internal.h
++++ b/util-linux/volume_id/volume_id_internal.h
+@@ -83,9 +83,9 @@ struct volume_id {
+ //	const char	*type;
+ };
+ 
+-struct volume_id *volume_id_open_node(int fd);
+-int volume_id_probe_all(struct volume_id *id, /*uint64_t off,*/ uint64_t size);
+-void free_volume_id(struct volume_id *id);
++struct volume_id* FAST_FUNC volume_id_open_node(int fd);
++int FAST_FUNC volume_id_probe_all(struct volume_id *id, /*uint64_t off,*/ uint64_t size);
++void FAST_FUNC free_volume_id(struct volume_id *id);
+ 
+ /* util.h */
+ 
+@@ -162,68 +162,68 @@ void volume_id_free_buffer(struct volume_id *id);
+ 
+ /* RAID */
+ 
+-//int volume_id_probe_highpoint_37x_raid(struct volume_id *id /*,uint64_t off*/);
+-//int volume_id_probe_highpoint_45x_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
++//int FAST_FUNC volume_id_probe_highpoint_37x_raid(struct volume_id *id /*,uint64_t off*/);
++//int FAST_FUNC volume_id_probe_highpoint_45x_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
+ 
+-//int volume_id_probe_intel_software_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
++//int FAST_FUNC volume_id_probe_intel_software_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
+ 
+-int volume_id_probe_linux_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
++int FAST_FUNC volume_id_probe_linux_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
+ 
+-//int volume_id_probe_lsi_mega_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
++//int FAST_FUNC volume_id_probe_lsi_mega_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
+ 
+-//int volume_id_probe_nvidia_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
++//int FAST_FUNC volume_id_probe_nvidia_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
+ 
+-//int volume_id_probe_promise_fasttrack_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
++//int FAST_FUNC volume_id_probe_promise_fasttrack_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
+ 
+-//int volume_id_probe_silicon_medley_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
++//int FAST_FUNC volume_id_probe_silicon_medley_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
+ 
+-//int volume_id_probe_via_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
++//int FAST_FUNC volume_id_probe_via_raid(struct volume_id *id /*,uint64_t off*/, uint64_t size);
+ 
+-//int volume_id_probe_lvm1(struct volume_id *id /*,uint64_t off*/);
+-//int volume_id_probe_lvm2(struct volume_id *id /*,uint64_t off*/);
++//int FAST_FUNC volume_id_probe_lvm1(struct volume_id *id /*,uint64_t off*/);
++//int FAST_FUNC volume_id_probe_lvm2(struct volume_id *id /*,uint64_t off*/);
+ 
+ /* FS */
+ 
+-int volume_id_probe_btrfs(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_btrfs(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_cramfs(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_cramfs(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_ext(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_ext(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_vfat(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_vfat(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_hfs_hfsplus(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_hfs_hfsplus(struct volume_id *id /*,uint64_t off*/);
+ 
+-//int volume_id_probe_hpfs(struct volume_id *id /*,uint64_t off*/);
++//int FAST_FUNC volume_id_probe_hpfs(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_iso9660(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_iso9660(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_jfs(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_jfs(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_linux_swap(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_linux_swap(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_luks(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_luks(struct volume_id *id /*,uint64_t off*/);
+ 
+-//int volume_id_probe_mac_partition_map(struct volume_id *id /*,uint64_t off*/);
++//int FAST_FUNC volume_id_probe_mac_partition_map(struct volume_id *id /*,uint64_t off*/);
+ 
+-//int volume_id_probe_minix(struct volume_id *id /*,uint64_t off*/);
++//int FAST_FUNC volume_id_probe_minix(struct volume_id *id /*,uint64_t off*/);
+ 
+-//int volume_id_probe_msdos_part_table(struct volume_id *id /*,uint64_t off*/);
++//int FAST_FUNC volume_id_probe_msdos_part_table(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_ntfs(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_ntfs(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_ocfs2(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_ocfs2(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_reiserfs(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_reiserfs(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_romfs(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_romfs(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_sysv(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_sysv(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_udf(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_udf(struct volume_id *id /*,uint64_t off*/);
+ 
+-//int volume_id_probe_ufs(struct volume_id *id /*,uint64_t off*/);
++//int FAST_FUNC volume_id_probe_ufs(struct volume_id *id /*,uint64_t off*/);
+ 
+-int volume_id_probe_xfs(struct volume_id *id /*,uint64_t off*/);
++int FAST_FUNC volume_id_probe_xfs(struct volume_id *id /*,uint64_t off*/);
+ 
+ POP_SAVED_FUNCTION_VISIBILITY
+diff --git a/util-linux/volume_id/xfs.c b/util-linux/volume_id/xfs.c
+index 389074c..1017d07 100644
+--- a/util-linux/volume_id/xfs.c
++++ b/util-linux/volume_id/xfs.c
+@@ -35,7 +35,7 @@ struct xfs_super_block {
+ 	uint64_t	fdblocks;
+ } PACKED;
+ 
+-int volume_id_probe_xfs(struct volume_id *id /*,uint64_t off*/)
++int FAST_FUNC volume_id_probe_xfs(struct volume_id *id /*,uint64_t off*/)
+ {
+ #define off ((uint64_t)0)
+ 	struct xfs_super_block *xs;

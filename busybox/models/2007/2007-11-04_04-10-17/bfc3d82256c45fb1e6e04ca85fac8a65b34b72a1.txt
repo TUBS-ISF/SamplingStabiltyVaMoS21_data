@@ -1,0 +1,429 @@
+2007-11-04 04:10:17 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 71f439f..77c678c 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -846,10 +846,13 @@ extern int correct_password(const struct passwd *pw);
+ /* Returns a ptr to static storage */
+ extern char *pw_encrypt(const char *clear, const char *salt);
+ extern int obscure(const char *old, const char *newval, const struct passwd *pwdp);
+-extern int index_in_str_array(const char *const string_array[], const char *key);
+-extern int index_in_strings(const char *strings, const char *key);
+-extern int index_in_substr_array(const char *const string_array[], const char *key);
+-extern int index_in_substrings(const char *strings, const char *key);
++
++int index_in_str_array(const char *const string_array[], const char *key);
++int index_in_strings(const char *strings, const char *key);
++int index_in_substr_array(const char *const string_array[], const char *key);
++int index_in_substrings(const char *strings, const char *key);
++const char *nth_string(const char *strings, int n);
++
+ extern void print_login_issue(const char *issue_file, const char *tty);
+ extern void print_login_prompt(void);
+ 
+diff --git a/libbb/compare_string_array.c b/libbb/compare_string_array.c
+index 731d3d8..7b5ce85 100644
+--- a/libbb/compare_string_array.c
++++ b/libbb/compare_string_array.c
+@@ -67,3 +67,12 @@ int index_in_substrings(const char *strings, const char *key)
+ 	}
+ 	return -1;
+ }
++
++const char *nth_string(const char *strings, int n)
++{
++        while (n) {
++                n--;
++                strings += strlen(strings) + 1;
++        }
++        return strings;
++}
+diff --git a/miscutils/adjtimex.c b/miscutils/adjtimex.c
+index 67dd0a9..07f0834 100644
+--- a/miscutils/adjtimex.c
++++ b/miscutils/adjtimex.c
+@@ -14,34 +14,46 @@
+ #include "libbb.h"
+ #include <sys/timex.h>
+ 
+-static const struct {
+-	int bit;
+-	const char *name;
+-} statlist[] = {
+-	{ STA_PLL,       "PLL"       },
+-	{ STA_PPSFREQ,   "PPSFREQ"   },
+-	{ STA_PPSTIME,   "PPSTIME"   },
+-	{ STA_FLL,       "FFL"       },
+-	{ STA_INS,       "INS"       },
+-	{ STA_DEL,       "DEL"       },
+-	{ STA_UNSYNC,    "UNSYNC"    },
+-	{ STA_FREQHOLD,  "FREQHOLD"  },
+-	{ STA_PPSSIGNAL, "PPSSIGNAL" },
+-	{ STA_PPSJITTER, "PPSJITTER" },
+-	{ STA_PPSWANDER, "PPSWANDER" },
+-	{ STA_PPSERROR,  "PPSERROR"  },
+-	{ STA_CLOCKERR,  "CLOCKERR"  },
+-	{ 0, NULL }
++static const uint16_t statlist_bit[] = {
++	STA_PLL,
++	STA_PPSFREQ,
++	STA_PPSTIME,
++	STA_FLL,
++	STA_INS,
++	STA_DEL,
++	STA_UNSYNC,
++	STA_FREQHOLD,
++	STA_PPSSIGNAL,
++	STA_PPSJITTER,
++	STA_PPSWANDER,
++	STA_PPSERROR,
++	STA_CLOCKERR,
++	0
+ };
++static const char statlist_name[] =
++	"PLL"       "\0"
++	"PPSFREQ"   "\0"
++	"PPSTIME"   "\0"
++	"FFL"       "\0"
++	"INS"       "\0"
++	"DEL"       "\0"
++	"UNSYNC"    "\0"
++	"FREQHOLD"  "\0"
++	"PPSSIGNAL" "\0"
++	"PPSJITTER" "\0"
++	"PPSWANDER" "\0"
++	"PPSERROR"  "\0"
++	"CLOCKERR"
++;
+ 
+-static const char *const ret_code_descript[] = {
+-	"clock synchronized",
+-	"insert leap second",
+-	"delete leap second",
+-	"leap second in progress",
+-	"leap second has occurred",
++static const char ret_code_descript[] =
++	"clock synchronized" "\0"
++	"insert leap second" "\0"
++	"delete leap second" "\0"
++	"leap second in progress" "\0"
++	"leap second has occurred" "\0"
+ 	"clock not synchronized"
+-};
++;
+ 
+ int adjtimex_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int adjtimex_main(int argc, char **argv)
+@@ -52,7 +64,7 @@ int adjtimex_main(int argc, char **argv)
+ 	unsigned opt;
+ 	char *opt_o, *opt_f, *opt_p, *opt_t;
+ 	struct timex txc;
+-	int i, ret, sep;
++	int i, ret;
+ 	const char *descript;
+ 	txc.modes=0;
+ 
+@@ -81,33 +93,42 @@ int adjtimex_main(int argc, char **argv)
+ 
+ 	ret = adjtimex(&txc);
+ 
+-	if (ret < 0) perror("adjtimex");
++	if (ret < 0) {
++		bb_perror_nomsg_and_die();
++	}
++
++	if (!(opt & OPT_quiet)) {
++		int sep;
++		const char *name;
+ 
+-	if (!(opt & OPT_quiet) && ret>=0) {
+ 		printf(
+ 			"    mode:         %d\n"
+ 			"-o  offset:       %ld\n"
+ 			"-f  frequency:    %ld\n"
+ 			"    maxerror:     %ld\n"
+ 			"    esterror:     %ld\n"
+-			"    status:       %d ( ",
++			"    status:       %d (",
+ 		txc.modes, txc.offset, txc.freq, txc.maxerror,
+ 		txc.esterror, txc.status);
+ 
+ 		/* representative output of next code fragment:
+ 		   "PLL | PPSTIME" */
+-		sep=0;
+-		for (i=0; statlist[i].name; i++) {
+-			if (txc.status & statlist[i].bit) {
+-				if (sep) fputs(" | ",stdout);
+-				fputs(statlist[i].name,stdout);
+-				sep=1;
++		name = statlist_name;
++		sep = 0;
++		for (i = 0; statlist_bit[i]; i++) {
++			if (txc.status & statlist_bit[i]) {
++				if (sep)
++					fputs(" | ", stdout);
++				fputs(name, stdout);
++				sep = 1;
+ 			}
++			name += strlen(name) + 1;
+ 		}
+ 
+ 		descript = "error";
+-		if (ret >= 0 && ret <= 5) descript = ret_code_descript[ret];
+-		printf(" )\n"
++		if (ret <= 5)
++			descript = nth_string(ret_code_descript, ret);
++		printf(")\n"
+ 			"-p  timeconstant: %ld\n"
+ 			"    precision:    %ld\n"
+ 			"    tolerance:    %ld\n"
+@@ -119,5 +140,6 @@ int adjtimex_main(int argc, char **argv)
+ 		txc.precision, txc.tolerance, txc.tick,
+ 		(long)txc.time.tv_sec, (long)txc.time.tv_usec, ret, descript);
+ 	}
+-	return (ret<0);
++
++	return 0;
+ }
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index c8129d7..93b1aac 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -491,15 +491,6 @@ static uint8_t mode_loop(uint16_t mode_sup, uint16_t mode_sel, int cc, uint8_t *
+ 	return err_dma;
+ }
+ 
+-static const char *nth_str(const char *strings, int n)
+-{
+-	while (n) {
+-		n--;
+-		strings += strlen(strings) + 1;
+-	}
+-	return strings;
+-}
+-
+ static const char pkt_str[] ALIGN1 =
+ 	"Direct-access device" "\0"             /* word 0, bits 12-8 = 00 */
+ 	"Sequential-access device" "\0"         /* word 0, bits 12-8 = 01 */
+@@ -710,7 +701,7 @@ static void identify(uint16_t *val)
+ 	} else if (!(val[GEN_CONFIG] & NOT_ATAPI)) {
+ 		dev = ATAPI_DEV;
+ 		eqpt = (val[GEN_CONFIG] & EQPT_TYPE) >> SHIFT_EQPT;
+-		printf("ATAPI %s, with ", eqpt <= 0xf ? nth_str(pkt_str, eqpt) : "unknown");
++		printf("ATAPI %s, with ", eqpt <= 0xf ? nth_string(pkt_str, eqpt) : "unknown");
+ 		like_std = 3;
+ 	} else
+ 		/* "Unknown device type:\n\tbits 15&14 of general configuration word 0 both set to 1.\n" */
+@@ -748,7 +739,7 @@ static void identify(uint16_t *val)
+ 		if (val[MINOR] && (val[MINOR] <= MINOR_MAX)) {
+ 			if (like_std < 3) like_std = 3;
+ 			std = actual_ver[val[MINOR]];
+-			if (std) printf("\n\tUsed: %s ", nth_str(minor_str, val[MINOR]));
++			if (std) printf("\n\tUsed: %s ", nth_string(minor_str, val[MINOR]));
+ 
+ 		}
+ 		/* looks like when they up-issue the std, they obsolete one;
+@@ -847,7 +838,7 @@ static void identify(uint16_t *val)
+ 		jj = val[GEN_CONFIG] >> 1;
+ 		for (ii = 1; ii < 15; ii++) {
+ 			if (jj & 0x0001)
+-				printf("\t%s\n", nth_str(ata1_cfg_str, ii));
++				printf("\t%s\n", nth_string(ata1_cfg_str, ii));
+ 			jj >>=1;
+ 		}
+ 	}
+@@ -1070,7 +1061,7 @@ static void identify(uint16_t *val)
+ 		jj = val[CMDS_SUPP_0];
+ 		kk = val[CMDS_EN_0];
+ 		for (ii = 0; ii < NUM_CMD_FEAT_STR; ii++) {
+-			const char *feat_str = nth_str(cmd_feat_str, ii);
++			const char *feat_str = nth_string(cmd_feat_str, ii);
+ 			if ((jj & 0x8000) && (*feat_str != '\0')) {
+ 				printf("\t%s\t%s\n", (kk & 0x8000) ? "   *" : "", feat_str);
+ 			}
+@@ -1088,7 +1079,7 @@ static void identify(uint16_t *val)
+ 	}
+ 	/* Removable Media Status Notification feature set */
+ 	if ((val[RM_STAT] & RM_STAT_BITS) == RM_STAT_SUP)
+-		printf("\t%s supported\n", nth_str(cmd_feat_str, 27));
++		printf("\t%s supported\n", nth_string(cmd_feat_str, 27));
+ 
+ 	/* security */
+ 	if ((eqpt != CDROM) && (like_std > 3)
+@@ -1100,7 +1091,7 @@ static void identify(uint16_t *val)
+ 		jj = val[SECU_STATUS];
+ 		if (jj) {
+ 			for (ii = 0; ii < NUM_SECU_STR; ii++) {
+-				printf("\t%s\t%s\n", (!(jj & 0x0001)) ? "not" : "", nth_str(secu_str, ii));
++				printf("\t%s\t%s\n", (!(jj & 0x0001)) ? "not" : "", nth_string(secu_str, ii));
+ 				jj >>=1;
+ 			}
+ 			if (val[SECU_STATUS] & SECU_ENABLED) {
+@@ -1182,13 +1173,13 @@ static void dump_identity(const struct hd_driveid *id)
+ 				id->model, id->fw_rev, id->serial_no);
+ 	for (i = 0; i <= 15; i++) {
+ 		if (id->config & (1<<i))
+-			printf(" %s", nth_str(cfg_str, i));
++			printf(" %s", nth_string(cfg_str, i));
+ 	}
+ 	printf(" }\n RawCHS=%u/%u/%u, TrkSize=%u, SectSize=%u, ECCbytes=%u\n"
+ 			" BuffType=(%u) %s, BuffSize=%ukB, MaxMultSect=%u",
+ 				id->cyls, id->heads, id->sectors, id->track_bytes,
+ 				id->sector_bytes, id->ecc_bytes,
+-				id->buf_type, nth_str(BuffType, (id->buf_type > 3) ? 0 : id->buf_type),
++				id->buf_type, nth_string(BuffType, (id->buf_type > 3) ? 0 : id->buf_type),
+ 				id->buf_size/2, id->max_multsect);
+ 	if (id->max_multsect) {
+ 		printf(", MultSect=");
+@@ -1294,7 +1285,7 @@ static void dump_identity(const struct hd_driveid *id)
+ 	if ((id->minor_rev_num && id->minor_rev_num <= 31)
+ 	 || (id->major_rev_num && id->minor_rev_num <= 31)
+ 	) {
+-		printf("\n Drive conforms to: %s: ", (id->minor_rev_num <= 31) ? nth_str(minor_str, id->minor_rev_num) : "unknown");
++		printf("\n Drive conforms to: %s: ", (id->minor_rev_num <= 31) ? nth_string(minor_str, id->minor_rev_num) : "unknown");
+ 		if (id->major_rev_num != 0x0000 &&  /* NOVAL_0 */
+ 		    id->major_rev_num != 0xFFFF) {  /* NOVAL_1 */
+ 			for (i = 0; i <= 15; i++) {
+diff --git a/networking/ifconfig.c b/networking/ifconfig.c
+index 3dcb118..fff5f5d 100644
+--- a/networking/ifconfig.c
++++ b/networking/ifconfig.c
+@@ -164,7 +164,7 @@ struct in6_ifreq {
+ 
+ struct arg1opt {
+ 	const char *name;
+-	int selector;
++	unsigned short selector;
+ 	unsigned short ifr_offset;
+ };
+ 
+@@ -183,70 +183,70 @@ struct options {
+ #define ifreq_offsetof(x)  offsetof(struct ifreq, x)
+ 
+ static const struct arg1opt Arg1Opt[] = {
+-	{"SIOCSIFMETRIC",  SIOCSIFMETRIC,  ifreq_offsetof(ifr_metric)},
+-	{"SIOCSIFMTU",     SIOCSIFMTU,     ifreq_offsetof(ifr_mtu)},
+-	{"SIOCSIFTXQLEN",  SIOCSIFTXQLEN,  ifreq_offsetof(ifr_qlen)},
+-	{"SIOCSIFDSTADDR", SIOCSIFDSTADDR, ifreq_offsetof(ifr_dstaddr)},
+-	{"SIOCSIFNETMASK", SIOCSIFNETMASK, ifreq_offsetof(ifr_netmask)},
+-	{"SIOCSIFBRDADDR", SIOCSIFBRDADDR, ifreq_offsetof(ifr_broadaddr)},
++	{ "SIFMETRIC",  SIOCSIFMETRIC,  ifreq_offsetof(ifr_metric) },
++	{ "SIFMTU",     SIOCSIFMTU,     ifreq_offsetof(ifr_mtu) },
++	{ "SIFTXQLEN",  SIOCSIFTXQLEN,  ifreq_offsetof(ifr_qlen) },
++	{ "SIFDSTADDR", SIOCSIFDSTADDR, ifreq_offsetof(ifr_dstaddr) },
++	{ "SIFNETMASK", SIOCSIFNETMASK, ifreq_offsetof(ifr_netmask) },
++	{ "SIFBRDADDR", SIOCSIFBRDADDR, ifreq_offsetof(ifr_broadaddr) },
+ #if ENABLE_FEATURE_IFCONFIG_HW
+-	{"SIOCSIFHWADDR",  SIOCSIFHWADDR,  ifreq_offsetof(ifr_hwaddr)},
++	{ "SIFHWADDR",  SIOCSIFHWADDR,  ifreq_offsetof(ifr_hwaddr) },
+ #endif
+-	{"SIOCSIFDSTADDR", SIOCSIFDSTADDR, ifreq_offsetof(ifr_dstaddr)},
++	{ "SIFDSTADDR", SIOCSIFDSTADDR, ifreq_offsetof(ifr_dstaddr) },
+ #ifdef SIOCSKEEPALIVE
+-	{"SIOCSKEEPALIVE", SIOCSKEEPALIVE, ifreq_offsetof(ifr_data)},
++	{ "SKEEPALIVE", SIOCSKEEPALIVE, ifreq_offsetof(ifr_data) },
+ #endif
+ #ifdef SIOCSOUTFILL
+-	{"SIOCSOUTFILL",   SIOCSOUTFILL,   ifreq_offsetof(ifr_data)},
++	{ "SOUTFILL",   SIOCSOUTFILL,   ifreq_offsetof(ifr_data) },
+ #endif
+ #if ENABLE_FEATURE_IFCONFIG_MEMSTART_IOADDR_IRQ
+-	{"SIOCSIFMAP",     SIOCSIFMAP,     ifreq_offsetof(ifr_map.mem_start)},
+-	{"SIOCSIFMAP",     SIOCSIFMAP,     ifreq_offsetof(ifr_map.base_addr)},
+-	{"SIOCSIFMAP",     SIOCSIFMAP,     ifreq_offsetof(ifr_map.irq)},
++	{ "SIFMAP",     SIOCSIFMAP,     ifreq_offsetof(ifr_map.mem_start) },
++	{ "SIFMAP",     SIOCSIFMAP,     ifreq_offsetof(ifr_map.base_addr) },
++	{ "SIFMAP",     SIOCSIFMAP,     ifreq_offsetof(ifr_map.irq) },
+ #endif
+ 	/* Last entry if for unmatched (possibly hostname) arg. */
+ #if ENABLE_FEATURE_IPV6
+-	{"SIOCSIFADDR",    SIOCSIFADDR,    ifreq_offsetof(ifr_addr)}, /* IPv6 version ignores the offset */
+-	{"SIOCDIFADDR",    SIOCDIFADDR,    ifreq_offsetof(ifr_addr)}, /* IPv6 version ignores the offset */
++	{ "SIFADDR",    SIOCSIFADDR,    ifreq_offsetof(ifr_addr) }, /* IPv6 version ignores the offset */
++	{ "DIFADDR",    SIOCDIFADDR,    ifreq_offsetof(ifr_addr) }, /* IPv6 version ignores the offset */
+ #endif
+-	{"SIOCSIFADDR",    SIOCSIFADDR,    ifreq_offsetof(ifr_addr)},
++	{ "SIFADDR",    SIOCSIFADDR,    ifreq_offsetof(ifr_addr) },
+ };
+ 
+ static const struct options OptArray[] = {
+-	{"metric",      N_ARG,         ARG_METRIC,      0},
+-	{"mtu",         N_ARG,         ARG_MTU,         0},
+-	{"txqueuelen",  N_ARG,         ARG_TXQUEUELEN,  0},
+-	{"dstaddr",     N_ARG,         ARG_DSTADDR,     0},
+-	{"netmask",     N_ARG,         ARG_NETMASK,     0},
+-	{"broadcast",   N_ARG | M_CLR, ARG_BROADCAST,   IFF_BROADCAST},
++	{ "metric",      N_ARG,         ARG_METRIC,      0 },
++	{ "mtu",         N_ARG,         ARG_MTU,         0 },
++	{ "txqueuelen",  N_ARG,         ARG_TXQUEUELEN,  0 },
++	{ "dstaddr",     N_ARG,         ARG_DSTADDR,     0 },
++	{ "netmask",     N_ARG,         ARG_NETMASK,     0 },
++	{ "broadcast",   N_ARG | M_CLR, ARG_BROADCAST,   IFF_BROADCAST },
+ #if ENABLE_FEATURE_IFCONFIG_HW
+-	{"hw",          N_ARG, ARG_HW,                  0},
++	{ "hw",          N_ARG, ARG_HW,                  0 },
+ #endif
+-	{"pointopoint", N_ARG | M_CLR, ARG_POINTOPOINT, IFF_POINTOPOINT},
++	{ "pointopoint", N_ARG | M_CLR, ARG_POINTOPOINT, IFF_POINTOPOINT },
+ #ifdef SIOCSKEEPALIVE
+-	{"keepalive",   N_ARG,         ARG_KEEPALIVE,   0},
++	{ "keepalive",   N_ARG,         ARG_KEEPALIVE,   0 },
+ #endif
+ #ifdef SIOCSOUTFILL
+-	{"outfill",     N_ARG,         ARG_OUTFILL,     0},
++	{ "outfill",     N_ARG,         ARG_OUTFILL,     0 },
+ #endif
+ #if ENABLE_FEATURE_IFCONFIG_MEMSTART_IOADDR_IRQ
+-	{"mem_start",   N_ARG,         ARG_MEM_START,   0},
+-	{"io_addr",     N_ARG,         ARG_IO_ADDR,     0},
+-	{"irq",         N_ARG,         ARG_IRQ,         0},
++	{ "mem_start",   N_ARG,         ARG_MEM_START,   0 },
++	{ "io_addr",     N_ARG,         ARG_IO_ADDR,     0 },
++	{ "irq",         N_ARG,         ARG_IRQ,         0 },
+ #endif
+ #if ENABLE_FEATURE_IPV6
+-	{"add",         N_ARG,         ARG_ADD_DEL,     0},
+-	{"del",         N_ARG,         ARG_ADD_DEL,     0},
+-#endif
+-	{"arp",         N_CLR | M_SET, 0,               IFF_NOARP},
+-	{"trailers",    N_CLR | M_SET, 0,               IFF_NOTRAILERS},
+-	{"promisc",     N_SET | M_CLR, 0,               IFF_PROMISC},
+-	{"multicast",   N_SET | M_CLR, 0,               IFF_MULTICAST},
+-	{"allmulti",    N_SET | M_CLR, 0,               IFF_ALLMULTI},
+-	{"dynamic",     N_SET | M_CLR, 0,               IFF_DYNAMIC},
+-	{"up",          N_SET,         0,               (IFF_UP | IFF_RUNNING)},
+-	{"down",        N_CLR,         0,               IFF_UP},
+-	{NULL,          0,             ARG_HOSTNAME,    (IFF_UP | IFF_RUNNING)}
++	{ "add",         N_ARG,         ARG_ADD_DEL,     0 },
++	{ "del",         N_ARG,         ARG_ADD_DEL,     0 },
++#endif
++	{ "arp",         N_CLR | M_SET, 0,               IFF_NOARP },
++	{ "trailers",    N_CLR | M_SET, 0,               IFF_NOTRAILERS },
++	{ "promisc",     N_SET | M_CLR, 0,               IFF_PROMISC },
++	{ "multicast",   N_SET | M_CLR, 0,               IFF_MULTICAST },
++	{ "allmulti",    N_SET | M_CLR, 0,               IFF_ALLMULTI },
++	{ "dynamic",     N_SET | M_CLR, 0,               IFF_DYNAMIC },
++	{ "up",          N_SET,         0,               (IFF_UP | IFF_RUNNING) },
++	{ "down",        N_CLR,         0,               IFF_UP },
++	{ NULL,          0,             ARG_HOSTNAME,    (IFF_UP | IFF_RUNNING) }
+ };
+ 
+ /*
+@@ -405,7 +405,7 @@ int ifconfig_main(int argc, char **argv)
+ 								xioctl(sockfd6, SIOGIFINDEX, &ifr);
+ 								ifr6.ifr6_ifindex = ifr.ifr_ifindex;
+ 								ifr6.ifr6_prefixlen = prefix_len;
+-								ioctl_or_perror_and_die(sockfd6, a1op->selector, &ifr6, "%s", a1op->name);
++								ioctl_or_perror_and_die(sockfd6, a1op->selector, &ifr6, "SIOC%s", a1op->name);
+ 								if (ENABLE_FEATURE_CLEAN_UP)
+ 									free(lsa);
+ 								continue;
+@@ -457,7 +457,7 @@ int ifconfig_main(int argc, char **argv)
+ 						*((int *) p) = i;
+ 				}
+ 
+-				ioctl_or_perror_and_die(sockfd, a1op->selector, &ifr, "%s", a1op->name);
++				ioctl_or_perror_and_die(sockfd, a1op->selector, &ifr, "SIOC%s", a1op->name);
+ #ifdef QUESTIONABLE_ALIAS_CASE
+ 				if (mask & A_COLON_CHK) {
+ 					/*

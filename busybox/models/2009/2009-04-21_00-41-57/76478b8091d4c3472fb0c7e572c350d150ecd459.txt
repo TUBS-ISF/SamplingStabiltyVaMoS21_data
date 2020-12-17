@@ -1,0 +1,15 @@
+2009-04-21 00:41:57 +0000
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index 6e1398d..e17fb9e 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -63,7 +63,8 @@ struct dhcpOfferedAddr* FAST_FUNC add_lease(
+ 	if (oldest) {
+ 		oldest->hostname[0] = '\0';
+ 		if (hostname) {
+-        		hostname_length = hostname[-1]; /* look at option size byte */
++			/* option size byte, + 1 for NUL */
++        		hostname_length = hostname[-1] + 1;
+ 			if (hostname_length > sizeof(oldest->hostname))
+ 				hostname_length = sizeof(oldest->hostname);
+             		hostname = (uint8_t*) safe_strncpy((char*)oldest->hostname, (char*)hostname, hostname_length);

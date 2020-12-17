@@ -1,0 +1,24 @@
+2008-12-29 01:03:17 +0000
+diff --git a/procps/sysctl.c b/procps/sysctl.c
+index 23fb16e..262574e 100644
+--- a/procps/sysctl.c
++++ b/procps/sysctl.c
+@@ -97,7 +97,8 @@ static int sysctl_handle_preload_file(const char *filename)
+ static int sysctl_act_on_setting(char *setting)
+ {
+ 	int fd, retval = EXIT_SUCCESS;
+-	char *cptr, *outname, *value;
++	char *cptr, *outname;
++	char *value = value; /* for compiler */
+ 
+ 	outname = xstrdup(setting);
+ 
+@@ -235,7 +236,7 @@ static void sysctl_dots_to_slashes(char *name)
+ 	 */
+ 	end = name + strlen(name);
+ 	last_good = name - 1;
+-	*end = '.'; /* trick the loop in trying full name too */
++	*end = '.'; /* trick the loop into trying full name too */
+ 
+  again:
+ 	cptr = end;

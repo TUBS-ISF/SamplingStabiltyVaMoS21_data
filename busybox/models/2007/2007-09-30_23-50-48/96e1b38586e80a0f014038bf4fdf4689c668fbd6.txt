@@ -1,0 +1,334 @@
+2007-09-30 23:50:48 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index e3f9c49..a8463ae 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -248,6 +248,7 @@ extern char *bb_get_last_path_component_nostrip(const char *path);
+ 
+ int ndelay_on(int fd);
+ int ndelay_off(int fd);
++int close_on_exec_on(int fd);
+ void xdup2(int, int);
+ void xmove_fd(int, int);
+ 
+diff --git a/init/init.c b/init/init.c
+index 543ec2e..5e84011 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -179,7 +179,7 @@ static void message(int device, const char *fmt, ...)
+ 				bb_error_msg("can't log to %s", log_console);
+ 				device = L_CONSOLE;
+ 			} else {
+-				fcntl(log_fd, F_SETFD, FD_CLOEXEC);
++				close_on_exec_on(log_fd);
+ 			}
+ 		}
+ 	}
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index eb1633b..2bf20f3 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -164,6 +164,11 @@ int ndelay_on(int fd)
+ 	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL) | O_NONBLOCK);
+ }
+ 
++int close_on_exec_on(int fd)
++{
++        return fcntl(fd, F_SETFD, FD_CLOEXEC);
++}
++
+ int ndelay_off(int fd)
+ {
+ 	return fcntl(fd, F_SETFL, fcntl(fd,F_GETFL) & ~O_NONBLOCK);
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index bfa5c17..734d4a7 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -371,10 +371,7 @@ int devfsd_main(int argc, char **argv)
+ 	xchdir(mount_point);
+ 
+ 	fd = xopen(".devfsd", O_RDONLY);
+-
+-	if (fcntl(fd, F_SETFD, FD_CLOEXEC) != 0)
+-		bb_perror_msg_and_die("FD_CLOEXEC");
+-
++	close_on_exec_on(fd);
+ 	xioctl(fd, DEVFSDIOC_GET_PROTO_REV, &proto_rev);
+ 
+ 	/*setup initial entries */
+diff --git a/networking/nc.c b/networking/nc.c
+index e7bd519..19750e5 100644
+--- a/networking/nc.c
++++ b/networking/nc.c
+@@ -113,7 +113,7 @@ int nc_main(int argc, char **argv)
+ 				lport = get_nport(&lsa->sa);
+ 				fdprintf(2, "%d\n", ntohs(lport));
+ 			}
+-			fcntl(sfd, F_SETFD, FD_CLOEXEC);
++			close_on_exec_on(sfd);
+  accept_again:
+ 			cfd = accept(sfd, NULL, 0);
+ 			if (cfd < 0)
+diff --git a/networking/udhcp/signalpipe.c b/networking/udhcp/signalpipe.c
+index 9c7ead9..fafd208 100644
+--- a/networking/udhcp/signalpipe.c
++++ b/networking/udhcp/signalpipe.c
+@@ -39,9 +39,9 @@ void udhcp_sp_setup(void)
+ {
+ 	/* was socketpair, but it needs AF_UNIX in kernel */
+ 	xpipe(signal_pipe);
+-	fcntl(signal_pipe[0], F_SETFD, FD_CLOEXEC);
+-	fcntl(signal_pipe[1], F_SETFD, FD_CLOEXEC);
+-	fcntl(signal_pipe[1], F_SETFL, O_NONBLOCK);
++	close_on_exec_on(signal_pipe[0]);
++	close_on_exec_on(signal_pipe[1]);
++	ndelay_on(signal_pipe[1]);
+ 	signal(SIGUSR1, signal_handler);
+ 	signal(SIGUSR2, signal_handler);
+ 	signal(SIGTERM, signal_handler);
+@@ -56,7 +56,7 @@ int udhcp_sp_fd_set(fd_set *rfds, int extra_fd)
+ 	FD_ZERO(rfds);
+ 	FD_SET(signal_pipe[0], rfds);
+ 	if (extra_fd >= 0) {
+-		fcntl(extra_fd, F_SETFD, FD_CLOEXEC);
++		close_on_exec_on(extra_fd);
+ 		FD_SET(extra_fd, rfds);
+ 	}
+ 	return signal_pipe[0] > extra_fd ? signal_pipe[0] : extra_fd;
+diff --git a/runit/runit_lib.c b/runit/runit_lib.c
+index 4b7950c..2ed9054 100644
+--- a/runit/runit_lib.c
++++ b/runit/runit_lib.c
+@@ -50,11 +50,6 @@ unsigned byte_chr(char *s,unsigned n,int c)
+ 	return t - s;
+ }
+ 
+-int coe(int fd)
+-{
+-	return fcntl(fd, F_SETFD, FD_CLOEXEC);
+-}
+-
+ #ifdef UNUSED
+ static /* as it isn't used anywhere else */
+ void tai_pack(char *s, const struct tai *t)
+diff --git a/runit/runit_lib.h b/runit/runit_lib.h
+index c644f5b..4b94820 100644
+--- a/runit/runit_lib.h
++++ b/runit/runit_lib.h
+@@ -27,8 +27,6 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ extern unsigned byte_chr(char *s,unsigned n,int c);
+ 
+-extern int coe(int);
+-
+ #define direntry struct dirent
+ 
+ //struct tai {
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 1ee3dda..7cf142d 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -454,8 +454,8 @@ int runsv_main(int argc, char **argv)
+ 	dir = argv[1];
+ 
+ 	xpipe(selfpipe);
+-	coe(selfpipe[0]);
+-	coe(selfpipe[1]);
++	close_on_exec_on(selfpipe[0]);
++	close_on_exec_on(selfpipe[1]);
+ 	ndelay_on(selfpipe[0]);
+ 	ndelay_on(selfpipe[1]);
+ 
+@@ -491,8 +491,8 @@ int runsv_main(int argc, char **argv)
+ 			if (stat("log/down", &s) != -1)
+ 				svd[1].want = W_DOWN;
+ 			xpipe(logpipe);
+-			coe(logpipe[0]);
+-			coe(logpipe[1]);
++			close_on_exec_on(logpipe[0]);
++			close_on_exec_on(logpipe[1]);
+ 		}
+ 	}
+ 
+@@ -512,7 +512,7 @@ int runsv_main(int argc, char **argv)
+ 			O_WRONLY|O_NDELAY|O_APPEND|O_CREAT, 0600);
+ 	if (lock_exnb(svd[0].fdlock) == -1)
+ 		fatal_cannot("lock supervise/lock");
+-	coe(svd[0].fdlock);
++	close_on_exec_on(svd[0].fdlock);
+ 	if (haslog) {
+ 		if (mkdir("log/supervise", 0700) == -1) {
+ 			r = readlink("log/supervise", buf, 256);
+@@ -536,30 +536,30 @@ int runsv_main(int argc, char **argv)
+ 				O_WRONLY|O_NDELAY|O_APPEND|O_CREAT, 0600);
+ 		if (lock_ex(svd[1].fdlock) == -1)
+ 			fatal_cannot("lock log/supervise/lock");
+-		coe(svd[1].fdlock);
++		close_on_exec_on(svd[1].fdlock);
+ 	}
+ 
+ 	mkfifo("log/supervise/control"+4, 0600);
+ 	svd[0].fdcontrol = xopen("log/supervise/control"+4, O_RDONLY|O_NDELAY);
+-	coe(svd[0].fdcontrol);
++	close_on_exec_on(svd[0].fdcontrol);
+ 	svd[0].fdcontrolwrite = xopen("log/supervise/control"+4, O_WRONLY|O_NDELAY);
+-	coe(svd[0].fdcontrolwrite);
++	close_on_exec_on(svd[0].fdcontrolwrite);
+ 	update_status(&svd[0]);
+ 	if (haslog) {
+ 		mkfifo("log/supervise/control", 0600);
+ 		svd[1].fdcontrol = xopen("log/supervise/control", O_RDONLY|O_NDELAY);
+-		coe(svd[1].fdcontrol);
++		close_on_exec_on(svd[1].fdcontrol);
+ 		svd[1].fdcontrolwrite = xopen("log/supervise/control", O_WRONLY|O_NDELAY);
+-		coe(svd[1].fdcontrolwrite);
++		close_on_exec_on(svd[1].fdcontrolwrite);
+ 		update_status(&svd[1]);
+ 	}
+ 	mkfifo("log/supervise/ok"+4, 0600);
+ 	fd = xopen("log/supervise/ok"+4, O_RDONLY|O_NDELAY);
+-	coe(fd);
++	close_on_exec_on(fd);
+ 	if (haslog) {
+ 		mkfifo("log/supervise/ok", 0600);
+ 		fd = xopen("log/supervise/ok", O_RDONLY|O_NDELAY);
+-		coe(fd);
++		close_on_exec_on(fd);
+ 	}
+ 	for (;;) {
+ 		struct pollfd x[3];
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 8d25923..924f771 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -190,8 +190,8 @@ static int setup_log(void)
+ 		warnx("cannot create pipe for log");
+ 		return -1;
+ 	}
+-	coe(logpipe[1]);
+-	coe(logpipe[0]);
++	close_on_exec_on(logpipe[1]);
++	close_on_exec_on(logpipe[0]);
+ 	ndelay_on(logpipe[0]);
+ 	ndelay_on(logpipe[1]);
+ 	if (dup2(logpipe[1], 2) == -1) {
+@@ -245,7 +245,7 @@ int runsvdir_main(int argc, char **argv)
+ 	curdir = open_read(".");
+ 	if (curdir == -1)
+ 		fatal2_cannot("open current directory", "");
+-	coe(curdir);
++	close_on_exec_on(curdir);
+ 
+ 	stampcheck = monotonic_sec();
+ 
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index b5eed15..cdf4e42 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -361,7 +361,7 @@ static unsigned rotate(struct logdir *ld)
+ 		/* we presume this cannot fail */
+ 		ld->filecur = fdopen(ld->fdcur, "a"); ////
+ 		setvbuf(ld->filecur, NULL, _IOFBF, linelen); ////
+-		coe(ld->fdcur);
++		close_on_exec_on(ld->fdcur);
+ 		ld->size = 0;
+ 		while (fchmod(ld->fdcur, 0644) == -1)
+ 			pause2cannot("set mode of current", ld->name);
+@@ -482,7 +482,7 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 		warn2("cannot open log directory", (char*)fn);
+ 		return 0;
+ 	}
+-	coe(ld->fddir);
++	close_on_exec_on(ld->fddir);
+ 	if (fchdir(ld->fddir) == -1) {
+ 		logdir_close(ld);
+ 		warn2("cannot change directory", (char*)fn);
+@@ -498,7 +498,7 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 			pause1cannot("change to initial working directory");
+ 		return 0;
+ 	}
+-	coe(ld->fdlock);
++	close_on_exec_on(ld->fdlock);
+ 
+ 	ld->size = 0;
+ 	ld->sizemax = 1000000;
+@@ -624,7 +624,7 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 	ld->filecur = fdopen(ld->fdcur, "a"); ////
+ 	setvbuf(ld->filecur, NULL, _IOFBF, linelen); ////
+ 
+-	coe(ld->fdcur);
++	close_on_exec_on(ld->fdcur);
+ 	while (fchmod(ld->fdcur, 0644) == -1)
+ 		pause2cannot("set mode of current", ld->name);
+ 
+@@ -851,7 +851,7 @@ int svlogd_main(int argc, char **argv)
+ 	if (dirn <= 0) usage();
+ 	////if (buflen <= linemax) usage();
+ 	fdwdir = xopen(".", O_RDONLY|O_NDELAY);
+-	coe(fdwdir);
++	close_on_exec_on(fdwdir);
+ 	dir = xzalloc(dirn * sizeof(struct logdir));
+ 	for (i = 0; i < dirn; ++i) {
+ 		dir[i].fddir = -1;
+diff --git a/shell/ash.c b/shell/ash.c
+index 183911c..9d8b83c 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -3469,7 +3469,7 @@ setjobctl(int on)
+ 		close(ofd);
+ 		if (fd < 0)
+ 			goto out;
+-		fcntl(fd, F_SETFD, FD_CLOEXEC);
++		close_on_exec_on(fd);
+ 		do { /* while we are in the background */
+ 			pgrp = tcgetpgrp(fd);
+ 			if (pgrp < 0) {
+@@ -8830,7 +8830,7 @@ closescript(void)
+ static void
+ setinputfd(int fd, int push)
+ {
+-	fcntl(fd, F_SETFD, FD_CLOEXEC);
++	close_on_exec_on(fd);
+ 	if (push) {
+ 		pushfile();
+ 		parsefile->buf = 0;
+diff --git a/shell/hush.c b/shell/hush.c
+index 5f9f2c5..9c70556 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -760,9 +760,11 @@ static int builtin_eval(char **argv)
+ static int builtin_cd(char **argv)
+ {
+ 	const char *newdir;
+-	if (argv[1] == NULL)
++	if (argv[1] == NULL) {
++		// bash does nothing (exitcode 0) if HOME is ""; if it's unset,
++		// bash says "bash: cd: HOME not set" and does nothing (exitcode 1)
+ 		newdir = getenv("HOME") ? : "/";
+-	else
++	} else
+ 		newdir = argv[1];
+ 	if (chdir(newdir)) {
+ 		printf("cd: %s: %s\n", newdir, strerror(errno));
+@@ -3629,7 +3631,7 @@ static void setup_job_control(void)
+ 
+ 	saved_task_pgrp = shell_pgrp = getpgrp();
+ 	debug_printf_jobs("saved_task_pgrp=%d\n", saved_task_pgrp);
+-	fcntl(interactive_fd, F_SETFD, FD_CLOEXEC);
++	close_on_exec_on(interactive_fd);
+ 
+ 	/* If we were ran as 'hush &',
+ 	 * sleep until we are in the foreground.  */
+diff --git a/shell/lash.c b/shell/lash.c
+index 5ba490f..af3a8f8 100644
+--- a/shell/lash.c
++++ b/shell/lash.c
+@@ -576,7 +576,7 @@ static int setup_redirects(struct child_prog *prog, int squirrel[])
+ 		if (openfd != redir->fd) {
+ 			if (squirrel && redir->fd < 3) {
+ 				squirrel[redir->fd] = dup(redir->fd);
+-				fcntl(squirrel[redir->fd], F_SETFD, FD_CLOEXEC);
++				close_on_exec_on(squirrel[redir->fd]);
+ 			}
+ 			dup2(openfd, redir->fd);
+ 			close(openfd);

@@ -1,0 +1,1110 @@
+2008-05-15 21:30:45 +0000
+diff --git a/archival/libunarchive/archive_xread_all_eof.c b/archival/libunarchive/archive_xread_all_eof.c
+index 7e082ab..c93dfa2 100644
+--- a/archival/libunarchive/archive_xread_all_eof.c
++++ b/archival/libunarchive/archive_xread_all_eof.c
+@@ -12,7 +12,7 @@ ssize_t archive_xread_all_eof(archive_handle_t *archive_handle,
+ 	ssize_t size;
+ 
+ 	size = full_read(archive_handle->src_fd, buf, count);
+-	if (size != 0 && size != count) {
++	if (size != 0 && size != (ssize_t)count) {
+ 		bb_error_msg_and_die("short read: %u of %u",
+ 				(unsigned)size, (unsigned)count);
+ 	}
+diff --git a/archival/libunarchive/decompress_bunzip2.c b/archival/libunarchive/decompress_bunzip2.c
+index c1b1273..f74fdf1 100644
+--- a/archival/libunarchive/decompress_bunzip2.c
++++ b/archival/libunarchive/decompress_bunzip2.c
+@@ -103,7 +103,7 @@ static unsigned get_bits(bunzip_data *bd, int bits_wanted)
+ 	/* If we need to get more data from the byte buffer, do so.  (Loop getting
+ 	   one byte at a time to enforce endianness and avoid unaligned access.) */
+ 
+-	while (bd->inbufBitCount < bits_wanted) {
++	while ((int)(bd->inbufBitCount) < bits_wanted) {
+ 
+ 		/* If we need to read more data from file into byte buffer, do so */
+ 
+@@ -172,7 +172,7 @@ static int get_next_block(bunzip_data *bd)
+ 
+ 	if (get_bits(bd, 1)) return RETVAL_OBSOLETE_INPUT;
+ 	origPtr = get_bits(bd, 24);
+-	if (origPtr > dbufSize) return RETVAL_DATA_ERROR;
++	if ((int)origPtr > dbufSize) return RETVAL_DATA_ERROR;
+ 
+ 	/* mapping table: if some byte values are never used (encoding things
+ 	   like ascii text), the compression code removes the gaps to have fewer
+@@ -368,7 +368,7 @@ static int get_next_block(bunzip_data *bd)
+ 		   j = get_bits(bd, hufGroup->maxLen);
+ 		 */
+ 
+-		while (bd->inbufBitCount < hufGroup->maxLen) {
++		while ((int)(bd->inbufBitCount) < hufGroup->maxLen) {
+ 			if (bd->inbufPos == bd->inbufCount) {
+ 				j = get_bits(bd, hufGroup->maxLen);
+ 				goto got_huff_bits;
+@@ -505,7 +505,7 @@ static int get_next_block(bunzip_data *bd)
+ 	   it doesn't qualify as a run (hence writeRunCountdown=5). */
+ 
+ 	if (dbufCount) {
+-		if (origPtr >= dbufCount) return RETVAL_DATA_ERROR;
++		if ((int)origPtr >= dbufCount) return RETVAL_DATA_ERROR;
+ 		bd->writePos = dbuf[origPtr];
+ 	    bd->writeCurrent = (unsigned char)(bd->writePos & 0xff);
+ 		bd->writePos >>= 8;
+diff --git a/archival/libunarchive/decompress_unlzma.c b/archival/libunarchive/decompress_unlzma.c
+index 5fb7eae..c320400 100644
+--- a/archival/libunarchive/decompress_unlzma.c
++++ b/archival/libunarchive/decompress_unlzma.c
+@@ -329,7 +329,7 @@ unpack_lzma_stream(int src_fd, int dst_fd)
+ 			if (buffer_pos == header.dict_size) {
+ 				buffer_pos = 0;
+ 				global_pos += header.dict_size;
+-				if (full_write(dst_fd, buffer, header.dict_size) != header.dict_size)
++				if (full_write(dst_fd, buffer, header.dict_size) != (ssize_t)header.dict_size)
+ 					goto bad;
+ 				USE_DESKTOP(total_written += header.dict_size;)
+ 			}
+@@ -480,7 +480,7 @@ unpack_lzma_stream(int src_fd, int dst_fd)
+ 				if (buffer_pos == header.dict_size) {
+ 					buffer_pos = 0;
+ 					global_pos += header.dict_size;
+-					if (full_write(dst_fd, buffer, header.dict_size) != header.dict_size)
++					if (full_write(dst_fd, buffer, header.dict_size) != (ssize_t)header.dict_size)
+ 						goto bad;
+ 					USE_DESKTOP(total_written += header.dict_size;)
+ 				}
+@@ -489,7 +489,7 @@ unpack_lzma_stream(int src_fd, int dst_fd)
+ 		}
+ 	}
+ 
+-	if (full_write(dst_fd, buffer, buffer_pos) != buffer_pos) {
++	if (full_write(dst_fd, buffer, buffer_pos) != (ssize_t)buffer_pos) {
+  bad:
+ 		rc_free(rc);
+ 		return -1;
+diff --git a/archival/libunarchive/decompress_unzip.c b/archival/libunarchive/decompress_unzip.c
+index a764fbc..9036fab 100644
+--- a/archival/libunarchive/decompress_unzip.c
++++ b/archival/libunarchive/decompress_unzip.c
+@@ -922,7 +922,7 @@ static int inflate_block(STATE_PARAM smallint *e)
+ /* Two callsites, both in inflate_get_next_window */
+ static void calculate_gunzip_crc(STATE_PARAM_ONLY)
+ {
+-	int n;
++	unsigned n;
+ 	for (n = 0; n < gunzip_outbuf_count; n++) {
+ 		gunzip_crc = gunzip_crc_table[((int) gunzip_crc ^ (gunzip_window[n])) & 0xff] ^ (gunzip_crc >> 8);
+ 	}
+@@ -1003,7 +1003,7 @@ inflate_unzip_internal(STATE_PARAM int in, int out)
+ 	while (1) {
+ 		int r = inflate_get_next_window(PASS_STATE_ONLY);
+ 		nwrote = full_write(out, gunzip_window, gunzip_outbuf_count);
+-		if (nwrote != gunzip_outbuf_count) {
++		if (nwrote != (ssize_t)gunzip_outbuf_count) {
+ 			bb_perror_msg("write");
+ 			n = -1;
+ 			goto ret;
+@@ -1064,7 +1064,7 @@ static int top_up(STATE_PARAM unsigned n)
+ {
+ 	int count = bytebuffer_size - bytebuffer_offset;
+ 
+-	if (count < n) {
++	if (count < (int)n) {
+ 		memmove(bytebuffer, &bytebuffer[bytebuffer_offset], count);
+ 		bytebuffer_offset = 0;
+ 		bytebuffer_size = full_read(gunzip_src_fd, &bytebuffer[count], bytebuffer_max - count);
+diff --git a/include/libbb.h b/include/libbb.h
+index 09dcc1b..216b3ec 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1367,7 +1367,7 @@ extern const char bb_default_login_shell[];
+ #undef isdigit
+ #define isdigit(a) ((unsigned)((a) - '0') <= 9)
+ 
+-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
++#define ARRAY_SIZE(x) ((unsigned)(sizeof(x) / sizeof((x)[0])))
+ 
+ 
+ #if __GNUC_PREREQ(4,1)
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 9fe0cf9..3d5aef8 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -598,7 +598,7 @@ static void install_links(const char *busybox, int use_symbolic_links)
+ 
+ 	int (*lf)(const char *, const char *);
+ 	char *fpc;
+-	int i;
++	unsigned i;
+ 	int rc;
+ 
+ 	lf = link;
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index 62dcc55..9c802a3 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -199,7 +199,7 @@ static void cmdedit_set_out_char(int next_char)
+ 	{
+ 		bb_putchar(c);
+ 	}
+-	if (++cmdedit_x >= cmdedit_termw) {
++	if (++cmdedit_x >= (int)cmdedit_termw) {
+ 		/* terminal is scrolled down */
+ 		cmdedit_y++;
+ 		cmdedit_x = 0;
+@@ -861,7 +861,8 @@ static void input_tab(smallint *lastWasTab)
+ 			exe_n_cwd_tab_completion(matchBuf, find_type);
+ 		/* Sort, then remove any duplicates found */
+ 		if (matches) {
+-			int i, n = 0;
++			unsigned i;
++			int n = 0;
+ 			qsort_string_vector(matches, num_matches);
+ 			for (i = 0; i < num_matches - 1; ++i) {
+ 				if (matches[i] && matches[i+1]) { /* paranoia */
+diff --git a/libbb/u_signal_names.c b/libbb/u_signal_names.c
+index 7a0f75d..1dcbf5f 100644
+--- a/libbb/u_signal_names.c
++++ b/libbb/u_signal_names.c
+@@ -123,14 +123,14 @@ static const char signals[][7] = {
+ 
+ int get_signum(const char *name)
+ {
+-	int i;
++	unsigned i;
+ 
+ 	i = bb_strtou(name, NULL, 10);
+ 	if (!errno)
+ 		return i;
+ 	if (strncasecmp(name, "SIG", 3) == 0)
+ 		name += 3;
+-	for (i = 0; (size_t)i < ARRAY_SIZE(signals); i++)
++	for (i = 0; i < ARRAY_SIZE(signals); i++)
+ 		if (strcasecmp(name, signals[i]) == 0)
+ 			return i;
+ 
+@@ -170,9 +170,9 @@ const char *get_signame(int number)
+ 
+ void print_signames(void)
+ {
+-	int signo;
++	unsigned signo;
+ 
+-	for (signo = 1; (size_t)signo < ARRAY_SIZE(signals); signo++) {
++	for (signo = 1; signo < ARRAY_SIZE(signals); signo++) {
+ 		const char *name = signals[signo];
+ 		if (name[0])
+ 			puts(name);
+diff --git a/libbb/udp_io.c b/libbb/udp_io.c
+index e968ecb..689c39a 100644
+--- a/libbb/udp_io.c
++++ b/libbb/udp_io.c
+@@ -113,7 +113,7 @@ recv_from_to(int fd, void *buf, size_t len, int flags,
+ 	} u;
+ 	struct cmsghdr *cmsgptr;
+ 	struct msghdr msg;
+-	socklen_t recv_length;
++	ssize_t recv_length;
+ 
+ 	iov[0].iov_base = buf;
+ 	iov[0].iov_len = len;
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index da0dce3..5e16182 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -479,7 +479,7 @@ static char *get_logname(char *logname, unsigned size_logname,
+ 			default:
+ 				if (!isascii(ascval) || !isprint(ascval)) {
+ 					/* ignore garbage characters */
+-				} else if (bp - logname >= size_logname - 1) {
++				} else if ((int)(bp - logname) >= size_logname - 1) {
+ 					bb_error_msg_and_die("%s: input overrun", op->tty);
+ 				} else {
+ 					full_write(1, &c, 1); /* echo the character */
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 0b2d558..6db4df4 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -423,7 +423,7 @@ static char *ParseField(char *user, char *ary, int modvalue, int off,
+ 
+ static void FixDayDow(CronLine *line)
+ {
+-	size_t i;
++	unsigned i;
+ 	int weekUsed = 0;
+ 	int daysUsed = 0;
+ 
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index ec5ede6..7afa9ff 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -1486,7 +1486,8 @@ static const char xfermode_name[][5] ALIGN1 = {
+ 
+ static int translate_xfermode(const char *name)
+ {
+-	int val, i;
++	int val;
++	unsigned i;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(xfermode_val); i++) {
+ 		if (!strncmp(name, xfermode_name[i], 5))
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 065bf6f..25b91c0 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -297,7 +297,7 @@ static void read_lines(void)
+ 					new_linepos += 7;
+ 					new_linepos &= (~7);
+ 				}
+-				if (new_linepos >= w)
++				if ((int)new_linepos >= w)
+ 					break;
+ 				linepos = new_linepos;
+ 			}
+@@ -415,7 +415,7 @@ static void m_status_print(void)
+ 	printf(" lines %i-%i/%i ",
+ 			cur_fline + 1, cur_fline + max_displayed_line + 1,
+ 			max_fline + 1);
+-	if (cur_fline >= max_fline - max_displayed_line) {
++	if (cur_fline >= (int)(max_fline - max_displayed_line)) {
+ 		printf("(END)"NORMAL);
+ 		if (num_files > 1 && current_file != num_files)
+ 			printf(HIGHLIGHT" - next: %s"NORMAL, files[current_file]);
+@@ -444,7 +444,7 @@ static void status_print(void)
+ #endif
+ 
+ 	clear_line();
+-	if (cur_fline && cur_fline < max_fline - max_displayed_line) {
++	if (cur_fline && cur_fline < (int)(max_fline - max_displayed_line)) {
+ 		bb_putchar(':');
+ 		return;
+ 	}
+@@ -587,7 +587,7 @@ static void print_ascii(const char *str)
+ /* Print the buffer */
+ static void buffer_print(void)
+ {
+-	int i;
++	unsigned i;
+ 
+ 	move_cursor(0, 0);
+ 	for (i = 0; i <= max_displayed_line; i++)
+@@ -600,7 +600,7 @@ static void buffer_print(void)
+ 
+ static void buffer_fill_and_print(void)
+ {
+-	int i;
++	unsigned i;
+ 	for (i = 0; i <= max_displayed_line && cur_fline + i <= max_fline; i++) {
+ 		buffer[i] = flines[cur_fline + i];
+ 	}
+@@ -662,7 +662,7 @@ static void open_file_and_read_lines(void)
+ /* Reinitialize everything for a new file - free the memory and start over */
+ static void reinitialize(void)
+ {
+-	int i;
++	unsigned i;
+ 
+ 	if (flines) {
+ 		for (i = 0; i <= max_fline; i++)
+@@ -763,7 +763,7 @@ static int less_getch(int pos)
+ static char* less_gets(int sz)
+ {
+ 	char c;
+-	int i = 0;
++	unsigned i = 0;
+ 	char *result = xzalloc(1);
+ 
+ 	while (1) {
+@@ -836,7 +836,7 @@ static void change_file(int direction)
+ 
+ static void remove_current_file(void)
+ {
+-	int i;
++	unsigned i;
+ 
+ 	if (num_files < 2)
+ 		return;
+@@ -974,7 +974,7 @@ static void regex_process(void)
+ 	match_pos = 0;
+ 	fill_match_lines(0);
+ 	while (match_pos < num_matches) {
+-		if (match_lines[match_pos] > cur_fline)
++		if ((int)match_lines[match_pos] > cur_fline)
+ 			break;
+ 		match_pos++;
+ 	}
+@@ -990,7 +990,7 @@ static void regex_process(void)
+ 
+ static void number_process(int first_digit)
+ {
+-	int i;
++	unsigned i;
+ 	int num;
+ 	char num_input[sizeof(int)*4]; /* more than enough */
+ 	char keypress;
+@@ -1120,7 +1120,7 @@ static void save_input_to_file(void)
+ {
+ 	const char *msg = "";
+ 	char *current_line;
+-	int i;
++	unsigned i;
+ 	FILE *fp;
+ 
+ 	print_statusline("Log file: ");
+@@ -1204,7 +1204,7 @@ static char opp_bracket(char bracket)
+ 
+ static void match_right_bracket(char bracket)
+ {
+-	int i;
++	unsigned i;
+ 
+ 	if (strchr(flines[cur_fline], bracket) == NULL) {
+ 		print_statusline("No bracket in top line");
+diff --git a/miscutils/makedevs.c b/miscutils/makedevs.c
+index 43e4b8c..3b45d70 100644
+--- a/miscutils/makedevs.c
++++ b/miscutils/makedevs.c
+@@ -99,12 +99,12 @@ int makedevs_main(int argc, char **argv)
+ 
+ 	while ((line = xmalloc_fgetline(table)) != NULL) {
+ 		char type;
+-		unsigned int mode = 0755;
+-		unsigned int major = 0;
+-		unsigned int minor = 0;
+-		unsigned int count = 0;
+-		unsigned int increment = 0;
+-		unsigned int start = 0;
++		unsigned mode = 0755;
++		unsigned major = 0;
++		unsigned minor = 0;
++		unsigned count = 0;
++		unsigned increment = 0;
++		unsigned start = 0;
+ 		char name[41];
+ 		char user[41];
+ 		char group[41];
+@@ -121,7 +121,7 @@ int makedevs_main(int argc, char **argv)
+ 		{
+ 			if (*line=='\0' || *line=='#' || isspace(*line))
+ 				continue;
+-			bb_error_msg("line %d invalid: '%s'", linenum, line);
++			bb_error_msg("invalid line %d: '%s'", linenum, line);
+ 			ret = EXIT_FAILURE;
+ 			continue;
+ 		}
+@@ -140,7 +140,7 @@ int makedevs_main(int argc, char **argv)
+ 				ret = EXIT_FAILURE;
+ 				goto loop;
+ 			}
+-			if ((mode != -1) && (chmod(full_name, mode) < 0)){
++			if (chmod(full_name, mode) < 0) {
+ 				bb_perror_msg("line %d: chmod failed for %s", linenum, full_name);
+ 				ret = EXIT_FAILURE;
+ 				goto loop;
+@@ -157,7 +157,7 @@ int makedevs_main(int argc, char **argv)
+ 				ret = EXIT_FAILURE;
+ 				goto loop;
+ 			}
+-			if ((mode != -1) && (chmod(full_name, mode) < 0)){
++			if (chmod(full_name, mode) < 0) {
+ 				bb_perror_msg("line %d: chmod failed for %s", linenum, full_name);
+ 				ret = EXIT_FAILURE;
+ 				goto loop;
+@@ -180,7 +180,7 @@ int makedevs_main(int argc, char **argv)
+ 			}
+ 
+ 			if (count > 0) {
+-				int i;
++				unsigned i;
+ 				char *full_name_inc;
+ 
+ 				full_name_inc = xmalloc(strlen(full_name) + 4);
+@@ -195,7 +195,7 @@ int makedevs_main(int argc, char **argv)
+ 						bb_perror_msg("line %d: chown failed for %s", linenum, full_name_inc);
+ 						ret = EXIT_FAILURE;
+ 					}
+-					if ((mode != -1) && (chmod(full_name_inc, mode) < 0)){
++					if (chmod(full_name_inc, mode) < 0) {
+ 						bb_perror_msg("line %d: chmod failed for %s", linenum, full_name_inc);
+ 						ret = EXIT_FAILURE;
+ 					}
+@@ -211,7 +211,7 @@ int makedevs_main(int argc, char **argv)
+ 					bb_perror_msg("line %d: chown failed for %s", linenum, full_name);
+ 					ret = EXIT_FAILURE;
+ 				}
+-				if ((mode != -1) && (chmod(full_name, mode) < 0)){
++				if (chmod(full_name, mode) < 0) {
+ 					bb_perror_msg("line %d: chmod failed for %s", linenum, full_name);
+ 					ret = EXIT_FAILURE;
+ 				}
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index f6dcbe8..0a74ba0 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -2041,7 +2041,7 @@ obj_add_symbol(struct obj_file *f, const char *name,
+ 	int n_type = ELF_ST_TYPE(info);
+ 	int n_binding = ELF_ST_BIND(info);
+ 
+-	for (sym = f->symtab[hash]; sym; sym = sym->next)
++	for (sym = f->symtab[hash]; sym; sym = sym->next) {
+ 		if (f->symbol_cmp(sym->name, name) == 0) {
+ 			int o_secidx = sym->secidx;
+ 			int o_info = sym->info;
+@@ -2100,14 +2100,14 @@ obj_add_symbol(struct obj_file *f, const char *name,
+ 				return sym;
+ 			}
+ 		}
++	}
+ 
+ 	/* Completely new symbol.  */
+ 	sym = arch_new_symbol();
+ 	sym->next = f->symtab[hash];
+ 	f->symtab[hash] = sym;
+ 	sym->ksymidx = -1;
+-
+-	if (ELF_ST_BIND(info) == STB_LOCAL && symidx != -1) {
++	if (ELF_ST_BIND(info) == STB_LOCAL && symidx != (unsigned long)(-1)) {
+ 		if (symidx >= f->local_symtab_size)
+ 			bb_error_msg("local symbol %s with index %ld exceeds local_symtab_size %ld",
+ 					name, (long) symidx, (long) f->local_symtab_size);
+@@ -3313,7 +3313,7 @@ static struct obj_file *obj_load(FILE * fp, int loadprogbits ATTRIBUTE_UNUSED)
+ {
+ 	struct obj_file *f;
+ 	ElfW(Shdr) * section_headers;
+-	int shnum, i;
++	size_t shnum, i;
+ 	char *shstrtab;
+ 
+ 	/* Read the file header.  */
+@@ -3585,7 +3585,7 @@ static int obj_gpl_license(struct obj_file *f, const char **license)
+ 		while (ptr < endptr) {
+ 			value = strchr(ptr, '=');
+ 			if (value && strncmp(ptr, "license", value-ptr) == 0) {
+-				int i;
++				unsigned i;
+ 				if (license)
+ 					*license = value+1;
+ 				for (i = 0; i < ARRAY_SIZE(gpl_licenses); ++i) {
+@@ -3724,7 +3724,8 @@ add_ksymoops_symbols(struct obj_file *f, const char *filename,
+ 	struct obj_symbol *sym;
+ 	char *name, *absolute_filename;
+ 	char str[STRVERSIONLEN];
+-	int i, l, lm_name, lfilename, use_ksymtab, version;
++	unsigned i;
++	int l, lm_name, lfilename, use_ksymtab, version;
+ 	struct stat statbuf;
+ 
+ 	/* WARNING: was using realpath, but replaced by readlink to stop using
+@@ -4127,7 +4128,7 @@ int insmod_main(int argc, char **argv)
+ 	m_size = obj_load_size(f);
+ 
+ 	m_addr = create_module(m_name, m_size);
+-	if (m_addr == -1) switch (errno) {
++	if (m_addr == (ElfW(Addr))(-1)) switch (errno) {
+ 		case EEXIST:
+ 			bb_error_msg_and_die("a module named %s already exists", m_name);
+ 		case ENOMEM:
+diff --git a/networking/arping.c b/networking/arping.c
+index 9d2c671..2db2ff4 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -174,7 +174,7 @@ static bool recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 	if (ah->ar_pro != htons(ETH_P_IP)
+ 		|| (ah->ar_pln != 4)
+ 		|| (ah->ar_hln != me.sll_halen)
+-		|| (len < sizeof(*ah) + 2 * (4 + ah->ar_hln)))
++		|| (len < (int)(sizeof(*ah) + 2 * (4 + ah->ar_hln))))
+ 		return false;
+ 
+ 	memcpy(&src_ip, p + ah->ar_hln, 4);
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 6fd322c..f835d80 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -600,7 +600,7 @@ static void parse_conf(const char *path, int flag)
+ 
+ #if ENABLE_FEATURE_HTTPD_ERROR_PAGES
+ 		if (flag == FIRST_PARSE && *p0 == 'E') {
+-			int i;
++			unsigned i;
+ 			/* error status code */
+ 			int status = atoi(++p0);
+ 			/* c already points at the character following ':' in parse loop */
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index 0aa2320..983d9d0 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -604,7 +604,7 @@ static int set_if_addr(char *master_ifname, char *slave_ifname)
+ 
+ 	struct ifreq ifr;
+ 	int res;
+-	int i;
++	unsigned i;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(ifra); i++) {
+ 		strncpy_IFNAMSIZ(ifr.ifr_name, master_ifname);
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index 50b9626..c123918 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -486,7 +486,7 @@ static const struct dhcp_client_t ext_dhcp_clients[] = {
+ #if ENABLE_FEATURE_IFUPDOWN_EXTERNAL_DHCP
+ static int dhcp_up(struct interface_defn_t *ifd, execfn *exec)
+ {
+-	int i;
++	unsigned i;
+ #if ENABLE_FEATURE_IFUPDOWN_IP
+ 	/* ip doesn't up iface when it configures it (unlike ifconfig) */
+ 	if (!execute("ip link set %iface% up", ifd, exec))
+@@ -522,7 +522,7 @@ static int dhcp_up(struct interface_defn_t *ifd ATTRIBUTE_UNUSED,
+ #if ENABLE_FEATURE_IFUPDOWN_EXTERNAL_DHCP
+ static int dhcp_down(struct interface_defn_t *ifd, execfn *exec)
+ {
+-	int i;
++	unsigned i;
+ 	for (i = 0; i < ARRAY_SIZE(ext_dhcp_clients); i++) {
+ 		if (exists_execable(ext_dhcp_clients[i].name))
+ 			return execute(ext_dhcp_clients[i].stopcmd, ifd, exec);
+@@ -1154,7 +1154,7 @@ int ifupdown_main(int argc, char **argv)
+ 		char *liface;
+ 		char *pch;
+ 		bool okay = 0;
+-		unsigned cmds_ret;
++		int cmds_ret;
+ 
+ 		iface = xstrdup(target_list->data);
+ 		target_list = target_list->link;
+diff --git a/networking/inetd.c b/networking/inetd.c
+index d71a115..3be9dcb 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -750,7 +750,7 @@ static NOINLINE servtab_t *parse_one_line(void)
+ 			if (*p == '-') {
+ 				p++;
+ 				n = bb_strtou(p, &p, 10);
+-				if (n > INT_MAX || n < sep->se_rpcver_lo)
++				if (n > INT_MAX || (int)n < sep->se_rpcver_lo)
+ 					goto bad_ver_spec;
+ 				sep->se_rpcver_hi = n;
+ 			}
+@@ -812,7 +812,7 @@ static NOINLINE servtab_t *parse_one_line(void)
+ 	 && (sep->se_socktype == SOCK_STREAM
+ 	     || sep->se_socktype == SOCK_DGRAM)
+ 	) {
+-		int i;
++		unsigned i;
+ 		for (i = 0; i < ARRAY_SIZE(builtins); i++)
+ 			if (strncmp(builtins[i].bi_service7, sep->se_service, 7) == 0)
+ 				goto found_bi;
+diff --git a/networking/interface.c b/networking/interface.c
+index ee8ab10..a24ab01 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -525,7 +525,7 @@ static int if_readconf(void)
+ 		if (ioctl_or_warn(skfd, SIOCGIFCONF, &ifc) < 0) {
+ 			goto out;
+ 		}
+-		if (ifc.ifc_len == sizeof(struct ifreq) * numreqs) {
++		if (ifc.ifc_len == (int)(sizeof(struct ifreq) * numreqs)) {
+ 			/* assume it overflowed and try again */
+ 			numreqs += 10;
+ 			continue;
+@@ -862,7 +862,7 @@ const struct hwtype *get_hwntype(int type)
+ /* return 1 if address is all zeros */
+ static int hw_null_address(const struct hwtype *hw, void *ap)
+ {
+-	unsigned int i;
++	int i;
+ 	unsigned char *address = (unsigned char *) ap;
+ 
+ 	for (i = 0; i < hw->alen; i++)
+diff --git a/networking/isrv_identd.c b/networking/isrv_identd.c
+index a96ac60..3e05632 100644
+--- a/networking/isrv_identd.c
++++ b/networking/isrv_identd.c
+@@ -61,7 +61,7 @@ static int do_rd(int fd, void **paramp)
+ 	p = strpbrk(cur, "\r\n");
+ 	if (p)
+ 		*p = '\0';
+-	if (!p && sz && buf->pos <= sizeof(buf->buf))
++	if (!p && sz && buf->pos <= (int)sizeof(buf->buf))
+ 		goto ok;
+ 	/* Terminate session. If we are in server mode, then
+ 	 * fd is still in nonblocking mode - we never block here */
+diff --git a/networking/libiproute/libnetlink.c b/networking/libiproute/libnetlink.c
+index d29d035..47a055a 100644
+--- a/networking/libiproute/libnetlink.c
++++ b/networking/libiproute/libnetlink.c
+@@ -265,7 +265,7 @@ int rtnl_talk(struct rtnl_handle *rtnl, struct nlmsghdr *n,
+ 		if (msg.msg_namelen != sizeof(nladdr)) {
+ 			bb_error_msg_and_die("sender address length == %d", msg.msg_namelen);
+ 		}
+-		for (h = (struct nlmsghdr*)buf; status >= sizeof(*h); ) {
++		for (h = (struct nlmsghdr*)buf; status >= (int)sizeof(*h); ) {
+ //			int l_err;
+ 			int len = h->nlmsg_len;
+ 			int l = len - sizeof(*h);
+@@ -293,7 +293,7 @@ int rtnl_talk(struct rtnl_handle *rtnl, struct nlmsghdr *n,
+ 
+ 			if (h->nlmsg_type == NLMSG_ERROR) {
+ 				struct nlmsgerr *err = (struct nlmsgerr*)NLMSG_DATA(h);
+-				if (l < sizeof(struct nlmsgerr)) {
++				if (l < (int)sizeof(struct nlmsgerr)) {
+ 					bb_error_msg("ERROR truncated");
+ 				} else {
+ 					errno = - err->error;
+@@ -336,7 +336,7 @@ int addattr32(struct nlmsghdr *n, int maxlen, int type, uint32_t data)
+ {
+ 	int len = RTA_LENGTH(4);
+ 	struct rtattr *rta;
+-	if (NLMSG_ALIGN(n->nlmsg_len) + len > maxlen)
++	if ((int)(NLMSG_ALIGN(n->nlmsg_len) + len) > maxlen)
+ 		return -1;
+ 	rta = (struct rtattr*)(((char*)n) + NLMSG_ALIGN(n->nlmsg_len));
+ 	rta->rta_type = type;
+@@ -351,7 +351,7 @@ int addattr_l(struct nlmsghdr *n, int maxlen, int type, void *data, int alen)
+ 	int len = RTA_LENGTH(alen);
+ 	struct rtattr *rta;
+ 
+-	if (NLMSG_ALIGN(n->nlmsg_len) + len > maxlen)
++	if ((int)(NLMSG_ALIGN(n->nlmsg_len) + len) > maxlen)
+ 		return -1;
+ 	rta = (struct rtattr*)(((char*)n) + NLMSG_ALIGN(n->nlmsg_len));
+ 	rta->rta_type = type;
+diff --git a/networking/libiproute/ll_map.c b/networking/libiproute/ll_map.c
+index 3cfc9cc..031b29a 100644
+--- a/networking/libiproute/ll_map.c
++++ b/networking/libiproute/ll_map.c
+@@ -75,7 +75,7 @@ int ll_remember_index(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
+ 	if (tb[IFLA_ADDRESS]) {
+ 		int alen;
+ 		im->alen = alen = RTA_PAYLOAD(tb[IFLA_ADDRESS]);
+-		if (alen > sizeof(im->addr))
++		if (alen > (int)sizeof(im->addr))
+ 			alen = sizeof(im->addr);
+ 		memcpy(im->addr, RTA_DATA(tb[IFLA_ADDRESS]), alen);
+ 	} else {
+diff --git a/networking/libiproute/ll_proto.c b/networking/libiproute/ll_proto.c
+index 62262c9..8d96374 100644
+--- a/networking/libiproute/ll_proto.c
++++ b/networking/libiproute/ll_proto.c
+@@ -98,10 +98,8 @@ __PF(ECONET,econet)
+ 
+ const char *ll_proto_n2a(unsigned short id, char *buf, int len)
+ {
+-	int i;
+-
++	unsigned i;
+ 	id = ntohs(id);
+-
+ 	for (i = 0; i < ARRAY_SIZE(llproto_names); i++) {
+ 		 if (llproto_names[i].id == id)
+ 			return llproto_names[i].name;
+@@ -112,7 +110,7 @@ const char *ll_proto_n2a(unsigned short id, char *buf, int len)
+ 
+ int ll_proto_a2n(unsigned short *id, char *buf)
+ {
+-	int i;
++	unsigned i;
+ 	for (i = 0; i < ARRAY_SIZE(llproto_names); i++) {
+ 		 if (strcasecmp(llproto_names[i].name, buf) == 0) {
+ 			 *id = htons(llproto_names[i].id);
+diff --git a/networking/libiproute/ll_types.c b/networking/libiproute/ll_types.c
+index 60a78c7..50c9f20 100644
+--- a/networking/libiproute/ll_types.c
++++ b/networking/libiproute/ll_types.c
+@@ -187,7 +187,7 @@ const char *ll_type_n2a(int type, char *buf, int len)
+ #endif /* FEATURE_IP_RARE_PROTOCOLS */
+ 	};
+ 
+-	int i;
++	unsigned i;
+ 	const char *aname = arphrd_name;
+ 	for (i = 0; i < ARRAY_SIZE(arphrd_type); i++) {
+ 		if (arphrd_type[i] == type)
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index f37d97f..027656d 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -187,7 +187,7 @@ static int smtp_checkp(const char *fmt, const char *param, int code)
+ 	bb_error_msg_and_die("%s failed", msg);
+ }
+ 
+-static int inline smtp_check(const char *fmt, int code)
++static inline int smtp_check(const char *fmt, int code)
+ {
+ 	return smtp_checkp(fmt, NULL, code);
+ }
+@@ -224,7 +224,7 @@ static void pop3_checkr(const char *fmt, const char *param, char **ret)
+ 	bb_error_msg_and_die("%s failed", msg);
+ }
+ 
+-static void inline pop3_check(const char *fmt, const char *param)
++static inline void pop3_check(const char *fmt, const char *param)
+ {
+ 	pop3_checkr(fmt, param, NULL);
+ }
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index c0b4a3f..e9df275 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -413,7 +413,7 @@ ifaddrlist(struct IFADDRLIST **ipaddrp)
+ 	ifc.ifc_buf = (caddr_t)ibuf;
+ 
+ 	if (ioctl(fd, SIOCGIFCONF, (char *)&ifc) < 0
+-	 || ifc.ifc_len < sizeof(struct ifreq)
++	 || ifc.ifc_len < (int)sizeof(struct ifreq)
+ 	) {
+ 		if (errno == EINVAL)
+ 			bb_error_msg_and_die(
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index b13367d..58498f9 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -319,7 +319,7 @@ void read_config(const char *file)
+ {
+ 	FILE *in;
+ 	char buffer[READ_CONFIG_BUF_SIZE], *token, *line;
+-	int i, lineno;
++	unsigned i, lineno;
+ 
+ 	for (i = 0; i < KWS_WITH_DEFAULTS; i++)
+ 		keywords[i].handler(keywords[i].def, keywords[i].var);
+@@ -344,7 +344,7 @@ void read_config(const char *file)
+ 		for (i = 0; i < ARRAY_SIZE(keywords); i++) {
+ 			if (!strcasecmp(token, keywords[i].keyword)) {
+ 				if (!keywords[i].handler(line, keywords[i].var)) {
+-					bb_error_msg("can't parse line %d in %s at '%s'",
++					bb_error_msg("can't parse line %u in %s at '%s'",
+ 							lineno, file, line);
+ 					/* reset back to the default value */
+ 					keywords[i].handler(keywords[i].def, keywords[i].var);
+diff --git a/networking/zcip.c b/networking/zcip.c
+index 8db840c..fccb1a4 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -162,7 +162,7 @@ static int run(char *argv[3], struct in_addr *ip)
+ /**
+  * Return milliseconds of random delay, up to "secs" seconds.
+  */
+-static unsigned ALWAYS_INLINE random_delay_ms(unsigned secs)
++static ALWAYS_INLINE unsigned random_delay_ms(unsigned secs)
+ {
+ 	return rand() % (secs * 1000);
+ }
+diff --git a/procps/kill.c b/procps/kill.c
+index b839b38..ed659af 100644
+--- a/procps/kill.c
++++ b/procps/kill.c
+@@ -106,19 +106,19 @@ int kill_main(int argc, char **argv)
+ 	argc--;
+ 
+ do_it_now:
++	pid = getpid();
+ 
+ 	if (killall5) {
+ 		pid_t sid;
+ 		procps_status_t* p = NULL;
+ 
+-		/* Now stop all processes */
+-		kill(-1, SIGSTOP);
+ 		/* Find out our own session id */
+-		pid = getpid();
+ 		sid = getsid(pid);
++		/* Now stop all processes */
++		kill(-1, SIGSTOP);
+ 		/* Now kill all processes except our session */
+ 		while ((p = procps_scan(p, PSSCAN_PID|PSSCAN_SID))) {
+-			if (p->sid != sid && p->pid != pid && p->pid != 1)
++			if (p->sid != (unsigned)sid && p->pid != (unsigned)pid && p->pid != 1)
+ 				kill(p->pid, signo);
+ 		}
+ 		/* And let them continue */
+@@ -134,7 +134,6 @@ do_it_now:
+ 
+ 	if (killall) {
+ 		/* Looks like they want to do a killall.  Do that */
+-		pid = getpid();
+ 		while (arg) {
+ 			pid_t* pidList;
+ 
+diff --git a/procps/pgrep.c b/procps/pgrep.c
+index f20789c..336fa84 100644
+--- a/procps/pgrep.c
++++ b/procps/pgrep.c
+@@ -115,7 +115,7 @@ int pgrep_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			cmd = proc->comm;
+ 		/* NB: OPT_INVERT is always 0 or 1 */
+ 		if ((regexec(&re_buffer, cmd, 1, re_match, 0) == 0 /* match found */
+-		     && (!OPT_ANCHOR || (re_match[0].rm_so == 0 && re_match[0].rm_eo == strlen(cmd)))) ^ OPT_INVERT
++		     && (!OPT_ANCHOR || (re_match[0].rm_so == 0 && re_match[0].rm_eo == (regoff_t)strlen(cmd)))) ^ OPT_INVERT
+ 		) {
+ 			matched_pid = proc->pid;
+ 			if (OPT_LAST) {
+diff --git a/procps/pidof.c b/procps/pidof.c
+index 46e646d..8ed5a21 100644
+--- a/procps/pidof.c
++++ b/procps/pidof.c
+@@ -59,7 +59,7 @@ int pidof_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			if (opt & OPT_OMIT) {
+ 				llist_t *omits_p = omits;
+ 				while (omits_p) {
+-					if (xatoul(omits_p->data) == *pl) {
++					if (xatoul(omits_p->data) == (unsigned long)(*pl)) {
+ 						goto omitting;
+ 					}
+ 					omits_p = omits_p->link;
+diff --git a/procps/ps.c b/procps/ps.c
+index aeb8cec..cf939bb 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -310,7 +310,7 @@ static ps_out_t* new_out_t(void)
+ 
+ static const ps_out_t* find_out_spec(const char *name)
+ {
+-	int i;
++	unsigned i;
+ 	for (i = 0; i < ARRAY_SIZE(out_spec); i++) {
+ 		if (!strcmp(name, out_spec[i].name))
+ 			return &out_spec[i];
+diff --git a/procps/top.c b/procps/top.c
+index 206f9e8..ca43376 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -53,7 +53,7 @@ typedef struct jiffy_counts_t {
+    the next. Used for finding deltas. */
+ typedef struct save_hist {
+ 	unsigned long ticks;
+-	unsigned pid;
++	pid_t pid;
+ } save_hist;
+ 
+ typedef int (*cmp_funcp)(top_status_t *P, top_status_t *Q);
+@@ -317,7 +317,7 @@ static unsigned long display_header(int scr_width)
+ 	fclose(fp);
+ 
+ 	/* output memory info */
+-	if (scr_width > sizeof(scrbuf))
++	if (scr_width > (int)sizeof(scrbuf))
+ 		scr_width = sizeof(scrbuf);
+ 	snprintf(scrbuf, scr_width,
+ 		"Mem: %luK used, %luK free, %luK shrd, %luK buff, %luK cached",
+@@ -481,7 +481,7 @@ static NOINLINE void display_process_list(int count, int scr_width)
+ 				, SHOW_STAT(pcpu)
+ #endif
+ 		);
+-		if (col + 1 < scr_width)
++		if ((int)(col + 1) < scr_width)
+ 			read_cmdline(line_buf + col, scr_width - col - 1, s->pid, s->comm);
+ 		fputs(line_buf, stdout);
+ 		/* printf(" %d/%d %lld/%lld", s->pcpu, total_pcpu,
+@@ -584,7 +584,7 @@ static char *grab_number(char *str, const char *match, unsigned sz)
+ static void display_topmem_header(int scr_width)
+ {
+ 	char linebuf[128];
+-	int i;
++	unsigned i;
+ 	FILE *fp;
+ 	union {
+ 		struct {
+@@ -703,7 +703,7 @@ static NOINLINE void display_topmem_process_list(int count, int scr_width)
+ 		ulltoa6_and_space(s->dirty_sh, &line_buf[6*6]);
+ 		ulltoa6_and_space(s->stack   , &line_buf[7*6]);
+ 		line_buf[8*6] = '\0';
+-		if (scr_width > MIN_WIDTH) {
++		if (scr_width > (int)MIN_WIDTH) {
+ 			read_cmdline(&line_buf[8*6], scr_width - MIN_WIDTH, s->pid, s->comm);
+ 		}
+ 		printf("\n""%.*s", scr_width, line_buf);
+diff --git a/shell/ash.c b/shell/ash.c
+index 200e2d4..e149070 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -1790,7 +1790,7 @@ extern struct globals_var *const ash_ptr_to_globals_var;
+ #define vartab        (G_var.vartab       )
+ #define varinit       (G_var.varinit      )
+ #define INIT_G_var() do { \
+-	int i; \
++	unsigned i; \
+ 	(*(struct globals_var**)&ash_ptr_to_globals_var) = xzalloc(sizeof(G_var)); \
+ 	barrier(); \
+ 	for (i = 0; i < ARRAY_SIZE(varinit_data); i++) { \
+@@ -6223,7 +6223,7 @@ varvalue(char *name, int varflags, int flags, struct strlist *var_str_list)
+ 				if (!eq) /* stop at first non-assignment */
+ 					break;
+ 				eq++;
+-				if (name_len == (eq - str)
++				if (name_len == (unsigned)(eq - str)
+ 				 && strncmp(str, name, name_len) == 0) {
+ 					p = eq;
+ 					/* goto value; - WRONG! */
+@@ -9500,12 +9500,13 @@ plus_minus_o(char *name, int val)
+ 		ash_msg("illegal option %co %s", val ? '-' : '+', name);
+ 		return 1;
+ 	}
+-	for (i = 0; i < NOPTS; i++)
++	for (i = 0; i < NOPTS; i++) {
+ 		if (val) {
+ 			out1fmt("%-16s%s\n", optnames(i), optlist[i] ? "on" : "off");
+ 		} else {
+ 			out1fmt("set %co %s\n", optlist[i] ? '-' : '+', optnames(i));
+ 		}
++	}
+ 	return 0;
+ }
+ static void
+@@ -9699,7 +9700,7 @@ getopts(char *optstr, char *optvar, char **optfirst, int *param_optind, int *opt
+ 		return 1;
+ 	optnext = optfirst + *param_optind - 1;
+ 
+-	if (*param_optind <= 1 || *optoff < 0 || strlen(optnext[-1]) < *optoff)
++	if (*param_optind <= 1 || *optoff < 0 || (int)strlen(optnext[-1]) < *optoff)
+ 		p = NULL;
+ 	else
+ 		p = optnext[-1] + *optoff;
+@@ -11121,7 +11122,7 @@ xxreadtoken(void)
+ 						return readtoken1(c, BASESYNTAX, (char *) NULL, 0);
+ 					}
+ 
+-					if (p - xxreadtoken_chars >= xxreadtoken_singles) {
++					if ((size_t)(p - xxreadtoken_chars) >= xxreadtoken_singles) {
+ 						if (pgetc() == *p) {    /* double occurrence? */
+ 							p += xxreadtoken_doubles + 1;
+ 						} else {
+@@ -11817,7 +11818,8 @@ trapcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ static int
+ helpcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+-	int col, i;
++	unsigned col;
++	unsigned i;
+ 
+ 	out1fmt("\nBuilt-in commands:\n-------------------\n");
+ 	for (col = 0, i = 0; i < ARRAY_SIZE(builtintab); i++) {
+@@ -12479,6 +12481,7 @@ ulimitcmd(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ 
+ 			while ((c = *p++) >= '0' && c <= '9') {
+ 				val = (val * 10) + (long)(c - '0');
++				// val is actually 'unsigned long int' and can't get < 0
+ 				if (val < (rlim_t) 0)
+ 					break;
+ 			}
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index 6f4429f..af93aab 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -70,7 +70,7 @@ static void interrupted(int sig ATTRIBUTE_UNUSED)
+ int logread_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int logread_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	int cur;
++	unsigned cur;
+ 	int log_semid; /* ipc semaphore id */
+ 	int log_shmid; /* ipc shared memory id */
+ 	smallint follow = getopt32(argv, "f");
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 371b558..f8fc517 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -570,7 +570,7 @@ static void do_syslogd(void)
+ 	timestamp_and_log_internal("syslogd started: BusyBox v" BB_VER);
+ 
+ 	for (;;) {
+-		size_t sz;
++		ssize_t sz;
+ 
+ #if ENABLE_FEATURE_SYSLOGD_DUP
+ 		last_buf = recvbuf;
+diff --git a/util-linux/fdisk_sun.c b/util-linux/fdisk_sun.c
+index e595444..eec319c 100644
+--- a/util-linux/fdisk_sun.c
++++ b/util-linux/fdisk_sun.c
+@@ -230,8 +230,7 @@ static void
+ create_sunlabel(void)
+ {
+ 	struct hd_geometry geometry;
+-	unsigned int ndiv;
+-	int i;
++	unsigned ndiv;
+ 	unsigned char c;
+ 	const struct sun_predefined_drives *p = NULL;
+ 
+@@ -241,6 +240,7 @@ create_sunlabel(void)
+ 	memset(MBRbuffer, 0, sizeof(MBRbuffer));
+ 	sunlabel->magic = SUN_SSWAP16(SUN_LABEL_MAGIC);
+ 	if (!floppy) {
++		unsigned i;
+ 		puts("Drive type\n"
+ 		 "   ?   auto configure\n"
+ 		 "   0   custom (with hardware detected defaults)");
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 2da3481..31790d2 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -147,7 +147,7 @@ static const char *normalize(const char *arg)
+ static int generate_output(char **argv, int argc, const char *optstr, const struct option *longopts)
+ {
+ 	int exit_code = 0; /* We assume everything will be OK */
+-	unsigned opt;
++	int opt;
+ #if ENABLE_GETOPT_LONG
+ 	int longindex;
+ #endif
+@@ -173,7 +173,7 @@ static int generate_output(char **argv, int argc, const char *optstr, const stru
+ #else
+ 			getopt(argc, argv, optstr);
+ #endif
+-		if (opt == EOF)
++		if (opt == -1)
+ 			break;
+ 		if (opt == '?' || opt == ':' )
+ 			exit_code = 1;
+@@ -190,7 +190,7 @@ static int generate_output(char **argv, int argc, const char *optstr, const stru
+ 				printf(" %s", normalize(optarg));
+ 			else {
+ 				printf(" -%c", opt);
+-				charptr = strchr(optstr,opt);
++				charptr = strchr(optstr, opt);
+ 				if (charptr != NULL && *++charptr == ':')
+ 					printf(" %s",
+ 						normalize(optarg ? optarg : ""));
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 292f877..3cfbc56 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -307,7 +307,7 @@ static long parse_mount_options(char *options, char **unrecognized)
+ 
+ 	// Loop through options
+ 	for (;;) {
+-		size_t i;
++		unsigned i;
+ 		char *comma = strchr(options, ',');
+ 		const char *option_str = mount_option_str;
+ 
+diff --git a/util-linux/volume_id/unused_ufs.c b/util-linux/volume_id/unused_ufs.c
+index c666b86..8693758 100644
+--- a/util-linux/volume_id/unused_ufs.c
++++ b/util-linux/volume_id/unused_ufs.c
+@@ -167,7 +167,7 @@ int volume_id_probe_ufs(struct volume_id *id, uint64_t off)
+ 	static const short offsets[] = { 0, 8, 64, 256 };
+ 
+ 	uint32_t magic;
+-	int i;
++	unsigned i;
+ 	struct ufs_super_block *ufs;
+ 
+ 	dbg("probing at offset 0x%llx", (unsigned long long) off);
+diff --git a/util-linux/volume_id/volume_id.c b/util-linux/volume_id/volume_id.c
+index aec96a2..d81f3f9 100644
+--- a/util-linux/volume_id/volume_id.c
++++ b/util-linux/volume_id/volume_id.c
+@@ -152,7 +152,7 @@ static const probe_fptr fs2[] = {
+ 
+ int volume_id_probe_all(struct volume_id *id, uint64_t off, uint64_t size)
+ {
+-	size_t i;
++	unsigned i;
+ 
+ 	if (id == NULL)
+ 		return -EINVAL;

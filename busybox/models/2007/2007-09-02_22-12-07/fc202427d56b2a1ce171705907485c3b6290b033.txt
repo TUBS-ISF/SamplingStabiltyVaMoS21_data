@@ -1,0 +1,13 @@
+2007-09-02 22:12:07 +0000
+diff --git a/networking/Config.in b/networking/Config.in
+index 5275adc..d687dbe 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -249,6 +249,7 @@ config IFUPDOWN
+ config IFUPDOWN_IFSTATE_PATH
+ 	string "Absolute path to ifstate file"
+ 	default "/var/run/ifstate"
++	depends on IFUPDOWN
+ 	help
+ 	  ifupdown keeps state information in a file called ifstate.
+ 	  Typically it is located in /var/run/ifstate, however

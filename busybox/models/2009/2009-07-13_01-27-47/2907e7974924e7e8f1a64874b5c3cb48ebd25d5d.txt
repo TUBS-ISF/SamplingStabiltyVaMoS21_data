@@ -1,0 +1,42 @@
+2009-07-13 01:27:47 +0200
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index e49278e..215e4a9 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -79,7 +79,22 @@ static void new_group(char *group, gid_t gid)
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		free(p);
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+-	/* Ignore errors: if file is missing we suppose admin doesn't want it */
++	/* /etc/gshadow fields:
++	 * 1. Group name.
++	 * 2. Encrypted password.
++	 *    If set, non-members of the group can join the group
++	 *    by typing the password for that group using the newgrp command.
++	 *    If the value is of this field ! then no user is allowed
++	 *    to access the group using the newgrp command. A value of !!
++	 *    is treated the same as a value of ! only it indicates
++	 *    that a password has never been set before. If the value is null,
++	 *    only group members can log into the group.
++	 * 3. Group administrators (comma delimited list).
++	 *    Group members listed here can add or remove group members
++	 *    using the gpasswd command.
++	 * 4. Group members (comma delimited list).
++	 */
++	/* Ignore errors: if file is missing we assume admin doesn't want it */
+ 	update_passwd(bb_path_gshadow_file, group, "!::", NULL);
+ #endif
+ }
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index 136dcdf..0e9936a 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -177,7 +177,7 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ 	 * 5. maximum days password is valid
+ 	 * 6. days before password is to expire that user is warned
+ 	 * 7. days after password expires that account is disabled
+-	 * 8. unix date when login expires (may no longer be used)
++	 * 8. unix date when login expires (i.e. when it may no longer be used)
+ 	 */
+ 	/* fields:     2 3  4 5     6 78 */
+ 	p = xasprintf("!:%u:0:99999:7:::", (unsigned)(time(NULL)) / (24*60*60));

@@ -1,0 +1,33 @@
+2010-04-21 18:05:10 -0400
+diff --git a/networking/Config.in b/networking/Config.in
+index 61e59b2..ce7166f 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -122,8 +122,8 @@ config FEATURE_FTPD_ACCEPT_BROKEN_LIST
+ 	default y
+ 	depends on FTPD
+ 	help
+-	  Some ftp-clients (among them KDE's Konqueror) issue illegal
+-	  "LIST -la" requests. This option works around those problems.
++	  Some ftp clients (among them KDE's Konqueror) issue illegal
++	  "LIST -l" requests. This option works around such problems.
+ 	  It might prevent you from listing files starting with "-" and
+ 	  it increases the code size by ~40 bytes.
+ 	  Most other ftp servers seem to behave similar to this.
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index 9d43ea3..c63b931 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -618,10 +618,10 @@ popen_ls(const char *opt)
+ 	argv[4] = NULL;
+ 
+ 	/* Improve compatibility with non-RFC conforming FTP clients
+-	 * which send e.g. "LIST -l", "LIST -la".
++	 * which send e.g. "LIST -l", "LIST -la", "LIST -aL".
+ 	 * See https://bugs.kde.org/show_bug.cgi?id=195578 */
+ 	if (ENABLE_FEATURE_FTPD_ACCEPT_BROKEN_LIST
+-	 && G.ftp_arg && G.ftp_arg[0] == '-' && G.ftp_arg[1] == 'l'
++	 && G.ftp_arg && G.ftp_arg[0] == '-'
+ 	) {
+ 		const char *tmp = strchr(G.ftp_arg, ' ');
+ 		if (tmp) /* skip the space */

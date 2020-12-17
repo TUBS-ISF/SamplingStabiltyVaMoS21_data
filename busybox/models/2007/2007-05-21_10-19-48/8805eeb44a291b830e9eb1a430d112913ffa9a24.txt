@@ -1,0 +1,43 @@
+2007-05-21 10:19:48 +0000
+diff --git a/shell/README b/shell/README
+index d492671..919cb9f 100644
+--- a/shell/README
++++ b/shell/README
+@@ -1,6 +1,20 @@
+ Various bits of what is known about busybox shells, in no particular order.
+ 
+-2006-05-06
++2007-05-21
++hush: environment cannot be handled by libc routines as they are leaky
++(by API design and thus unfixable): hush will leak memory in this script,
++bash does not:
++pid=$$
++while true; do
++    unset t;
++    t=111111111111111111111111111111111111111111111111111111111111111111111111
++    export t
++    ps -o vsz,pid,comm | grep " $pid "
++done
++The fix is to not use setenv/putenv/unsetenv but manipulate env ourself. TODO.
++hush: meanwhile, first three command subst bugs mentioned below are fixed. :)
++
++2007-05-06
+ hush: more bugs spotted. Comparison with bash:
+ bash-3.2# echo "TEST`date;echo;echo`BEST"
+ TESTSun May  6 09:21:05 CEST 2007BEST         [we dont strip eols]
+diff --git a/shell/hush_test/hush-parsing/process_subst.right b/shell/hush_test/hush-parsing/process_subst.right
+index 8f9ab9d..397bc80 100644
+--- a/shell/hush_test/hush-parsing/process_subst.right
++++ b/shell/hush_test/hush-parsing/process_subst.right
+@@ -1,2 +1,3 @@
+ TESTzzBEST
+ TEST$(echo zz)BEST
++TEST'BEST
+diff --git a/shell/hush_test/hush-parsing/process_subst.tests b/shell/hush_test/hush-parsing/process_subst.tests
+index f8299a5..21996bc 100755
+--- a/shell/hush_test/hush-parsing/process_subst.tests
++++ b/shell/hush_test/hush-parsing/process_subst.tests
+@@ -1,2 +1,3 @@
+ echo "TEST`echo zz;echo;echo`BEST"
+ echo "TEST`echo '$(echo zz)'`BEST"
++echo "TEST`echo "'"`BEST"

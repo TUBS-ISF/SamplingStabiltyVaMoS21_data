@@ -1,0 +1,113 @@
+2009-10-27 17:17:34 +0100
+diff --git a/console-tools/kbd_mode.c b/console-tools/kbd_mode.c
+index 544bbb7..e1d8523 100644
+--- a/console-tools/kbd_mode.c
++++ b/console-tools/kbd_mode.c
+@@ -25,7 +25,7 @@ int kbd_mode_main(int argc UNUSED_PARAM, char **argv)
+ 	const char *tty_name = CURRENT_TTY;
+ 
+ 	opt = getopt32(argv, "sakuC:", &tty_name);
+-	fd = xopen(tty_name, O_NONBLOCK);
++	fd = xopen_nonblocking(tty_name);
+ 	opt &= 0xf; /* clear -C bit, see (*) */
+ 
+ 	if (!opt) { /* print current setting */
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index 3364180..e833474 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -277,7 +277,7 @@ int setfont_main(int argc UNUSED_PARAM, char **argv)
+ 	opts = getopt32(argv, "m:C:", &mapfilename, &tty_name);
+ 	argv += optind;
+ 
+-	fd = xopen(tty_name, O_NONBLOCK);
++	fd = xopen_nonblocking(tty_name);
+ 
+ 	if (sizeof(CONFIG_DEFAULT_SETFONT_DIR) > 1) { // if not ""
+ 		if (*argv[0] != '/') {
+diff --git a/console-tools/loadkmap.c b/console-tools/loadkmap.c
+index ac2c0a6..a6b9a86 100644
+--- a/console-tools/loadkmap.c
++++ b/console-tools/loadkmap.c
+@@ -36,7 +36,7 @@ int loadkmap_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	fd = get_console_fd_or_die();
+ /* or maybe:
+ 	opt = getopt32(argv, "C:", &tty_name);
+-	fd = xopen(tty_name, O_NONBLOCK);
++	fd = xopen_nonblocking(tty_name);
+ */
+ 
+ 	xread(STDIN_FILENO, flags, 7);
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index baa1ec2..cb9b183 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -1295,7 +1295,7 @@ int stty_main(int argc, char **argv)
+ 	if (file_name) {
+ 		int fd, fdflags;
+ 		G.device_name = file_name;
+-		fd = xopen(G.device_name, O_RDONLY | O_NONBLOCK);
++		fd = xopen_nonblocking(G.device_name);
+ 		if (fd != STDIN_FILENO) {
+ 			dup2(fd, STDIN_FILENO);
+ 			close(fd);
+diff --git a/include/libbb.h b/include/libbb.h
+index 9865121..d2b7437 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -400,6 +400,7 @@ void bb_unsetenv(const char *key) FAST_FUNC;
+ void xunlink(const char *pathname) FAST_FUNC;
+ void xstat(const char *pathname, struct stat *buf) FAST_FUNC;
+ int xopen(const char *pathname, int flags) FAST_FUNC;
++int xopen_nonblocking(const char *pathname) FAST_FUNC;
+ int xopen3(const char *pathname, int flags, int mode) FAST_FUNC;
+ int open_or_warn(const char *pathname, int flags) FAST_FUNC;
+ int open3_or_warn(const char *pathname, int flags, int mode) FAST_FUNC;
+diff --git a/libbb/xfuncs_printf.c b/libbb/xfuncs_printf.c
+index 345c842..241887a 100644
+--- a/libbb/xfuncs_printf.c
++++ b/libbb/xfuncs_printf.c
+@@ -140,6 +140,15 @@ int FAST_FUNC xopen(const char *pathname, int flags)
+ 	return xopen3(pathname, flags, 0666);
+ }
+ 
++/* Die if we can't open an existing file readonly with O_NONBLOCK
++ * and return the fd.
++ * Note that for ioctl O_RDONLY is sufficient.
++ */
++int FAST_FUNC xopen_nonblocking(const char *pathname)
++{
++	return xopen(pathname, O_RDONLY | O_NONBLOCK);
++}
++
+ // Warn if we can't open a file and return a fd.
+ int FAST_FUNC open3_or_warn(const char *pathname, int flags, int mode)
+ {
+diff --git a/miscutils/eject.c b/miscutils/eject.c
+index 75618be..adff9e0 100644
+--- a/miscutils/eject.c
++++ b/miscutils/eject.c
+@@ -103,7 +103,7 @@ int eject_main(int argc UNUSED_PARAM, char **argv)
+ 	   eject /dev/cdrom
+ 	*/
+ 
+-	xmove_fd(xopen(device, O_RDONLY|O_NONBLOCK), dev_fd);
++	xmove_fd(xopen_nonblocking(device), dev_fd);
+ 
+ 	if (ENABLE_FEATURE_EJECT_SCSI && (flags & FLAG_SCSI))
+ 		eject_scsi(device);
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 65c11ec..c4d2f3b 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -1552,8 +1552,8 @@ static void process_dev(char *devname)
+ 	unsigned char args[4] = { WIN_SETFEATURES, 0, 0, 0 };
+ 	const char *fmt = " %s\t= %2ld";
+ 
+-	/*fd = xopen(devname, O_RDONLY | O_NONBLOCK);*/
+-	xmove_fd(xopen(devname, O_RDONLY | O_NONBLOCK), fd);
++	/*fd = xopen_nonblocking(devname);*/
++	xmove_fd(xopen_nonblocking(devname), fd);
+ 	printf("\n%s:\n", devname);
+ 
+ 	if (getset_readahead == IS_SET) {

@@ -1,0 +1,255 @@
+2009-06-14 19:42:12 +0200
+diff --git a/coreutils/test.c b/coreutils/test.c
+index cfaf4ca..73048d3 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -19,7 +19,6 @@
+  * Original copyright notice states:
+  *     "This program is in the Public Domain."
+  */
+-
+ #include "libbb.h"
+ #include <setjmp.h>
+ 
+@@ -29,7 +28,6 @@
+  * This is true regardless of PREFER_APPLETS and STANDALONE_SHELL
+  * state. */
+ 
+-
+ /* test(1) accepts the following grammar:
+ 	oexpr	::= aexpr | aexpr "-o" oexpr ;
+ 	aexpr	::= nexpr | nexpr "-a" aexpr ;
+@@ -47,6 +45,50 @@
+ 	operand ::= <any legal UNIX file name>
+ */
+ 
++/* TODO: handle [[ expr ]] bashism bash-compatibly.
++ * [[ ]] is meant to be a "better [ ]", with less weird syntax
++ * and without the risk of variables and quoted strings misinterpreted
++ * as operators.
++ * This will require support from shells - we need to know quote status
++ * of each parameter (see below).
++ *
++ * Word splitting and pathname expansion should NOT be performed:
++ *      # a="a b"; [[ $a = "a b" ]] && echo YES
++ *      YES
++ *      # [[ /bin/m* ]] && echo YES
++ *      YES
++ *
++ * =~ should do regexp match
++ * = and == should do pattern match against right side:
++ *      # [[ *a* == bab ]] && echo YES
++ *      # [[ bab == *a* ]] && echo YES
++ *      YES
++ * != does the negated == (i.e., also with pattern matching).
++ * Pattern matching is quotation-sensitive:
++ *      # [[ bab == "b"a* ]] && echo YES
++ *      YES
++ *      # [[ bab == b"a*" ]] && echo YES
++ *
++ * Conditional operators such as -f must be unquoted literals to be recognized:
++ *      # [[ -e /bin ]] && echo YES
++ *      YES
++ *      # [[ '-e' /bin ]] && echo YES
++ *      bash: conditional binary operator expected...
++ *      # A='-e'; [[ $A /bin ]] && echo YES
++ *      bash: conditional binary operator expected...
++ *
++ * || and && should work as -o and -a work in [ ]
++ * -a and -o aren't recognized (&& and || are to be used instead)
++ * ( and ) do not need to be quoted unlike in [ ]:
++ *      # [[ ( abc ) && '' ]] && echo YES
++ *      # [[ ( abc ) || '' ]] && echo YES
++ *      YES
++ *      # [[ ( abc ) -o '' ]] && echo YES
++ *      bash: syntax error in conditional expression...
++ *
++ * Apart from the above, [[ expr ]] should work as [ expr ]
++ */
++
+ #define TEST_DEBUG 0
+ 
+ enum token {
+diff --git a/shell/ash.c b/shell/ash.c
+index 3452351..9b40ca3 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -2224,17 +2224,17 @@ listvars(int on, int off, char ***end)
+ /* ============ Path search helper
+  *
+  * The variable path (passed by reference) should be set to the start
+- * of the path before the first call; padvance will update
+- * this value as it proceeds.  Successive calls to padvance will return
++ * of the path before the first call; path_advance will update
++ * this value as it proceeds.  Successive calls to path_advance will return
+  * the possible path expansions in sequence.  If an option (indicated by
+  * a percent sign) appears in the path entry then the global variable
+  * pathopt will be set to point to it; otherwise pathopt will be set to
+  * NULL.
+  */
+-static const char *pathopt;     /* set by padvance */
++static const char *pathopt;     /* set by path_advance */
+ 
+ static char *
+-padvance(const char **path, const char *name)
++path_advance(const char **path, const char *name)
+ {
+ 	const char *p;
+ 	char *q;
+@@ -2538,7 +2538,7 @@ cdcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	}
+ 	do {
+ 		c = *path;
+-		p = padvance(&path, dest);
++		p = path_advance(&path, dest);
+ 		if (stat(p, &statb) >= 0 && S_ISDIR(statb.st_mode)) {
+ 			if (c && c != ':')
+ 				flags |= CD_PRINT;
+@@ -7159,7 +7159,7 @@ shellexec(char **argv, const char *path, int idx)
+ 		e = errno;
+ 	} else {
+ 		e = ENOENT;
+-		while ((cmdname = padvance(&path, argv[0])) != NULL) {
++		while ((cmdname = path_advance(&path, argv[0])) != NULL) {
+ 			if (--idx < 0 && pathopt == NULL) {
+ 				tryexec(IF_FEATURE_SH_STANDALONE(-1,) cmdname, argv, envp);
+ 				if (errno != ENOENT && errno != ENOTDIR)
+@@ -7198,7 +7198,7 @@ printentry(struct tblentry *cmdp)
+ 	idx = cmdp->param.index;
+ 	path = pathval();
+ 	do {
+-		name = padvance(&path, cmdp->cmdname);
++		name = path_advance(&path, cmdp->cmdname);
+ 		stunalloc(name);
+ 	} while (--idx >= 0);
+ 	out1fmt("%s%s\n", name, (cmdp->rehash ? "*" : nullstr));
+@@ -7570,7 +7570,7 @@ describe_command(char *command, int describe_command_verbose)
+ 			p = command;
+ 		} else {
+ 			do {
+-				p = padvance(&path, command);
++				p = path_advance(&path, command);
+ 				stunalloc(p);
+ 			} while (--j >= 0);
+ 		}
+@@ -8727,23 +8727,6 @@ static int ulimitcmd(int, char **) FAST_FUNC;
+ #define BUILTIN_REG_ASSG        "6"
+ #define BUILTIN_SPEC_REG_ASSG   "7"
+ 
+-/* We do not handle [[ expr ]] bashism bash-compatibly,
+- * we make it a synonym of [ expr ].
+- * Basically, word splitting and pathname expansion should NOT be performed
+- * Examples:
+- * no word splitting:     a="a b"; [[ $a = "a b" ]]; echo $? should print "0"
+- * no pathname expansion: [[ /bin/m* = "/bin/m*" ]]; echo $? should print "0"
+- * Additional operators:
+- * || and && should work as -o and -a
+- * =~ regexp match
+- * == should do _pattern match_ against right side. bash does this:
+- *      # [[ *a* == bab ]] && echo YES
+- *      # [[ bab == *a* ]] && echo YES
+- *      YES
+- * != does the negated == (i.e., also with pattern matching)
+- * Apart from the above, [[ expr ]] should work as [ expr ]
+- */
+-
+ /* Stubs for calling non-FAST_FUNC's */
+ #if ENABLE_ASH_BUILTIN_ECHO
+ static int FAST_FUNC echocmd(int argc, char **argv)   { return echo_main(argc, argv); }
+@@ -9718,7 +9701,7 @@ chkmail(void)
+ 	setstackmark(&smark);
+ 	mpath = mpathset() ? mpathval() : mailval();
+ 	for (mtp = mailtime; mtp < mailtime + MAXMBOXES; mtp++) {
+-		p = padvance(&mpath, nullstr);
++		p = path_advance(&mpath, nullstr);
+ 		if (p == NULL)
+ 			break;
+ 		if (*p == '\0')
+@@ -11912,7 +11895,7 @@ find_dot_file(char *name)
+ 		goto try_cur_dir;
+ 	}
+ 
+-	while ((fullname = padvance(&path, name)) != NULL) {
++	while ((fullname = path_advance(&path, name)) != NULL) {
+  try_cur_dir:
+ 		if ((stat(fullname, &statb) == 0) && S_ISREG(statb.st_mode)) {
+ 			/*
+@@ -11921,7 +11904,8 @@ find_dot_file(char *name)
+ 			 */
+ 			return fullname;
+ 		}
+-		stunalloc(fullname);
++		if (fullname != name)
++			stunalloc(fullname);
+ 	}
+ 
+ 	/* not found in the PATH */
+@@ -12095,7 +12079,7 @@ find_command(char *name, struct cmdentry *entry, int act, const char *path)
+ 	e = ENOENT;
+ 	idx = -1;
+  loop:
+-	while ((fullname = padvance(&path, name)) != NULL) {
++	while ((fullname = path_advance(&path, name)) != NULL) {
+ 		stunalloc(fullname);
+ 		/* NB: code below will still use fullname
+ 		 * despite it being "unallocated" */
+diff --git a/shell/ash_test/ash-misc/source1.right b/shell/ash_test/ash-misc/source1.right
+new file mode 100644
+index 0000000..0ab7c54
+--- /dev/null
++++ b/shell/ash_test/ash-misc/source1.right
+@@ -0,0 +1,2 @@
++Sourced ok
++Done
+diff --git a/shell/ash_test/ash-misc/source1.tests b/shell/ash_test/ash-misc/source1.tests
+new file mode 100755
+index 0000000..e2e75b2
+--- /dev/null
++++ b/shell/ash_test/ash-misc/source1.tests
+@@ -0,0 +1,5 @@
++echo "echo Sourced ok" >../sourced.sh
++PATH="..:$PATH"
++. sourced.sh
++rm ../sourced.sh
++echo Done
+diff --git a/shell/ash_test/run-all b/shell/ash_test/run-all
+index 4d0f39a..ad93e25 100755
+--- a/shell/ash_test/run-all
++++ b/shell/ash_test/run-all
+@@ -19,7 +19,7 @@ export THIS_SH
+ do_test()
+ {
+     test -d "$1" || return 0
+-    echo do_test "$1"
++#   echo do_test "$1"
+     # $1 but with / replaced by # so that it can be used as filename part
+     noslash=`echo "$1" | sed 's:/:#:g'`
+     (
+diff --git a/shell/hush.c b/shell/hush.c
+index 245fb58..fe05e47 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -311,22 +311,9 @@ struct command {
+ #if ENABLE_HUSH_BASH_COMPAT
+ # define CMD_SINGLEWORD_NOGLOB 2
+ #endif
+-// Basically, word splitting and pathname expansion should NOT be performed
+-// Examples:
+-// no word splitting:     a="a b"; [[ $a = "a b" ]]; echo $? should print "0"
+-// no pathname expansion: [[ /bin/m* = "/bin/m*" ]]; echo $? should print "0"
+-// Additional operators:
+-// || and && should work as -o and -a
+-// =~ regexp match
+-// == should do _pattern match_ against right side. bash does this:
+-//      # [[ *a* == bab ]] && echo YES
+-//      # [[ bab == *a* ]] && echo YES
+-//      YES
+-// != does the negated == (i.e., also with pattern matching)
+-// Apart from the above, [[ expr ]] should work as [ expr ]
+ 
+ /* used for "export noglob=* glob* a=`echo a b`" */
+-/*#define CMD_SINGLEWORD_NOGLOB_COND 3 */
++//#define CMD_SINGLEWORD_NOGLOB_COND 3
+ // It is hard to implement correctly, it adds significant amounts of tricky code,
+ // and all this is only useful for really obscure export statements
+ // almost nobody would use anyway. #ifdef CMD_SINGLEWORD_NOGLOB_COND

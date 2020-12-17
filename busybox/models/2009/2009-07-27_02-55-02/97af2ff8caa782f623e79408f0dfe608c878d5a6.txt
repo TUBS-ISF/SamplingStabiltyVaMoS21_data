@@ -1,0 +1,68 @@
+2009-07-27 02:55:02 +0200
+diff --git a/init/Config.in b/init/Config.in
+index 1a1be4a..3d99d47 100644
+--- a/init/Config.in
++++ b/init/Config.in
+@@ -93,6 +93,26 @@ config HALT
+ 	help
+ 	  Stop all processes and either halt, reboot, or power off the system.
+ 
++config FEATURE_CALL_TELINIT
++	bool "Call telinit on shutdown and reboot"
++	default n
++	depends on HALT && !INIT
++	help
++	  Call an external program (normally telinit) to facilitate
++	  a switch to a proper runlevel.
++
++	  This option is only available if you selected halt and friends,
++	  but did not select init.
++
++config TELINIT_PATH
++	string "Path to telinit executable"
++	default "/sbin/telinit"
++	depends on FEATURE_CALL_TELINIT
++	help
++	  When busybox halt and friends have to call external telinit
++	  to facilitate proper shutdown, this path is to be used when
++	  locating telinit executable.
++
+ config MESG
+ 	bool "mesg"
+ 	default n
+diff --git a/init/halt.c b/init/halt.c
+index 3a23eca..c88c333 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -85,6 +85,8 @@ int halt_main(int argc UNUSED_PARAM, char **argv)
+ //TODO: I tend to think that signalling linuxrc is wrong
+ // pity original author didn't comment on it...
+ 		if (ENABLE_FEATURE_INITRD) {
++			/* talk to linuxrc */
++			/* bbox init/linuxrc assumed */
+ 			pid_t *pidlist = find_pid_by_name("linuxrc");
+ 			if (pidlist[0] > 0)
+ 				rc = kill(pidlist[0], signals[which]);
+@@ -92,7 +94,21 @@ int halt_main(int argc UNUSED_PARAM, char **argv)
+ 				free(pidlist);
+ 		}
+ 		if (rc) {
+-			rc = kill(1, signals[which]);
++			/* talk to init */
++			if (!ENABLE_FEATURE_CALL_TELINIT) {
++				/* bbox init assumed */
++				rc = kill(1, signals[which]);
++			} else {
++				/* SysV style init assumed */
++				/* runlevels:
++				 * 0 == shutdown
++				 * 6 == reboot */
++				rc = execlp(CONFIG_TELINIT_PATH,
++						CONFIG_TELINIT_PATH,
++						which == 2 ? "6" : "0",
++						(char *)NULL
++				);
++			}
+ 		}
+ 	} else {
+ 		rc = reboot(magic[which]);

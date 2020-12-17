@@ -1,0 +1,14 @@
+2008-07-22 18:32:06 +0000
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 86d404a..7f61bf4 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -267,7 +267,7 @@ config FEATURE_HWCLOCK_ADJTIME_FHS
+ 	  to use the FHS behavior, answer Y here, otherwise answer N for the
+ 	  classic /etc/adjtime path.
+ 
+-	  http://www.pathname.com/fhs/pub/fhs-2.3.html#VARLIBHWCLOCKSTATEDIRECTORYFORHWCLO
++	  pathname.com/fhs/pub/fhs-2.3.html#VARLIBHWCLOCKSTATEDIRECTORYFORHWCLO
+ 
+ config IPCRM
+ 	bool "ipcrm"

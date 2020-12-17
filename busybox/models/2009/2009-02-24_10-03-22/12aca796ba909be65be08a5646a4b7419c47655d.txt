@@ -1,0 +1,27 @@
+2009-02-24 10:03:22 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 0e60660..d5cf4cc 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2716,7 +2716,7 @@
+ "loading). modprobe uses a configuration file to determine what option(s) to\n" \
+ "pass each module it loads.\n" \
+ "\n" \
+-"The configuration file is searched (in order) amongst:\n" \
++"The configuration file is searched (in this order):\n" \
+ "\n" \
+ "    /etc/modprobe.conf (2.6 only)\n" \
+ "    /etc/modules.conf\n" \
+diff --git a/networking/Config.in b/networking/Config.in
+index dc0de9a..7410fcb 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -822,7 +822,7 @@ config FEATURE_TRACEROUTE_VERBOSE
+ 	default n
+ 	depends on TRACEROUTE
+ 	help
+-	  Add some verbosity to traceroute. This includes amongst other things
++	  Add some verbosity to traceroute. This includes among other things
+ 	  hostnames and ICMP response types.
+ 
+ config FEATURE_TRACEROUTE_SOURCE_ROUTE

@@ -1,0 +1,42 @@
+2010-01-10 02:47:32 +0100
+diff --git a/testsuite/cpio.tests b/testsuite/cpio.tests
+index 56f1885..75f0858 100755
+--- a/testsuite/cpio.tests
++++ b/testsuite/cpio.tests
+@@ -42,6 +42,7 @@ total 0
+ " \
+ 	"" ""
+ 
++
+ test x"$SKIP_KNOWN_BUGS" = x"" && {
+ # Currently fails. Numerous buglets: "1 blocks" versus "1 block",
+ # "1 block" must go to stderr, does not list cpio.testdir/x and cpio.testdir/y
+@@ -57,6 +58,7 @@ cpio.testdir/y
+ 	"" ""
+ }
+ 
++
+ # More complex case
+ rm -rf cpio.testdir cpio.testdir2 2>/dev/null
+ mkdir cpio.testdir
+@@ -82,6 +84,20 @@ total 8
+ " \
+ 	"" ""
+ 
++
++# Was trying to create "/usr/bin", correct is "usr/bin".
++rm -rf cpio.testdir
++testing "cpio -p with absolute paths" \
++"echo /usr/bin | cpio -dp cpio.testdir; echo \$?;
++ls cpio.testdir" \
++"\
++1 blocks
++0
++usr
++" \
++	"" ""
++
++
+ # Clean up
+ rm -rf cpio.testdir cpio.testdir2 2>/dev/null
+ 

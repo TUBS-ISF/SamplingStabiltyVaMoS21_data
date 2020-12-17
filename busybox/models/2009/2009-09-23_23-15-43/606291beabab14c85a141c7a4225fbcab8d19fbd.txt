@@ -1,0 +1,152 @@
+2009-09-23 23:15:43 +0200
+diff --git a/archival/rpm.c b/archival/rpm.c
+index 309b55a..27c6b78 100644
+--- a/archival/rpm.c
++++ b/archival/rpm.c
+@@ -324,7 +324,7 @@ static char *rpm_getstr(int tag, int itemindex)
+ 		return NULL;
+ 	if (found[0]->type == RPM_STRING_TYPE || found[0]->type == RPM_I18NSTRING_TYPE || found[0]->type == RPM_STRING_ARRAY_TYPE) {
+ 		int n;
+-		char *tmpstr = (char *) (map + found[0]->offset);
++		char *tmpstr = (char *) map + found[0]->offset;
+ 		for (n=0; n < itemindex; n++)
+ 			tmpstr = tmpstr + strlen(tmpstr) + 1;
+ 		return tmpstr;
+@@ -343,7 +343,7 @@ static int rpm_getint(int tag, int itemindex)
+ 	if (!found || itemindex >= found[0]->count)
+ 		return -1;
+ 
+-	tmpint = (int *) (map + found[0]->offset);
++	tmpint = (int *) ((char *) map + found[0]->offset);
+ 
+ 	if (found[0]->type == RPM_INT32_TYPE) {
+ 		tmpint = (int *) ((char *) tmpint + itemindex*4);
+diff --git a/editors/vi.c b/editors/vi.c
+index 31a1edc..4decbea 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -2187,11 +2187,11 @@ static void catch_sig(int sig)
+ }
+ #endif /* FEATURE_VI_USE_SIGNALS */
+ 
+-static int mysleep(int hund)	// sleep for 'h' 1/100 seconds
++static int mysleep(int hund)	// sleep for 'hund' 1/100 seconds or stdin ready
+ {
+ 	struct pollfd pfd[1];
+ 
+-	pfd[0].fd = 0;
++	pfd[0].fd = STDIN_FILENO;
+ 	pfd[0].events = POLLIN;
+ 	return safe_poll(pfd, 1, hund*10) > 0;
+ }
+diff --git a/findutils/find.c b/findutils/find.c
+index 76f6709..47c86be 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -74,7 +74,7 @@ typedef struct {
+ #endif
+ } action;
+ 
+-#define ACTS(name, arg...) typedef struct { action a; arg; } action_##name;
++#define ACTS(name, ...) typedef struct { action a; __VA_ARGS__ } action_##name;
+ #define ACTF(name) \
+ 	static int FAST_FUNC func_##name(const char *fileName UNUSED_PARAM, \
+ 		struct stat *statbuf UNUSED_PARAM, \
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 72edfc7..2e48e40 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -15,7 +15,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <paths.h>
+ #include "busybox.h" /* uses applet tables */
+ 
+ /* This does a fork/exec in one call, using vfork().  Returns PID of new child,
+diff --git a/shell/ash.c b/shell/ash.c
+index db28af7..b7c6431 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -5042,7 +5042,7 @@ struct redirtab {
+ 	struct redirtab *next;
+ 	int nullredirs;
+ 	int pair_count;
+-	struct two_fd_t two_fd[0];
++	struct two_fd_t two_fd[];
+ };
+ #define redirlist (G_var.redirlist)
+ 
+diff --git a/shell/bbsh.c b/shell/bbsh.c
+index ad875ab..c372626 100644
+--- a/shell/bbsh.c
++++ b/shell/bbsh.c
+@@ -54,7 +54,7 @@ struct command {
+ 	int flags;		// exit, suspend, && ||
+ 	int pid;		// pid (or exit code)
+ 	int argc;
+-	char *argv[0];
++	char *argv[];
+ };
+ 
+ // A collection of processes piped into/waiting on each other.
+diff --git a/shell/hush.c b/shell/hush.c
+index eaf9114..9db2091 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -787,7 +787,7 @@ static void xxfree(void *ptr)
+  * HUSH_DEBUG >= 2 prints line number in this file where it was detected.
+  */
+ #if HUSH_DEBUG < 2
+-# define die_if_script(lineno, fmt...)          die_if_script(fmt)
++# define die_if_script(lineno, ...)             die_if_script(__VA_ARGS__)
+ # define syntax_error(lineno, msg)              syntax_error(msg)
+ # define syntax_error_at(lineno, msg)           syntax_error_at(msg)
+ # define syntax_error_unterm_ch(lineno, ch)     syntax_error_unterm_ch(ch)
+@@ -856,7 +856,7 @@ static void syntax_error_unexpected_ch(unsigned lineno, int ch)
+ # undef syntax_error_unterm_str
+ # undef syntax_error_unexpected_ch
+ #else
+-# define die_if_script(fmt...)          die_if_script(__LINE__, fmt)
++# define die_if_script(...)             die_if_script(__LINE__, __VA_ARGS__)
+ # define syntax_error(msg)              syntax_error(__LINE__, msg)
+ # define syntax_error_at(msg)           syntax_error_at(__LINE__, msg)
+ # define syntax_error_unterm_ch(ch)     syntax_error_unterm_ch(__LINE__, ch)
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 90866c8..754fa44 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -21,7 +21,6 @@
+ #include <syslog.h>
+ */
+ 
+-#include <paths.h>
+ #include <sys/un.h>
+ #include <sys/uio.h>
+ 
+diff --git a/util-linux/minix.h b/util-linux/minix.h
+index 3e2b989..e0fbcf7 100644
+--- a/util-linux/minix.h
++++ b/util-linux/minix.h
+@@ -48,7 +48,7 @@ struct minix_superblock {
+ 
+ struct minix_dir_entry {
+ 	uint16_t inode;
+-	char name[0];
++	char name[];
+ };
+ 
+ /* Believe it or not, but mount.h has this one #defined */
+diff --git a/util-linux/volume_id/romfs.c b/util-linux/volume_id/romfs.c
+index 4ed1319..f5005cd 100644
+--- a/util-linux/volume_id/romfs.c
++++ b/util-linux/volume_id/romfs.c
+@@ -24,7 +24,7 @@ struct romfs_super {
+ 	uint8_t magic[8];
+ 	uint32_t size;
+ 	uint32_t checksum;
+-	uint8_t name[0];
++	uint8_t name[];
+ } PACKED;
+ 
+ int volume_id_probe_romfs(struct volume_id *id /*,uint64_t off*/)

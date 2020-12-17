@@ -1,0 +1,193 @@
+2007-06-30 08:03:26 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 124b11f..e80e764 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -836,6 +836,8 @@ typedef struct {
+ 	DIR *dir;
+ /* Fields are set to 0/NULL if failed to determine (or not requested) */
+ 	char *cmd;
++	char *argv0;
++	/*char *exe;*/
+ 	USE_SELINUX(char *context;)
+ 	/* Everything below must contain no ptrs to malloc'ed data:
+ 	 * it is memset(0) for each process in procps_scan() */
+@@ -861,13 +863,15 @@ enum {
+ 	PSSCAN_UIDGID   = 1 << 4,
+ 	PSSCAN_COMM     = 1 << 5,
+ 	PSSCAN_CMD      = 1 << 6,
+-	PSSCAN_STATE    = 1 << 7,
+-	PSSCAN_VSZ      = 1 << 8,
+-	PSSCAN_RSS      = 1 << 9,
+-	PSSCAN_STIME    = 1 << 10,
+-	PSSCAN_UTIME    = 1 << 11,
+-	PSSCAN_TTY      = 1 << 12,
+-	USE_SELINUX(PSSCAN_CONTEXT  = 1 << 13,)
++	PSSCAN_ARGV0    = 1 << 7,
++	PSSCAN_EXE      = 1 << 8, /* not implemented yet */
++	PSSCAN_STATE    = 1 << 9,
++	PSSCAN_VSZ      = 1 << 10,
++	PSSCAN_RSS      = 1 << 11,
++	PSSCAN_STIME    = 1 << 12,
++	PSSCAN_UTIME    = 1 << 13,
++	PSSCAN_TTY      = 1 << 14,
++	USE_SELINUX(PSSCAN_CONTEXT  = 1 << 15,)
+ 	/* These are all retrieved from proc/NN/stat in one go: */
+ 	PSSCAN_STAT     = PSSCAN_PPID | PSSCAN_PGID | PSSCAN_SID
+ 	                | PSSCAN_COMM | PSSCAN_STATE
+diff --git a/libbb/find_pid_by_name.c b/libbb/find_pid_by_name.c
+index 13ccb54..cfc5b34 100644
+--- a/libbb/find_pid_by_name.c
++++ b/libbb/find_pid_by_name.c
+@@ -38,6 +38,14 @@ execXXX("/proc/self/exe", applet_name, params....)
+ and therefore comm field contains "exe".
+ */
+ 
++static const char *bb_basename(const char *name)
++{
++	const char *cp = strrchr(name, '/');
++	if (cp)
++		return cp + 1;
++	return name;
++}
++
+ /* find_pid_by_name()
+  *
+  *  Modified by Vladimir Oleynik for use with libbb/procps.c
+@@ -55,8 +63,16 @@ pid_t* find_pid_by_name(const char* procName)
+ 	procps_status_t* p = NULL;
+ 
+ 	pidList = xmalloc(sizeof(*pidList));
+-	while ((p = procps_scan(p, PSSCAN_PID|PSSCAN_COMM))) {
+-		if (strncmp(p->comm, procName, sizeof(p->comm)-1) == 0) {
++	while ((p = procps_scan(p, PSSCAN_PID|PSSCAN_COMM|PSSCAN_ARGV0))) {
++		if (
++		/* we require comm to match and to not be truncated */
++		/* in Linux, if comm is 15 chars, it may be a truncated
++		 * name, so we don't allow that to match */
++		    (!p->comm[sizeof(p->comm)-2] && strcmp(p->comm, procName) == 0)
++		/* or we require argv0 to match (essential for matching reexeced /proc/self/exe)*/
++		 || (p->argv0 && strcmp(bb_basename(p->argv0), procName) == 0)
++		/* TOOD: we can also try exe, do we want that? */
++		) {
+ 			pidList = xrealloc(pidList, sizeof(*pidList) * (i+2));
+ 			pidList[i++] = p->pid;
+ 		}
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 5924d60..8413ce8 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -92,7 +92,7 @@ static int read_to_buf(const char *filename, void *buf)
+ 	return ret;
+ }
+ 
+-procps_status_t* alloc_procps_scan(int flags)
++procps_status_t *alloc_procps_scan(int flags)
+ {
+ 	procps_status_t* sp = xzalloc(sizeof(procps_status_t));
+ 	sp->dir = xopendir("/proc");
+@@ -133,7 +133,7 @@ static char *skip_fields(char *str, int count)
+ #endif
+ 
+ void BUG_comm_size(void);
+-procps_status_t* procps_scan(procps_status_t* sp, int flags)
++procps_status_t *procps_scan(procps_status_t* sp, int flags)
+ {
+ 	struct dirent *entry;
+ 	char buf[PROCPS_BUFSIZE];
+@@ -266,24 +266,31 @@ procps_status_t* procps_scan(procps_status_t* sp, int flags)
+ 
+ 		}
+ 
+-		if (flags & PSSCAN_CMD) {
+-			free(sp->cmd);
+-			sp->cmd = NULL;
++		if (flags & (PSSCAN_CMD|PSSCAN_ARGV0)) {
++			if (sp->argv0) {
++				free(sp->argv0);
++				sp->argv0 = NULL;
++			}
++			if (sp->cmd) {
++				free(sp->cmd);
++				sp->cmd = NULL;
++			}
+ 			strcpy(filename_tail, "/cmdline");
++			/* TODO: to get rid of size limits, read into malloc buf,
++			 * then realloc it down to real size. */
+ 			n = read_to_buf(filename, buf);
+ 			if (n <= 0)
+ 				break;
+-			if (buf[n-1] == '\n') {
+-				if (!--n)
+-					break;
+-				buf[n] = '\0';
++			if (flags & PSSCAN_ARGV0)
++				sp->argv0 = xstrdup(buf);
++			if (flags & PSSCAN_CMD) {
++				do {
++					n--;
++					if ((unsigned char)(buf[n]) < ' ')
++						buf[n] = ' ';
++				} while (n);
++				sp->cmd = xstrdup(buf);
+ 			}
+-			do {
+-				n--;
+-				if ((unsigned char)(buf[n]) < ' ')
+-					buf[n] = ' ';
+-			} while (n);
+-			sp->cmd = xstrdup(buf);
+ 		}
+ 		break;
+ 	}
+diff --git a/procps/top.c b/procps/top.c
+index c6efe2d..136f140 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -40,7 +40,8 @@ typedef struct top_status_t {
+ 	unsigned pid, ppid;
+ 	unsigned uid;
+ 	char state[4];
+-	char comm[COMM_LEN];
++/* TODO: read /proc/$PID/cmdline only for processes which are displayed */
++	char cmd[64];
+ } top_status_t;
+ 
+ typedef struct jiffy_counts_t{
+@@ -444,7 +445,7 @@ static void display_status(int count, int scr_width)
+ #endif
+ 		);
+ 		if (col > 0)
+-			printf("%.*s", col, s->comm);
++			printf("%.*s", col, s->cmd);
+ 		/* printf(" %d/%d %lld/%lld", s->pcpu, total_pcpu,
+ 			jif.busy - prev_jif.busy, jif.total - prev_jif.total); */
+ 		s++;
+@@ -559,6 +560,7 @@ int top_main(int argc, char **argv)
+ 				| PSSCAN_UTIME
+ 				| PSSCAN_STATE
+ 				| PSSCAN_COMM
++				| PSSCAN_CMD
+ 				| PSSCAN_SID
+ 				| PSSCAN_UIDGID
+ 		))) {
+@@ -572,7 +574,10 @@ int top_main(int argc, char **argv)
+ #endif
+ 			top[n].uid = p->uid;
+ 			strcpy(top[n].state, p->state);
+-			strcpy(top[n].comm, p->comm);
++			if (p->cmd)
++				safe_strncpy(top[n].cmd, p->cmd, sizeof(top[n].cmd));
++			else /* mimic ps */
++				sprintf(top[n].cmd, "[%s]", p->comm);
+ 		}
+ 		if (ntop == 0) {
+ 			bb_error_msg_and_die("no process info in /proc");
+@@ -585,6 +590,7 @@ int top_main(int argc, char **argv)
+ 			continue;
+ 		}
+ 		do_stats();
++/* TODO: we don't need to sort all 10000 processes, we need to find top 24! */
+ 		qsort(top, ntop, sizeof(top_status_t), (void*)mult_lvl_cmp);
+ #else
+ 		qsort(top, ntop, sizeof(top_status_t), (void*)sort_function);

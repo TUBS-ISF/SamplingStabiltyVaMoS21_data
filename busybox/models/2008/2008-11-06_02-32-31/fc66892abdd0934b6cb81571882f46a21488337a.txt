@@ -1,0 +1,49 @@
+2008-11-06 02:32:31 +0000
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index 8caeb3c..c6a3a4c 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -197,7 +197,7 @@ int loadfont_main(int argc UNUSED_PARAM, char **argv)
+ 	 * just read the entire file.
+ 	 */
+ 	len = 32*1024; // can't be larger
+-	psfhdr = (struct psf_header *) xmalloc_read(STDIN_FILENO, &len);
++	psfhdr = xmalloc_read(STDIN_FILENO, &len);
+ 	// xmalloc_open_zipped_read_close(filename, &len);
+ 	if (!psfhdr)
+ 		bb_perror_msg_and_die("error reading input font");
+@@ -282,7 +282,7 @@ int setfont_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 	// load font
+ 	len = 32*1024; // can't be larger
+-	psfhdr = (struct psf_header *) xmalloc_open_zipped_read_close(*argv, &len);
++	psfhdr = xmalloc_open_zipped_read_close(*argv, &len);
+ 	if (!psfhdr)
+ 		bb_simple_perror_msg_and_die(*argv);
+ 	do_load(fd, psfhdr, len);
+diff --git a/modutils/depmod.c b/modutils/depmod.c
+index 5b9e9e8..a4474d5 100644
+--- a/modutils/depmod.c
++++ b/modutils/depmod.c
+@@ -50,7 +50,7 @@ static int FAST_FUNC parse_module(const char *fname, struct stat *sb,
+ 	if (strrstr(fname, ".ko") == NULL)
+ 		return TRUE;
+ 
+-	image = (char *) xmalloc_open_zipped_read_close(fname, &len);
++	image = xmalloc_open_zipped_read_close(fname, &len);
+ 	info = xzalloc(sizeof(module_info));
+ 
+ 	info->next = *first;
+diff --git a/modutils/modutils.c b/modutils/modutils.c
+index 10b49c9..0d7d72d 100644
+--- a/modutils/modutils.c
++++ b/modutils/modutils.c
+@@ -123,7 +123,7 @@ int FAST_FUNC bb_init_module(const char *filename, const char *options)
+ #endif
+ 
+ 	/* Use the 2.6 way */
+-	image = (char *) xmalloc_open_zipped_read_close(filename, &len);
++	image = xmalloc_open_zipped_read_close(filename, &len);
+ 	if (image) {
+ 		if (init_module(image, len, options) != 0)
+ 			rc = errno;

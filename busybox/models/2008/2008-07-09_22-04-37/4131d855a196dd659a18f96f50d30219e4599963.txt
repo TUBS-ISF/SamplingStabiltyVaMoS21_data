@@ -1,0 +1,14 @@
+2008-07-09 22:04:37 +0000
+diff --git a/miscutils/last_fancy.c b/miscutils/last_fancy.c
+index b4ae574..f3ea037 100644
+--- a/miscutils/last_fancy.c
++++ b/miscutils/last_fancy.c
+@@ -52,7 +52,7 @@ static void show_entry(struct utmp *ut, int state, time_t dur_secs)
+ 
+ 	/* manpages say ut_tv.tv_sec *is* time_t,
+ 	 * but some systems have it wrong */
+-        tmp = ut->ut_tv.tv_sec;
++	tmp = ut->ut_tv.tv_sec;
+ 	safe_strncpy(login_time, ctime(&tmp), 17);
+ 	snprintf(logout_time, 8, "- %s", ctime(&dur_secs) + 11);
+ 

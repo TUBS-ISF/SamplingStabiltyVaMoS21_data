@@ -1,0 +1,256 @@
+2008-03-02 12:51:26 +0000
+diff --git a/editors/diff.c b/editors/diff.c
+index 8844ec1..1359af8 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -1095,12 +1095,6 @@ static void do_diff(char *dir1, char *path1, char *dir2, char *path2)
+ 
+ 
+ #if ENABLE_FEATURE_DIFF_DIR
+-static int dir_strcmp(const void *p1, const void *p2)
+-{
+-	return strcmp(*(char *const *) p1, *(char *const *) p2);
+-}
+-
+-
+ /* This function adds a filename to dl, the directory listing. */
+ static int add_to_dirlist(const char *filename,
+ 		struct stat ATTRIBUTE_UNUSED * sb, void *userdata,
+@@ -1144,7 +1138,7 @@ static char **get_dir(char *path)
+ 	}
+ 
+ 	/* Sort dl alphabetically. */
+-	qsort(dl, dl_count, sizeof(char *), dir_strcmp);
++	qsort_string_vector(dl, dl_count);
+ 
+ 	dl[dl_count] = NULL;
+ 	return dl;
+diff --git a/include/libbb.h b/include/libbb.h
+index 8305e59..9b52dd2 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -545,6 +545,9 @@ extern FILE *fopen_or_warn(const char *filename, const char *mode);
+ /* "Opens" stdin if filename is special, else just opens file: */
+ extern FILE *fopen_or_warn_stdin(const char *filename);
+ 
++int bb_pstrcmp(const void *a, const void *b);
++void qsort_string_vector(char **sv, unsigned count);
++
+ /* Wrapper which restarts poll on EINTR or ENOMEM.
+  * On other errors complains [perror("poll")] and returns.
+  * Warning! May take (much) longer than timeout_ms to return!
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index fd36655..654722c 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -12,6 +12,7 @@ lib-y += bb_askpass.o
+ lib-y += bb_basename.o
+ lib-y += bb_do_delay.o
+ lib-y += bb_pwd.o
++lib-y += bb_qsort.o
+ lib-y += bb_strtonum.o
+ lib-y += change_identity.o
+ lib-y += chomp.o
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index d716169..7e40820 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -796,11 +796,6 @@ static char *add_quote_for_spec_chars(char *found)
+ 	return s;
+ }
+ 
+-static int match_compare(const void *a, const void *b)
+-{
+-	return strcmp(*(char**)a, *(char**)b);
+-}
+-
+ /* Do TAB completion */
+ static void input_tab(smallint *lastWasTab)
+ {
+@@ -841,7 +836,7 @@ static void input_tab(smallint *lastWasTab)
+ 		/* Sort, then remove any duplicates found */
+ 		if (matches) {
+ 			int i, n = 0;
+-			qsort(matches, num_matches, sizeof(char*), match_compare);
++			qsort_string_vector(matches, num_matches);
+ 			for (i = 0; i < num_matches - 1; ++i) {
+ 				if (matches[i] && matches[i+1]) { /* paranoia */
+ 					if (strcmp(matches[i], matches[i+1]) == 0) {
+diff --git a/shell/msh.c b/shell/msh.c
+index cde18d0..52a11bc 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -527,9 +527,6 @@ static int grave(int quoted);
+ static void globname(char *we, char *pp);
+ static char *generate(char *start1, char *end1, char *middle, char *end);
+ static int anyspcl(struct wdblock *wb);
+-static int xstrcmp(char *p1, char *p2);
+-static void glob0(char *a0, unsigned a1
+-		/*, int item_sz, int (*f)(char *, char *) */);
+ static void readhere(char **name, char *s, int ec);
+ static int xxchar(struct ioarg *ap);
+ 
+@@ -4269,11 +4266,11 @@ static struct wdblock *glob(char *cp, struct wdblock *wb)
+ 				DELETE(cl->w_words[i]);
+ 			DELETE(cl);
+ 		}
+-		for (i = 0; i < cl->w_nword; i++)
+-			unquote(cl->w_words[i]);
+-		glob0((char *) cl->w_words, cl->w_nword /*, sizeof(char *), xstrcmp*/);
+ 		if (cl->w_nword) {
+ 			for (i = 0; i < cl->w_nword; i++)
++				unquote(cl->w_words[i]);
++			qsort_string_vector(cl->w_words, cl->w_nword);
++			for (i = 0; i < cl->w_nword; i++)
+ 				wb = addword(cl->w_words[i], wb);
+ 			DELETE(cl);
+ 			return wb;
+@@ -4296,11 +4293,13 @@ static void globname(char *we, char *pp)
+ 	for (np = we; np != pp; pp--)
+ 		if (pp[-1] == '/')
+ 			break;
+-	for (dp = cp = get_space((int) (pp - np) + 3); np < pp;)
++	dp = cp = get_space((int) (pp - np) + 3);
++	while (np < pp)
+ 		*cp++ = *np++;
+ 	*cp++ = '.';
+ 	*cp = '\0';
+-	for (gp = cp = get_space(strlen(pp) + 1); *np && *np != '/';)
++	gp = cp = get_space(strlen(pp) + 1);
++	while (*np && *np != '/')
+ 		*cp++ = *np++;
+ 	*cp = '\0';
+ 	dirp = opendir(dp);
+@@ -4372,11 +4371,6 @@ static int anyspcl(struct wdblock *wb)
+ 	return 0;
+ }
+ 
+-static int xstrcmp(char *p1, char *p2)
+-{
+-	return strcmp(*(char **) p1, *(char **) p2);
+-}
+-
+ 
+ /* -------- word.c -------- */
+ 
+@@ -4423,118 +4417,11 @@ static char **getwords(struct wdblock *wb)
+ 	}
+ 	nb = sizeof(*wd) * wb->w_nword;
+ 	wd = get_space(nb);
+-	memcpy((char *) wd, (char *) wb->w_words, nb);
+-	DELETE(wb);					/* perhaps should done by caller */
++	memcpy(wd, wb->w_words, nb);
++	DELETE(wb);			/* perhaps should done by caller */
+ 	return wd;
+ }
+ 
+-/*static int (*cmp_func) (char *, char *);*/
+-/*static int glob_item_sz;*/
+-#define cmp_func xstrcmp
+-enum { glob_item_sz = sizeof(char *) };
+-
+-static void glob3(char *index1, char *index2, char *index3)
+-{
+-	int m = glob_item_sz;
+-	do {
+-		char c = *index1;
+-		*index1++ = *index3;
+-		*index3++ = *index2;
+-		*index2++ = c;
+-	} while (--m);
+-}
+-
+-static void glob2(char *index1, char *index2)
+-{
+-	int m = glob_item_sz;
+-	do {
+-		char c = *index1;
+-		*index1++ = *index2;
+-		*index2++ = c;
+-	} while (--m);
+-}
+-
+-static void glob1(char *base, char *lim)
+-{
+-	char *i, *j;
+-	int v2;
+-	char *lptr, *hptr;
+-	int c;
+-	unsigned n;
+-
+-	v2 = glob_item_sz;
+- top:
+-	n = (int) (lim - base);
+-	if (n <= v2)
+-		return;
+-	n = v2 * (n / (2 * v2));
+-	hptr = lptr = base + n;
+-	i = base;
+-	j = lim - v2;
+-	for (;;) {
+-		if (i < lptr) {
+-			c = cmp_func(i, lptr);
+-			if (c == 0) {
+-				lptr -= v2;
+-				glob2(i, lptr);
+-				continue;
+-			}
+-			if (c < 0) {
+-				i += v2;
+-				continue;
+-			}
+-		}
+- begin:
+-		if (j > hptr) {
+-			c = cmp_func(hptr, j);
+-			if (c == 0) {
+-				hptr += v2;
+-				glob2(hptr, j);
+-				goto begin;
+-			}
+-			if (c > 0) {
+-				if (i == lptr) {
+-					hptr += v2;
+-					glob3(i, hptr, j);
+-					lptr += v2;
+-					i = lptr;
+-					goto begin;
+-				}
+-				glob2(i, j);
+-				j -= v2;
+-				i += v2;
+-				continue;
+-			}
+-			j -= v2;
+-			goto begin;
+-		}
+-
+-		if (i == lptr) {
+-			if (lptr - base >= lim - hptr) {
+-				glob1(hptr + v2, lim);
+-				lim = lptr;
+-			} else {
+-				glob1(base, lptr);
+-				base = hptr + v2;
+-			}
+-			goto top;
+-		}
+-
+-		lptr -= v2;
+-		glob3(j, lptr, i);
+-		hptr -= v2;
+-		j = hptr;
+-	}
+-}
+-
+-static void glob0(char *a0, unsigned a1
+-		/*, int item_sz, int (*f) (char *, char *) */)
+-{
+-	/*cmp_func = f; - always xstrcmp */
+-	/*glob_item_sz = item_sz; - always sizeof(char*) */
+-	glob1(a0, a0 + a1 * /*item_sz:*/ sizeof(char*));
+-}
+-
+ 
+ /* -------- io.c -------- */
+ 

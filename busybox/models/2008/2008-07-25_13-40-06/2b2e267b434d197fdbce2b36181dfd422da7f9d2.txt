@@ -1,0 +1,18 @@
+2008-07-25 13:40:06 +0000
+diff --git a/shell/ash_test/ash-redir/redir5.right b/shell/ash_test/ash-redir/redir5.right
+new file mode 100644
+index 0000000..9d08777
+--- /dev/null
++++ b/shell/ash_test/ash-redir/redir5.right
+@@ -0,0 +1,2 @@
++./redir5.tests: line 2: 10: Bad file descriptor
++OK
+diff --git a/shell/ash_test/ash-redir/redir5.tests b/shell/ash_test/ash-redir/redir5.tests
+new file mode 100755
+index 0000000..91b0c1f
+--- /dev/null
++++ b/shell/ash_test/ash-redir/redir5.tests
+@@ -0,0 +1,3 @@
++# ash uses fd 10 (usually) for reading the script
++echo LOST >&10
++echo OK

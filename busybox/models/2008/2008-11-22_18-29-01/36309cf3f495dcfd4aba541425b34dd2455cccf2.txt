@@ -1,0 +1,89 @@
+2008-11-22 18:29:01 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 5223e9e..49c9400 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1864,8 +1864,12 @@
+      "\ninotifyd waits for PROG to exit." \
+      "\nWhen x event happens for all FILEs, inotifyd exits" \
+ 
++/* 2.6 style insmod has no options and required filename
++ * (not module name - .ko can't be omitted) */
+ #define insmod_trivial_usage \
+-	USE_FEATURE_2_4_MODULES("[OPTION]... ") "MODULE [symbol=value]..."
++	USE_FEATURE_2_4_MODULES("[OPTION]... MODULE ") \
++	SKIP_FEATURE_2_4_MODULES("FILE ") \
++	"[symbol=value]..."
+ #define insmod_full_usage "\n\n" \
+        "Load the specified kernel modules into the kernel" \
+ 	USE_FEATURE_2_4_MODULES( "\n" \
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 61ee500..4d211f5 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -16,9 +16,17 @@ int insmod_main(int argc UNUSED_PARAM, char **argv)
+ 	char *filename;
+ 	int rc;
+ 
++	/* Compat note:
++	 * 2.6 style insmod has no options and required filename
++	 * (not module name - .ko can't be omitted).
++	 * 2.4 style insmod can take module name without .ko
++	 * and performs module search in default directories
++	 * or in $MODPATH.
++	 */
++
+ 	USE_FEATURE_2_4_MODULES(
+ 		getopt32(argv, INSMOD_OPTS INSMOD_ARGS);
+-		argv += optind-1;
++		argv += optind - 1;
+ 	);
+ 
+ 	filename = *++argv;
+diff --git a/modutils/modutils-24.c b/modutils/modutils-24.c
+index ae0afd4..ecab193 100644
+--- a/modutils/modutils-24.c
++++ b/modutils/modutils-24.c
+@@ -3810,7 +3810,7 @@ static void print_load_map(struct obj_file *f UNUSED_PARAM)
+ }
+ #endif
+ 
+-int FAST_FUNC bb_init_module_24(const char *m_filename, const char *options UNUSED_PARAM)
++int FAST_FUNC bb_init_module_24(const char *m_filename, const char *options)
+ {
+ 	int k_crcs;
+ 	unsigned long m_size;
+@@ -3906,13 +3906,13 @@ int FAST_FUNC bb_init_module_24(const char *m_filename, const char *options UNUS
+ 
+ 	m_addr = create_module(m_name, m_size);
+ 	if (m_addr == (ElfW(Addr))(-1)) switch (errno) {
+-		case EEXIST:
+-			bb_error_msg_and_die("a module named %s already exists", m_name);
+-		case ENOMEM:
+-			bb_error_msg_and_die("can't allocate kernel memory for module; needed %lu bytes",
+-					m_size);
+-		default:
+-			bb_perror_msg_and_die("create_module: %s", m_name);
++	case EEXIST:
++		bb_error_msg_and_die("a module named %s already exists", m_name);
++	case ENOMEM:
++		bb_error_msg_and_die("can't allocate kernel memory for module; needed %lu bytes",
++				m_size);
++	default:
++		bb_perror_msg_and_die("create_module: %s", m_name);
+ 	}
+ 
+ #if !LOADBITS
+diff --git a/modutils/modutils.h b/modutils/modutils.h
+index 32ee18b..ddd4e17 100644
+--- a/modutils/modutils.h
++++ b/modutils/modutils.h
+@@ -23,7 +23,7 @@ const char *moderror(int err) FAST_FUNC;
+ llist_t *llist_find(llist_t *first, const char *str) FAST_FUNC;
+ void replace(char *s, char what, char with) FAST_FUNC;
+ char *replace_underscores(char *s) FAST_FUNC;
+-int string_to_llist(char *string, llist_t **llist, const char *delim) FAST_FUNC ;
++int string_to_llist(char *string, llist_t **llist, const char *delim) FAST_FUNC;
+ char *filename2modname(const char *filename, char *modname) FAST_FUNC;
+ char *parse_cmdline_module_options(char **argv) FAST_FUNC;
+ 

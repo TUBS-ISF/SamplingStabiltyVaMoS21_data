@@ -1,0 +1,13 @@
+2007-09-22 21:13:17 +0000
+diff --git a/scripts/defconfig b/scripts/defconfig
+index a669de1..7cd17ec 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -519,6 +519,7 @@ CONFIG_FEATURE_HDPARM_HDIO_GETSET_DMA=y
+ CONFIG_MAKEDEVS=y
+ # CONFIG_FEATURE_MAKEDEVS_LEAF is not set
+ CONFIG_FEATURE_MAKEDEVS_TABLE=y
++CONFIG_MICROCOM=y
+ CONFIG_MOUNTPOINT=y
+ CONFIG_MT=y
+ CONFIG_RAIDAUTORUN=y

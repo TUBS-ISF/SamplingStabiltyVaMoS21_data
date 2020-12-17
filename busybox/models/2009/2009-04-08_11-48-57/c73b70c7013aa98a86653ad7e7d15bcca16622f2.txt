@@ -1,0 +1,372 @@
+2009-04-08 11:48:57 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 5594aae..6075f51 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -117,7 +117,10 @@
+ #define IF_HAS_NO_KEYWORDS(...) __VA_ARGS__
+ #endif
+ 
+-/* Keep unconditionally on for now */
++/* Enable/disable sanity checks. Ok to enable in production,
++ * only adds a bit of bloat.
++ * Keeping unconditionally on for now.
++ */
+ #define HUSH_DEBUG 1
+ /* In progress... */
+ #define ENABLE_HUSH_FUNCTIONS 0
+@@ -524,6 +527,9 @@ struct globals {
+ 	char **traps; /* char *traps[NSIG] */
+ 	sigset_t blocked_set;
+ 	sigset_t inherited_set;
++#if HUSH_DEBUG
++	unsigned long memleak_value;
++#endif
+ 	char user_input_buf[ENABLE_FEATURE_EDITING ? BUFSIZ : 2];
+ #if ENABLE_FEATURE_SH_STANDALONE
+ 	struct nofork_save_area nofork_save;
+@@ -555,14 +561,17 @@ static int builtin_jobs(char **argv);
+ #if ENABLE_HUSH_HELP
+ static int builtin_help(char **argv);
+ #endif
++#if HUSH_DEBUG
++static int builtin_memleak(char **argv);
++#endif
+ static int builtin_pwd(char **argv);
+ static int builtin_read(char **argv);
+-static int builtin_test(char **argv);
+-static int builtin_trap(char **argv);
+-static int builtin_true(char **argv);
+ static int builtin_set(char **argv);
+ static int builtin_shift(char **argv);
+ static int builtin_source(char **argv);
++static int builtin_test(char **argv);
++static int builtin_trap(char **argv);
++static int builtin_true(char **argv);
+ static int builtin_umask(char **argv);
+ static int builtin_unset(char **argv);
+ static int builtin_wait(char **argv);
+@@ -618,6 +627,9 @@ static const struct built_in_command bltins[] = {
+ #if ENABLE_HUSH_JOB
+ 	BLTIN("jobs"    , builtin_jobs    , "List active jobs"),
+ #endif
++#if HUSH_DEBUG
++	BLTIN("memleak" , builtin_memleak , "Debug tool"),
++#endif
+ 	BLTIN("pwd"     , builtin_pwd     , "Print current directory"),
+ 	BLTIN("read"    , builtin_read    , "Input environment variable"),
+ //	BLTIN("return"  , builtin_return  , "Return from a function"),
+@@ -5962,6 +5974,36 @@ static int builtin_jobs(char **argv UNUSED_PARAM)
+ }
+ #endif
+ 
++#if HUSH_DEBUG
++static int builtin_memleak(char **argv UNUSED_PARAM)
++{
++	void *p;
++	unsigned long l;
++
++	/* Crude attempt to find where "free memory" starts,
++	 * sans fragmentation. */
++	p = malloc(240);
++	l = (unsigned long)p;
++	free(p);
++	p = malloc(3400);
++	if (l < (unsigned long)p) l = (unsigned long)p;
++	free(p);
++
++	if (!G.memleak_value)
++		G.memleak_value = l;
++	
++	l -= G.memleak_value;
++	if ((long)l < 0)
++		l = 0;
++	l /= 1024;
++	if (l > 127)
++		l = 127;
++
++	/* Exitcode is "how many kilobytes we leaked since 1st call" */
++	return l;
++}
++#endif
++
+ static int builtin_pwd(char **argv UNUSED_PARAM)
+ {
+ 	puts(set_cwd());
+diff --git a/shell/hush_test/hush-z_slow/leak_all1.right b/shell/hush_test/hush-z_slow/leak_all1.right
+new file mode 100644
+index 0000000..c6f0334
+--- /dev/null
++++ b/shell/hush_test/hush-z_slow/leak_all1.right
+@@ -0,0 +1,3 @@
++Warm up
++Measuring memory leak...
++Ok
+diff --git a/shell/hush_test/hush-z_slow/leak_all1.tests b/shell/hush_test/hush-z_slow/leak_all1.tests
+new file mode 100755
+index 0000000..6834d9a
+--- /dev/null
++++ b/shell/hush_test/hush-z_slow/leak_all1.tests
+@@ -0,0 +1,61 @@
++# "Check many leaks" test #1
++# Cramming all kinds of weird commands in here.
++# As you find leaks, please create separate, small test
++# for each leak.
++# Narrowing down the leak using this large test may be difficult.
++# It is intended to be a blanket "is everything ok?" test
++
++echo "Warm up"
++i=1
++l=1
++t=1
++export t
++while test $i != 99; do
++    t=value1_$i; t=value2_$i true; t=value3_$i /bin/true; t=value4_$i exec 1>&1
++    { t=value3_$i /bin/true; } </dev/null
++    if true; t=valueA_$i false >>/dev/null; true; then
++	: << HERE >/dev/null; true <<HERE
++Hello builtin :
++HERE
++Hello true
++HERE
++    elif false; then
++	true; echo Doesnt run
++    else
++	{ true; }; echo Doesnt run too >>/foo/bar
++    fi
++    : $((i++))
++done
++
++memleak
++
++echo "Measuring memory leak..."
++# Please copy the entire block from above verbatim
++i=1
++l=1
++t=1
++export t
++while test $i != 99; do
++    t=value1_$i; t=value2_$i true; t=value3_$i /bin/true; t=value4_$i exec 1>&1
++    { t=value3_$i /bin/true; } </dev/null
++    if true; t=valueA_$i false >>/dev/null; true; then
++	: << HERE >/dev/null; true <<HERE
++Hello builtin :
++HERE
++Hello true
++HERE
++    elif false; then
++	true; echo Doesnt run
++    else
++	{ true; }; echo Doesnt run too >>/foo/bar
++    fi
++    : $((i++))
++done
++
++memleak
++kb=$?
++if test $kb -le 4; then
++    echo Ok #$kb
++else
++    echo "Bad: $kb kb (or more) leaked"
++fi
+diff --git a/shell/hush_test/hush-z_slow/leak_var.right b/shell/hush_test/hush-z_slow/leak_var.right
+index 7bccc1e..1d4d6ff 100644
+--- a/shell/hush_test/hush-z_slow/leak_var.right
++++ b/shell/hush_test/hush-z_slow/leak_var.right
+@@ -1,2 +1,2 @@
+ Measuring memory leak...
+-vsz does not grow
++Ok
+diff --git a/shell/hush_test/hush-z_slow/leak_var.tests b/shell/hush_test/hush-z_slow/leak_var.tests
+index b3e13e3..41c09e4 100755
+--- a/shell/hush_test/hush-z_slow/leak_var.tests
++++ b/shell/hush_test/hush-z_slow/leak_var.tests
+@@ -1,96 +1,4 @@
+-pid=$$
+-
+-# Warm up
+-beg=`ps -o pid,vsz | grep "^ *$pid "`
+-i=1
+-while test $i != X; do
+-    unset t
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111
+-    export t
+-    unset t
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111
+-    export t
+-    unset t
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111
+-    export t
+-    unset t
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111
+-    export t
+-    unset t
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111
+-    export t
+-    i=1$i
+-    if test $i = 1111111111111111111111111111111111111111111111; then i=2; fi
+-    if test $i = 1111111111111111111111111111111111111111111112; then i=3; fi
+-    if test $i = 1111111111111111111111111111111111111111111113; then i=4; fi
+-    if test $i = 1111111111111111111111111111111111111111111114; then i=5; fi
+-    if test $i = 1111111111111111111111111111111111111111111115; then i=6; fi
+-    if test $i = 1111111111111111111111111111111111111111111116; then i=7; fi
+-    if test $i = 1111111111111111111111111111111111111111111117; then i=8; fi
+-    if test $i = 1111111111111111111111111111111111111111111118; then i=9; fi
+-    if test $i = 1111111111111111111111111111111111111111111119; then i=a; fi
+-    if test $i = 111111111111111111111111111111111111111111111a; then i=b; fi
+-    if test $i = 111111111111111111111111111111111111111111111b; then i=c; fi
+-    if test $i = 111111111111111111111111111111111111111111111c; then i=d; fi
+-    if test $i = 111111111111111111111111111111111111111111111d; then i=e; fi
+-    if test $i = 111111111111111111111111111111111111111111111e; then i=f; fi
+-    if test $i = 111111111111111111111111111111111111111111111f; then i=g; fi
+-    if test $i = 111111111111111111111111111111111111111111111g; then i=h; fi
+-    if test $i = 111111111111111111111111111111111111111111111h; then i=i; fi
+-    if test $i = 111111111111111111111111111111111111111111111i; then i=j; fi
+-    if test $i = 111111111111111111111111111111111111111111111j; then i=X; fi
+-done
+-end=`ps -o pid,vsz | grep "^ *$pid "`
+-
+-# Warm up again (I do need it on my machine)
+-beg=`ps -o pid,vsz | grep "^ *$pid "`
+-i=1
+-while test $i != X; do
+-    unset t
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111
+-    export t
+-    unset t
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111
+-    export t
+-    unset t
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111
+-    export t
+-    unset t
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111
+-    export t
+-    unset t
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111
+-    export t
+-    i=1$i
+-    if test $i = 1111111111111111111111111111111111111111111111; then i=2; fi
+-    if test $i = 1111111111111111111111111111111111111111111112; then i=3; fi
+-    if test $i = 1111111111111111111111111111111111111111111113; then i=4; fi
+-    if test $i = 1111111111111111111111111111111111111111111114; then i=5; fi
+-    if test $i = 1111111111111111111111111111111111111111111115; then i=6; fi
+-    if test $i = 1111111111111111111111111111111111111111111116; then i=7; fi
+-    if test $i = 1111111111111111111111111111111111111111111117; then i=8; fi
+-    if test $i = 1111111111111111111111111111111111111111111118; then i=9; fi
+-    if test $i = 1111111111111111111111111111111111111111111119; then i=a; fi
+-    if test $i = 111111111111111111111111111111111111111111111a; then i=b; fi
+-    if test $i = 111111111111111111111111111111111111111111111b; then i=c; fi
+-    if test $i = 111111111111111111111111111111111111111111111c; then i=d; fi
+-    if test $i = 111111111111111111111111111111111111111111111d; then i=e; fi
+-    if test $i = 111111111111111111111111111111111111111111111e; then i=f; fi
+-    if test $i = 111111111111111111111111111111111111111111111f; then i=g; fi
+-    if test $i = 111111111111111111111111111111111111111111111g; then i=h; fi
+-    if test $i = 111111111111111111111111111111111111111111111h; then i=i; fi
+-    if test $i = 111111111111111111111111111111111111111111111i; then i=j; fi
+-    if test $i = 111111111111111111111111111111111111111111111j; then i=X; fi
+-done
+-end=`ps -o pid,vsz | grep "^ *$pid "`
+-if test "$beg" != "$end"; then
+-    true echo "vsz grows: $beg -> $end"
+-else
+-    true echo "vsz does not grow"
+-fi
+-
+ echo "Measuring memory leak..."
+-beg=`ps -o pid,vsz | grep "^ *$pid "`
+ i=1
+ while test $i != X; do
+     unset t
+@@ -128,11 +36,12 @@ while test $i != X; do
+     if test $i = 111111111111111111111111111111111111111111111h; then i=i; fi
+     if test $i = 111111111111111111111111111111111111111111111i; then i=j; fi
+     if test $i = 111111111111111111111111111111111111111111111j; then i=X; fi
++    memleak
+ done
+-end=`ps -o pid,vsz | grep "^ *$pid "`
+-
+-if test "$beg" != "$end"; then
+-    echo "vsz grows: $beg -> $end"
++memleak
++kb=$?
++if test $kb -le 4; then
++    echo Ok
+ else
+-    echo "vsz does not grow"
++    echo "Bad: $kb kb (or more) leaked"
+ fi
+diff --git a/shell/hush_test/hush-z_slow/leak_var2.right b/shell/hush_test/hush-z_slow/leak_var2.right
+index 7bccc1e..c6f0334 100644
+--- a/shell/hush_test/hush-z_slow/leak_var2.right
++++ b/shell/hush_test/hush-z_slow/leak_var2.right
+@@ -1,2 +1,3 @@
++Warm up
+ Measuring memory leak...
+-vsz does not grow
++Ok
+diff --git a/shell/hush_test/hush-z_slow/leak_var2.tests b/shell/hush_test/hush-z_slow/leak_var2.tests
+index 09f2475..0ab1315 100755
+--- a/shell/hush_test/hush-z_slow/leak_var2.tests
++++ b/shell/hush_test/hush-z_slow/leak_var2.tests
+@@ -1,10 +1,7 @@
+-pid=$$
+-
+ t=1
+ export t
+ 
+-# Warm up
+-beg=`ps -o pid,vsz | grep "^ *$pid "`
++echo "Warm up"
+ i=1
+ while test $i != X; do
+     t=111111111111111111111111111111111111111111111111111111111111111111111110$i
+@@ -17,31 +14,10 @@ while test $i != X; do
+     if test $i = 1111111111111111111111111111111111111111111113; then i=4; fi
+     if test $i = 1111111111111111111111111111111111111111111114; then i=X; fi
+ done
+-end=`ps -o pid,vsz | grep "^ *$pid "`
+ 
+-# Warm up again (I do need it on my machine)
+-beg=`ps -o pid,vsz | grep "^ *$pid "`
+-i=1
+-while test $i != X; do
+-    t=111111111111111111111111111111111111111111111111111111111111111111111110$i
+-    t=111111111111111111111111111111111111111111111111111111111111111111111111$i true
+-    t=111111111111111111111111111111111111111111111111111111111111111111111112$i /bin/true
+-    t=111111111111111111111111111111111111111111111111111111111111111111111113$i exec 1>&1
+-    i=1$i
+-    if test $i = 1111111111111111111111111111111111111111111111; then i=2; fi
+-    if test $i = 1111111111111111111111111111111111111111111112; then i=3; fi
+-    if test $i = 1111111111111111111111111111111111111111111113; then i=4; fi
+-    if test $i = 1111111111111111111111111111111111111111111114; then i=X; fi
+-done
+-end=`ps -o pid,vsz | grep "^ *$pid "`
+-if test "$beg" != "$end"; then
+-    true echo "vsz grows: $beg -> $end"
+-else
+-    true echo "vsz does not grow"
+-fi
++memleak
+ 
+ echo "Measuring memory leak..."
+-beg=`ps -o pid,vsz | grep "^ *$pid "`
+ i=1
+ while test $i != X; do
+     t=111111111111111111111111111111111111111111111111111111111111111111111110$i
+@@ -54,10 +30,11 @@ while test $i != X; do
+     if test $i = 1111111111111111111111111111111111111111111113; then i=4; fi
+     if test $i = 1111111111111111111111111111111111111111111114; then i=X; fi
+ done
+-end=`ps -o pid,vsz | grep "^ *$pid "`
+ 
+-if test "$beg" != "$end"; then
+-    echo "vsz grows: $beg -> $end"
++memleak
++kb=$?
++if test $kb -le 4; then
++    echo Ok
+ else
+-    echo "vsz does not grow"
++    echo "Bad: $kb kb (or more) leaked"
+ fi

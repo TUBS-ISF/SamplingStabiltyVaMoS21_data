@@ -1,0 +1,61 @@
+2008-07-29 11:10:01 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 5af939d..8ffc612 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -217,7 +217,7 @@ void xxfree(void *ptr)
+ /* Keep unconditionally on for now */
+ #define HUSH_DEBUG 1
+ /* Do we support ANY keywords? */
+-#if ENABLE_HUSH_IF || ENABLE_HUSH_LOOPS
++#if ENABLE_HUSH_IF || ENABLE_HUSH_LOOPS || ENABLE_HUSH_CASE
+ #define HAS_KEYWORDS 1
+ #define IF_HAS_KEYWORDS(...) __VA_ARGS__
+ #define IF_HAS_NO_KEYWORDS(...)
+@@ -276,6 +276,8 @@ typedef enum reserved_style {
+ 	RES_UNTIL ,
+ 	RES_DO    ,
+ 	RES_DONE  ,
++#endif
++#if ENABLE_HUSH_LOOPS || ENABLE_HUSH_CASE
+ 	RES_IN    ,
+ #endif
+ #if ENABLE_HUSH_CASE
+@@ -1998,6 +2000,8 @@ static void debug_print_tree(struct pipe *pi, int lvl)
+ 		[RES_UNTIL] = "UNTIL",
+ 		[RES_DO   ] = "DO"   ,
+ 		[RES_DONE ] = "DONE" ,
++#endif
++#if ENABLE_HUSH_LOOPS || ENABLE_HUSH_CASE
+ 		[RES_IN   ] = "IN"   ,
+ #endif
+ #if ENABLE_HUSH_CASE
+@@ -2058,7 +2062,7 @@ static int run_list(struct pipe *pi)
+ #endif
+ 	smallint flag_skip = 1;
+ 	smalluint rcode = 0; /* probably just for compiler */
+-#if ENABLE_HUSH_IF
++#if ENABLE_HUSH_IF || ENABLE_HUSH_CASE
+ 	smalluint cond_code = 0;
+ #else
+ 	enum { cond_code = 0, };
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index 0ed8fae..103ef68 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -170,6 +170,7 @@ enum {
+ };
+ #endif
+ 
++#if ENABLE_FEATURE_FBSET_READMODE
+ static void ss(uint32_t *x, uint32_t flag, char *buf, const char *what)
+ {
+ 	if (strstr(buf, what))
+@@ -178,7 +179,6 @@ static void ss(uint32_t *x, uint32_t flag, char *buf, const char *what)
+ 		*x |= flag;
+ }
+ 
+-#if ENABLE_FEATURE_FBSET_READMODE
+ static int readmode(struct fb_var_screeninfo *base, const char *fn,
+ 					const char *mode)
+ {

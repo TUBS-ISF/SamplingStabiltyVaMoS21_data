@@ -1,0 +1,167 @@
+2008-08-05 23:32:27 +0000
+diff --git a/console-tools/chvt.c b/console-tools/chvt.c
+index ea3e7c0..302ffb4 100644
+--- a/console-tools/chvt.c
++++ b/console-tools/chvt.c
+@@ -19,7 +19,6 @@ int chvt_main(int argc, char **argv)
+ 	}
+ 
+ 	num = xatou_range(argv[1], 1, 63);
+-	/* double cast suppresses "cast to ptr from int of different size" */
+-	console_make_active(get_console_fd(), num);
++	console_make_active(get_console_fd_or_die(), num);
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/console-tools/deallocvt.c b/console-tools/deallocvt.c
+index e9a3989..0974883 100644
+--- a/console-tools/deallocvt.c
++++ b/console-tools/deallocvt.c
+@@ -28,6 +28,6 @@ int deallocvt_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	/* double cast suppresses "cast to ptr from int of different size" */
+-	xioctl(get_console_fd(), VT_DISALLOCATE, (void *)(ptrdiff_t)num);
++	xioctl(get_console_fd_or_die(), VT_DISALLOCATE, (void *)(ptrdiff_t)num);
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/console-tools/dumpkmap.c b/console-tools/dumpkmap.c
+index 1d6bbdc..c382b5a 100644
+--- a/console-tools/dumpkmap.c
++++ b/console-tools/dumpkmap.c
+@@ -32,7 +32,7 @@ int dumpkmap_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 
+ /*	bb_warn_ignoring_args(argc>=2);*/
+ 
+-	fd = xopen(CURRENT_VC, O_RDWR);
++	fd = get_console_fd_or_die();
+ 
+ 	write(STDOUT_FILENO, "bkeymap", 7);
+ 
+diff --git a/console-tools/kbd_mode.c b/console-tools/kbd_mode.c
+index 2162fd4..cb97947 100644
+--- a/console-tools/kbd_mode.c
++++ b/console-tools/kbd_mode.c
+@@ -19,17 +19,15 @@ int kbd_mode_main(int argc UNUSED_PARAM, char **argv)
+ 	int fd;
+ 	unsigned opt;
+ 	enum {
+-		SCANCODE = (1<<0),
+-		ASCII	 = (1<<1),
+-		MEDIUMRAW= (1<<2),
+-		UNICODE	 = (1<<3)
++		SCANCODE  = (1 << 0),
++		ASCII	  = (1 << 1),
++		MEDIUMRAW = (1 << 2),
++		UNICODE	  = (1 << 3)
+ 	};
+ 	static const char KD_xxx[] ALIGN1 = "saku";
+ 	opt = getopt32(argv, KD_xxx);
+-	fd = get_console_fd();
+-/*	if (fd < 0)
+-		return EXIT_FAILURE;
+-*/
++	fd = get_console_fd_or_die();
++
+ 	if (!opt) { /* print current setting */
+ 		const char *mode = "unknown";
+ 		int m;
+@@ -46,7 +44,8 @@ int kbd_mode_main(int argc UNUSED_PARAM, char **argv)
+ 		printf("The keyboard is in %s mode\n", mode);
+ 	} else {
+ 		opt = opt & UNICODE ? 3 : opt >> 1;
+-		xioctl(fd, KDSKBMODE, opt);
++		/* double cast prevents warnings about widening conversion */
++		xioctl(fd, KDSKBMODE, (void*)(ptrdiff_t)opt);
+ 	}
+ 
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index 48b2980..567aa38 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -174,7 +174,7 @@ int loadfont_main(int argc, char **argv UNUSED_PARAM)
+ 	if (argc != 1)
+ 		bb_show_usage();
+ 
+-	fd = xopen(CURRENT_VC, O_RDWR);
++	fd = get_console_fd_or_die();
+ 	loadnewfont(fd);
+ 
+ 	return EXIT_SUCCESS;
+diff --git a/console-tools/loadkmap.c b/console-tools/loadkmap.c
+index b891c9b..56948e0 100644
+--- a/console-tools/loadkmap.c
++++ b/console-tools/loadkmap.c
+@@ -35,7 +35,7 @@ int loadkmap_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 
+ /*  bb_warn_ignoring_args(argc>=2);*/
+ 
+-	fd = xopen(CURRENT_VC, O_RDWR);
++	fd = get_console_fd_or_die();
+ 
+ 	xread(STDIN_FILENO, flags, 7);
+ 	if (strncmp(flags, BINARY_KEYMAP_MAGIC, 7))
+diff --git a/console-tools/setkeycodes.c b/console-tools/setkeycodes.c
+index e9a0508..597272a 100644
+--- a/console-tools/setkeycodes.c
++++ b/console-tools/setkeycodes.c
+@@ -26,11 +26,11 @@ int setkeycodes_main(int argc, char **argv)
+ 	int fd, sc;
+ 	struct kbkeycode a;
+ 
+-	if (argc % 2 != 1 || argc < 2) {
++	if (!(argc & 1) /* if even */ || argc < 2) {
+ 		bb_show_usage();
+ 	}
+ 
+-	fd = get_console_fd();
++	fd = get_console_fd_or_die();
+ 
+ 	while (argc > 2) {
+ 		a.keycode = xatou_range(argv[2], 0, 127);
+@@ -40,7 +40,7 @@ int setkeycodes_main(int argc, char **argv)
+ 			a.scancode += 128;
+ 		}
+ 		ioctl_or_perror_and_die(fd, KDSETKEYCODE, &a,
+-			"failed to set SCANCODE %x to KEYCODE %d",
++			"can't set SCANCODE %x to KEYCODE %d",
+ 			sc, a.keycode);
+ 		argc -= 2;
+ 		argv += 2;
+diff --git a/include/libbb.h b/include/libbb.h
+index 3996846..075fa05 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -287,7 +287,7 @@ extern int recursive_action(const char *fileName, unsigned flags,
+ extern int device_open(const char *device, int mode) FAST_FUNC;
+ enum { GETPTY_BUFSIZE = 16 }; /* more than enough for "/dev/ttyXXX" */
+ extern int xgetpty(char *line) FAST_FUNC;
+-extern int get_console_fd(void) FAST_FUNC;
++extern int get_console_fd_or_die(void) FAST_FUNC;
+ extern void console_make_active(int fd, const int vt_num) FAST_FUNC;
+ extern char *find_block_device(const char *path) FAST_FUNC;
+ /* bb_copyfd_XX print read/write errors and return -1 if they occur */
+diff --git a/libbb/get_console.c b/libbb/get_console.c
+index d042afa..ad56e74 100644
+--- a/libbb/get_console.c
++++ b/libbb/get_console.c
+@@ -38,7 +38,7 @@ static int open_a_console(const char *fnam)
+  * if someone else used X (which does a chown on /dev/console).
+  */
+ 
+-int FAST_FUNC get_console_fd(void)
++int FAST_FUNC get_console_fd_or_die(void)
+ {
+ 	static const char *const console_names[] = {
+ 		DEV_CONSOLE, CURRENT_VC, CURRENT_TTY
+@@ -65,8 +65,8 @@ int FAST_FUNC get_console_fd(void)
+ 		}
+ 	}
+ 
+-	bb_error_msg("can't open console");
+-	return fd;                      /* total failure */
++	bb_error_msg_and_die("can't open console");
++	/*return fd; - total failure */
+ }
+ 
+ /* From <linux/vt.h> */

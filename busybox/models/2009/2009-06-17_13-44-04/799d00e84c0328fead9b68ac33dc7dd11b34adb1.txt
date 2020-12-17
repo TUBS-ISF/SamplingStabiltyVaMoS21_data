@@ -1,0 +1,89 @@
+2009-06-17 13:44:04 +0200
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 42a4b27..67cb78c 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -5,17 +5,14 @@
+ 
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+-/************************************/
+-/* Defaults _you_ may want to tweak */
+-/************************************/
+-
+-/* the period of time the client is allowed to use that address */
+-#define LEASE_TIME              (60*60*24*10) /* 10 days of seconds */
+-#define LEASES_FILE		CONFIG_DHCPD_LEASES_FILE
+-
+-/* where to find the DHCP server configuration file */
++/* Defaults you may want to tweak */
++/* Default max_lease_sec */
++#define LEASE_TIME      (60*60*24 * 10)
++#define LEASES_FILE     CONFIG_DHCPD_LEASES_FILE
++/* Where to find the DHCP server configuration file */
+ #define DHCPD_CONF_FILE         "/etc/udhcpd.conf"
+ 
++
+ struct option_set {
+ 	uint8_t *data;
+ 	struct option_set *next;
+@@ -119,7 +116,11 @@ uint32_t get_static_nip_by_mac(struct static_lease *st_lease, void *arg) FAST_FU
+ /* Check to see if an IP is reserved as a static IP */
+ int is_nip_reserved(struct static_lease *st_lease, uint32_t nip) FAST_FUNC;
+ /* Print out static leases just to check what's going on (debug code) */
+-void print_static_leases(struct static_lease **st_lease_pp) FAST_FUNC;
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 2
++void log_static_leases(struct static_lease **st_lease_pp) FAST_FUNC;
++#else
++# define log_static_leases(st_lease_pp) ((void)0)
++#endif
+ 
+ 
+ /*** serverpacket.h ***/
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index c3cc2b0..3559215 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -270,7 +270,7 @@ static int FAST_FUNC read_staticlease(const char *const_line, void *arg)
+ 
+ 	add_static_lease(arg, (uint8_t*) &mac_bytes, ip);
+ 
+-	if (ENABLE_UDHCP_DEBUG) print_static_leases(arg);
++	log_static_leases(arg);
+ 
+ 	return 1;
+ }
+diff --git a/networking/udhcp/static_leases.c b/networking/udhcp/static_leases.c
+index 7d1aa2f..1887a8a 100644
+--- a/networking/udhcp/static_leases.c
++++ b/networking/udhcp/static_leases.c
+@@ -57,19 +57,23 @@ int FAST_FUNC is_nip_reserved(struct static_lease *st_lease, uint32_t nip)
+ 	return 0;
+ }
+ 
+-#if ENABLE_UDHCP_DEBUG
++#if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 2
+ /* Print out static leases just to check what's going on */
+ /* Takes the address of the pointer to the static_leases linked list */
+-void FAST_FUNC print_static_leases(struct static_lease **st_lease_pp)
++void FAST_FUNC log_static_leases(struct static_lease **st_lease_pp)
+ {
+-	struct static_lease *cur = *st_lease_pp;
++	struct static_lease *cur;
+ 
++	if (dhcp_verbose < 2)
++		return;
++
++	cur = *st_lease_pp;
+ 	while (cur) {
+-		printf("PrintStaticLeases: lease mac: %02x:%02x:%02x:%02x:%02x:%02x\n",
++		bb_info_msg("static lease: mac:%02x:%02x:%02x:%02x:%02x:%02x nip:%x",
+ 			cur->mac[0], cur->mac[1], cur->mac[2],
+-			cur->mac[3], cur->mac[4], cur->mac[5]
++			cur->mac[3], cur->mac[4], cur->mac[5],
++			cur->nip
+ 		);
+-		printf("PrintStaticLeases: lease ip: %x\n", cur->nip);
+ 		cur = cur->next;
+ 	}
+ }

@@ -1,0 +1,203 @@
+2009-03-18 17:32:44 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index bc47ce7..8ea493b 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -594,9 +594,9 @@ extern ssize_t open_read_close(const char *filename, void *buf, size_t maxsz) FA
+ // Reads byte-by-byte. Useful when it is important to not read ahead.
+ // Bytes are appended to pfx (which must be malloced, or NULL).
+ extern char *xmalloc_reads(int fd, char *pfx, size_t *maxsz_p) FAST_FUNC;
+-/* Reads block up to *maxsz_p (default: MAX_INT(ssize_t)) */
++/* Reads block up to *maxsz_p (default: INT_MAX - 4095) */
+ extern void *xmalloc_read(int fd, size_t *maxsz_p) FAST_FUNC;
+-/* Returns NULL if file can't be opened */
++/* Returns NULL if file can't be opened (default max size: INT_MAX - 4095) */
+ extern void *xmalloc_open_read_close(const char *filename, size_t *maxsz_p) FAST_FUNC;
+ /* Autodetects .gz etc */
+ extern int open_zipped(const char *fname) FAST_FUNC;
+@@ -619,6 +619,8 @@ extern char *bb_get_chunk_from_file(FILE *file, int *end) FAST_FUNC;
+ extern char *bb_get_chunk_with_continuation(FILE *file, int *end, int *lineno) FAST_FUNC;
+ /* Reads up to (and including) TERMINATING_STRING: */
+ extern char *xmalloc_fgets_str(FILE *file, const char *terminating_string) FAST_FUNC;
++/* Same, with limited max size, and returns the length (excluding NUL): */
++extern char *xmalloc_fgets_str_len(FILE *file, const char *terminating_string, size_t *maxsz_p) FAST_FUNC;
+ /* Chops off TERMINATING_STRING from the end: */
+ extern char *xmalloc_fgetline_str(FILE *file, const char *terminating_string) FAST_FUNC;
+ /* Reads up to (and including) "\n" or NUL byte: */
+diff --git a/libbb/fgets_str.c b/libbb/fgets_str.c
+index 8026a15..3fe61cd 100644
+--- a/libbb/fgets_str.c
++++ b/libbb/fgets_str.c
+@@ -10,7 +10,7 @@
+ 
+ #include "libbb.h"
+ 
+-static char *xmalloc_fgets_internal(FILE *file, const char *terminating_string, int chop_off)
++static char *xmalloc_fgets_internal(FILE *file, const char *terminating_string, int chop_off, size_t *maxsz_p)
+ {
+ 	char *linebuf = NULL;
+ 	const int term_length = strlen(terminating_string);
+@@ -18,6 +18,7 @@ static char *xmalloc_fgets_internal(FILE *file, const char *terminating_string,
+ 	int linebufsz = 0;
+ 	int idx = 0;
+ 	int ch;
++	size_t maxsz = *maxsz_p;
+ 
+ 	while (1) {
+ 		ch = fgetc(file);
+@@ -30,6 +31,11 @@ static char *xmalloc_fgets_internal(FILE *file, const char *terminating_string,
+ 		if (idx >= linebufsz) {
+ 			linebufsz += 200;
+ 			linebuf = xrealloc(linebuf, linebufsz);
++			if (idx >= maxsz) {
++				linebuf[idx] = ch;
++				idx++;
++				break;
++			}
+ 		}
+ 
+ 		linebuf[idx] = ch;
+@@ -48,6 +54,7 @@ static char *xmalloc_fgets_internal(FILE *file, const char *terminating_string,
+ 	/* Grow/shrink *first*, then store NUL */
+ 	linebuf = xrealloc(linebuf, idx + 1);
+ 	linebuf[idx] = '\0';
++	*maxsz_p = idx;
+ 	return linebuf;
+ }
+ 
+@@ -57,10 +64,23 @@ static char *xmalloc_fgets_internal(FILE *file, const char *terminating_string,
+  * Return NULL if EOF is reached immediately.  */
+ char* FAST_FUNC xmalloc_fgets_str(FILE *file, const char *terminating_string)
+ {
+-	return xmalloc_fgets_internal(file, terminating_string, 0);
++	size_t maxsz = INT_MAX - 4095;
++	return xmalloc_fgets_internal(file, terminating_string, 0, &maxsz);
++}
++
++char* FAST_FUNC xmalloc_fgets_str_len(FILE *file, const char *terminating_string, size_t *maxsz_p)
++{
++	size_t maxsz;
++
++	if (!maxsz_p) {
++		maxsz = INT_MAX - 4095;
++		maxsz_p = &maxsz;
++	}
++	return xmalloc_fgets_internal(file, terminating_string, 0, maxsz_p);
+ }
+ 
+ char* FAST_FUNC xmalloc_fgetline_str(FILE *file, const char *terminating_string)
+ {
+-	return xmalloc_fgets_internal(file, terminating_string, 1);
++	size_t maxsz = INT_MAX - 4095;
++	return xmalloc_fgets_internal(file, terminating_string, 1, &maxsz);
+ }
+diff --git a/libbb/read.c b/libbb/read.c
+index 815007c..37503e8 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -141,7 +141,7 @@ char* FAST_FUNC xmalloc_reads(int fd, char *buf, size_t *maxsz_p)
+ {
+ 	char *p;
+ 	size_t sz = buf ? strlen(buf) : 0;
+-	size_t maxsz = maxsz_p ? *maxsz_p : MAXINT(size_t);
++	size_t maxsz = maxsz_p ? *maxsz_p : (INT_MAX - 4095);
+ 
+ 	goto jump_in;
+ 	while (sz < maxsz) {
+@@ -198,7 +198,7 @@ void* FAST_FUNC xmalloc_read(int fd, size_t *maxsz_p)
+ 	size_t to_read;
+ 	struct stat st;
+ 
+-	to_read = maxsz_p ? *maxsz_p : MAXINT(ssize_t); /* max to read */
++	to_read = maxsz_p ? *maxsz_p : (INT_MAX - 4095); /* max to read */
+ 
+ 	/* Estimate file size */
+ 	st.st_size = 0; /* in case fstat fails, assume 0 */
+@@ -262,7 +262,7 @@ void* FAST_FUNC xmalloc_open_read_close(const char *filename, size_t *maxsz_p)
+ 	len = lseek(fd, 0, SEEK_END) | 0x3ff; /* + up to 1k */
+ 	if (len != (off_t)-1) {
+ 		xlseek(fd, 0, SEEK_SET);
+-		size = maxsz_p ? *maxsz_p : INT_MAX;
++		size = maxsz_p ? *maxsz_p : (INT_MAX - 4095);
+ 		if (len < size)
+ 			size = len;
+ 	}
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index 6630db7..39a4d18 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -972,23 +972,60 @@ cmdio_get_cmd_and_arg(void)
+ 
+ 	free(G.ftp_cmd);
+ 	len = 8 * 1024; /* Paranoia. Peer may send 1 gigabyte long cmd... */
+-	G.ftp_cmd = cmd = xmalloc_reads(STDIN_FILENO, NULL, &len);
++	G.ftp_cmd = cmd = xmalloc_fgets_str_len(stdin, "\r\n", &len);
+ 	if (!cmd)
+ 		exit(0);
+ 
+-/* TODO: de-escape telnet here: 0xff,0xff => 0xff */
+-/* RFC959 says that ABOR, STAT, QUIT may be sent even during
+- * data transfer, and may be preceded by telnet's "Interrupt Process"
+- * code (two-byte sequence 255,244) and then by telnet "Synch" code
+- * 255,242 (byte 242 is sent with TCP URG bit using send(MSG_OOB)
+- * and may generate SIGURG on our side. See RFC854).
+- * So far we don't support that (may install SIGURG handler if we'd want to),
+- * but we need to at least remove 255,xxx pairs. lftp sends those. */
+-
+-	/* Trailing '\n' is already stripped, strip '\r' */
+-	len = strlen(cmd) - 1;
+-	if ((ssize_t)len >= 0 && cmd[len] == '\r')
+-		cmd[len--] = '\0';
++	/* De-escape telnet: 0xff,0xff => 0xff */
++	/* RFC959 says that ABOR, STAT, QUIT may be sent even during
++	 * data transfer, and may be preceded by telnet's "Interrupt Process"
++	 * code (two-byte sequence 255,244) and then by telnet "Synch" code
++	 * 255,242 (byte 242 is sent with TCP URG bit using send(MSG_OOB)
++	 * and may generate SIGURG on our side. See RFC854).
++	 * So far we don't support that (may install SIGURG handler if we'd want to),
++	 * but we need to at least remove 255,xxx pairs. lftp sends those. */
++	/* Then de-escape FTP: NUL => '\n' */
++	/* Testing for \xff:
++	 * Create file named '\xff': echo Hello >`echo -ne "\xff"`
++	 * Try to get it:            ftpget -v 127.0.0.1 Eff `echo -ne "\xff\xff"`
++	 * (need "\xff\xff" until ftpget applet is fixed to do escaping :)
++	 * Testing for embedded LF:
++	 * LF_HERE=`echo -ne "LF\nHERE"`
++	 * echo Hello >"$LF_HERE"
++	 * ftpget -v 127.0.0.1 LF_HERE "$LF_HERE"
++	 */
++	{
++		int dst, src;
++
++		/* Strip "\r\n" if it is there */
++		if (len != 0 && cmd[len - 1] == '\n') {
++			len--;
++			if (len != 0 && cmd[len - 1] == '\r')
++				len--;
++			cmd[len] = '\0';
++		}
++		src = strchrnul(cmd, 0xff) - cmd;
++		/* 99,99% there are neither NULs nor 255s and src == len */
++		if (src < len) {
++			dst = src;
++			do {
++				if ((unsigned char)(cmd[src]) == 255) {
++					src++;
++					/* 255,xxx - skip 255 */
++					if ((unsigned char)(cmd[src]) != 255) {
++						/* 255,!255 - skip both */
++						src++;
++						continue;
++					}
++					/* 255,255 - retain one 255 */
++				}
++				/* NUL => '\n' */
++				cmd[dst++] = cmd[src] ? cmd[src] : '\n';
++				src++;
++			} while (src < len);
++			cmd[dst] = '\0';
++		}
++	}
+ 
+ 	if (G.verbose > 1)
+ 		verbose_log(cmd);

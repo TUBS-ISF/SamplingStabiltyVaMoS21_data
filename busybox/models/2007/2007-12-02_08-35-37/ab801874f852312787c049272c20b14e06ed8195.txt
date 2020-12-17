@@ -1,0 +1,342 @@
+2007-12-02 08:35:37 +0000
+diff --git a/Makefile.custom b/Makefile.custom
+index 5562ba3..a4db141 100644
+--- a/Makefile.custom
++++ b/Makefile.custom
+@@ -90,7 +90,7 @@ objsizes: busybox_unstripped
+ 
+ .PHONY: stksizes
+ stksizes: busybox_unstripped
+-	$(CROSS_COMPILE)objdump -d busybox_unstripped | $(srctree)/scripts/checkstack.pl $(ARCH)
++	$(CROSS_COMPILE)objdump -d busybox_unstripped | $(srctree)/scripts/checkstack.pl $(ARCH) | uniq
+ 
+ .PHONY: bigdata
+ bigdata: busybox_unstripped
+diff --git a/archival/bz/blocksort.c b/archival/bz/blocksort.c
+index cddbfcb..0e73ffe 100644
+--- a/archival/bz/blocksort.c
++++ b/archival/bz/blocksort.c
+@@ -721,7 +721,8 @@ void mainQSort3(uint32_t* ptr,
+ #define CLEARMASK (~(SETMASK))
+ 
+ static NOINLINE
+-void mainSort(uint32_t*   ptr,
++void mainSort(EState* state,
++		uint32_t* ptr,
+ 		uint8_t*  block,
+ 		uint16_t* quadrant,
+ 		uint32_t* ftab,
+@@ -729,13 +730,18 @@ void mainSort(uint32_t*   ptr,
+ 		int32_t*  budget)
+ {
+ 	int32_t  i, j, k, ss, sb;
+-	int32_t  runningOrder[256];
+-	Bool     bigDone[256];
+-	int32_t  copyStart[256];
+-	int32_t  copyEnd  [256];
+ 	uint8_t  c1;
+ 	int32_t  numQSorted;
+ 	uint16_t s;
++	Bool     bigDone[256];
++	/* bbox: moved to EState to save stack
++	int32_t  runningOrder[256];
++	int32_t  copyStart[256];
++	int32_t  copyEnd  [256];
++	*/
++#define runningOrder (state->mainSort__runningOrder)
++#define copyStart    (state->mainSort__copyStart)
++#define copyEnd      (state->mainSort__copyEnd)
+ 
+ 	/*-- set up the 2-byte frequency table --*/
+ 	/* was: for (i = 65536; i >= 0; i--) ftab[i] = 0; */
+@@ -985,6 +991,9 @@ void mainSort(uint32_t*   ptr,
+ 			AssertH(((bbSize-1) >> shifts) <= 65535, 1002);
+ 		}
+ 	}
++#undef runningOrder
++#undef copyStart
++#undef copyEnd
+ }
+ 
+ #undef BIGFREQ
+@@ -1041,7 +1050,7 @@ void BZ2_blockSort(EState* s)
+ 		 */
+ 		budget = nblock * ((wfact-1) / 3);
+ 
+-		mainSort(ptr, block, quadrant, ftab, nblock, &budget);
++		mainSort(s, ptr, block, quadrant, ftab, nblock, &budget);
+ 		if (budget < 0) {
+ 			fallbackSort(s->arr1, s->arr2, ftab, nblock);
+ 		}
+diff --git a/archival/bz/bzlib_private.h b/archival/bz/bzlib_private.h
+index 02f177e..48676a3 100644
+--- a/archival/bz/bzlib_private.h
++++ b/archival/bz/bzlib_private.h
+@@ -178,13 +178,22 @@ typedef struct EState {
+ 	uint8_t  selector   [BZ_MAX_SELECTORS];
+ 	uint8_t  selectorMtf[BZ_MAX_SELECTORS];
+ 
+-	uint8_t  len  [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
+-	int32_t  code [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
+-	int32_t  rfreq[BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
++	uint8_t  len[BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
++
++	/* stack-saving measures: these can be local, but they are too big */
++	int32_t  sendMTFValues__code [BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
++	int32_t  sendMTFValues__rfreq[BZ_N_GROUPS][BZ_MAX_ALPHA_SIZE];
+ #if CONFIG_BZIP2_FEATURE_SPEED >= 5
+ 	/* second dimension: only 3 needed; 4 makes index calculations faster */
+-	uint32_t len_pack[BZ_MAX_ALPHA_SIZE][4];
++	uint32_t sendMTFValues__len_pack[BZ_MAX_ALPHA_SIZE][4];
+ #endif
++	int32_t  BZ2_hbMakeCodeLengths__heap  [BZ_MAX_ALPHA_SIZE + 2];
++	int32_t  BZ2_hbMakeCodeLengths__weight[BZ_MAX_ALPHA_SIZE * 2];
++	int32_t  BZ2_hbMakeCodeLengths__parent[BZ_MAX_ALPHA_SIZE * 2];
++
++	int32_t  mainSort__runningOrder[256];
++	int32_t  mainSort__copyStart[256];
++	int32_t  mainSort__copyEnd[256];
+ } EState;
+ 
+ 
+@@ -203,7 +212,7 @@ static void
+ BZ2_hbAssignCodes(int32_t*, uint8_t*, int32_t, int32_t, int32_t);
+ 
+ static void
+-BZ2_hbMakeCodeLengths(uint8_t*, int32_t*, int32_t, int32_t);
++BZ2_hbMakeCodeLengths(EState*, uint8_t*, int32_t*, int32_t, int32_t);
+ 
+ /*-------------------------------------------------------------*/
+ /*--- end                                   bzlib_private.h ---*/
+diff --git a/archival/bz/compress.c b/archival/bz/compress.c
+index b72edbb..640b887 100644
+--- a/archival/bz/compress.c
++++ b/archival/bz/compress.c
+@@ -264,13 +264,16 @@ void sendMTFValues(EState* s)
+ 	 * are also globals only used in this proc.
+ 	 * Made global to keep stack frame size small.
+ 	 */
++#define code     sendMTFValues__code
++#define rfreq    sendMTFValues__rfreq
++#define len_pack sendMTFValues__len_pack
+ 
+ 	uint16_t cost[BZ_N_GROUPS];
+ 	int32_t  fave[BZ_N_GROUPS];
+ 
+ 	uint16_t* mtfv = s->mtfv;
+ 
+-	alphaSize = s->nInUse+2;
++	alphaSize = s->nInUse + 2;
+ 	for (t = 0; t < BZ_N_GROUPS; t++)
+ 		for (v = 0; v < alphaSize; v++)
+ 			s->len[t][v] = BZ_GREATER_ICOST;
+@@ -453,7 +456,7 @@ void sendMTFValues(EState* s)
+ 		/* maxLen was changed from 20 to 17 in bzip2-1.0.3.  See
+ 		 * comment in huffman.c for details. */
+ 		for (t = 0; t < nGroups; t++)
+-			BZ2_hbMakeCodeLengths(&(s->len[t][0]), &(s->rfreq[t][0]), alphaSize, 17 /*20*/);
++			BZ2_hbMakeCodeLengths(s, &(s->len[t][0]), &(s->rfreq[t][0]), alphaSize, 17 /*20*/);
+ 	}
+ 
+ 	AssertH(nGroups < 8, 3002);
+@@ -602,6 +605,9 @@ void sendMTFValues(EState* s)
+ 		selCtr++;
+ 	}
+ 	AssertH(selCtr == nSelectors, 3007);
++#undef code
++#undef rfreq
++#undef len_pack
+ }
+ 
+ 
+diff --git a/archival/bz/huffman.c b/archival/bz/huffman.c
+index 02838c4..676b1af 100644
+--- a/archival/bz/huffman.c
++++ b/archival/bz/huffman.c
+@@ -98,7 +98,8 @@ void DOWNHEAP1(int32_t *heap, int32_t *weight, int32_t nHeap)
+ 
+ /*---------------------------------------------------*/
+ static
+-void BZ2_hbMakeCodeLengths(uint8_t *len,
++void BZ2_hbMakeCodeLengths(EState *s,
++		uint8_t *len,
+ 		int32_t *freq,
+ 		int32_t alphaSize,
+ 		int32_t maxLen)
+@@ -110,9 +111,14 @@ void BZ2_hbMakeCodeLengths(uint8_t *len,
+ 	int32_t nNodes, nHeap, n1, n2, i, j, k;
+ 	Bool  tooLong;
+ 
++	/* bbox: moved to EState to save stack
+ 	int32_t heap  [BZ_MAX_ALPHA_SIZE + 2];
+ 	int32_t weight[BZ_MAX_ALPHA_SIZE * 2];
+ 	int32_t parent[BZ_MAX_ALPHA_SIZE * 2];
++	*/
++#define heap   (s->BZ2_hbMakeCodeLengths__heap)
++#define weight (s->BZ2_hbMakeCodeLengths__weight)
++#define parent (s->BZ2_hbMakeCodeLengths__parent)
+ 
+ 	for (i = 0; i < alphaSize; i++)
+ 		weight[i+1] = (freq[i] == 0 ? 1 : freq[i]) << 8;
+@@ -189,6 +195,9 @@ void BZ2_hbMakeCodeLengths(uint8_t *len,
+ 			weight[i] = j << 8;
+ 		}
+ 	}
++#undef heap
++#undef weight
++#undef parent
+ }
+ 
+ 
+diff --git a/scripts/checkstack.pl b/scripts/checkstack.pl
+index 6f45524..55cdd78 100755
+--- a/scripts/checkstack.pl
++++ b/scripts/checkstack.pl
+@@ -126,7 +126,8 @@ while (my $line = <STDIN>) {
+ 		$addr =~ s/ /0/g;
+ 		$addr = "0x$addr";
+ 
+-		my $intro = "$addr $func [$file]:";
++		# bbox: was: my $intro = "$addr $func [$file]:";
++		my $intro = "$func [$file]:";
+ 		my $padlen = 56 - length($intro);
+ 		while ($padlen > 0) {
+ 			$intro .= '	';
+diff --git a/shell/msh.c b/shell/msh.c
+index 32953f4..9f95fe2 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -735,6 +735,9 @@ struct globals {
+ 	char filechar_cmdbuf[BUFSIZ];
+ 	char line[LINELIM];
+ 	char child_cmd[LINELIM];
++
++	char grave__var_name[LINELIM];
++	char grave__alt_value[LINELIM];
+ };
+ 
+ #define G (*ptr_to_globals)
+@@ -746,6 +749,9 @@ struct globals {
+ #define filechar_cmdbuf (G.filechar_cmdbuf)
+ #define line            (G.line           )
+ #define child_cmd       (G.child_cmd      )
++#define INIT_G() do { \
++	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++} while (0)
+ 
+ 
+ #ifdef MSHDEBUG
+@@ -4042,8 +4048,12 @@ static int grave(int quoted)
+ 			ignore_once = 1;
+ 		if (*src == '$' && !ignore && !ignore_once) {
+ 			struct var *vp;
++			/* moved to G to reduce stack usage
+ 			char var_name[LINELIM];
+ 			char alt_value[LINELIM];
++			*/
++#define var_name (G.grave__var_name)
++#define alt_value (G.grave__alt_value)
+ 			int var_index = 0;
+ 			int alt_index = 0;
+ 			char operator = 0;
+@@ -4131,6 +4141,8 @@ static int grave(int quoted)
+ 					count++;
+ 				}
+ 			}
++#undef var_name
++#undef alt_value
+ 		} else {
+ 			*dest++ = *src++;
+ 			count++;
+@@ -5173,7 +5185,8 @@ int msh_main(int argc, char **argv)
+ 	char *name, **ap;
+ 	int (*iof) (struct ioarg *);
+ 
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G));
++	INIT_G();
++
+ 	sharedbuf.id = AFID_NOBUF;
+ 	mainbuf.id = AFID_NOBUF;
+ 	e.linep = line;
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index de9dde3..35c0ccf 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -109,16 +109,22 @@ struct globals {
+ 	unsigned long req_nr_inodes;
+ 	unsigned currently_testing;
+ 
+-
+ 	char root_block[BLOCK_SIZE];
+ 	char super_block_buffer[BLOCK_SIZE];
+ 	char boot_block_buffer[512];
+ 	unsigned short good_blocks_table[MAX_GOOD_BLOCKS];
+ 	/* check_blocks(): buffer[] was the biggest static in entire bbox */
+ 	char check_blocks_buffer[BLOCK_SIZE * TEST_BUFFER_BLOCKS];
+-};
+ 
++	unsigned short ind_block1[BLOCK_SIZE >> 1];
++	unsigned short dind_block1[BLOCK_SIZE >> 1];
++	unsigned long ind_block2[BLOCK_SIZE >> 2];
++	unsigned long dind_block2[BLOCK_SIZE >> 2];
++};
+ #define G (*ptr_to_globals)
++#define INIT_G() do { \
++	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++} while (0)
+ 
+ static ALWAYS_INLINE unsigned div_roundup(unsigned size, unsigned n)
+ {
+@@ -306,8 +312,12 @@ static void make_bad_inode(void)
+ 	struct minix1_inode *inode = &INODE_BUF1[MINIX_BAD_INO];
+ 	int i, j, zone;
+ 	int ind = 0, dind = 0;
++	/* moved to globals to reduce stack usage
+ 	unsigned short ind_block[BLOCK_SIZE >> 1];
+ 	unsigned short dind_block[BLOCK_SIZE >> 1];
++	*/
++#define ind_block (G.ind_block1)
++#define dind_block (G.dind_block1)
+ 
+ #define NEXT_BAD (zone = next(zone))
+ 
+@@ -351,6 +361,8 @@ static void make_bad_inode(void)
+ 		write_block(ind, (char *) ind_block);
+ 	if (dind)
+ 		write_block(dind, (char *) dind_block);
++#undef ind_block
++#undef dind_block
+ }
+ 
+ #if ENABLE_FEATURE_MINIX2
+@@ -359,8 +371,12 @@ static void make_bad_inode2(void)
+ 	struct minix2_inode *inode = &INODE_BUF2[MINIX_BAD_INO];
+ 	int i, j, zone;
+ 	int ind = 0, dind = 0;
++	/* moved to globals to reduce stack usage
+ 	unsigned long ind_block[BLOCK_SIZE >> 2];
+ 	unsigned long dind_block[BLOCK_SIZE >> 2];
++	*/
++#define ind_block (G.ind_block2)
++#define dind_block (G.dind_block2)
+ 
+ 	if (!G.badblocks)
+ 		return;
+@@ -401,6 +417,8 @@ static void make_bad_inode2(void)
+ 		write_block(ind, (char *) ind_block);
+ 	if (dind)
+ 		write_block(dind, (char *) dind_block);
++#undef ind_block
++#undef dind_block
+ }
+ #else
+ void make_bad_inode2(void);
+@@ -613,7 +631,7 @@ int mkfs_minix_main(int argc, char **argv)
+ 	char *str_i, *str_n;
+ 	char *listfile = NULL;
+ 
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G));
++	INIT_G();
+ /* default (changed to 30, per Linus's suggestion, Sun Nov 21 08:05:07 1993) */
+ 	G.namelen = 30;
+ 	G.dirsize = 32;

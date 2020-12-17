@@ -1,0 +1,206 @@
+2009-11-25 14:52:47 +0100
+diff --git a/include/libbb.h b/include/libbb.h
+index 1194f7e..1f39c95 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1474,6 +1474,7 @@ extern const char bb_msg_write_error[];
+ extern const char bb_msg_unknown[];
+ extern const char bb_msg_can_not_create_raw_socket[];
+ extern const char bb_msg_perm_denied_are_you_root[];
++extern const char bb_msg_you_must_be_root[];
+ extern const char bb_msg_requires_arg[];
+ extern const char bb_msg_invalid_arg[];
+ extern const char bb_msg_standard_input[];
+diff --git a/include/usage.h b/include/usage.h
+index 461f5fc..760e854 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3219,6 +3219,9 @@
+      "\n	-n	Do not daemonize" \
+      "\n	-g	Set system time even if offset is > 1000 sec" \
+      "\n	-q	Quit after clock is set" \
++/* -N exists for mostly compat reasons, thus Not essential to inform */ \
++/* the user that it exists: user may use nice as well */ \
++/*   "\n	-N	Run at high priority" */ \
+      "\n	-l	Run as server on port 123" \
+      "\n	-p PEER	Obtain time from PEER (may be repeated)" \
+ 
+diff --git a/libbb/messages.c b/libbb/messages.c
+index 9009028..1d0e587 100644
+--- a/libbb/messages.c
++++ b/libbb/messages.c
+@@ -28,7 +28,8 @@ const char bb_msg_write_error[] ALIGN1 = "write error";
+ const char bb_msg_read_error[] ALIGN1 = "read error";
+ const char bb_msg_unknown[] ALIGN1 = "(unknown)";
+ const char bb_msg_can_not_create_raw_socket[] ALIGN1 = "can't create raw socket";
+-const char bb_msg_perm_denied_are_you_root[] ALIGN1 = "permission denied. (are you root?)";
++const char bb_msg_perm_denied_are_you_root[] ALIGN1 = "permission denied (are you root?)";
++const char bb_msg_you_must_be_root[] ALIGN1 = "you must be root";
+ const char bb_msg_requires_arg[] ALIGN1 = "%s requires an argument";
+ const char bb_msg_invalid_arg[] ALIGN1 = "invalid argument '%s' to '%s'";
+ const char bb_msg_standard_input[] ALIGN1 = "standard input";
+diff --git a/libbb/xfuncs_printf.c b/libbb/xfuncs_printf.c
+index 644134a..d362841 100644
+--- a/libbb/xfuncs_printf.c
++++ b/libbb/xfuncs_printf.c
+@@ -388,7 +388,7 @@ int FAST_FUNC xsocket(int domain, int type, int protocol)
+ 		if (domain == AF_PACKET) s = "PACKET";
+ 		if (domain == AF_NETLINK) s = "NETLINK";
+ IF_FEATURE_IPV6(if (domain == AF_INET6) s = "INET6";)
+-		bb_perror_msg_and_die("socket(AF_%s)", s);
++		bb_perror_msg_and_die("socket(AF_%s,%d,%d)", s, type, protocol);
+ #else
+ 		bb_perror_msg_and_die("socket");
+ #endif
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 67b10f6..0444404 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -118,9 +118,9 @@ int crontab_main(int argc UNUSED_PARAM, char **argv)
+ 	argv += optind;
+ 
+ 	if (sanitize_env_if_suid()) { /* Clears dangerous stuff, sets PATH */
+-		/* run by non-root? */
++		/* Run by non-root */
+ 		if (opt_ler & (OPT_u|OPT_c))
+-			bb_error_msg_and_die("only root can use -c or -u");
++			bb_error_msg_and_die(bb_msg_you_must_be_root);
+ 	}
+ 
+ 	if (opt_ler & OPT_u) {
+diff --git a/networking/ntpd.c b/networking/ntpd.c
+index 12e498d..e2c3506 100644
+--- a/networking/ntpd.c
++++ b/networking/ntpd.c
+@@ -7,7 +7,9 @@
+  */
+ #include "libbb.h"
+ #include <netinet/ip.h> /* For IPTOS_LOWDELAY definition */
+-
++#ifndef IPTOS_LOWDELAY
++# define IPTOS_LOWDELAY 0x10
++#endif
+ #ifndef IP_PKTINFO
+ # error "Sorry, your kernel has to support IP_PKTINFO"
+ #endif
+@@ -161,10 +163,11 @@ enum {
+ 	OPT_n = (1 << 0),
+ 	OPT_g = (1 << 1),
+ 	OPT_q = (1 << 2),
++	OPT_N = (1 << 3),
+ 	/* Insert new options above this line. */
+ 	/* Non-compat options: */
+-	OPT_p = (1 << 3),
+-	OPT_l = (1 << 4),
++	OPT_p = (1 << 4),
++	OPT_l = (1 << 5) * ENABLE_FEATURE_NTPD_SERVER,
+ };
+ 
+ 
+@@ -877,16 +880,18 @@ static NOINLINE void ntp_init(char **argv)
+ 	/* tzset(); - why? it's called automatically when needed, no? */
+ 
+ 	if (getuid())
+-		bb_error_msg_and_die("need root privileges");
++		bb_error_msg_and_die(bb_msg_you_must_be_root);
+ 
+ 	peers = NULL;
+ 	opt_complementary = "dd:p::"; /* d: counter, p: list */
+ 	opts = getopt32(argv,
+-			"ngq" /* compat */
++			"ngqN" /* compat */
+ 			"p:"IF_FEATURE_NTPD_SERVER("l") /* NOT compat */
+ 			"d" /* compat */
+-			"46aAbLNx", /* compat, ignored */
++			"46aAbLx", /* compat, ignored */
+ 			&peers, &G.verbose);
++	if (!(opts & (OPT_p|OPT_l)))
++		bb_show_usage();
+ #if ENABLE_FEATURE_NTPD_SERVER
+ 	G.listen_fd = -1;
+ 	if (opts & OPT_l) {
+@@ -903,6 +908,9 @@ static NOINLINE void ntp_init(char **argv)
+ 		logmode = LOGMODE_NONE;
+ 		bb_daemonize(DAEMON_DEVNULL_STDIO);
+ 	}
++	/* I hesitate to set -20 prio. -15 should be high enough for timekeeping */
++	if (opts & OPT_N)
++		setpriority(PRIO_PROCESS, 0, -15);
+ 
+ 	/* Set some globals */
+ 	{
+diff --git a/networking/tcpudp.c b/networking/tcpudp.c
+index 25b3319..d0db33b 100644
+--- a/networking/tcpudp.c
++++ b/networking/tcpudp.c
+@@ -239,7 +239,7 @@ int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
+ 	client = 0;
+ 	if ((getuid() == 0) && !(opts & OPT_u)) {
+ 		xfunc_exitcode = 100;
+-		bb_error_msg_and_die("-U ssluser must be set when running as root");
++		bb_error_msg_and_die(bb_msg_you_must_be_root);
+ 	}
+ 	if (opts & OPT_u)
+ 		if (!uidgid_get(&sslugid, ssluser, 1)) {
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index e9f3cc6..110bdfa 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -835,7 +835,7 @@ common_traceroute_main(int op, char **argv)
+ 		 * probe (e.g., on a multi-homed host).
+ 		 */
+ 		if (getuid() != 0)
+-			bb_error_msg_and_die("you must be root to use -s");
++			bb_error_msg_and_die(bb_msg_you_must_be_root);
+ 	}
+ 	if (op & OPT_WAITTIME)
+ 		waittime = xatou_range(waittime_str, 1, 24 * 60 * 60);
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 271e691..d27d65f 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -1801,8 +1801,6 @@ static int match_opt(const char *fs_opt, const char *O_opt)
+ 
+ // Parse options, if necessary parse fstab/mtab, and call singlemount for
+ // each directory to be mounted.
+-static const char must_be_root[] ALIGN1 = "you must be root";
+-
+ int mount_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mount_main(int argc UNUSED_PARAM, char **argv)
+ {
+@@ -1871,7 +1869,7 @@ int mount_main(int argc UNUSED_PARAM, char **argv)
+ 		// argument when we get it.
+ 		if (argv[1]) {
+ 			if (nonroot)
+-				bb_error_msg_and_die(must_be_root);
++				bb_error_msg_and_die(bb_msg_you_must_be_root);
+ 			mtpair->mnt_fsname = argv[0];
+ 			mtpair->mnt_dir = argv[1];
+ 			mtpair->mnt_type = fstype;
+@@ -1888,7 +1886,7 @@ int mount_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	i = parse_mount_options(cmdopts, NULL); // FIXME: should be "long", not "int"
+ 	if (nonroot && (i & ~MS_SILENT)) // Non-root users cannot specify flags
+-		bb_error_msg_and_die(must_be_root);
++		bb_error_msg_and_die(bb_msg_you_must_be_root);
+ 
+ 	// If we have a shared subtree flag, don't worry about fstab or mtab.
+ 	if (ENABLE_FEATURE_MOUNT_FLAGS
+@@ -1947,7 +1945,7 @@ int mount_main(int argc UNUSED_PARAM, char **argv)
+ 			// No, mount -a won't mount anything,
+ 			// even user mounts, for mere humans
+ 			if (nonroot)
+-				bb_error_msg_and_die(must_be_root);
++				bb_error_msg_and_die(bb_msg_you_must_be_root);
+ 
+ 			// Does type match? (NULL matches always)
+ 			if (!match_fstype(mtcur, fstype))
+@@ -2012,7 +2010,7 @@ int mount_main(int argc UNUSED_PARAM, char **argv)
+ 			// fstab must have "users" or "user"
+ 			l = parse_mount_options(mtcur->mnt_opts, NULL);
+ 			if (!(l & MOUNT_USERS))
+-				bb_error_msg_and_die(must_be_root);
++				bb_error_msg_and_die(bb_msg_you_must_be_root);
+ 		}
+ 
+ 		// Mount the last thing we found

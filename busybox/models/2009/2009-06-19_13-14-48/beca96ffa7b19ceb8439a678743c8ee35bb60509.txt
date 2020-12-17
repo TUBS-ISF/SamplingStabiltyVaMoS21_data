@@ -1,0 +1,32 @@
+2009-06-19 13:14:48 +0200
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index bfd51bc..b97be8b 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -416,6 +416,13 @@ config FEATURE_MKSWAP_V0
+ 	  If your kernel is older than 2.1.117, then v0 support is the
+ 	  only option.
+ 
++config FEATURE_MKSWAP_UUID
++	bool "UUID support"
++	default n
++	depends on MKSWAP
++	help
++	  Generate swap spaces with universally unique identifiers.
++
+ config MORE
+ 	bool "more"
+ 	default n
+diff --git a/util-linux/mkswap.c b/util-linux/mkswap.c
+index 5d1f6f0..f718843 100644
+--- a/util-linux/mkswap.c
++++ b/util-linux/mkswap.c
+@@ -50,7 +50,7 @@ static void mkswap_selinux_setcontext(int fd, const char *path)
+ # define mkswap_selinux_setcontext(fd, path) ((void)0)
+ #endif
+ 
+-#if ENABLE_DESKTOP
++#if ENABLE_FEATURE_MKSWAP_UUID
+ static void mkswap_generate_uuid(uint8_t *buf)
+ {
+ 	/* http://www.ietf.org/rfc/rfc4122.txt

@@ -1,0 +1,340 @@
+2010-01-15 22:05:07 +0100
+diff --git a/coreutils/cp.c b/coreutils/cp.c
+index 9f6c123..d7c8d91 100644
+--- a/coreutils/cp.c
++++ b/coreutils/cp.c
+@@ -35,10 +35,9 @@ int cp_main(int argc, char **argv)
+ 		OPT_a = 1 << (sizeof(FILEUTILS_CP_OPTSTR)-1),
+ 		OPT_r = 1 << (sizeof(FILEUTILS_CP_OPTSTR)),
+ 		OPT_P = 1 << (sizeof(FILEUTILS_CP_OPTSTR)+1),
+-		OPT_H = 1 << (sizeof(FILEUTILS_CP_OPTSTR)+2),
+-		OPT_v = 1 << (sizeof(FILEUTILS_CP_OPTSTR)+3),
++		OPT_v = 1 << (sizeof(FILEUTILS_CP_OPTSTR)+2),
+ #if ENABLE_FEATURE_CP_LONG_OPTIONS
+-		OPT_parents = 1 << (sizeof(FILEUTILS_CP_OPTSTR)+4),
++		OPT_parents = 1 << (sizeof(FILEUTILS_CP_OPTSTR)+3),
+ #endif
+ 	};
+ 
+@@ -48,7 +47,7 @@ int cp_main(int argc, char **argv)
+ 	// -r and -R are the same
+ 	// -R (and therefore -r) turns on -d (coreutils does this)
+ 	// -a = -pdR
+-	opt_complementary = "-2:l--s:s--l:Pd:rRd:Rd:apdR:HL";
++	opt_complementary = "-2:l--s:s--l:Pd:rRd:Rd:apdR";
+ #if ENABLE_FEATURE_CP_LONG_OPTIONS
+ 	applet_long_options =
+ 		"archive\0"        No_argument "a"
+@@ -64,7 +63,7 @@ int cp_main(int argc, char **argv)
+ 		;
+ #endif
+ 	// -v (--verbose) is ignored
+-	flags = getopt32(argv, FILEUTILS_CP_OPTSTR "arPHv");
++	flags = getopt32(argv, FILEUTILS_CP_OPTSTR "arPv");
+ 	/* Options of cp from GNU coreutils 6.10:
+ 	 * -a, --archive
+ 	 * -f, --force
+@@ -113,17 +112,14 @@ int cp_main(int argc, char **argv)
+ 	 */
+ 	argc -= optind;
+ 	argv += optind;
+-	flags ^= FILEUTILS_DEREFERENCE; /* the sense of this flag was reversed */
++	/* Reverse this bit. If there is -d, bit is not set: */
++	flags ^= FILEUTILS_DEREFERENCE;
+ 	/* coreutils 6.9 compat:
+ 	 * by default, "cp" derefs symlinks (creates regular dest files),
+ 	 * but "cp -R" does not. We switch off deref if -r or -R (see above).
+ 	 * However, "cp -RL" must still deref symlinks: */
+ 	if (flags & FILEUTILS_DEREF_SOFTLINK) /* -L */
+ 		flags |= FILEUTILS_DEREFERENCE;
+-	/* The behavior of -H is *almost* like -L, but not quite, so let's
+-	 * just ignore it too for fun. TODO.
+-	if (flags & OPT_H) ... // deref command-line params only
+-	*/
+ 
+ #if ENABLE_SELINUX
+ 	if (flags & FILEUTILS_PRESERVE_SECURITY_CONTEXT) {
+diff --git a/coreutils/install.c b/coreutils/install.c
+index 2e604be..e968299 100644
+--- a/coreutils/install.c
++++ b/coreutils/install.c
+@@ -101,7 +101,7 @@ int install_main(int argc, char **argv)
+ #if ENABLE_FEATURE_INSTALL_LONG_OPTIONS
+ 	applet_long_options = install_longopts;
+ #endif
+-	opt_complementary = "s--d:d--s" IF_SELINUX(":Z--\xff:\xff--Z");
++	opt_complementary = "s--d:d--s" IF_FEATURE_INSTALL_LONG_OPTIONS(IF_SELINUX(":Z--\xff:\xff--Z"));
+ 	/* -c exists for backwards compatibility, it's needed */
+ 	/* -v is ignored ("print name of each created directory") */
+ 	/* -b is ignored ("make a backup of each existing destination file") */
+diff --git a/include/libbb.h b/include/libbb.h
+index 1159634..9e6ee84 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -262,20 +262,21 @@ extern char *strrstr(const char *haystack, const char *needle) FAST_FUNC;
+ extern const char *bb_mode_string(mode_t mode) FAST_FUNC;
+ extern int is_directory(const char *name, int followLinks, struct stat *statBuf) FAST_FUNC;
+ enum {	/* DO NOT CHANGE THESE VALUES!  cp.c, mv.c, install.c depend on them. */
+-	FILEUTILS_PRESERVE_STATUS = 1,
+-	FILEUTILS_DEREFERENCE = 2,
+-	FILEUTILS_RECUR = 4,
+-	FILEUTILS_FORCE = 8,
+-	FILEUTILS_INTERACTIVE = 0x10,
+-	FILEUTILS_MAKE_HARDLINK = 0x20,
+-	FILEUTILS_MAKE_SOFTLINK = 0x40,
+-	FILEUTILS_DEREF_SOFTLINK = 0x80,
++	FILEUTILS_PRESERVE_STATUS = 1 << 0, /* -p */
++	FILEUTILS_DEREFERENCE     = 1 << 1, /* !-d */
++	FILEUTILS_RECUR           = 1 << 2, /* -R */
++	FILEUTILS_FORCE           = 1 << 3, /* -f */
++	FILEUTILS_INTERACTIVE     = 1 << 4, /* -i */
++	FILEUTILS_MAKE_HARDLINK   = 1 << 5, /* -l */
++	FILEUTILS_MAKE_SOFTLINK   = 1 << 6, /* -s */
++	FILEUTILS_DEREF_SOFTLINK  = 1 << 7, /* -L */
++	FILEUTILS_DEREFERENCE_L0  = 1 << 8, /* -H */
+ #if ENABLE_SELINUX
+-	FILEUTILS_PRESERVE_SECURITY_CONTEXT = 0x100,
+-	FILEUTILS_SET_SECURITY_CONTEXT = 0x200
++	FILEUTILS_PRESERVE_SECURITY_CONTEXT = 1 << 9, /* -c */
++	FILEUTILS_SET_SECURITY_CONTEXT = 1 << 10,
+ #endif
+ };
+-#define FILEUTILS_CP_OPTSTR "pdRfilsL" IF_SELINUX("c")
++#define FILEUTILS_CP_OPTSTR "pdRfilsLH" IF_SELINUX("c")
+ extern int remove_file(const char *path, int flags) FAST_FUNC;
+ /* NB: without FILEUTILS_RECUR in flags, it will basically "cat"
+  * the source, not copy (unless "source" is a directory).
+diff --git a/libbb/copy_file.c b/libbb/copy_file.c
+index 893b52e..6c64fab 100644
+--- a/libbb/copy_file.c
++++ b/libbb/copy_file.c
+@@ -83,7 +83,7 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 	signed char ovr;
+ 
+ /* Inverse of cp -d ("cp without -d") */
+-#define FLAGS_DEREF (flags & FILEUTILS_DEREFERENCE)
++#define FLAGS_DEREF (flags & (FILEUTILS_DEREFERENCE + FILEUTILS_DEREFERENCE_L0))
+ 
+ 	if ((FLAGS_DEREF ? stat : lstat)(source, &source_stat) < 0) {
+ 		/* This may be a dangling symlink.
+@@ -194,7 +194,7 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 			if (new_source == NULL)
+ 				continue;
+ 			new_dest = concat_path_file(dest, d->d_name);
+-			if (copy_file(new_source, new_dest, flags) < 0)
++			if (copy_file(new_source, new_dest, flags & ~FILEUTILS_DEREFERENCE_L0) < 0)
+ 				retval = -1;
+ 			free(new_source);
+ 			free(new_dest);
+diff --git a/testsuite/cp.tests b/testsuite/cp.tests
+new file mode 100755
+index 0000000..75a7dcb
+--- /dev/null
++++ b/testsuite/cp.tests
+@@ -0,0 +1,206 @@
++#!/bin/sh
++# Copyright 2010 by Denys Vlasenko
++# Licensed under GPL v2, see file LICENSE for details.
++
++. ./testing.sh
++
++# Opening quote in "omitting directory 'dir'" message:
++sq='`'  # GNU cp: `
++sq="'"  # bbox cp: '
++
++rm -rf cp.testdir >/dev/null
++
++mkdir cp.testdir
++mkdir cp.testdir/dir
++> cp.testdir/dir/file
++ln -s file cp.testdir/dir/file_symlink
++
++> cp.testdir/file
++ln -s file cp.testdir/file_symlink
++ln -s dir cp.testdir/dir_symlink
++
++
++# testing "test name" "command" "expected result" "file input" "stdin"
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++testing "cp" '\
++cd cp.testdir || exit 1; cp * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test ! -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -e cp.testdir2/dir              || echo BAD: dir
++test ! -e cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++' "\
++cp: omitting directory ${sq}dir'
++cp: omitting directory ${sq}dir_symlink'
++1
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++testing "cp -d" '\
++cd cp.testdir || exit 1; cp -d * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test   -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -e cp.testdir2/dir              || echo BAD: dir
++test   -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++' "\
++cp: omitting directory ${sq}dir'
++1
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++testing "cp -P" '\
++cd cp.testdir || exit 1; cp -P * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test   -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -e cp.testdir2/dir              || echo BAD: dir
++test   -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++' "\
++cp: omitting directory ${sq}dir'
++1
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++testing "cp -L" '\
++cd cp.testdir || exit 1; cp -L * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test ! -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -e cp.testdir2/dir              || echo BAD: dir
++test ! -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++' "\
++cp: omitting directory ${sq}dir'
++cp: omitting directory ${sq}dir_symlink'
++1
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++testing "cp -H" '\
++cd cp.testdir || exit 1; cp -H * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test ! -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -e cp.testdir2/dir              || echo BAD: dir
++test ! -e cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++' "\
++cp: omitting directory ${sq}dir'
++cp: omitting directory ${sq}dir_symlink'
++1
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++testing "cp -R" '\
++cd cp.testdir || exit 1; cp -R * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test   -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -L cp.testdir2/dir              || echo BAD: dir
++test   -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++test ! -L cp.testdir2/dir/file         || echo BAD: dir/file
++test   -L cp.testdir2/dir/file_symlink || echo BAD: dir/file_symlink
++' "\
++0
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++testing "cp -Rd" '\
++cd cp.testdir || exit 1; cp -Rd * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test   -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -L cp.testdir2/dir              || echo BAD: dir
++test   -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++test ! -L cp.testdir2/dir/file         || echo BAD: dir/file
++test   -L cp.testdir2/dir/file_symlink || echo BAD: dir/file_symlink
++' "\
++0
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++testing "cp -RP" '\
++cd cp.testdir || exit 1; cp -RP * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test   -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -L cp.testdir2/dir              || echo BAD: dir
++test   -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++test ! -L cp.testdir2/dir/file         || echo BAD: dir/file
++test   -L cp.testdir2/dir/file_symlink || echo BAD: dir/file_symlink
++' "\
++0
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++testing "cp -RL" '\
++cd cp.testdir || exit 1; cp -RL * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test ! -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -L cp.testdir2/dir              || echo BAD: dir
++test ! -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++test ! -L cp.testdir2/dir/file         || echo BAD: dir/file
++test ! -L cp.testdir2/dir/file_symlink || echo BAD: dir/file_symlink
++' "\
++0
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++# GNU coreutils 7.2 says:
++# cp: will not create hard link `../cp.testdir2/dir_symlink' to directory `../cp.testdir2/dir'
++test x"$SKIP_KNOWN_BUGS" = x"" && \
++testing "cp -RH" '\
++cd cp.testdir || exit 1; cp -RH * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test ! -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -L cp.testdir2/dir              || echo BAD: dir
++test ! -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++test ! -L cp.testdir2/dir/file         || echo BAD: dir/file
++test   -L cp.testdir2/dir/file_symlink || echo BAD: dir/file_symlink
++' "\
++0
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++# GNU coreutils 7.2 says:
++# cp: will not create hard link `../cp.testdir2/dir_symlink' to directory `../cp.testdir2/dir'
++test x"$SKIP_KNOWN_BUGS" = x"" && \
++testing "cp -RHP" '\
++cd cp.testdir || exit 1; cp -RHP * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test ! -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -L cp.testdir2/dir              || echo BAD: dir
++test ! -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++test ! -L cp.testdir2/dir/file         || echo BAD: dir/file
++test   -L cp.testdir2/dir/file_symlink || echo BAD: dir/file_symlink
++' "\
++0
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++testing "cp -RHL" '\
++cd cp.testdir || exit 1; cp -RHL * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test ! -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -L cp.testdir2/dir              || echo BAD: dir
++test ! -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++test ! -L cp.testdir2/dir/file         || echo BAD: dir/file
++test ! -L cp.testdir2/dir/file_symlink || echo BAD: dir/file_symlink
++' "\
++0
++" "" ""
++
++rm -rf cp.testdir2 >/dev/null && mkdir cp.testdir2 || exit 1
++# Wow! "cp -RLH" is not the same as "cp -RHL" (prev test)!
++# GNU coreutils 7.2 says:
++# cp: will not create hard link `../cp.testdir2/dir_symlink' to directory `../cp.testdir2/dir'
++test x"$SKIP_KNOWN_BUGS" = x"" && \
++testing "cp -RLH" '\
++cd cp.testdir || exit 1; cp -RLH * ../cp.testdir2 2>&1; echo $?; cd .. || exit 1
++test ! -L cp.testdir2/file             || echo BAD: file
++test ! -L cp.testdir2/file_symlink     || echo BAD: file_symlink
++test ! -L cp.testdir2/dir              || echo BAD: dir
++test ! -L cp.testdir2/dir_symlink      || echo BAD: dir_symlink
++test ! -L cp.testdir2/dir/file         || echo BAD: dir/file
++test ! -L cp.testdir2/dir/file_symlink || echo BAD: dir/file_symlink
++' "\
++0
++" "" ""
++
++
++# Clean up
++rm -rf cp.testdir cp.testdir2 2>/dev/null
++
++exit $FAILCOUNT

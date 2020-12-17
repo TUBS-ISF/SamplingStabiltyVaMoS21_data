@@ -1,0 +1,37 @@
+2007-12-10 08:40:29 +0000
+diff --git a/init/init.c b/init/init.c
+index c0c8b17..baa5a50 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -513,11 +513,13 @@ static void run_actions(int action)
+ 	for (a = init_action_list; a; a = tmp) {
+ 		tmp = a->next;
+ 		if (a->action == action) {
+-			/* a->terminal of "" means "init's console" */
+-			if (a->terminal[0] && access(a->terminal, R_OK | W_OK)) {
+-				//message(L_LOG | L_CONSOLE, "Device %s cannot be opened in RW mode", a->terminal /*, strerror(errno)*/);
+-				delete_init_action(a);
+-			} else if (a->action & (SYSINIT | WAIT | CTRLALTDEL | SHUTDOWN | RESTART)) {
++			// Pointless: run() will error out if open of device fails.
++			///* a->terminal of "" means "init's console" */
++			//if (a->terminal[0] && access(a->terminal, R_OK | W_OK)) {
++			//	//message(L_LOG | L_CONSOLE, "Device %s cannot be opened in RW mode", a->terminal /*, strerror(errno)*/);
++			//	delete_init_action(a);
++			//} else
++			if (a->action & (SYSINIT | WAIT | CTRLALTDEL | SHUTDOWN | RESTART)) {
+ 				waitfor(run(a));
+ 				delete_init_action(a);
+ 			} else if (a->action & ONCE) {
+diff --git a/shell/cttyhack.c b/shell/cttyhack.c
+index 915ab51..2015700 100644
+--- a/shell/cttyhack.c
++++ b/shell/cttyhack.c
+@@ -69,7 +69,7 @@ int cttyhack_main(int argc, char **argv)
+ 		dup2(fd, 2);
+ 		while (fd > 2) close(fd--);
+ 		/* Some other session may have it as ctty. Steal it from them */
+-		ioctl(0, TIOCSCTTY, 1)
++		ioctl(0, TIOCSCTTY, 1);
+ 	}
+ 
+ 	BB_EXECVP(argv[0], argv);

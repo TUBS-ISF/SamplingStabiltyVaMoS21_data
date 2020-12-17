@@ -1,0 +1,18 @@
+2008-05-22 02:10:50 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 1f4213a..a1e4894 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3509,9 +3509,9 @@
+        "Show listing of the last users that logged into the system" \
+ 	USE_FEATURE_LAST_FANCY( "\n" \
+      "\nOptions:" \
+-     "\n	-H		Show header line" \
+-     "\n	-W		Display with no host column truncation" \
+-     "\n	-f file		Read from file instead of /var/log/wtmp" \
++/*   "\n	-H	Show header line" */ \
++     "\n	-W	Display with no host column truncation" \
++     "\n	-f file Read from file instead of /var/log/wtmp" \
+ 	)
+ 
+ #define sha1sum_trivial_usage \

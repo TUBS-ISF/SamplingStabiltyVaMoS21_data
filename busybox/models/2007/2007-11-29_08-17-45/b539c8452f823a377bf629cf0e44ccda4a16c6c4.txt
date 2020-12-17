@@ -1,0 +1,426 @@
+2007-11-29 08:17:45 +0000
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index eecb72c..55782b5 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -77,7 +77,6 @@ void udhcp_run_script(struct dhcpMessage *packet, const char *name);
+ #define end_option		udhcp_end_option
+ #define add_option_string	udhcp_add_option_string
+ #define add_simple_option	udhcp_add_simple_option
+-#define option_lengths		udhcp_option_lengths
+ /* from socket.h */
+ #define listen_socket		udhcp_listen_socket
+ #define read_interface		udhcp_read_interface
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 6ade1ee..d8077f7 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -19,15 +19,9 @@
+ #include "options.h"
+ 
+ 
+-/* Something is definitely wrong here. IPv4 addresses
+- * in variables of type long?? BTW, we use inet_ntoa()
+- * in the code. Manpage says that struct in_addr has a member of type long (!)
+- * which holds IPv4 address, and the struct is passed by value (!!)
+- */
+ static int timeout; /* = 0. Must be signed */
+ static uint32_t requested_ip; /* = 0 */
+ static uint32_t server_addr;
+-static int packet_num; /* = 0 */
+ static int sockfd = -1;
+ 
+ #define LISTEN_NONE 0
+@@ -74,12 +68,6 @@ static void perform_renew(void)
+ 	case INIT_SELECTING:
+ 		break;
+ 	}
+-
+-	/* start things over */
+-	packet_num = 0;
+-
+-	/* Kill any timeouts because the user wants this to hurry along */
+-	timeout = 0;
+ }
+ 
+ 
+@@ -153,8 +141,11 @@ int udhcpc_main(int argc, char **argv)
+ 	int discover_retries = 3;
+ 	uint32_t xid = 0;
+ 	uint32_t lease_seconds = 0; /* can be given as 32-bit quantity */
+-	unsigned t1 = 0, t2 = 0; /* what a wonderful names */
+-	unsigned timestamp_got_lease = 0; /* for gcc */
++	int packet_num;
++	/* t1, t2... what a wonderful names... */
++	unsigned t1 = t1; /* for gcc */
++	unsigned t2 = t2;
++	unsigned timestamp_got_lease = timestamp_got_lease;
+ 	unsigned opt;
+ 	int max_fd;
+ 	int retval;
+@@ -315,6 +306,7 @@ int udhcpc_main(int argc, char **argv)
+ 	state = INIT_SELECTING;
+ 	udhcp_run_script(NULL, "deconfig");
+ 	change_listen_mode(LISTEN_RAW);
++	packet_num = 0;
+ 
+ 	/* Main event loop. select() waits on signal pipe and possibly
+ 	 * on sockfd.
+@@ -585,6 +577,10 @@ int udhcpc_main(int argc, char **argv)
+ 			switch (signo) {
+ 			case SIGUSR1:
+ 				perform_renew();
++				/* start things over */
++				packet_num = 0;
++				/* Kill any timeouts because the user wants this to hurry along */
++				timeout = 0;
+ 				break;
+ 			case SIGUSR2:
+ 				perform_release();
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 28106d3..216b7ab 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -100,7 +100,7 @@ int send_inform(struct dhcpMessage *oldpacket);
+ int read_config(const char *file);
+ void write_leases(void);
+ void read_leases(const char *file);
+-struct option_set *find_option(struct option_set *opt_list, char code);
++struct option_set *find_option(struct option_set *opt_list, uint8_t code);
+ 
+ 
+ #endif
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 5026598..63c9064 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -71,7 +71,7 @@ static int read_yn(const char *line, void *arg)
+ 
+ 
+ /* find option 'code' in opt_list */
+-struct option_set *find_option(struct option_set *opt_list, char code)
++struct option_set *find_option(struct option_set *opt_list, uint8_t code)
+ {
+ 	while (opt_list && opt_list->data[OPT_CODE] < code)
+ 		opt_list = opt_list->next;
+@@ -154,31 +154,29 @@ static int read_opt(const char *const_line, void *arg)
+ {
+ 	struct option_set **opt_list = arg;
+ 	char *opt, *val, *endptr;
+-	const struct dhcp_option *option;
+-	int retval = 0, length;
+-	char buffer[8];
+ 	char *line;
++	const struct dhcp_option *option;
++	int retval, length, idx;
++	char buffer[8] __attribute__((aligned(4)));
+ 	uint16_t *result_u16 = (uint16_t *) buffer;
+ 	uint32_t *result_u32 = (uint32_t *) buffer;
+ 
+ 	/* Cheat, the only const line we'll actually get is "" */
+ 	line = (char *) const_line;
+ 	opt = strtok(line, " \t=");
+-	if (!opt) return 0;
++	if (!opt)
++		return 0;
+ 
+-	option = dhcp_options;
+-	while (1) {
+-		if (!option->code)
+-			return 0;
+-		if (!strcasecmp(option->opt_name, opt))
+-			break;
+-		option++;
+-	}
++	idx = index_in_strings(opt, dhcp_option_strings); /* NB: was strcasecmp! */
++	if (idx < 0)
++		return 0;
++	option = &dhcp_options[idx];
+ 
++	retval = 0;
+ 	do {
+ 		val = strtok(NULL, ", \t");
+ 		if (!val) break;
+-		length = option_lengths[option->flags & TYPE_MASK];
++		length = dhcp_option_lengths[option->flags & TYPE_MASK];
+ 		retval = 0;
+ 		opt = buffer; /* new meaning for variable opt */
+ 		switch (option->flags & TYPE_MASK) {
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index 60e9edc..1745fee 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -98,7 +98,9 @@ struct dhcpOfferedAddr *find_lease_by_yiaddr(uint32_t yiaddr)
+ /* check is an IP is taken, if it is, add it to the lease table */
+ static int nobody_responds_to_arp(uint32_t addr)
+ {
+-	static const uint8_t blank_chaddr[16]; /* 16 zero bytes */
++	/* 16 zero bytes */
++	static const uint8_t blank_chaddr[16] = { 0 };
++	/* = { 0 } helps gcc to put it in rodata, not bss */
+ 
+ 	struct in_addr temp;
+ 	int r;
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index ffc0ed1..c224f36 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -11,54 +11,97 @@
+ 
+ /* Supported options are easily added here */
+ const struct dhcp_option dhcp_options[] = {
+-	/* opt_name[12] flags                                   code */
+-	{"subnet",      OPTION_IP | OPTION_REQ,                 0x01},   /* DHCP_SUBNET         */
+-	{"timezone",    OPTION_S32,                             0x02},   /* DHCP_TIME_OFFSET    */
+-	{"router",      OPTION_IP | OPTION_LIST | OPTION_REQ,   0x03},   /* DHCP_ROUTER         */
+-	{"timesvr",     OPTION_IP | OPTION_LIST,                0x04},   /* DHCP_TIME_SERVER    */
+-	{"namesvr",     OPTION_IP | OPTION_LIST,                0x05},   /* DHCP_NAME_SERVER    */
+-	{"dns",         OPTION_IP | OPTION_LIST | OPTION_REQ,   0x06},   /* DHCP_DNS_SERVER     */
+-	{"logsvr",      OPTION_IP | OPTION_LIST,                0x07},   /* DHCP_LOG_SERVER     */
+-	{"cookiesvr",   OPTION_IP | OPTION_LIST,                0x08},   /* DHCP_COOKIE_SERVER  */
+-	{"lprsvr",      OPTION_IP | OPTION_LIST,                0x09},   /* DHCP_LPR_SERVER     */
+-	{"hostname",    OPTION_STRING | OPTION_REQ,             0x0c},   /* DHCP_HOST_NAME      */
+-	{"bootsize",    OPTION_U16,                             0x0d},   /* DHCP_BOOT_SIZE      */
+-	{"domain",      OPTION_STRING | OPTION_LIST | OPTION_REQ, 0x0f}, /* DHCP_DOMAIN_NAME    */
+-	{"swapsvr",     OPTION_IP,                              0x10},   /* DHCP_SWAP_SERVER    */
+-	{"rootpath",    OPTION_STRING,                          0x11},   /* DHCP_ROOT_PATH      */
+-	{"ipttl",       OPTION_U8,                              0x17},   /* DHCP_IP_TTL         */
+-	{"mtu",         OPTION_U16,                             0x1a},   /* DHCP_MTU            */
+-	{"broadcast",   OPTION_IP | OPTION_REQ,                 0x1c},   /* DHCP_BROADCAST      */
+-	{"nisdomain",   OPTION_STRING | OPTION_REQ,             0x28},   /* DHCP_NTP_SERVER     */
+-	{"nissrv",      OPTION_IP | OPTION_LIST | OPTION_REQ,   0x29},   /* DHCP_WINS_SERVER    */
+-	{"ntpsrv",      OPTION_IP | OPTION_LIST | OPTION_REQ,   0x2a},   /* DHCP_REQUESTED_IP   */
+-	{"wins",        OPTION_IP | OPTION_LIST,                0x2c},   /* DHCP_LEASE_TIME     */
+-	{"requestip",   OPTION_IP,                              0x32},   /* DHCP_OPTION_OVER    */
+-	{"lease",       OPTION_U32,                             0x33},   /* DHCP_MESSAGE_TYPE   */
+-	{"dhcptype",    OPTION_U8,                              0x35},   /* DHCP_SERVER_ID      */
+-	{"serverid",    OPTION_IP,                              0x36},   /* DHCP_PARAM_REQ      */
+-	{"message",     OPTION_STRING,                          0x38},   /* DHCP_MESSAGE        */
+-// TODO: 1) some options should not be parsed & passed to script -
+-// maxsize sure should not, since it cannot appear in server responses!
+-// grep for opt_name is fix the mess.
+-// 2) Using fixed-sized char[] vector wastes space.
+-	{"maxsize",     OPTION_U16,                             0x39},   /* DHCP_MAX_SIZE       */
+-	{"vendorclass", OPTION_STRING,                          0x3C},   /* DHCP_VENDOR         */
+-	{"clientid",    OPTION_STRING,                          0x3D},   /* DHCP_CLIENT_ID      */
+-	{"tftp",        OPTION_STRING,                          0x42},
+-	{"bootfile",    OPTION_STRING,                          0x43},
+-	{"userclass",   OPTION_STRING,                          0x4D},
++	/* flags                                     code */
++	{ OPTION_IP | OPTION_REQ,                    0x01 }, /* DHCP_SUBNET        */
++	{ OPTION_S32,                                0x02 }, /* DHCP_TIME_OFFSET   */
++	{ OPTION_IP | OPTION_LIST | OPTION_REQ,      0x03 }, /* DHCP_ROUTER        */
++	{ OPTION_IP | OPTION_LIST,                   0x04 }, /* DHCP_TIME_SERVER   */
++	{ OPTION_IP | OPTION_LIST,                   0x05 }, /* DHCP_NAME_SERVER   */
++	{ OPTION_IP | OPTION_LIST | OPTION_REQ,      0x06 }, /* DHCP_DNS_SERVER    */
++	{ OPTION_IP | OPTION_LIST,                   0x07 }, /* DHCP_LOG_SERVER    */
++	{ OPTION_IP | OPTION_LIST,                   0x08 }, /* DHCP_COOKIE_SERVER */
++	{ OPTION_IP | OPTION_LIST,                   0x09 }, /* DHCP_LPR_SERVER    */
++	{ OPTION_STRING | OPTION_REQ,                0x0c }, /* DHCP_HOST_NAME     */
++	{ OPTION_U16,                                0x0d }, /* DHCP_BOOT_SIZE     */
++	{ OPTION_STRING | OPTION_LIST | OPTION_REQ,  0x0f }, /* DHCP_DOMAIN_NAME   */
++	{ OPTION_IP,                                 0x10 }, /* DHCP_SWAP_SERVER   */
++	{ OPTION_STRING,                             0x11 }, /* DHCP_ROOT_PATH     */
++	{ OPTION_U8,                                 0x17 }, /* DHCP_IP_TTL        */
++	{ OPTION_U16,                                0x1a }, /* DHCP_MTU           */
++	{ OPTION_IP | OPTION_REQ,                    0x1c }, /* DHCP_BROADCAST     */
++	{ OPTION_STRING | OPTION_REQ,                0x28 }, /* DHCP_NTP_SERVER    */
++	{ OPTION_IP | OPTION_LIST | OPTION_REQ,      0x29 }, /* DHCP_WINS_SERVER   */
++	{ OPTION_IP | OPTION_LIST | OPTION_REQ,      0x2a }, /* DHCP_REQUESTED_IP  */
++	{ OPTION_IP | OPTION_LIST,                   0x2c }, /* DHCP_LEASE_TIME    */
++	{ OPTION_IP,                                 0x32 }, /* DHCP_OPTION_OVER   */
++	{ OPTION_U32,                                0x33 }, /* DHCP_MESSAGE_TYPE  */
++	{ OPTION_U8,                                 0x35 }, /* DHCP_SERVER_ID     */
++	{ OPTION_IP,                                 0x36 }, /* DHCP_PARAM_REQ     */
++	{ OPTION_STRING,                             0x38 }, /* DHCP_MESSAGE       */
++	{ OPTION_STRING,                             0x3C }, /* DHCP_VENDOR        */
++	{ OPTION_STRING,                             0x3D }, /* DHCP_CLIENT_ID     */
++	{ OPTION_STRING,                             0x42 }, /* "tftp"             */
++	{ OPTION_STRING,                             0x43 }, /* "bootfile"         */
++	{ OPTION_STRING,                             0x4D }, /* "userclass"        */
+ #if ENABLE_FEATURE_RFC3397
+-	{"search",      OPTION_STR1035 | OPTION_LIST | OPTION_REQ, 0x77},
++	{ OPTION_STR1035 | OPTION_LIST | OPTION_REQ, 0x77 }, /* "search"           */
+ #endif
+ 	/* MSIE's "Web Proxy Autodiscovery Protocol" support */
+-	{"wpad",        OPTION_STRING,                          0xfc},
+-	{} /* zero-padded terminating entry */
++	{ OPTION_STRING,                             0xfc }, /* "wpad"             */
++
++	/* Options below have no match in dhcp_option_strings[],
++	 * are not passed to dhcpc scripts, and cannot be specified
++	 * with "option XXX YYY" syntax in dhcpd config file. */
++
++	{ OPTION_U16,                                0x39 }, /* DHCP_MAX_SIZE      */
++	{ } /* zeroed terminating entry */
+ };
+ 
++/* Used for converting options from incoming packets to env variables
++ * for udhcpc stript */
++/* Must match dhcp_options[] order */
++const char dhcp_option_strings[] ALIGN1 =
++	"subnet" "\0"      /* DHCP_SUBNET         */
++	"timezone" "\0"    /* DHCP_TIME_OFFSET    */
++	"router" "\0"      /* DHCP_ROUTER         */
++	"timesvr" "\0"     /* DHCP_TIME_SERVER    */
++	"namesvr" "\0"     /* DHCP_NAME_SERVER    */
++	"dns" "\0"         /* DHCP_DNS_SERVER     */
++	"logsvr" "\0"      /* DHCP_LOG_SERVER     */
++	"cookiesvr" "\0"   /* DHCP_COOKIE_SERVER  */
++	"lprsvr" "\0"      /* DHCP_LPR_SERVER     */
++	"hostname" "\0"    /* DHCP_HOST_NAME      */
++	"bootsize" "\0"    /* DHCP_BOOT_SIZE      */
++	"domain" "\0"      /* DHCP_DOMAIN_NAME    */
++	"swapsvr" "\0"     /* DHCP_SWAP_SERVER    */
++	"rootpath" "\0"    /* DHCP_ROOT_PATH      */
++	"ipttl" "\0"       /* DHCP_IP_TTL         */
++	"mtu" "\0"         /* DHCP_MTU            */
++	"broadcast" "\0"   /* DHCP_BROADCAST      */
++	"nisdomain" "\0"   /* DHCP_NTP_SERVER     */
++	"nissrv" "\0"      /* DHCP_WINS_SERVER    */
++	"ntpsrv" "\0"      /* DHCP_REQUESTED_IP   */
++	"wins" "\0"        /* DHCP_LEASE_TIME     */
++	"requestip" "\0"   /* DHCP_OPTION_OVER    */
++	"lease" "\0"       /* DHCP_MESSAGE_TYPE   */
++	"dhcptype" "\0"    /* DHCP_SERVER_ID      */
++	"serverid" "\0"    /* DHCP_PARAM_REQ      */
++	"message" "\0"     /* DHCP_MESSAGE        */
++	"vendorclass" "\0" /* DHCP_VENDOR         */
++	"clientid" "\0"    /* DHCP_CLIENT_ID      */
++	"tftp" "\0"
++	"bootfile" "\0"
++	"userclass" "\0"
++#if ENABLE_FEATURE_RFC3397
++	"search" "\0"
++#endif
++	/* MSIE's "Web Proxy Autodiscovery Protocol" support */
++	"wpad" "\0"
++	;
++
+ 
+ /* Lengths of the different option types */
+-const unsigned char option_lengths[] ALIGN1 = {
++const uint8_t dhcp_option_lengths[] ALIGN1 = {
+ 	[OPTION_IP] =      4,
+ 	[OPTION_IP_PAIR] = 8,
+ 	[OPTION_BOOLEAN] = 1,
+@@ -137,8 +180,10 @@ int end_option(uint8_t *optionptr)
+ 	int i = 0;
+ 
+ 	while (optionptr[i] != DHCP_END) {
+-		if (optionptr[i] == DHCP_PADDING) i++;
+-		else i += optionptr[i + OPT_LEN] + 2;
++		if (optionptr[i] == DHCP_PADDING)
++			i++;
++		else
++			i += optionptr[i + OPT_LEN] + 2;
+ 	}
+ 	return i;
+ }
+@@ -173,10 +218,11 @@ int add_simple_option(uint8_t *optionptr, uint8_t code, uint32_t data)
+ 			uint8_t option[6], len;
+ 
+ 			option[OPT_CODE] = code;
+-			len = option_lengths[dh->flags & TYPE_MASK];
++			len = dhcp_option_lengths[dh->flags & TYPE_MASK];
+ 			option[OPT_LEN] = len;
+-			if (BB_BIG_ENDIAN) data <<= 8 * (4 - len);
+-			/* This memcpy is for broken processors which can't
++			if (BB_BIG_ENDIAN)
++				data <<= 8 * (4 - len);
++			/* This memcpy is for processors which can't
+ 			 * handle a simple unaligned 32-bit assignment */
+ 			memcpy(&option[OPT_DATA], &data, 4);
+ 			return add_option_string(optionptr, option);
+diff --git a/networking/udhcp/options.h b/networking/udhcp/options.h
+index 4bf73a1..c98aec4 100644
+--- a/networking/udhcp/options.h
++++ b/networking/udhcp/options.h
+@@ -98,13 +98,13 @@ enum {
+ #define OPT_DATA 2
+ 
+ struct dhcp_option {
+-	char opt_name[12];
+-	char flags;
++	uint8_t flags;
+ 	uint8_t code;
+ };
+ 
+ extern const struct dhcp_option dhcp_options[];
+-extern const unsigned char option_lengths[];
++extern const char dhcp_option_strings[];
++extern const uint8_t dhcp_option_lengths[];
+ 
+ uint8_t *get_option(struct dhcpMessage *packet, int code);
+ int end_option(uint8_t *optionptr);
+diff --git a/networking/udhcp/script.c b/networking/udhcp/script.c
+index 33d96e6..8a18898 100644
+--- a/networking/udhcp/script.c
++++ b/networking/udhcp/script.c
+@@ -33,7 +33,7 @@ static const uint8_t max_option_length[] = {
+ static inline int upper_length(int length, int opt_index)
+ {
+ 	return max_option_length[opt_index] *
+-		(length / option_lengths[opt_index]);
++		(length / dhcp_option_lengths[opt_index]);
+ }
+ 
+ 
+@@ -57,7 +57,7 @@ static int mton(uint32_t mask)
+ 
+ 
+ /* Allocate and fill with the text of option 'option'. */
+-static char *alloc_fill_opts(uint8_t *option, const struct dhcp_option *type_p)
++static char *alloc_fill_opts(uint8_t *option, const struct dhcp_option *type_p, const char *opt_name)
+ {
+ 	int len, type, optlen;
+ 	uint16_t val_u16;
+@@ -68,10 +68,10 @@ static char *alloc_fill_opts(uint8_t *option, const struct dhcp_option *type_p)
+ 
+ 	len = option[OPT_LEN - 2];
+ 	type = type_p->flags & TYPE_MASK;
+-	optlen = option_lengths[type];
++	optlen = dhcp_option_lengths[type];
+ 
+-	dest = ret = xmalloc(upper_length(len, type) + strlen(type_p->opt_name) + 2);
+-	dest += sprintf(ret, "%s=", type_p->opt_name);
++	dest = ret = xmalloc(upper_length(len, type) + strlen(opt_name) + 2);
++	dest += sprintf(ret, "%s=", opt_name);
+ 
+ 	for (;;) {
+ 		switch (type) {
+@@ -133,6 +133,7 @@ static char **fill_envp(struct dhcpMessage *packet)
+ 	int i, j;
+ 	char **envp;
+ 	char *var;
++	const char *opt_name;
+ 	uint8_t *temp;
+ 	char over = 0;
+ 
+@@ -171,11 +172,13 @@ static char **fill_envp(struct dhcpMessage *packet)
+ 	envp[j] = xmalloc(sizeof("ip=255.255.255.255"));
+ 	sprintip(envp[j++], "ip=", (uint8_t *) &packet->yiaddr);
+ 
+-	for (i = 0; dhcp_options[i].code; i++) {
++	opt_name = dhcp_option_strings;
++	i = 0;
++	while (*opt_name) {
+ 		temp = get_option(packet, dhcp_options[i].code);
+ 		if (!temp)
+-			continue;
+-		envp[j++] = alloc_fill_opts(temp, &dhcp_options[i]);
++			goto next;
++		envp[j++] = alloc_fill_opts(temp, &dhcp_options[i], opt_name);
+ 
+ 		/* Fill in a subnet bits option for things like /24 */
+ 		if (dhcp_options[i].code == DHCP_SUBNET) {
+@@ -183,6 +186,9 @@ static char **fill_envp(struct dhcpMessage *packet)
+ 			memcpy(&subnet, temp, 4);
+ 			envp[j++] = xasprintf("mask=%d", mton(subnet));
+ 		}
++ next:
++		opt_name += strlen(opt_name) + 1;
++		i++;
+ 	}
+ 	if (packet->siaddr) {
+ 		envp[j] = xmalloc(sizeof("siaddr=255.255.255.255"));

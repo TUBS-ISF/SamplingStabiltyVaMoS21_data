@@ -1,0 +1,13 @@
+2008-05-30 10:44:37 +0000
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 2efa776..de05580 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -313,6 +313,7 @@ static long parse_mount_options(char *options, char **unrecognized)
+ 
+ 		if (comma) *comma = '\0';
+ 
++/* FIXME: use hasmntopt() */
+ 		// Find this option in mount_options
+ 		for (i = 0; i < ARRAY_SIZE(mount_options); i++) {
+ 			if (!strcasecmp(option_str, options)) {

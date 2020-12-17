@@ -1,0 +1,279 @@
+2009-03-09 00:12:37 +0000
+diff --git a/e2fsprogs/old_e2fsprogs/e2fsck.c b/e2fsprogs/old_e2fsprogs/e2fsck.c
+index 6ade0db..d1f8d1e 100644
+--- a/e2fsprogs/old_e2fsprogs/e2fsck.c
++++ b/e2fsprogs/old_e2fsprogs/e2fsck.c
+@@ -12892,7 +12892,7 @@ static int e2fsck_update_progress(e2fsck_t ctx, int pass,
+ 
+ 	if (ctx->progress_fd) {
+ 		sprintf(buf, "%d %lu %lu\n", pass, cur, max);
+-		write(ctx->progress_fd, buf, strlen(buf));
++		xwrite_str(ctx->progress_fd, buf);
+ 	} else {
+ 		percent = calc_percent(&e2fsck_tbl, pass, cur, max);
+ 		e2fsck_simple_progress(ctx, ctx->device_name,
+diff --git a/include/libbb.h b/include/libbb.h
+index 3e21cbf..7d6ea90 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -489,6 +489,8 @@ int create_and_bind_dgram_or_die(const char *bindaddr, int port) FAST_FUNC;
+ int create_and_connect_stream_or_die(const char *peer, int port) FAST_FUNC;
+ /* Connect to peer identified by lsa */
+ int xconnect_stream(const len_and_sockaddr *lsa) FAST_FUNC;
++/* Get local address of bound or accepted socket */
++len_and_sockaddr *get_sock_lsa(int fd) FAST_FUNC;
+ /* Return malloc'ed len_and_sockaddr with socket address of host:port
+  * Currently will return IPv4 or IPv6 sockaddrs only
+  * (depending on host), but in theory nothing prevents e.g.
+@@ -607,6 +609,7 @@ extern ssize_t safe_write(int fd, const void *buf, size_t count) FAST_FUNC;
+ // if some data was written before error occurred
+ extern ssize_t full_write(int fd, const void *buf, size_t count) FAST_FUNC;
+ extern void xwrite(int fd, const void *buf, size_t count) FAST_FUNC;
++extern void xwrite_str(int fd, const char *str) FAST_FUNC;
+ extern void xopen_xwrite_close(const char* file, const char *str) FAST_FUNC;
+ 
+ /* Reads and prints to stdout till eof, then closes FILE. Exits on error: */
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 13cdb81..80380ae 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -99,7 +99,7 @@ static const char *unpack_usage_messages(void)
+ 
+ static void full_write2_str(const char *str)
+ {
+-	full_write(STDERR_FILENO, str, strlen(str));
++	xwrite_str(STDERR_FILENO, str);
+ }
+ 
+ void FAST_FUNC bb_show_usage(void)
+diff --git a/libbb/write.c b/libbb/write.c
+index 37f4617..116e4d1 100644
+--- a/libbb/write.c
++++ b/libbb/write.c
+@@ -10,11 +10,10 @@
+ #include "libbb.h"
+ 
+ /* Open file and write string str to it, close file.
+- * Die on any open or write-error.  */
++ * Die on any open or write error.  */
+ void FAST_FUNC xopen_xwrite_close(const char* file, const char* str)
+ {
+ 	int fd = xopen(file, O_WRONLY);
+-
+-	xwrite(fd, str, strlen(str));
++	xwrite_str(fd, str);
+ 	close(fd);
+ }
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index 2eb4cb9..9758445 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -35,6 +35,19 @@ int FAST_FUNC setsockopt_bindtodevice(int fd, const char *iface)
+ 	return r;
+ }
+ 
++len_and_sockaddr* FAST_FUNC get_sock_lsa(int fd)
++{
++	len_and_sockaddr *lsa;
++	socklen_t len = 0;
++
++	/* Can be optimized to do only one getsockname() */
++	if (getsockname(fd, NULL, &len) != 0)
++		return NULL;
++	lsa = xzalloc(LSA_LEN_SIZE + len);
++	lsa->len = len;
++	getsockname(fd, &lsa->u.sa, &lsa->len);
++	return lsa;
++}
+ 
+ void FAST_FUNC xconnect(int s, const struct sockaddr *s_addr, socklen_t addrlen)
+ {
+@@ -51,8 +64,9 @@ void FAST_FUNC xconnect(int s, const struct sockaddr *s_addr, socklen_t addrlen)
+ 
+ /* Return port number for a service.
+  * If "port" is a number use it as the port.
+- * If "port" is a name it is looked up in /etc/services, if it isnt found return
+- * default_port */
++ * If "port" is a name it is looked up in /etc/services,
++ * if it isnt found return default_port
++ */
+ unsigned FAST_FUNC bb_lookup_port(const char *port, const char *protocol, unsigned default_port)
+ {
+ 	unsigned port_nr = default_port;
+diff --git a/libbb/xfuncs_printf.c b/libbb/xfuncs_printf.c
+index cd0f84d..6d0fa6e 100644
+--- a/libbb/xfuncs_printf.c
++++ b/libbb/xfuncs_printf.c
+@@ -208,6 +208,10 @@ void FAST_FUNC xwrite(int fd, const void *buf, size_t count)
+ 			bb_error_msg_and_die("short write");
+ 	}
+ }
++void FAST_FUNC xwrite_str(int fd, const char *str)
++{
++	xwrite(fd, str, strlen(str));
++}
+ 
+ // Die with an error message if we can't lseek to the right spot.
+ off_t FAST_FUNC xlseek(int fd, off_t offset, int whence)
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index d4b5013..17b5088 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -145,7 +145,7 @@ int adduser_main(int argc UNUSED_PARAM, char **argv)
+ 				/*99999,*/              /* sp->sp_max */
+ 				/*7*/                   /* sp->sp_warn */
+ 		);
+-		xwrite(fd, s, strlen(s));
++		xwrite_str(fd, s);
+ 		close(fd);
+ 	}
+ #endif
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index ba5b0d6..467316f 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -713,6 +713,7 @@ int getty_main(int argc UNUSED_PARAM, char **argv)
+ 	/* Write the modem init string and DON'T flush the buffers */
+ 	if (options.flags & F_INITSTRING) {
+ 		debug("writing init string\n");
++		/* todo: use xwrite_str? */
+ 		full_write(STDOUT_FILENO, options.initstring, strlen(options.initstring));
+ 	}
+ 
+diff --git a/modutils/modutils-24.c b/modutils/modutils-24.c
+index 451975a..169fe54 100644
+--- a/modutils/modutils-24.c
++++ b/modutils/modutils-24.c
+@@ -3513,7 +3513,7 @@ static void set_tainted(int fd, const char *m_name,
+ 		buf[sizeof(buf)-1] = '\0';
+ 		oldval = strtoul(buf, NULL, 10);
+ 		sprintf(buf, "%d\n", oldval | taint);
+-		write(fd, buf, strlen(buf));
++		xwrite_str(fd, buf);
+ 	}
+ }
+ 
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index 91cbc17..6289edf 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -107,14 +107,6 @@ struct globals {
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define INIT_G() do { } while (0)
+ 
+-
+-// libbb candidate?
+-static void
+-xwrite_str(int fd, const char *str)
+-{
+-	xwrite(fd, str, strlen(str));
+-}
+-
+ static char *
+ replace_text(const char *str, const char from, const char *to)
+ {
+@@ -918,20 +910,6 @@ handle_stou(void)
+ }
+ #endif /* ENABLE_FEATURE_FTP_WRITE */
+ 
+-/* TODO: libbb candidate (tftp has another copy) */
+-static len_and_sockaddr *get_sock_lsa(int s)
+-{
+-	len_and_sockaddr *lsa;
+-	socklen_t len = 0;
+-
+-	if (getsockname(s, NULL, &len) != 0)
+-		return NULL;
+-	lsa = xzalloc(LSA_LEN_SIZE + len);
+-	lsa->len = len;
+-	getsockname(s, &lsa->u.sa, &lsa->len);
+-	return lsa;
+-}
+-
+ int ftpd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ftpd_main(int argc UNUSED_PARAM, char **argv)
+ {
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 799dd99..fa08516 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -622,21 +622,6 @@ int tftp_main(int argc UNUSED_PARAM, char **argv)
+ #endif /* ENABLE_TFTP */
+ 
+ #if ENABLE_TFTPD
+-
+-/* TODO: libbb candidate? */
+-static len_and_sockaddr *get_sock_lsa(int s)
+-{
+-	len_and_sockaddr *lsa;
+-	socklen_t len = 0;
+-
+-	if (getsockname(s, NULL, &len) != 0)
+-		return NULL;
+-	lsa = xzalloc(LSA_LEN_SIZE + len);
+-	lsa->len = len;
+-	getsockname(s, &lsa->u.sa, &lsa->len);
+-	return lsa;
+-}
+-
+ int tftpd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tftpd_main(int argc UNUSED_PARAM, char **argv)
+ {
+diff --git a/procps/sysctl.c b/procps/sysctl.c
+index d59e269..862cd17 100644
+--- a/procps/sysctl.c
++++ b/procps/sysctl.c
+@@ -21,11 +21,6 @@ static int sysctl_display_all(const char *path);
+ static int sysctl_handle_preload_file(const char *filename);
+ static void sysctl_dots_to_slashes(char *name);
+ 
+-static void dwrite_str(int fd, const char *buf)
+-{
+-	write(fd, buf, strlen(buf));
+-}
+-
+ enum {
+ 	FLAG_SHOW_KEYS       = 1 << 0,
+ 	FLAG_SHOW_KEY_ERRORS = 1 << 1,
+@@ -147,7 +142,7 @@ static int sysctl_act_on_setting(char *setting)
+ 	}
+ 
+ 	if (option_mask32 & FLAG_WRITE) {
+-		dwrite_str(fd, value);
++		xwrite_str(fd, value);
+ 		close(fd);
+ 		if (option_mask32 & FLAG_SHOW_KEYS)
+ 			printf("%s = ", outname);
+diff --git a/shell/msh.c b/shell/msh.c
+index 0cb81fe..5f8c90e 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -743,7 +743,7 @@ static void print_tree(struct op *head)
+ static void prs(const char *s)
+ {
+ 	if (*s)
+-		write(STDERR_FILENO, s, strlen(s));
++		xwrite_str(STDERR_FILENO, s);
+ }
+ 
+ static void prn(unsigned u)
+@@ -3600,7 +3600,7 @@ static int doset(struct op *t UNUSED_PARAM, char **args)
+ 	cp = args[1];
+ 	if (cp == NULL) {
+ 		for (vp = vlist; vp; vp = vp->next)
+-			varput(vp->name, 1);
++			varput(vp->name, STDOUT_FILENO);
+ 		return 0;
+ 	}
+ 	if (*cp == '-') {
+@@ -3639,8 +3639,8 @@ static int doset(struct op *t UNUSED_PARAM, char **args)
+ static void varput(char *s, int out)
+ {
+ 	if (isalnum(*s) || *s == '_') {
+-		write(out, s, strlen(s));
+-		write(out, "\n", 1);
++		xwrite_str(out, s);
++		xwrite(out, "\n", 1);
+ 	}
+ }
+ 

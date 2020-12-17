@@ -1,0 +1,25 @@
+2009-10-08 04:19:14 +0200
+diff --git a/shell/ash.c b/shell/ash.c
+index 2e7228d..54af39a 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -3272,9 +3272,6 @@ struct job {
+ };
+ 
+ static struct job *makejob(/*union node *,*/ int);
+-#if !JOBS
+-#define forkshell(job, node, mode) forkshell(job, mode)
+-#endif
+ static int forkshell(struct job *, union node *, int);
+ static int waitforjob(struct job *);
+ 
+@@ -4541,9 +4538,6 @@ clear_traps(void)
+ static void closescript(void);
+ 
+ /* Called after fork(), in child */
+-#if !JOBS
+-# define forkchild(jp, n, mode) forkchild(jp, mode)
+-#endif
+ static NOINLINE void
+ forkchild(struct job *jp, union node *n, int mode)
+ {

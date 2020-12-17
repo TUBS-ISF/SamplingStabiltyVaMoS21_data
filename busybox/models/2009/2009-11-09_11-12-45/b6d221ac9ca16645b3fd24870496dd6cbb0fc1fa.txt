@@ -1,0 +1,14 @@
+2009-11-09 11:12:45 +0100
+diff --git a/examples/var_service/dhcp_if/dhcp_handler b/examples/var_service/dhcp_if/dhcp_handler
+index 5174040..927e02a 100755
+--- a/examples/var_service/dhcp_if/dhcp_handler
++++ b/examples/var_service/dhcp_if/dhcp_handler
+@@ -21,7 +21,7 @@
+ # ntpsrv=10.34.32.125 10.34.255.7
+ #
+ # renew: lease is renewed. Environment is similar to "bound".
+-# The IP address does not not change, however, the other DHCP paramaters,
++# The IP address does not change, however, the other DHCP paramaters,
+ # such as the default gateway, subnet mask, and dns server may change.
+ #
+ # nak: udhcpc received a NAK message.

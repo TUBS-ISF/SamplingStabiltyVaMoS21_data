@@ -1,0 +1,85 @@
+2007-11-23 03:39:45 +0000
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index c4d7252..31911cd 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -134,13 +134,15 @@ static char *get_var(const char *id, size_t idlen, struct interface_defn_t *ifd)
+ 	int i;
+ 
+ 	if (strncmpz(id, "iface", idlen) == 0) {
+-		char *result;
+-		static char label_buf[20];
+-		safe_strncpy(label_buf, ifd->iface, sizeof(label_buf));
+-		result = strchr(label_buf, ':');
+-		if (result) {
+-			*result = '\0';
+-		}
++		static char *label_buf;
++		//char *result;
++
++		free(label_buf);
++		label_buf = xstrdup(ifd->iface);
++		// Remove virtual iface suffix - why?
++		// ubuntu's ifup doesn't do this
++		//result = strchrnul(label_buf, ':');
++		//*result = '\0';
+ 		return label_buf;
+ 	}
+ 	if (strncmpz(id, "label", idlen) == 0) {
+diff --git a/sysklogd/logger.c b/sysklogd/logger.c
+index e2d0746..60eac6a 100644
+--- a/sysklogd/logger.c
++++ b/sysklogd/logger.c
+@@ -11,7 +11,10 @@
+ 
+ #if !defined CONFIG_SYSLOGD
+ 
++/* SYSLOG_NAMES defined to pull prioritynames[] and facilitynames[]
++ * from syslog.h. Grrrr - glibc puts those in _rwdata_! :( */
+ #define SYSLOG_NAMES
++#define SYSLOG_NAMES_CONST /* uclibc is saner :) */
+ #include <sys/syslog.h>
+ 
+ #else
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index 6567df3..51fb7a0 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -18,16 +18,30 @@
+ 
+ enum { KEY_ID = 0x414e4547 }; /* "GENA" */
+ 
+-static struct shbuf_ds {
++struct shbuf_ds {
+ 	int32_t size;           // size of data - 1
+ 	int32_t tail;           // end of message list
+ 	char data[1];           // messages
+-} *shbuf;
+-
+-// Semaphore operation structures
+-static struct sembuf SMrup[1] = {{0, -1, IPC_NOWAIT | SEM_UNDO}}; // set SMrup
+-static struct sembuf SMrdn[2] = {{1, 0}, {0, +1, SEM_UNDO}}; // set SMrdn
+-
++};
++
++static const struct sembuf init_sem[3] = {
++	{0, -1, IPC_NOWAIT | SEM_UNDO},
++	{1, 0}, {0, +1, SEM_UNDO}
++};
++
++struct globals {
++	struct sembuf SMrup[1]; // {0, -1, IPC_NOWAIT | SEM_UNDO},
++	struct sembuf SMrdn[2]; // {1, 0}, {0, +1, SEM_UNDO}
++	struct shbuf_ds *shbuf;
++};
++#define G (*(struct globals*)&bb_common_bufsiz1)
++#define SMrup (G.SMrup)
++#define SMrdn (G.SMrdn)
++#define shbuf (G.shbuf)
++#define INIT_G() \
++	do { \
++		memcpy(SMrup, init_sem, sizeof(init_sem)); \
++	} while (0)
+ 
+ static void error_exit(const char *str) ATTRIBUTE_NORETURN;
+ static void error_exit(const char *str)

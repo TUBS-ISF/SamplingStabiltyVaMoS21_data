@@ -1,0 +1,123 @@
+2007-06-16 13:37:59 +0000
+diff --git a/include/applets.h b/include/applets.h
+index e4dff11..0f378bb 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -257,6 +257,7 @@ USE_HALT(APPLET_ODDNAME(poweroff, halt, _BB_DIR_SBIN, _BB_SUID_NEVER, poweroff))
+ USE_PRINTENV(APPLET(printenv, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_PRINTF(APPLET(printf, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_PS(APPLET(ps, _BB_DIR_BIN, _BB_SUID_NEVER))
++USE_PSCAN(APPLET(pscan, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_PWD(APPLET_NOFORK(pwd, pwd, _BB_DIR_BIN, _BB_SUID_NEVER, pwd))
+ USE_RAIDAUTORUN(APPLET(raidautorun, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_RDATE(APPLET(rdate, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index 1c4442e..7e23de9 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2676,6 +2676,16 @@
+        " 2990 andersen andersen R ps\n"
+ 
+ 
++#define pscan_trivial_usage \
++       "[-p MIN_PORT] [-P MAX_PORT] [-t TIMEOUT] [-T MIN_RTT] HOST"
++#define pscan_full_usage \
++       "Scan a host, print all open ports" \
++       "\n\nOptions:" \
++     "\n	-p	Scan from this port (default 1)" \
++     "\n	-P	Scan up to this port (default 1024)" \
++     "\n	-t	Timeout (default 5000 ms)" \
++     "\n	-T	Minimum rtt (default 5 ms, increase for congested hosts)" \
++
+ #define pwd_trivial_usage \
+        ""
+ #define pwd_full_usage \
+diff --git a/networking/Config.in b/networking/Config.in
+index 5ccc483..efa6aae 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -527,6 +527,12 @@ config PING6
+ 	help
+ 	  This will give you a ping that can talk IPv6.
+ 
++config PSCAN
++	bool "pscan"
++	default n
++	help
++	  Simple network port scanner.
++
+ config FEATURE_FANCY_PING
+ 	bool "Enable fancy ping output"
+ 	default y
+diff --git a/networking/Kbuild b/networking/Kbuild
+index 13b4452..0f4ab7b 100644
+--- a/networking/Kbuild
++++ b/networking/Kbuild
+@@ -25,6 +25,7 @@ lib-$(CONFIG_NETSTAT)      += netstat.o
+ lib-$(CONFIG_NSLOOKUP)     += nslookup.o
+ lib-$(CONFIG_PING)         += ping.o
+ lib-$(CONFIG_PING6)        += ping.o
++lib-$(CONFIG_PSCAN)        += pscan.o
+ lib-$(CONFIG_ROUTE)        += route.o
+ lib-$(CONFIG_TELNET)       += telnet.o
+ lib-$(CONFIG_TELNETD)      += telnetd.o
+diff --git a/networking/ping.c b/networking/ping.c
+index 6b5045e..e94b791 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -341,7 +341,12 @@ static void sendping4(int junk ATTRIBUTE_UNUSED)
+ 	pkt->icmp_cksum = 0;
+ 	pkt->icmp_seq = htons(ntransmitted); /* don't ++ here, it can be a macro */
+ 	pkt->icmp_id = myid;
++
++// I can't fucking believe someone thought it's okay to do it like this...
++// where's hton? Where is a provision for different word size, structure padding, etc??
++// FIXME!
+ 	gettimeofday((struct timeval *) &pkt->icmp_dun, NULL);
++
+ 	pkt->icmp_cksum = in_cksum((unsigned short *) pkt, datalen + ICMP_MINLEN);
+ 
+ 	sendping_tail(sendping4, pkt, datalen + ICMP_MINLEN);
+@@ -356,6 +361,8 @@ static void sendping6(int junk ATTRIBUTE_UNUSED)
+ 	pkt->icmp6_cksum = 0;
+ 	pkt->icmp6_seq = htons(ntransmitted); /* don't ++ here, it can be a macro */
+ 	pkt->icmp6_id = myid;
++
++// FIXME!
+ 	gettimeofday((struct timeval *) &pkt->icmp6_data8[4], NULL);
+ 
+ 	sendping_tail(sendping6, pkt, datalen + sizeof(struct icmp6_hdr));
+diff --git a/networking/wget.c b/networking/wget.c
+index 2c060d7..fe669bb 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -693,16 +693,15 @@ progressmeter(int flag)
+ 	struct timeval now, td, tvwait;
+ 	off_t abbrevsize;
+ 	int elapsed, ratio, barlength, i;
+-	char buf[256];
+ 
+ 	if (flag == -1) { /* first call to progressmeter */
+-		gettimeofday(&start, (struct timezone *) 0);
++		gettimeofday(&start, NULL);
+ 		lastupdate = start;
+ 		lastsize = 0;
+ 		totalsize = content_len + beg_range; /* as content_len changes.. */
+ 	}
+ 
+-	gettimeofday(&now, (struct timezone *) 0);
++	gettimeofday(&now, NULL);
+ 	ratio = 100;
+ 	if (totalsize != 0 && !chunked) {
+ 		/* long long helps to have working ETA even if !LFS */
+@@ -713,7 +712,9 @@ progressmeter(int flag)
+ 	fprintf(stderr, "\r%-20.20s%4d%% ", curfile, ratio);
+ 
+ 	barlength = getttywidth() - 51;
+-	if (barlength > 0 && barlength < sizeof(buf)) {
++	if (barlength > 0) {
++		/* god bless gcc for variable arrays :) */
++		char buf[barlength+1];
+ 		i = barlength * ratio / 100;
+ 		memset(buf, '*', i);
+ 		memset(buf + i, ' ', barlength - i);

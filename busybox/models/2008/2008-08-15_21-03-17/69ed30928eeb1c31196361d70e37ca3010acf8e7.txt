@@ -1,0 +1,14 @@
+2008-08-15 21:03:17 +0000
+diff --git a/runit/chpst.c b/runit/chpst.c
+index 6e5180b..43e8d5f 100644
+--- a/runit/chpst.c
++++ b/runit/chpst.c
+@@ -228,7 +228,7 @@ int chpst_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	// envuidgid?
+-	if (ENABLE_ENVUIDGID && applet_name[0] == 'e') {
++	if (ENABLE_ENVUIDGID && applet_name[0] == 'e' && applet_name[3] == 'u') {
+ 		env_user = *argv++;
+ 		opt |= OPT_U;
+ 	}

@@ -1,0 +1,53 @@
+2009-09-24 01:43:21 +0200
+diff --git a/shell/ash.c b/shell/ash.c
+index b7c6431..597bc28 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -12259,8 +12259,9 @@ trapcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	if (!*ap) {
+ 		for (signo = 0; signo < NSIG; signo++) {
+ 			if (trap[signo] != NULL) {
+-				out1fmt("trap -- %s SIG%s\n",
++				out1fmt("trap -- %s %s%s\n",
+ 						single_quote(trap[signo]),
++						(signo == 0 ? "" : "SIG"),
+ 						get_signame(signo));
+ 			}
+ 		}
+diff --git a/shell/hush.c b/shell/hush.c
+index 9db2091..85a45dd 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -7099,7 +7099,7 @@ static int FAST_FUNC builtin_trap(char **argv)
+ 				printf("trap -- ");
+ 				print_escaped(G.traps[i]);
+ 				/* bash compat: it says SIGxxx, not just xxx */
+-				printf(" SIG%s\n", get_signame(i));
++				printf(" %s%s\n", i == 0 ? "" : "SIG", get_signame(i));
+ 			}
+ 		}
+ 		/*fflush(stdout); - done after each builtin anyway */
+diff --git a/shell/hush_test/hush-trap/usage.right b/shell/hush_test/hush-trap/usage.right
+index c0dbd6c..5b90222 100644
+--- a/shell/hush_test/hush-trap/usage.right
++++ b/shell/hush_test/hush-trap/usage.right
+@@ -2,13 +2,13 @@ ___
+ ___
+ ___
+ trap -- 'a' EXIT
+-trap -- 'a' INT
+-trap -- 'a' USR1
+-trap -- 'a' USR2
++trap -- 'a' SIGINT
++trap -- 'a' SIGUSR1
++trap -- 'a' SIGUSR2
+ ___
+ ___
+-trap -- 'a' USR1
+-trap -- 'a' USR2
++trap -- 'a' SIGUSR1
++trap -- 'a' SIGUSR2
+ ___
+ ___
+-trap -- 'a' USR2
++trap -- 'a' SIGUSR2

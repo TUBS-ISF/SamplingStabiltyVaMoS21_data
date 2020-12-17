@@ -1,0 +1,36 @@
+2010-04-20 04:00:03 -0400
+diff --git a/editors/sed.c b/editors/sed.c
+index 302a156..30ab8c9 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -936,7 +936,15 @@ static void process_files(void)
+ 		/* Skip blocks of commands we didn't match */
+ 		if (sed_cmd->cmd == '{') {
+ 			if (sed_cmd->invert ? matched : !matched) {
+-				while (sed_cmd->cmd != '}') {
++				unsigned nest_cnt = 0;
++				while (1) {
++					if (sed_cmd->cmd == '{')
++						nest_cnt++;
++					if (sed_cmd->cmd == '}') {
++						nest_cnt--;
++						if (nest_cnt == 0)
++							break;
++					}
+ 					sed_cmd = sed_cmd->next;
+ 					if (!sed_cmd)
+ 						bb_error_msg_and_die("unterminated {");
+diff --git a/testsuite/sed.tests b/testsuite/sed.tests
+index f88524d..b0de965 100755
+--- a/testsuite/sed.tests
++++ b/testsuite/sed.tests
+@@ -253,4 +253,9 @@ testing "sed c" \
+ 	"repl\nrepl\n" "" \
+ 	"first\nsecond\n"
+ 
++testing "sed nested {}s" \
++	"sed '/asd/ { p; /s/ { s/s/c/ }; p; q }'" \
++	"qwe\nasd\nacd\nacd\n" "" \
++	"qwe\nasd\nzxc\n"
++
+ exit $FAILCOUNT

@@ -1,0 +1,138 @@
+2007-11-12 02:13:12 +0000
+diff --git a/archival/libunarchive/get_header_tar_bz2.c b/archival/libunarchive/get_header_tar_bz2.c
+index 6d4f585..c2cbaff 100644
+--- a/archival/libunarchive/get_header_tar_bz2.c
++++ b/archival/libunarchive/get_header_tar_bz2.c
+@@ -11,7 +11,7 @@ char get_header_tar_bz2(archive_handle_t *archive_handle)
+ 	/* Can't lseek over pipes */
+ 	archive_handle->seek = seek_by_read;
+ 
+-	archive_handle->src_fd = open_transformer(archive_handle->src_fd, unpack_bz2_stream, "bunzip2", "bunzip2", "-cf", "-", NULL);
++	archive_handle->src_fd = open_transformer(archive_handle->src_fd, unpack_bz2_stream, "bunzip2");
+ 	archive_handle->offset = 0;
+ 	while (get_header_tar(archive_handle) == EXIT_SUCCESS)
+ 		continue;
+diff --git a/archival/libunarchive/get_header_tar_gz.c b/archival/libunarchive/get_header_tar_gz.c
+index dd655f5..9772e33 100644
+--- a/archival/libunarchive/get_header_tar_gz.c
++++ b/archival/libunarchive/get_header_tar_gz.c
+@@ -25,7 +25,7 @@ char get_header_tar_gz(archive_handle_t *archive_handle)
+ 	}
+ #endif
+ 
+-	archive_handle->src_fd = open_transformer(archive_handle->src_fd, unpack_gz_stream, "gunzip", "gunzip", "-cf", "-", NULL);
++	archive_handle->src_fd = open_transformer(archive_handle->src_fd, unpack_gz_stream, "gunzip");
+ 	archive_handle->offset = 0;
+ 	while (get_header_tar(archive_handle) == EXIT_SUCCESS)
+ 		continue;
+diff --git a/archival/libunarchive/get_header_tar_lzma.c b/archival/libunarchive/get_header_tar_lzma.c
+index cf73824..c859dcc 100644
+--- a/archival/libunarchive/get_header_tar_lzma.c
++++ b/archival/libunarchive/get_header_tar_lzma.c
+@@ -14,7 +14,7 @@ char get_header_tar_lzma(archive_handle_t * archive_handle)
+ 	/* Can't lseek over pipes */
+ 	archive_handle->seek = seek_by_read;
+ 
+-	archive_handle->src_fd = open_transformer(archive_handle->src_fd, unpack_lzma_stream, "unlzma", "unlzma", "-cf", "-", NULL);
++	archive_handle->src_fd = open_transformer(archive_handle->src_fd, unpack_lzma_stream, "unlzma");
+ 	archive_handle->offset = 0;
+ 	while (get_header_tar(archive_handle) == EXIT_SUCCESS)
+ 		continue;
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index 355613a..757a2a3 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -8,12 +8,12 @@
+ 
+ /* transformer(), more than meets the eye */
+ /*
+- * On MMU machine, the transform_prog and ... are stripped
+- * by a macro in include/unarchive.h. On NOMMU, transformer is stripped.
++ * On MMU machine, the transform_prog is removed by macro magic
++ * in include/unarchive.h. On NOMMU, transformer is removed.
+  */
+ int open_transformer(int src_fd,
+ 	USE_DESKTOP(long long) int (*transformer)(int src_fd, int dst_fd),
+-	const char *transform_prog, ...)
++	const char *transform_prog)
+ {
+ 	int fd_pipe[2];
+ 	int pid;
+@@ -29,9 +29,6 @@ int open_transformer(int src_fd,
+ 		bb_perror_msg_and_die("fork failed");
+ 
+ 	if (pid == 0) {
+-#if !BB_MMU
+-		va_list ap;
+-#endif
+ 		/* child process */
+ 		close(fd_pipe[0]); /* We don't wan't to read from the parent */
+ 		// FIXME: error check?
+@@ -43,12 +40,17 @@ int open_transformer(int src_fd,
+ 		}
+ 		exit(0);
+ #else
+-		xmove_fd(src_fd, 0);
+-		xmove_fd(fd_pipe[1], 1);
+-		va_start(ap, transform_prog);
+-		/* hoping that va_list -> char** on our CPU is working... */
+-		BB_EXECVP(transform_prog, (void*)ap);
+-		bb_perror_msg_and_die("exec failed");
++		{
++			char *argv[4];
++			xmove_fd(src_fd, 0);
++			xmove_fd(fd_pipe[1], 1);
++			argv[0] = (char*)transform_prog;
++			argv[1] = (char*)"-cf";
++			argv[2] = (char*)"-";
++			argv[3] = NULL;
++			BB_EXECVP(transform_prog, argv);
++			bb_perror_msg_and_die("exec failed");
++		}
+ #endif
+ 		/* notreached */
+ 	}
+diff --git a/archival/rpm.c b/archival/rpm.c
+index f078aea..41b8c81 100644
+--- a/archival/rpm.c
++++ b/archival/rpm.c
+@@ -237,7 +237,7 @@ static void extract_cpio_gz(int fd)
+ 	}
+ 
+ 	xchdir("/"); /* Install RPM's to root */
+-	archive_handle->src_fd = open_transformer(archive_handle->src_fd, xformer, xformer_prog, xformer_prog, "-cf", "-", NULL);
++	archive_handle->src_fd = open_transformer(archive_handle->src_fd, xformer, xformer_prog);
+ 	archive_handle->offset = 0;
+ 	while (get_header_cpio(archive_handle) == EXIT_SUCCESS)
+ 		continue;
+diff --git a/archival/tar.c b/archival/tar.c
+index 3fe1886..1def615 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -662,7 +662,7 @@ static char get_header_tar_Z(archive_handle_t *archive_handle)
+ 		bb_error_msg_and_die("invalid magic");
+ 	}
+ 
+-	archive_handle->src_fd = open_transformer(archive_handle->src_fd, uncompress, "uncompress", "uncompress", "-cf", "-", NULL);
++	archive_handle->src_fd = open_transformer(archive_handle->src_fd, uncompress, "uncompress");
+ 	archive_handle->offset = 0;
+ 	while (get_header_tar(archive_handle) == EXIT_SUCCESS)
+ 		continue;
+diff --git a/include/unarchive.h b/include/unarchive.h
+index 3d39655..00a00d6 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -116,10 +116,10 @@ extern USE_DESKTOP(long long) int unpack_lzma_stream(int src_fd, int dst_fd);
+ #if BB_MMU
+ extern int open_transformer(int src_fd,
+ 	USE_DESKTOP(long long) int (*transformer)(int src_fd, int dst_fd));
+-#define open_transformer(src_fd, transformer, transform_prog, ...) open_transformer(src_fd, transformer)
++#define open_transformer(src_fd, transformer, transform_prog) open_transformer(src_fd, transformer)
+ #else
+-extern int open_transformer(int src_fd, const char *transform_prog, ...);
+-#define open_transformer(src_fd, transformer, transform_prog, ...) open_transformer(src_fd, transform_prog, __VA_ARGS__)
++extern int open_transformer(int src_fd, const char *transform_prog);
++#define open_transformer(src_fd, transformer, transform_prog) open_transformer(src_fd, transform_prog)
+ #endif
+ 
+ #endif

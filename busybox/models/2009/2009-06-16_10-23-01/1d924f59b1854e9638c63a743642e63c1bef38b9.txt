@@ -1,0 +1,204 @@
+2009-06-16 10:23:01 +0200
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index ccdfd36..61e4a1d 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -170,8 +170,8 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 		if (static_lease_ip) {
+ 			bb_info_msg("Found static lease: %x", static_lease_ip);
+ 
+-			memcpy(&static_lease.chaddr, &packet.chaddr, 16);
+-			static_lease.yiaddr = static_lease_ip;
++			memcpy(&static_lease.lease_mac16, &packet.chaddr, 16);
++			static_lease.lease_nip = static_lease_ip;
+ 			static_lease.expires = 0;
+ 
+ 			lease = &static_lease;
+@@ -204,19 +204,19 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 					DEBUG("server_id = %08x", ntohl(server_id_aligned));
+ 					if (server_id_aligned == server_config.server
+ 					 && requested
+-					 && requested_aligned == lease->yiaddr
++					 && requested_aligned == lease->lease_nip
+ 					) {
+-						send_ACK(&packet, lease->yiaddr);
++						send_ACK(&packet, lease->lease_nip);
+ 					}
+ 				} else if (requested) {
+ 					/* INIT-REBOOT State */
+-					if (lease->yiaddr == requested_aligned)
+-						send_ACK(&packet, lease->yiaddr);
++					if (lease->lease_nip == requested_aligned)
++						send_ACK(&packet, lease->lease_nip);
+ 					else
+ 						send_NAK(&packet);
+-				} else if (lease->yiaddr == packet.ciaddr) {
++				} else if (lease->lease_nip == packet.ciaddr) {
+ 					/* RENEWING or REBINDING State */
+-					send_ACK(&packet, lease->yiaddr);
++					send_ACK(&packet, lease->lease_nip);
+ 				} else { /* don't know what to do!!!! */
+ 					send_NAK(&packet);
+ 				}
+@@ -231,10 +231,11 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 				if (lease) {
+ 					if (lease_expired(lease)) {
+ 						/* probably best if we drop this lease */
+-						memset(lease->chaddr, 0, 16);
+-					/* make some contention for this address */
+-					} else
++						memset(lease->lease_mac16, 0, 16);
++					} else {
++						/* make some contention for this address */
+ 						send_NAK(&packet);
++					}
+ 				} else {
+ 					uint32_t r = ntohl(requested_aligned);
+ 					if (r < server_config.start_ip
+@@ -252,7 +253,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 		case DHCPDECLINE:
+ 			DEBUG("Received DECLINE");
+ 			if (lease) {
+-				memset(lease->chaddr, 0, 16);
++				memset(lease->lease_mac16, 0, 16);
+ 				lease->expires = time(NULL) + server_config.decline_time;
+ 			}
+ 			break;
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 4b5fcc0..a3ace92 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -78,9 +78,9 @@ typedef uint32_t leasetime_t;
+ typedef int32_t signed_leasetime_t;
+ 
+ struct dhcpOfferedAddr {
+-	uint8_t chaddr[16];
+-	/* In network order */
+-	uint32_t yiaddr;
++	uint8_t lease_mac16[16];
++	/* "nip": IP in network order */
++	uint32_t lease_nip;
+ 	/* Unix time when lease expires, regardless of value of
+ 	 * server_config.remaining. Kept in memory in host order.
+ 	 * When written to file, converted to network order
+diff --git a/networking/udhcp/dumpleases.c b/networking/udhcp/dumpleases.c
+index 1558f88..5b98aa5 100644
+--- a/networking/udhcp/dumpleases.c
++++ b/networking/udhcp/dumpleases.c
+@@ -61,10 +61,10 @@ int dumpleases_main(int argc UNUSED_PARAM, char **argv)
+ 	while (full_read(fd, &lease, sizeof(lease)) == sizeof(lease)) {
+ 		const char *fmt = ":%02x" + 1;
+ 		for (i = 0; i < 6; i++) {
+-			printf(fmt, lease.chaddr[i]);
++			printf(fmt, lease.lease_mac16[i]);
+ 			fmt = ":%02x";
+ 		}
+-		addr.s_addr = lease.yiaddr;
++		addr.s_addr = lease.lease_nip;
+ 		/* actually, 15+1 and 19+1, +1 is a space between columns */
+ 		/* lease.hostname is char[20] and is always NUL terminated */
+ 		printf(" %-16s%-20s", inet_ntoa(addr), lease.hostname);
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index af77308..671ea94 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -360,7 +360,7 @@ void FAST_FUNC write_leases(void)
+ 	for (i = 0; i < server_config.max_leases; i++) {
+ 		leasetime_t tmp_time;
+ 
+-		if (leases[i].yiaddr == 0)
++		if (leases[i].lease_nip == 0)
+ 			continue;
+ 
+ 		/* Screw with the time in the struct, for easier writing */
+@@ -413,14 +413,14 @@ void FAST_FUNC read_leases(const char *file)
+ 	IF_UDHCP_DEBUG(i = 0;)
+ 	while (full_read(fd, &lease, sizeof(lease)) == sizeof(lease)) {
+ 		/* ADDME: what if it matches some static lease? */
+-		uint32_t y = ntohl(lease.yiaddr);
++		uint32_t y = ntohl(lease.lease_nip);
+ 		if (y >= server_config.start_ip && y <= server_config.end_ip) {
+ 			signed_leasetime_t expires = ntohl(lease.expires) - (signed_leasetime_t)time_passed;
+ 			if (expires <= 0)
+ 				continue;
+ 			/* NB: add_lease takes "relative time", IOW,
+ 			 * lease duration, not lease deadline. */
+-			if (!(add_lease(lease.chaddr, lease.yiaddr, expires, lease.hostname))) {
++			if (!(add_lease(lease.lease_mac16, lease.lease_nip, expires, lease.hostname))) {
+ 				bb_error_msg("too many leases while loading %s", file);
+ 				break;
+ 			}
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index b2cdd19..040126f 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -38,10 +38,10 @@ static void clear_lease(const uint8_t *chaddr, uint32_t yiaddr)
+ 		continue;
+ 
+ 	for (i = 0; i < server_config.max_leases; i++) {
+-		if ((j != 16 && memcmp(leases[i].chaddr, chaddr, 16) == 0)
+-		 || (yiaddr && leases[i].yiaddr == yiaddr)
++		if ((j != 16 && memcmp(leases[i].lease_mac16, chaddr, 16) == 0)
++		 || (yiaddr && leases[i].lease_nip == yiaddr)
+ 		) {
+-			memset(&(leases[i]), 0, sizeof(leases[i]));
++			memset(&leases[i], 0, sizeof(leases[i]));
+ 		}
+ 	}
+ }
+@@ -75,8 +75,8 @@ struct dhcpOfferedAddr* FAST_FUNC add_lease(
+ 				hostname++;
+ 			}
+ 		}
+-		memcpy(oldest->chaddr, chaddr, 16);
+-		oldest->yiaddr = yiaddr;
++		memcpy(oldest->lease_mac16, chaddr, 16);
++		oldest->lease_nip = yiaddr;
+ 		oldest->expires = time(NULL) + leasetime;
+ 	}
+ 
+@@ -97,7 +97,7 @@ struct dhcpOfferedAddr* FAST_FUNC find_lease_by_chaddr(const uint8_t *chaddr)
+ 	unsigned i;
+ 
+ 	for (i = 0; i < server_config.max_leases; i++)
+-		if (!memcmp(leases[i].chaddr, chaddr, 16))
++		if (!memcmp(leases[i].lease_mac16, chaddr, 16))
+ 			return &(leases[i]);
+ 
+ 	return NULL;
+@@ -110,8 +110,8 @@ struct dhcpOfferedAddr* FAST_FUNC find_lease_by_yiaddr(uint32_t yiaddr)
+ 	unsigned i;
+ 
+ 	for (i = 0; i < server_config.max_leases; i++)
+-		if (leases[i].yiaddr == yiaddr)
+-			return &(leases[i]);
++		if (leases[i].lease_nip == yiaddr)
++			return &leases[i];
+ 
+ 	return NULL;
+ }
+@@ -174,9 +174,9 @@ uint32_t FAST_FUNC find_free_or_expired_address(const uint8_t *chaddr)
+ 	}
+ 
+ 	if (oldest_lease && lease_expired(oldest_lease)
+-	 && nobody_responds_to_arp(oldest_lease->yiaddr, chaddr)
++	 && nobody_responds_to_arp(oldest_lease->lease_nip, chaddr)
+ 	) {
+-		return oldest_lease->yiaddr;
++		return oldest_lease->lease_nip;
+ 	}
+ 
+ 	return 0;
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index 157d157..6aa2d34 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -132,7 +132,7 @@ int FAST_FUNC send_offer(struct dhcpMessage *oldpacket)
+ 			signed_leasetime_t tmp = lease->expires - time(NULL);
+ 			if (tmp >= 0)
+ 				lease_time_aligned = tmp;
+-			packet.yiaddr = lease->yiaddr;
++			packet.yiaddr = lease->lease_nip;
+ 		}
+ 		/* Or the client has requested an IP */
+ 		else if ((req = get_option(oldpacket, DHCP_REQUESTED_IP)) != NULL

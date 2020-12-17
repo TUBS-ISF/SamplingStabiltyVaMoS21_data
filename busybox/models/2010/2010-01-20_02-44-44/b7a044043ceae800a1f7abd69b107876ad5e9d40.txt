@@ -1,0 +1,24 @@
+2010-01-20 02:44:44 +0100
+diff --git a/editors/diff.c b/editors/diff.c
+index 0c75873..ef20305 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -94,7 +94,7 @@ enum {                   /* Commandline flags */
+ 	FLAG_a,
+ 	FLAG_b,
+ 	FLAG_d,
+-	FLAG_i, /* unused */
++	FLAG_i,
+ 	FLAG_L, /* unused */
+ 	FLAG_N,
+ 	FLAG_q,
+@@ -177,6 +177,9 @@ static int read_token(FILE_and_pos_t *ft, token_t tok)
+ 		if (t == '\n')
+ 			tok |= TOK_EOL;
+ 
++		if (option_mask32 & FLAG(i)) /* Handcoded tolower() */
++			t = (t >= 'A' && t <= 'Z') ? t - ('A' - 'a') : t;
++
+ 		if ((option_mask32 & FLAG(w)) && is_space)
+ 			continue;
+ 

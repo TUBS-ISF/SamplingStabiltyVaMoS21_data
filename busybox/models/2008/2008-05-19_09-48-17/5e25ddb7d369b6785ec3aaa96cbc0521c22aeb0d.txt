@@ -1,0 +1,578 @@
+2008-05-19 09:48:17 +0000
+diff --git a/applets/usage.c b/applets/usage.c
+index 4955839..4f6a569 100644
+--- a/applets/usage.c
++++ b/applets/usage.c
+@@ -13,6 +13,6 @@ static const char usage_messages[] = ""
+ 
+ int main(void)
+ {
+-	write(1, usage_messages, sizeof(usage_messages));
++	write(STDOUT_FILENO, usage_messages, sizeof(usage_messages));
+ 	return 0;
+ }
+diff --git a/archival/libunarchive/decompress_bunzip2.c b/archival/libunarchive/decompress_bunzip2.c
+index f74fdf1..8f35bc5 100644
+--- a/archival/libunarchive/decompress_bunzip2.c
++++ b/archival/libunarchive/decompress_bunzip2.c
+@@ -762,7 +762,7 @@ int main(int argc, char **argv)
+ 
+ 	if (i < 0)
+ 		fprintf(stderr,"%s\n", bunzip_errors[-i]);
+-	else if (read(0, &c, 1))
++	else if (read(STDIN_FILENO, &c, 1))
+ 		fprintf(stderr,"Trailing garbage ignored\n");
+ 	return -i;
+ }
+diff --git a/coreutils/split.c b/coreutils/split.c
+index 2306789..39f62e6 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -98,7 +98,7 @@ int split_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	}
+ 
+ 	while (1) {
+-		bytes_read = safe_read(0, read_buffer, READ_BUFFER_SIZE);
++		bytes_read = safe_read(STDIN_FILENO, read_buffer, READ_BUFFER_SIZE);
+ 		if (!bytes_read)
+ 			break;
+ 		if (bytes_read < 0)
+@@ -130,7 +130,7 @@ int split_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				}
+ 			}
+ 
+-			xwrite(1, src, to_write);
++			xwrite(STDOUT_FILENO, src, to_write);
+ 			bytes_read -= to_write;
+ 			src += to_write;
+ 		} while (bytes_read);
+diff --git a/editors/ed.c b/editors/ed.c
+index 2f3bf03..0961cc3 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -825,7 +825,7 @@ static int printLines(int num1, int num2, int expandFlag)
+ 
+ 	while (num1 <= num2) {
+ 		if (!expandFlag) {
+-			write(1, lp->data, lp->len);
++			write(STDOUT_FILENO, lp->data, lp->len);
+ 			setCurNum(num1++);
+ 			lp = lp->next;
+ 			continue;
+diff --git a/editors/vi.c b/editors/vi.c
+index dded6ed..1770d98 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -2220,7 +2220,7 @@ static char readit(void)	// read (maybe cursor) key from stdin
+ 	// get input from User- are there already input chars in Q?
+ 	if (n <= 0) {
+ 		// the Q is empty, wait for a typed char
+-		n = safe_read(0, readbuffer, sizeof(readbuffer));
++		n = safe_read(STDIN_FILENO, readbuffer, sizeof(readbuffer));
+ 		if (n < 0) {
+ 			if (errno == EBADF || errno == EFAULT || errno == EINVAL
+ 			 || errno == EIO)
+@@ -2243,7 +2243,7 @@ static char readit(void)	// read (maybe cursor) key from stdin
+ 			 && ((size_t)n <= (sizeof(readbuffer) - 8))
+ 			) {
+ 				// read the rest of the ESC string
+-				int r = safe_read(0, readbuffer + n, sizeof(readbuffer) - n);
++				int r = safe_read(STDIN_FILENO, readbuffer + n, sizeof(readbuffer) - n);
+ 				if (r > 0)
+ 					n += r;
+ 			}
+@@ -4035,7 +4035,7 @@ static void crash_test()
+ 		printf("\n\n%d: \'%c\' %s\n\n\n%s[Hit return to continue]%s",
+ 			totalcmds, last_input_char, msg, SOs, SOn);
+ 		fflush(stdout);
+-		while (safe_read(0, d, 1) > 0) {
++		while (safe_read(STDIN_FILENO, d, 1) > 0) {
+ 			if (d[0] == '\n' || d[0] == '\r')
+ 				break;
+ 		}
+diff --git a/init/init.c b/init/init.c
+index 63154ce..e399389 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -175,7 +175,7 @@ static void message(int where, const char *fmt, ...)
+ 
+ 	if (where & L_CONSOLE) {
+ 		/* Send console messages to console so people will see them. */
+-		full_write(2, msg, l);
++		full_write(STDERR_FILENO, msg, l);
+ 	}
+ }
+ 
+@@ -471,8 +471,8 @@ static pid_t run(const struct init_action *a)
+ 		messageD(L_LOG, "waiting for enter to start '%s'"
+ 					"(pid %d, tty '%s')\n",
+ 				a->command, getpid(), a->terminal);
+-		full_write(1, press_enter, sizeof(press_enter) - 1);
+-		while (safe_read(0, &c, 1) == 1 && c != '\n')
++		full_write(STDOUT_FILENO, press_enter, sizeof(press_enter) - 1);
++		while (safe_read(STDIN_FILENO, &c, 1) == 1 && c != '\n')
+ 			continue;
+ 	}
+ 
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 464280b..86f8508 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -98,7 +98,7 @@ static const char *unpack_usage_messages(void)
+ 
+ static void full_write2_str(const char *str)
+ {
+-	full_write(2, str, strlen(str));
++	full_write(STDERR_FILENO, str, strlen(str));
+ }
+ 
+ void bb_show_usage(void)
+diff --git a/libbb/verror_msg.c b/libbb/verror_msg.c
+index ca44030..5c6df48 100644
+--- a/libbb/verror_msg.c
++++ b/libbb/verror_msg.c
+@@ -56,7 +56,7 @@ void bb_verror_msg(const char *s, va_list p, const char* strerr)
+ 
+ 	if (logmode & LOGMODE_STDIO) {
+ 		fflush(stdout);
+-		full_write(2, msg, used + msgeol_len);
++		full_write(STDERR_FILENO, msg, used + msgeol_len);
+ 	}
+ 	if (logmode & LOGMODE_SYSLOG) {
+ 		syslog(LOG_ERR, "%s", msg + applet_len);
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index f022aec..ae183a6 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -344,7 +344,7 @@ static void auto_baud(char *buf, unsigned size_buf, struct termios *tp)
+ 	 * try to extract the speed of the dial-in call.
+ 	 */
+ 	sleep(1);
+-	nread = safe_read(0, buf, size_buf - 1);
++	nread = safe_read(STDIN_FILENO, buf, size_buf - 1);
+ 	if (nread > 0) {
+ 		buf[nread] = '\0';
+ 		for (bp = buf; bp < buf + nread; bp++) {
+@@ -421,7 +421,7 @@ static char *get_logname(char *logname, unsigned size_logname,
+ 		while (cp->eol == '\0') {
+ 
+ 			/* Do not report trivial EINTR/EIO errors. */
+-			if (read(0, &c, 1) < 1) {
++			if (read(STDIN_FILENO, &c, 1) < 1) {
+ 				if (errno == EINTR || errno == EIO)
+ 					exit(EXIT_SUCCESS);
+ 				bb_perror_msg_and_die("%s: read", op->tty);
+@@ -460,7 +460,7 @@ static char *get_logname(char *logname, unsigned size_logname,
+ #endif
+ 				cp->erase = ascval;     /* set erase character */
+ 				if (bp > logname) {
+-					full_write(1, erase[cp->parity], 3);
++					full_write(STDOUT_FILENO, erase[cp->parity], 3);
+ 					bp--;
+ 				}
+ 				break;
+@@ -470,7 +470,7 @@ static char *get_logname(char *logname, unsigned size_logname,
+ #endif
+ 				cp->kill = ascval;      /* set kill character */
+ 				while (bp > logname) {
+-					full_write(1, erase[cp->parity], 3);
++					full_write(STDOUT_FILENO, erase[cp->parity], 3);
+ 					bp--;
+ 				}
+ 				break;
+@@ -482,7 +482,7 @@ static char *get_logname(char *logname, unsigned size_logname,
+ 				} else if ((int)(bp - logname) >= size_logname - 1) {
+ 					bb_error_msg_and_die("%s: input overrun", op->tty);
+ 				} else {
+-					full_write(1, &c, 1); /* echo the character */
++					full_write(STDOUT_FILENO, &c, 1); /* echo the character */
+ 					*bp++ = ascval; /* and store it */
+ 				}
+ 				break;
+@@ -715,7 +715,7 @@ int getty_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	/* Write the modem init string and DON'T flush the buffers */
+ 	if (options.flags & F_INITSTRING) {
+ 		debug("writing init string\n");
+-		full_write(1, options.initstring, strlen(options.initstring));
++		full_write(STDOUT_FILENO, options.initstring, strlen(options.initstring));
+ 	}
+ 
+ 	/* Optionally detect the baud rate from the modem status message */
+@@ -731,7 +731,7 @@ int getty_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		char ch;
+ 
+ 		debug("waiting for cr-lf\n");
+-		while (safe_read(0, &ch, 1) == 1) {
++		while (safe_read(STDIN_FILENO, &ch, 1) == 1) {
+ 			debug("read %x\n", (unsigned char)ch);
+ 			ch &= 0x7f;                     /* strip "parity bit" */
+ 			if (ch == '\n' || ch == '\r')
+@@ -767,7 +767,7 @@ int getty_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	termios_final(&options, &termios, &chardata);
+ 
+ 	/* Now the newline character should be properly written. */
+-	full_write(1, "\n", 1);
++	full_write(STDOUT_FILENO, "\n", 1);
+ 
+ 	/* Let the login program take care of password validation. */
+ 	/* We use PATH because we trust that root doesn't set "bad" PATH,
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 7afa9ff..8c0e473 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -1924,7 +1924,7 @@ static void identify_from_stdin(void)
+ 	unsigned char *b = (unsigned char *)buf;
+ 	int i;
+ 
+-	xread(0, buf, 1280);
++	xread(STDIN_FILENO, buf, 1280);
+ 
+ 	// Convert the newline-separated hex data into an identify block.
+ 
+diff --git a/miscutils/less.c b/miscutils/less.c
+index f69bce9..0529b20 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -273,7 +273,7 @@ static void read_lines(void)
+ 			/* if no unprocessed chars left, eat more */
+ 			if (readpos >= readeof) {
+ 				ndelay_on(0);
+-				eof_error = safe_read(0, readbuf, sizeof(readbuf));
++				eof_error = safe_read(STDIN_FILENO, readbuf, sizeof(readbuf));
+ 				ndelay_off(0);
+ 				readpos = 0;
+ 				readeof = eof_error;
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 4094061..4da7e5c 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -947,7 +947,7 @@ static void log_and_exit(void)
+ 	/* Why??
+ 	(this also messes up stdin when user runs httpd -i from terminal)
+ 	ndelay_on(0);
+-	while (read(0, iobuf, IOBUF_SIZE) > 0)
++	while (read(STDIN_FILENO, iobuf, IOBUF_SIZE) > 0)
+ 		continue;
+ 	*/
+ 
+@@ -1023,7 +1023,7 @@ static void send_headers(int responseNum)
+ 
+ 		if (DEBUG)
+ 			fprintf(stderr, "headers: '%s'\n", iobuf);
+-		full_write(1, iobuf, len);
++		full_write(STDOUT_FILENO, iobuf, len);
+ 		if (DEBUG)
+ 			fprintf(stderr, "writing error page: '%s'\n", error_page);
+ 		return send_file_and_exit(error_page, SEND_BODY);
+@@ -1062,7 +1062,7 @@ static void send_headers(int responseNum)
+ 	}
+ 	if (DEBUG)
+ 		fprintf(stderr, "headers: '%s'\n", iobuf);
+-	if (full_write(1, iobuf, len) != len) {
++	if (full_write(STDOUT_FILENO, iobuf, len) != len) {
+ 		if (verbose > 1)
+ 			bb_perror_msg("error");
+ 		log_and_exit();
+@@ -1090,7 +1090,7 @@ static int get_line(void)
+ 
+ 	while (1) {
+ 		if (hdr_cnt <= 0) {
+-			hdr_cnt = safe_read(0, hdr_buf, sizeof(hdr_buf));
++			hdr_cnt = safe_read(STDIN_FILENO, hdr_buf, sizeof(hdr_buf));
+ 			if (hdr_cnt <= 0)
+ 				break;
+ 			hdr_ptr = hdr_buf;
+@@ -1202,8 +1202,8 @@ static NOINLINE void cgi_io_loop_and_exit(int fromCgi_rd, int toCgi_wr, int post
+ 			 * and there *is* data to read from the peer
+ 			 * (POSTDATA) */
+ 			//count = post_len > (int)sizeof(hdr_buf) ? (int)sizeof(hdr_buf) : post_len;
+-			//count = safe_read(0, hdr_buf, count);
+-			count = safe_read(0, hdr_buf, sizeof(hdr_buf));
++			//count = safe_read(STDIN_FILENO, hdr_buf, count);
++			count = safe_read(STDIN_FILENO, hdr_buf, sizeof(hdr_buf));
+ 			if (count > 0) {
+ 				hdr_cnt = count;
+ 				hdr_ptr = hdr_buf;
+@@ -1237,8 +1237,8 @@ static NOINLINE void cgi_io_loop_and_exit(int fromCgi_rd, int toCgi_wr, int post
+ 					/* eof (or error) and there was no "HTTP",
+ 					 * so write it, then write received data */
+ 					if (out_cnt) {
+-						full_write(1, HTTP_200, sizeof(HTTP_200)-1);
+-						full_write(1, rbuf, out_cnt);
++						full_write(STDOUT_FILENO, HTTP_200, sizeof(HTTP_200)-1);
++						full_write(STDOUT_FILENO, rbuf, out_cnt);
+ 					}
+ 					break; /* CGI stdout is closed, exiting */
+ 				}
+@@ -1247,7 +1247,7 @@ static NOINLINE void cgi_io_loop_and_exit(int fromCgi_rd, int toCgi_wr, int post
+ 				/* "Status" header format is: "Status: 302 Redirected\r\n" */
+ 				if (out_cnt >= 8 && memcmp(rbuf, "Status: ", 8) == 0) {
+ 					/* send "HTTP/1.0 " */
+-					if (full_write(1, HTTP_200, 9) != 9)
++					if (full_write(STDOUT_FILENO, HTTP_200, 9) != 9)
+ 						break;
+ 					rbuf += 8; /* skip "Status: " */
+ 					count = out_cnt - 8;
+@@ -1256,7 +1256,7 @@ static NOINLINE void cgi_io_loop_and_exit(int fromCgi_rd, int toCgi_wr, int post
+ 					/* Did CGI add "HTTP"? */
+ 					if (memcmp(rbuf, HTTP_200, 4) != 0) {
+ 						/* there is no "HTTP", do it ourself */
+-						if (full_write(1, HTTP_200, sizeof(HTTP_200)-1) != sizeof(HTTP_200)-1)
++						if (full_write(STDOUT_FILENO, HTTP_200, sizeof(HTTP_200)-1) != sizeof(HTTP_200)-1)
+ 							break;
+ 					}
+ 					/* Commented out:
+@@ -1276,7 +1276,7 @@ static NOINLINE void cgi_io_loop_and_exit(int fromCgi_rd, int toCgi_wr, int post
+ 				if (count <= 0)
+ 					break;  /* eof (or error) */
+ 			}
+-			if (full_write(1, rbuf, count) != count)
++			if (full_write(STDOUT_FILENO, rbuf, count) != count)
+ 				break;
+ 			if (DEBUG)
+ 				fprintf(stderr, "cgi read %d bytes: '%.*s'\n", count, count, rbuf);
+@@ -1632,7 +1632,7 @@ static void send_file_and_exit(const char *url, int what)
+ 	while ((count = safe_read(f, iobuf, IOBUF_SIZE)) > 0) {
+ 		ssize_t n;
+ 		USE_FEATURE_HTTPD_RANGES(if (count > range_len) count = range_len;)
+-		n = full_write(1, iobuf, count);
++		n = full_write(STDOUT_FILENO, iobuf, count);
+ 		if (count != n)
+ 			break;
+ 		USE_FEATURE_HTTPD_RANGES(range_len -= count;)
+diff --git a/networking/httpd_indexcgi.c b/networking/httpd_indexcgi.c
+index fd64af3..94c6a69 100644
+--- a/networking/httpd_indexcgi.c
++++ b/networking/httpd_indexcgi.c
+@@ -125,7 +125,7 @@ static void guarantee(int size)
+ {
+ 	if (buffer + (BUFFER_SIZE-HEADROOM) - dst >= size)
+ 		return;
+-	write(1, buffer, dst - buffer);
++	write(STDOUT_FILENO, buffer, dst - buffer);
+ 	dst = buffer;
+ }
+ 
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 4ba726e..5f7bd03 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -562,7 +562,7 @@ static int readwrite(void)
+ 	/* if we have a timeout AND stdin is closed AND we haven't heard anything
+ 	 from the net during that time, assume it's dead and close it too. */
+ 		if (rr == 0) {
+-			if (!FD_ISSET(0, &ding1))
++			if (!FD_ISSET(STDIN_FILENO, &ding1))
+ 				netretry--;                        /* we actually try a coupla times. */
+ 			if (!netretry) {
+ 				if (o_verbose > 1)                /* normally we don't care */
+@@ -597,12 +597,12 @@ Debug("got %d from the net, errno %d", rr, errno);
+ 			goto shovel;
+ 
+ 	/* okay, suck more stdin */
+-		if (FD_ISSET(0, &ding2)) {                /* stdin: ding! */
+-			rr = read(0, bigbuf_in, BIGSIZ);
++		if (FD_ISSET(STDIN_FILENO, &ding2)) {                /* stdin: ding! */
++			rr = read(STDIN_FILENO, bigbuf_in, BIGSIZ);
+ 	/* Considered making reads here smaller for UDP mode, but 8192-byte
+ 	 mobygrams are kinda fun and exercise the reassembler. */
+ 			if (rr <= 0) {                        /* at end, or fukt, or ... */
+-				FD_CLR(0, &ding1);                /* disable and close stdin */
++				FD_CLR(STDIN_FILENO, &ding1);                /* disable and close stdin */
+ 				close(0);
+ 			} else {
+ 				rzleft = rr;
+@@ -625,7 +625,7 @@ Debug("got %d from the net, errno %d", rr, errno);
+ 			return 1;
+ 		}
+ 		if (rnleft) {
+-			rr = write(1, np, rnleft);
++			rr = write(STDOUT_FILENO, np, rnleft);
+ 			if (rr > 0) {
+ 				if (o_ofile) /* log the stdout */
+ 					oprint('<', (unsigned char *)np, rr);
+@@ -783,7 +783,7 @@ int nc_main(int argc, char **argv)
+ 	}
+ #endif
+ 
+-	FD_SET(0, &ding1);                        /* stdin *is* initially open */
++	FD_SET(STDIN_FILENO, &ding1);                        /* stdin *is* initially open */
+ 	if (proggie) {
+ 		close(0); /* won't need stdin */
+ 		option_mask32 &= ~OPT_o; /* -o with -e is meaningless! */
+diff --git a/networking/telnet.c b/networking/telnet.c
+index b357e69..3a06c16 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -121,7 +121,7 @@ static void conescape(void)
+ 			" z	suspend telnet\r\n"
+ 			" e	exit telnet\r\n");
+ 
+-	if (read(0, &b, 1) <= 0)
++	if (read(STDIN_FILENO, &b, 1) <= 0)
+ 		doexit(EXIT_FAILURE);
+ 
+ 	switch (b) {
+@@ -256,7 +256,7 @@ static void handlenetinput(int len)
+ 	}
+ 
+ 	if (len)
+-		write(1, G.buf, len);
++		write(STDOUT_FILENO, G.buf, len);
+ }
+ 
+ static void putiac(int c)
+@@ -601,7 +601,7 @@ int telnet_main(int argc, char **argv)
+ 	ufds[0].events = ufds[1].events = POLLIN;
+ #else
+ 	FD_ZERO(&readfds);
+-	FD_SET(0, &readfds);
++	FD_SET(STDIN_FILENO, &readfds);
+ 	FD_SET(G.netfd, &readfds);
+ 	maxfd = G.netfd + 1;
+ #endif
+@@ -629,10 +629,10 @@ int telnet_main(int argc, char **argv)
+ #ifdef USE_POLL
+ 			if (ufds[0].revents) /* well, should check POLLIN, but ... */
+ #else
+-			if (FD_ISSET(0, &rfds))
++			if (FD_ISSET(STDIN_FILENO, &rfds))
+ #endif
+ 			{
+-				len = read(0, G.buf, DATABUFSIZE);
++				len = read(STDIN_FILENO, G.buf, DATABUFSIZE);
+ 				if (len <= 0)
+ 					doexit(EXIT_SUCCESS);
+ 				TRACE(0, ("Read con: %d\n", len));
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index b6e754b..798afcf 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -98,7 +98,7 @@ static void print_outbuf(void)
+ {
+ 	int sz = cur_outbuf - outbuf;
+ 	if (sz > 0) {
+-		xwrite(1, outbuf, sz);
++		xwrite(STDOUT_FILENO, outbuf, sz);
+ 		cur_outbuf = outbuf;
+ 	}
+ }
+diff --git a/procps/top.c b/procps/top.c
+index de30ffb..b861deb 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -888,7 +888,7 @@ int top_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			 /* batch mode, or EOF on stdin ("top </dev/null") */
+ 			sleep(interval);
+ 		else if (safe_poll(pfd, 1, interval * 1000) > 0) {
+-			if (safe_read(0, &c, 1) != 1) { /* error/EOF? */
++			if (safe_read(STDIN_FILENO, &c, 1) != 1) { /* error/EOF? */
+ 				option_mask32 |= OPT_EOF;
+ 				continue;
+ 			}
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index db3d4c5..bfb9716 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -748,7 +748,7 @@ static int buffer_pread(/*int fd, */char *s, unsigned len)
+ 		poll(&input, 1, i * 1000);
+ 		sigprocmask(SIG_BLOCK, &blocked_sigset, NULL);
+ 
+-		i = ndelay_read(0, s, len);
++		i = ndelay_read(STDIN_FILENO, s, len);
+ 		if (i >= 0)
+ 			break;
+ 		if (errno == EINTR)
+@@ -994,7 +994,7 @@ int svlogd_main(int argc, char **argv)
+ 				logmatch(ld);
+ 			if (ld->matcherr == 'e') {
+ 				/* runit-1.8.0 compat: if timestamping, do it on stderr too */
+-				////full_write(2, printptr, printlen);
++				////full_write(STDERR_FILENO, printptr, printlen);
+ 				fwrite(printptr, 1, printlen, stderr);
+ 			}
+ 			if (ld->match != '+') continue;
+@@ -1022,7 +1022,7 @@ int svlogd_main(int argc, char **argv)
+ 			for (i = 0; i < dirn; ++i) {
+ 				if (dir[i].fddir == -1) continue;
+ 				if (dir[i].matcherr == 'e') {
+-					////full_write(2, lineptr, linelen);
++					////full_write(STDERR_FILENO, lineptr, linelen);
+ 					fwrite(lineptr, 1, linelen, stderr);
+ 				}
+ 				if (dir[i].match != '+') continue;
+diff --git a/shell/ash.c b/shell/ash.c
+index fa063bf..20b93f3 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -1258,7 +1258,7 @@ stunalloc(void *p)
+ {
+ #if DEBUG
+ 	if (!p || (g_stacknxt < (char *)p) || ((char *)p < g_stackp->space)) {
+-		write(2, "stunalloc\n", 10);
++		write(STDERR_FILENO, "stunalloc\n", 10);
+ 		abort();
+ 	}
+ #endif
+diff --git a/shell/msh.c b/shell/msh.c
+index 48fa56e..9e06a3b 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -743,7 +743,7 @@ static void print_tree(struct op *head)
+ static void prs(const char *s)
+ {
+ 	if (*s)
+-		write(2, s, strlen(s));
++		write(STDERR_FILENO, s, strlen(s));
+ }
+ 
+ static void prn(unsigned u)
+@@ -3384,7 +3384,7 @@ static int doread(struct op *t ATTRIBUTE_UNUSED, char **args)
+ 	}
+ 	for (wp = args + 1; *wp; wp++) {
+ 		for (cp = global_env.linep; !nl && cp < elinep - 1; cp++) {
+-			nb = nonblock_safe_read(0, cp, sizeof(*cp));
++			nb = nonblock_safe_read(STDIN_FILENO, cp, sizeof(*cp));
+ 			if (nb != sizeof(*cp))
+ 				break;
+ 			nl = (*cp == '\n');
+@@ -4522,7 +4522,7 @@ static int readc(void)
+ static void ioecho(char c)
+ {
+ 	if (FLAG['v'])
+-		write(2, &c, sizeof c);
++		write(STDERR_FILENO, &c, sizeof c);
+ }
+ 
+ static void pushio(struct ioarg *argp, int (*fn) (struct ioarg *))
+diff --git a/util-linux/script.c b/util-linux/script.c
+index c188332..e70294e 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -124,7 +124,7 @@ int script_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					goto restore;
+ 				}
+ 				if (count > 0) {
+-					full_write(1, buf, count);
++					full_write(STDOUT_FILENO, buf, count);
+ 					full_write(outfd, buf, count);
+ 					if (opt & 4) { /* -f */
+ 						fsync(outfd);
+@@ -132,7 +132,7 @@ int script_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				}
+ 			}
+ 			if (pfd[1].revents) {
+-				count = safe_read(0, buf, sizeof(buf));
++				count = safe_read(STDIN_FILENO, buf, sizeof(buf));
+ 				if (count <= 0) {
+ 					/* err/eof from stdin: don't read stdin anymore */
+ 					pfd[1].revents = 0;
+@@ -152,7 +152,7 @@ int script_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		loop = 999;
+ 		/* pty is in O_NONBLOCK mode, we exit as soon as buffer is empty */
+ 		while (--loop && (count = safe_read(pty, buf, sizeof(buf))) > 0) {
+-			full_write(1, buf, count);
++			full_write(STDOUT_FILENO, buf, count);
+ 			full_write(outfd, buf, count);
+ 		}
+  restore:

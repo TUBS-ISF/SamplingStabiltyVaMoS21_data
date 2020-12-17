@@ -1,0 +1,327 @@
+2008-03-24 02:18:03 +0000
+diff --git a/editors/patch.c b/editors/patch.c
+index a2d593d..e0fb58f 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -74,7 +74,7 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	int patch_level;
+ 	int ret = 0;
+ 
+-	xfunc_error_retval = 2;	
++	xfunc_error_retval = 2;
+ 	{
+ 		const char *p = "-1";
+ 		const char *i = "-"; /* compat */
+@@ -114,7 +114,7 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		if (!patch_line || strncmp(patch_line, "+++ ", 4) != 0)
+ 			bb_error_msg_and_die("invalid patch");
+ 		new_filename = extract_filename_and_free_line(patch_line, patch_level);
+-		
++
+ 		/* Get access rights from the file to be patched, -1 file does not exist */
+ 		if (stat(new_filename, &saved_stat) != 0) {
+ 			char *line_ptr;
+diff --git a/editors/vi.c b/editors/vi.c
+index 65fb026..454cfce 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -419,7 +419,7 @@ int vi_main(int argc, char **argv)
+ 			/* fall through */
+ 
+ 		default:
+-		    	bb_show_usage();
++			bb_show_usage();
+ 			return 1;
+ 		}
+ 	}
+diff --git a/init/init.c b/init/init.c
+index c4674a5..61b3025 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -230,8 +230,8 @@ static void console_init(void)
+ 			/* Give me _ANY_ open descriptor! */
+ 			fd = xopen("/", O_RDONLY); /* we don't believe this can fail */
+ 		}
+-    		while ((unsigned)fd < 2)
+-            		fd = dup(fd);
++		while ((unsigned)fd < 2)
++			fd = dup(fd);
+ 		if (fd > 2)
+ 			close(fd);
+ 	}
+diff --git a/libbb/login.c b/libbb/login.c
+index a711a54..a5be2c8 100644
+--- a/libbb/login.c
++++ b/libbb/login.c
+@@ -89,7 +89,7 @@ void print_login_issue(const char *issue_file, const char *tty)
+ void print_login_prompt(void)
+ {
+ 	char *hostname = safe_gethostname();
+-	
++
+ 	fputs(hostname, stdout);
+ 	fputs(LOGIN, stdout);
+ 	fflush(stdout);
+diff --git a/libbb/safe_gethostname.c b/libbb/safe_gethostname.c
+index 1290f4c..3b24edb 100644
+--- a/libbb/safe_gethostname.c
++++ b/libbb/safe_gethostname.c
+@@ -45,7 +45,7 @@ char *safe_gethostname(void)
+ 	 * name and an 8-byte nodename), but this is true on Linux. The same holds
+ 	 * for setdomainname(2) and the domainname field.
+ 	 */
+-	
++
+ 	/* Uname can fail only if you pass a bad pointer to it. */
+ 	uname(&uts);
+ 
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index 1e3d5bb..875e835 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -5,19 +5,19 @@
+  *
+  * ifenslave.c: Configure network interfaces for parallel routing.
+  *
+- *	This program controls the Linux implementation of running multiple
+- *	network interfaces in parallel.
++ *      This program controls the Linux implementation of running multiple
++ *      network interfaces in parallel.
+  *
+- * Author:	Donald Becker <becker@cesdis.gsfc.nasa.gov>
+- *		Copyright 1994-1996 Donald Becker
++ * Author:      Donald Becker <becker@cesdis.gsfc.nasa.gov>
++ *              Copyright 1994-1996 Donald Becker
+  *
+- *		This program is free software; you can redistribute it
+- *		and/or modify it under the terms of the GNU General Public
+- *		License as published by the Free Software Foundation.
++ *              This program is free software; you can redistribute it
++ *              and/or modify it under the terms of the GNU General Public
++ *              License as published by the Free Software Foundation.
+  *
+- *	The author may be reached as becker@CESDIS.gsfc.nasa.gov, or C/O
+- *	Center of Excellence in Space Data and Information Sciences
+- *	   Code 930.5, Goddard Space Flight Center, Greenbelt MD 20771
++ *      The author may be reached as becker@CESDIS.gsfc.nasa.gov, or C/O
++ *      Center of Excellence in Space Data and Information Sciences
++ *         Code 930.5, Goddard Space Flight Center, Greenbelt MD 20771
+  *
+  *  Changes :
+  *    - 2000/10/02 Willy Tarreau <willy at meta-x.org> :
+@@ -79,23 +79,23 @@
+  *         current version is 1.0.0 as a base line.
+  *
+  *    - 2003/05/22 - Jay Vosburgh <fubar at us dot ibm dot com>
+- *	 - ifenslave -c was broken; it's now fixed
+- *	 - Fixed problem with routes vanishing from master during enslave
+- *	   processing.
++ *       - ifenslave -c was broken; it's now fixed
++ *       - Fixed problem with routes vanishing from master during enslave
++ *         processing.
+  *
+  *    - 2003/05/27 - Amir Noam <amir.noam at intel dot com>
+- *	 - Fix backward compatibility issues:
+- *	   For drivers not using ABI versions, slave was set down while
+- *	   it should be left up before enslaving.
+- *	   Also, master was not set down and the default set_mac_address()
+- *	   would fail and generate an error message in the system log.
+- * 	 - For opt_c: slave should not be set to the master's setting
+- *	   while it is running. It was already set during enslave. To
+- *	   simplify things, it is now handeled separately.
++ *       - Fix backward compatibility issues:
++ *         For drivers not using ABI versions, slave was set down while
++ *         it should be left up before enslaving.
++ *         Also, master was not set down and the default set_mac_address()
++ *         would fail and generate an error message in the system log.
++ *       - For opt_c: slave should not be set to the master's setting
++ *         while it is running. It was already set during enslave. To
++ *         simplify things, it is now handeled separately.
+  *
+  *    - 2003/12/01 - Shmulik Hen <shmulik.hen at intel dot com>
+- *	 - Code cleanup and style changes
+- *	   set version to 1.1.0
++ *       - Code cleanup and style changes
++ *         set version to 1.1.0
+  */
+ 
+ #include "libbb.h"
+diff --git a/networking/inetd.c b/networking/inetd.c
+index 5cdfe0a..eb19d16 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -366,7 +366,7 @@ static len_and_sockaddr *xzalloc_lsa(int family)
+ 	lsa = xzalloc(LSA_LEN_SIZE + sz);
+ 	lsa->len = sz;
+ 	lsa->u.sa.sa_family = family;
+-	return lsa;	
++	return lsa;
+ }
+ 
+ static void rearm_alarm(void)
+@@ -1357,7 +1357,7 @@ int inetd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				/* peek at the packet and remember peer addr */
+ 				int r = recvfrom(ctrl, NULL, 0, MSG_PEEK|MSG_DONTWAIT,
+ 					&lsa->u.sa, &lsa->len);
+-                    		if (r < 0)
++				if (r < 0)
+ 					goto do_exit1;
+ 				/* make this socket "connected" to peer addr:
+ 				 * only packets from this peer will be recv'ed,
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index 2218f2c..378c4bb 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -408,7 +408,7 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 		// make a random string -- it will delimit message parts
+ 		srand(monotonic_us());
+- 		boundary = xasprintf("%d-%d-%d", rand(), rand(), rand());
++		boundary = xasprintf("%d-%d-%d", rand(), rand(), rand());
+ 
+ 		// put common headers and body start
+ 		printf(
+@@ -457,7 +457,7 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		printf("\r\n--%s--\r\n" "\r\n", boundary);
+ 
+ 		// leave "put message" mode
+- 		smtp_check(".", 250);
++		smtp_check(".", 250);
+ 		// ... and say goodbye
+ 		smtp_check("QUIT", 221);
+ 
+@@ -482,7 +482,7 @@ int sendgetmail_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 		// cache postprocess program
+ 		*fargs = *argv;
+-		
++
+ 		// authenticate
+ 		if (!(opts & OPT_U)) {
+ 			//opts |= OPT_U;
+diff --git a/printutils/lpd.c b/printutils/lpd.c
+index bc0348e..4008e43 100644
+--- a/printutils/lpd.c
++++ b/printutils/lpd.c
+@@ -18,13 +18,13 @@
+  * and should have the following structure:
+  *
+  * SPOOLDIR/
+- * 	<queue1>
+- * 	...
+- * 	<queueN>
++ *      <queue1>
++ *      ...
++ *      <queueN>
+  *
+  * <queueX> can be of two types:
+- * 	A. a printer character device or an ordinary file a link to such;
+- * 	B. a directory.
++ *      A. a printer character device or an ordinary file a link to such;
++ *      B. a directory.
+  *
+  * In case A lpd just dumps the data it receives from client (lpr) to the
+  * end of queue file/device. This is non-spooling mode.
+@@ -38,11 +38,11 @@
+  * lpd only sanitizes them (by removing most non-alphanumerics).
+  *
+  * If HELPER-PROG (with optional arguments) is specified then lpd continues to process client data:
+- * 	1. it reads and parses control file (cfA...). The parse process results in setting environment
+- * 	variables whose values were passed in control file; when parsing is complete, lpd deletes
+- * 	control file.
+- * 	2. it spawns specified helper application. It is then the helper application who is responsible
+- * 	for both actual printing and deleting processed data file.
++ *      1. it reads and parses control file (cfA...). The parse process results in setting environment
++ *      variables whose values were passed in control file; when parsing is complete, lpd deletes
++ *      control file.
++ *      2. it spawns specified helper application. It is then the helper application who is responsible
++ *      for both actual printing and deleting processed data file.
+  *
+  * A good lpr passes control files which when parsed provide the following variables:
+  * $H = host which issues the job
+diff --git a/scripts/Makefile.host b/scripts/Makefile.host
+index 763e2f2..23bd9ff 100644
+--- a/scripts/Makefile.host
++++ b/scripts/Makefile.host
+@@ -99,7 +99,7 @@ hostcxx_flags  = -Wp,-MD,$(depfile) $(__hostcxx_flags)
+ # host-csingle -> Executable
+ quiet_cmd_host-csingle 	= HOSTCC  $@
+       cmd_host-csingle	= $(HOSTCC) $(hostc_flags) -o $@ $< \
+-	  	$(HOST_LOADLIBES) $(HOSTLOADLIBES_$(@F))
++			  $(HOST_LOADLIBES) $(HOSTLOADLIBES_$(@F))
+ $(host-csingle): %: %.c FORCE
+ 	$(call if_changed_dep,host-csingle)
+ 
+diff --git a/shell/msh.c b/shell/msh.c
+index cd46954..fd4a541 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -159,7 +159,7 @@ static int mshdbg_rc = 0;
+ /*
+  * library and system definitions
+  */
+-typedef void xint;                     	/* base type of jmp_buf, for not broken compilers */
++typedef void xint;                      /* base type of jmp_buf, for not broken compilers */
+ 
+ /*
+  * shell components
+diff --git a/util-linux/volume_id/fat.c b/util-linux/volume_id/fat.c
+index 779971c..9ab1cef 100644
+--- a/util-linux/volume_id/fat.c
++++ b/util-linux/volume_id/fat.c
+@@ -181,7 +181,7 @@ int volume_id_probe_vfat(struct volume_id *id, uint64_t off)
+ 	if (vs->heads == 0)
+ 		return -1;
+ 
+-	/* cluster size check*/	
++	/* cluster size check */
+ 	if (vs->sectors_per_cluster == 0 ||
+ 	    (vs->sectors_per_cluster & (vs->sectors_per_cluster-1)))
+ 		return -1;
+diff --git a/util-linux/volume_id/unused_ufs.c b/util-linux/volume_id/unused_ufs.c
+index ba76876..c666b86 100644
+--- a/util-linux/volume_id/unused_ufs.c
++++ b/util-linux/volume_id/unused_ufs.c
+@@ -32,13 +32,13 @@ struct ufs_super_block {
+ 	uint32_t	fs_time;
+ 	uint32_t	fs_size;
+ 	uint32_t	fs_dsize;
+-	uint32_t	fs_ncg;	
++	uint32_t	fs_ncg;
+ 	uint32_t	fs_bsize;
+ 	uint32_t	fs_fsize;
+ 	uint32_t	fs_frag;
+ 	uint32_t	fs_minfree;
+ 	uint32_t	fs_rotdelay;
+-	uint32_t	fs_rps;	
++	uint32_t	fs_rps;
+ 	uint32_t	fs_bmask;
+ 	uint32_t	fs_fmask;
+ 	uint32_t	fs_bshift;
+@@ -63,7 +63,7 @@ struct ufs_super_block {
+ 	uint32_t	fs_cgsize;
+ 	uint32_t	fs_ntrak;
+ 	uint32_t	fs_nsect;
+-	uint32_t	fs_spc;	
++	uint32_t	fs_spc;
+ 	uint32_t	fs_ncyl;
+ 	uint32_t	fs_cpg;
+ 	uint32_t	fs_ipg;
+@@ -95,7 +95,7 @@ struct ufs_super_block {
+ 			uint32_t	fs_cgrotor;
+ 			uint32_t	fs_ocsp[28];
+ 			uint32_t	fs_contigdirs;
+-			uint32_t	fs_csp;	
++			uint32_t	fs_csp;
+ 			uint32_t	fs_maxcluster;
+ 			uint32_t	fs_active;
+ 			int32_t		fs_old_cpc;
+@@ -172,7 +172,7 @@ int volume_id_probe_ufs(struct volume_id *id, uint64_t off)
+ 
+ 	dbg("probing at offset 0x%llx", (unsigned long long) off);
+ 
+-	for (i = 0; i < ARRAY_SIZE(offsets); i++) {	
++	for (i = 0; i < ARRAY_SIZE(offsets); i++) {
+ 		ufs = volume_id_get_buffer(id, off + (offsets[i] * 0x400), 0x800);
+ 		if (ufs == NULL)
+ 			return -1;

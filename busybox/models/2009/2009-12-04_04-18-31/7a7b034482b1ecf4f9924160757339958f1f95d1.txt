@@ -1,0 +1,16 @@
+2009-12-04 04:18:31 +0100
+diff --git a/shell/ash.c b/shell/ash.c
+index cf406a4..5d0fc6d 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -13016,6 +13016,10 @@ init(void)
+ 
+ 	/* from trap.c: */
+ 	signal(SIGCHLD, SIG_DFL);
++	/* bash re-enables SIGHUP which is SIG_IGNed on entry.
++	 * Try: "trap '' HUP; bash; echo RET" and type "kill -HUP $$"
++	 */
++        signal(SIGHUP, SIG_DFL);
+ 
+ 	/* from var.c: */
+ 	{

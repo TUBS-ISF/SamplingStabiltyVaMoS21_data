@@ -1,0 +1,55 @@
+2007-09-21 13:43:28 +0000
+diff --git a/include/applets.h b/include/applets.h
+index f92ce4b..f162c54 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -223,6 +223,7 @@ USE_MATCHPATHCON(APPLET(matchpathcon, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_MD5SUM(APPLET_ODDNAME(md5sum, md5_sha1_sum, _BB_DIR_USR_BIN, _BB_SUID_NEVER, md5sum))
+ USE_MDEV(APPLET(mdev, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_MESG(APPLET(mesg, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
++USE_MICROCOM(APPLET(microcom, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_MKDIR(APPLET_NOFORK(mkdir, mkdir, _BB_DIR_BIN, _BB_SUID_NEVER, mkdir))
+ //USE_MKE2FS(APPLET(mke2fs, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_MKFIFO(APPLET(mkfifo, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index c5ed558..eb1a641 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2077,6 +2077,11 @@
+        "	y	Allow write access to your terminal\n" \
+        "	n	Disallow write access to your terminal"
+ 
++#define microcom_trivial_usage \
++	"[-s speed] tty-name"
++#define microcom_full_usage \
++	""
++
+ #define mkdir_trivial_usage \
+        "[OPTION] DIRECTORY..."
+ #define mkdir_full_usage \
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 107382f..7d8e948 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -305,6 +305,12 @@ config FEATURE_MDEV_LOAD_FIRMWARE
+ 	  /lib/firmware/ and if it exists, send it to the kernel for
+ 	  loading into the hardware.
+ 
++config MICROCOM
++	bool "microcom"
++	default n
++	help
++	  The poor man's minicom utility for chatting with serial port devices.
++
+ config MKSWAP
+ 	bool "mkswap"
+ 	default n
+diff --git a/util-linux/Kbuild b/util-linux/Kbuild
+index cc1d0e0..8f3138a 100644
+--- a/util-linux/Kbuild
++++ b/util-linux/Kbuild
+@@ -30,3 +30,4 @@ lib-$(CONFIG_SETARCH)		+=setarch.o
+ lib-$(CONFIG_SWAPONOFF)		+=swaponoff.o
+ lib-$(CONFIG_SWITCH_ROOT)	+=switch_root.o
+ lib-$(CONFIG_UMOUNT)		+=umount.o
++lib-$(CONFIG_MICROCOM)		+=microcom.o

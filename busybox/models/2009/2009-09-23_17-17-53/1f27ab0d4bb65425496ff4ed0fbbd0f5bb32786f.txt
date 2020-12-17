@@ -1,0 +1,243 @@
+2009-09-23 17:17:53 +0200
+diff --git a/libbb/parse_mode.c b/libbb/parse_mode.c
+index 40105dd..6eca00a 100644
+--- a/libbb/parse_mode.c
++++ b/libbb/parse_mode.c
+@@ -40,7 +40,7 @@ int FAST_FUNC bb_parse_mode(const char *s, mode_t *current_mode)
+ 	mode_t new_mode;
+ 	char op;
+ 
+-	if (((unsigned int)(*s - '0')) < 8) {
++	if ((unsigned char)(*s - '0') < 8) {
+ 		unsigned long tmp;
+ 		char *e;
+ 
+diff --git a/libpwdgrp/pwd_grp.c b/libpwdgrp/pwd_grp.c
+index e2077ad..947f48d 100644
+--- a/libpwdgrp/pwd_grp.c
++++ b/libpwdgrp/pwd_grp.c
+@@ -816,7 +816,7 @@ static int bb__parsepwent(void *data, char *line)
+ 
+ 	i = 0;
+ 	do {
+-		p = ((char *) ((struct passwd *) data)) + pw_off[i];
++		p = (char *) data + pw_off[i];
+ 
+ 		if ((i & 6) ^ 2) {	/* i!=2 and i!=3 */
+ 			*((char **) p) = line;
+@@ -873,7 +873,7 @@ static int bb__parsegrent(void *data, char *line)
+ 	end_of_buf = ((struct group *) data)->gr_name; /* Evil hack! */
+ 	i = 0;
+ 	do {
+-		p = ((char *) ((struct group *) data)) + gr_off[i];
++		p = (char *) data + gr_off[i];
+ 
+ 		if (i < 2) {
+ 			*((char **) p) = line;
+@@ -966,15 +966,15 @@ static const unsigned char sp_off[] ALIGN1 = {
+ 	offsetof(struct spwd, sp_flag)          /* 8 - not a char ptr */
+ };
+ 
+-static int bb__parsespent(void *data, char * line)
++static int bb__parsespent(void *data, char *line)
+ {
+ 	char *endptr;
+ 	char *p;
+ 	int i;
+ 
+ 	i = 0;
+-	do {
+-		p = ((char *) ((struct spwd *) data)) + sp_off[i];
++	while (1) {
++		p = (char *) data + sp_off[i];
+ 		if (i < 2) {
+ 			*((char **) p) = line;
+ 			line = strchr(line, ':');
+@@ -982,10 +982,10 @@ static int bb__parsespent(void *data, char * line)
+ 				break;
+ 			}
+ 		} else {
+-			*((long *) p) = (long) strtoul(line, &endptr, 10);
++			*((long *) p) = strtoul(line, &endptr, 10);
+ 
+ 			if (endptr == line) {
+-				*((long *) p) = ((i != 8) ? -1L : ((long)(~0UL)));
++				*((long *) p) = (i != 8) ? -1L : (long)(~0UL);
+ 			}
+ 
+ 			line = endptr;
+@@ -1003,9 +1003,9 @@ static int bb__parsespent(void *data, char * line)
+ 
+ 		}
+ 
+-		*line++ = 0;
++		*line++ = '\0';
+ 		++i;
+-	} while (1);
++	}
+ 
+ 	return EINVAL;
+ }
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index f0b64fe..d2104c3 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -320,11 +320,13 @@ static void ParseField(char *user, char *ary, int modvalue, int off,
+ 			skip = 1;
+ 			++ptr;
+ 		} else if (isdigit(*ptr)) {
++			char *endp;
+ 			if (n1 < 0) {
+-				n1 = strtol(ptr, &ptr, 10) + off;
++				n1 = strtol(ptr, &endp, 10) + off;
+ 			} else {
+-				n2 = strtol(ptr, &ptr, 10) + off;
++				n2 = strtol(ptr, &endp, 10) + off;
+ 			}
++			ptr = endp; /* gcc likes temp var for &endp */
+ 			skip = 1;
+ 		} else if (names) {
+ 			int i;
+@@ -361,7 +363,9 @@ static void ParseField(char *user, char *ary, int modvalue, int off,
+ 			n2 = n1;
+ 		}
+ 		if (*ptr == '/') {
+-			skip = strtol(ptr + 1, &ptr, 10);
++			char *endp;
++			skip = strtol(ptr + 1, &endp, 10);
++			ptr = endp; /* gcc likes temp var for &endp */
+ 		}
+ 
+ 		/*
+diff --git a/modutils/modutils-24.c b/modutils/modutils-24.c
+index 9f91c99..e5ff54d 100644
+--- a/modutils/modutils-24.c
++++ b/modutils/modutils-24.c
+@@ -2432,11 +2432,11 @@ new_process_module_arguments(struct obj_file *f, const char *options)
+ 		loc = contents + sym->value;
+ 
+ 		if (*pinfo == 'c') {
+-			if (!isdigit(*(pinfo + 1))) {
++			if (!isdigit(pinfo[1])) {
+ 				bb_error_msg_and_die("parameter type 'c' for %s must be followed by"
+ 						     " the maximum size", param);
+ 			}
+-			charssize = strtoul(pinfo + 1, (char **) NULL, 10);
++			charssize = strtoul(pinfo + 1, NULL, 10);
+ 		}
+ 
+ 		if (val == NULL) {
+@@ -2449,6 +2449,8 @@ new_process_module_arguments(struct obj_file *f, const char *options)
+ 		n = 0;
+ 		p = val;
+ 		while (*p != 0) {
++			char *endp;
++
+ 			if (++n > max)
+ 				bb_error_msg_and_die("too many values for %s (max %d)", param, max);
+ 
+@@ -2472,19 +2474,23 @@ new_process_module_arguments(struct obj_file *f, const char *options)
+ 				p += len;
+ 				break;
+ 			case 'b':
+-				*loc++ = strtoul(p, &p, 0);
++				*loc++ = strtoul(p, &endp, 0);
++				p = endp; /* gcc likes temp var for &endp */
+ 				break;
+ 			case 'h':
+-				*(short *) loc = strtoul(p, &p, 0);
++				*(short *) loc = strtoul(p, &endp, 0);
+ 				loc += tgt_sizeof_short;
++				p = endp;
+ 				break;
+ 			case 'i':
+-				*(int *) loc = strtoul(p, &p, 0);
++				*(int *) loc = strtoul(p, &endp, 0);
+ 				loc += tgt_sizeof_int;
++				p = endp;
+ 				break;
+ 			case 'l':
+-				*(long *) loc = strtoul(p, &p, 0);
++				*(long *) loc = strtoul(p, &endp, 0);
+ 				loc += tgt_sizeof_long;
++				p = endp;
+ 				break;
+ 			default:
+ 				bb_error_msg_and_die("unknown parameter type '%c' for %s",
+diff --git a/networking/libiproute/rtm_map.c b/networking/libiproute/rtm_map.c
+index ca2f443..6fe5c4b 100644
+--- a/networking/libiproute/rtm_map.c
++++ b/networking/libiproute/rtm_map.c
+@@ -88,7 +88,7 @@ int rtnl_rtntype_a2n(int *id, char *arg)
+ 		res = RTN_THROW;
+ 	else {
+ 		res = strtoul(arg, &end, 0);
+-		if (!end || end == arg || *end || res > 255)
++		if (end == arg || *end || res > 255)
+ 			return -1;
+ 	}
+ 	*id = res;
+diff --git a/networking/libiproute/utils.c b/networking/libiproute/utils.c
+index c84d018..5f09717 100644
+--- a/networking/libiproute/utils.c
++++ b/networking/libiproute/utils.c
+@@ -22,6 +22,7 @@ unsigned get_unsigned(char *arg, const char *errmsg)
+ 
+ 	if (*arg) {
+ 		res = strtoul(arg, &ptr, 0);
++//FIXME: "" will be accepted too, is it correct?!
+ 		if (!*ptr && res <= UINT_MAX) {
+ 			return res;
+ 		}
+@@ -36,6 +37,7 @@ uint32_t get_u32(char *arg, const char *errmsg)
+ 
+ 	if (*arg) {
+ 		res = strtoul(arg, &ptr, 0);
++//FIXME: "" will be accepted too, is it correct?!
+ 		if (!*ptr && res <= 0xFFFFFFFFUL) {
+ 			return res;
+ 		}
+@@ -50,6 +52,7 @@ uint16_t get_u16(char *arg, const char *errmsg)
+ 
+ 	if (*arg) {
+ 		res = strtoul(arg, &ptr, 0);
++//FIXME: "" will be accepted too, is it correct?!
+ 		if (!*ptr && res <= 0xFFFF) {
+ 			return res;
+ 		}
+diff --git a/networking/tc.c b/networking/tc.c
+index fc47e95..d963694 100644
+--- a/networking/tc.c
++++ b/networking/tc.c
+@@ -89,7 +89,7 @@ static int get_qdisc_handle(__u32 *h, const char *str) {
+ 	if (p == str)
+ 		return 1;
+ 	maj <<= 16;
+-	if (*p != ':' && *p!=0)
++	if (*p != ':' && *p != '\0')
+ 		return 1;
+  ok:
+ 	*h = maj;
+@@ -119,7 +119,8 @@ static int get_tc_classid(__u32 *h, const char *str) {
+ 		maj <<= 16;
+ 		str = p + 1;
+ 		min = strtoul(str, &p, 16);
+-		if (*p != 0 || min >= (1<<16))
++//FIXME: check for "" too?
++		if (*p != '\0' || min >= (1<<16))
+ 			return 1;
+ 		maj |= min;
+ 	} else if (*p != 0)
+diff --git a/shell/ash.c b/shell/ash.c
+index 68aa675..db28af7 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -10078,7 +10078,7 @@ change_random(const char *value)
+ 		vrandom.flags &= ~VNOFUNC;
+ 	} else {
+ 		/* set/reset */
+-		random_galois_LFSR = random_LCG = strtoul(value, (char **)NULL, 10);
++		random_galois_LFSR = random_LCG = strtoul(value, NULL, 10);
+ 	}
+ }
+ #endif

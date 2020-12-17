@@ -1,0 +1,809 @@
+2010-01-12 22:11:24 +0100
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index d5ee7be..804fc61 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -859,8 +859,6 @@ CONFIG_FEATURE_SH_IS_HUSH=y
+ # CONFIG_ASH is not set
+ # CONFIG_ASH_BASH_COMPAT is not set
+ # CONFIG_ASH_JOB_CONTROL is not set
+-# CONFIG_ASH_READ_NCHARS is not set
+-# CONFIG_ASH_READ_TIMEOUT is not set
+ # CONFIG_ASH_ALIAS is not set
+ # CONFIG_ASH_GETOPTS is not set
+ # CONFIG_ASH_BUILTIN_ECHO is not set
+diff --git a/scripts/defconfig b/scripts/defconfig
+index a98c7b6..3a3d082 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -856,8 +856,6 @@ CONFIG_FEATURE_SH_IS_ASH=y
+ CONFIG_ASH=y
+ CONFIG_ASH_BASH_COMPAT=y
+ CONFIG_ASH_JOB_CONTROL=y
+-CONFIG_ASH_READ_NCHARS=y
+-CONFIG_ASH_READ_TIMEOUT=y
+ CONFIG_ASH_ALIAS=y
+ CONFIG_ASH_GETOPTS=y
+ CONFIG_ASH_BUILTIN_ECHO=y
+diff --git a/shell/Kbuild b/shell/Kbuild
+index 03960a8..155ac6f 100644
+--- a/shell/Kbuild
++++ b/shell/Kbuild
+@@ -5,7 +5,7 @@
+ # Licensed under the GPL v2, see the file LICENSE in this tarball.
+ 
+ lib-y:=
+-lib-$(CONFIG_ASH)      += ash.o ash_ptr_hack.o
++lib-$(CONFIG_ASH)      += ash.o ash_ptr_hack.o shell_common.o builtin_read.o
+ lib-$(CONFIG_HUSH)     += hush.o match.o
+ lib-$(CONFIG_CTTYHACK) += cttyhack.o
+ 
+diff --git a/shell/ash.c b/shell/ash.c
+index e668f41..c7deffd 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -2,18 +2,18 @@
+ /*
+  * ash shell port for busybox
+  *
++ * This code is derived from software contributed to Berkeley by
++ * Kenneth Almquist.
++ *
++ * Original BSD copyright notice is retained at the end of this file.
++ *
+  * Copyright (c) 1989, 1991, 1993, 1994
+  *      The Regents of the University of California.  All rights reserved.
+  *
+  * Copyright (c) 1997-2005 Herbert Xu <herbert@gondor.apana.org.au>
+  * was re-ported from NetBSD and debianized.
+  *
+- * This code is derived from software contributed to Berkeley by
+- * Kenneth Almquist.
+- *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+- *
+- * Original BSD copyright notice is retained at the end of this file.
+  */
+ 
+ /*
+@@ -34,8 +34,6 @@
+ 
+ #define PROFILE 0
+ 
+-#define IFS_BROKEN
+-
+ #define JOBS ENABLE_ASH_JOB_CONTROL
+ 
+ #if DEBUG
+@@ -50,6 +48,9 @@
+ #include <paths.h>
+ #include <setjmp.h>
+ #include <fnmatch.h>
++
++#include "shell_common.h"
++#include "builtin_read.h"
+ #include "math.h"
+ #if ENABLE_ASH_RANDOM_SUPPORT
+ # include "random.h"
+@@ -1737,13 +1738,6 @@ struct localvar {
+ # define VDYNAMIC       0
+ #endif
+ 
+-#ifdef IFS_BROKEN
+-static const char defifsvar[] ALIGN1 = "IFS= \t\n";
+-#define defifs (defifsvar + 4)
+-#else
+-static const char defifs[] ALIGN1 = " \t\n";
+-#endif
+-
+ 
+ /* Need to be before varinit_data[] */
+ #if ENABLE_LOCALE_SUPPORT
+@@ -1774,7 +1768,7 @@ static const struct {
+ 	const char *text;
+ 	void (*func)(const char *) FAST_FUNC;
+ } varinit_data[] = {
+-#ifdef IFS_BROKEN
++#if IFS_BROKEN
+ 	{ VSTRFIXED|VTEXTFIXED       , defifsvar   , NULL            },
+ #else
+ 	{ VSTRFIXED|VTEXTFIXED|VUNSET, "IFS\0"     , NULL            },
+@@ -12499,211 +12493,53 @@ typedef enum __rlimit_resource rlim_t;
+ static int FAST_FUNC
+ readcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ {
+-	static const char *const arg_REPLY[] = { "REPLY", NULL };
+-
+-	char **ap;
+-	int backslash;
+-	char c;
+-	int rflag;
+-	char *prompt;
+-	const char *ifs;
+-	char *p;
+-	int startword;
+-	int status;
++	char *opt_n = NULL;
++	char *opt_p = NULL;
++	char *opt_t = NULL;
++	char *opt_u = NULL;
++	int read_flags = 0;
++	const char *r;
+ 	int i;
+-	int fd = 0;
+-#if ENABLE_ASH_READ_NCHARS
+-	int nchars = 0; /* if != 0, -n is in effect */
+-	int silent = 0;
+-	struct termios tty, old_tty;
+-#endif
+-#if ENABLE_ASH_READ_TIMEOUT
+-	unsigned end_ms = 0;
+-	unsigned timeout = 0;
+-#endif
+-
+-	rflag = 0;
+-	prompt = NULL;
+-	while ((i = nextopt("p:u:r"
+-		IF_ASH_READ_TIMEOUT("t:")
+-		IF_ASH_READ_NCHARS("n:s")
+-	)) != '\0') {
++
++	while ((i = nextopt("p:u:rt:n:s")) != '\0') {
+ 		switch (i) {
+ 		case 'p':
+-			prompt = optionarg;
++			opt_p = optionarg;
+ 			break;
+-#if ENABLE_ASH_READ_NCHARS
+ 		case 'n':
+-			nchars = bb_strtou(optionarg, NULL, 10);
+-			if (nchars < 0 || errno)
+-				ash_msg_and_raise_error("invalid count");
+-			/* nchars == 0: off (bash 3.2 does this too) */
++			opt_n = optionarg;
+ 			break;
+ 		case 's':
+-			silent = 1;
++			read_flags |= BUILTIN_READ_SILENT;
+ 			break;
+-#endif
+-#if ENABLE_ASH_READ_TIMEOUT
+ 		case 't':
+-			timeout = bb_strtou(optionarg, NULL, 10);
+-			if (errno || timeout > UINT_MAX / 2048)
+-				ash_msg_and_raise_error("invalid timeout");
+-			timeout *= 1000;
+-#if 0 /* even bash have no -t N.NNN support */
+-			ts.tv_sec = bb_strtou(optionarg, &p, 10);
+-			ts.tv_usec = 0;
+-			/* EINVAL means number is ok, but not terminated by NUL */
+-			if (*p == '.' && errno == EINVAL) {
+-				char *p2;
+-				if (*++p) {
+-					int scale;
+-					ts.tv_usec = bb_strtou(p, &p2, 10);
+-					if (errno)
+-						ash_msg_and_raise_error("invalid timeout");
+-					scale = p2 - p;
+-					/* normalize to usec */
+-					if (scale > 6)
+-						ash_msg_and_raise_error("invalid timeout");
+-					while (scale++ < 6)
+-						ts.tv_usec *= 10;
+-				}
+-			} else if (ts.tv_sec < 0 || errno) {
+-				ash_msg_and_raise_error("invalid timeout");
+-			}
+-			if (!(ts.tv_sec | ts.tv_usec)) { /* both are 0? */
+-				ash_msg_and_raise_error("invalid timeout");
+-			}
+-#endif /* if 0 */
++			opt_t = optionarg;
+ 			break;
+-#endif
+ 		case 'r':
+-			rflag = 1;
++			read_flags |= BUILTIN_READ_RAW;
+ 			break;
+ 		case 'u':
+-			fd = bb_strtou(optionarg, NULL, 10);
+-			if (fd < 0 || errno)
+-				ash_msg_and_raise_error("invalid file descriptor");
++			opt_u = optionarg;
+ 			break;
+ 		default:
+ 			break;
+ 		}
+ 	}
+-	if (prompt && isatty(fd)) {
+-		out2str(prompt);
+-	}
+-	ap = argptr;
+-	if (*ap == NULL)
+-		ap = (char**)arg_REPLY;
+-	ifs = bltinlookup("IFS");
+-	if (ifs == NULL)
+-		ifs = defifs;
+-#if ENABLE_ASH_READ_NCHARS
+-	tcgetattr(fd, &tty);
+-	old_tty = tty;
+-	if (nchars || silent) {
+-		if (nchars) {
+-			tty.c_lflag &= ~ICANON;
+-			tty.c_cc[VMIN] = nchars < 256 ? nchars : 255;
+-		}
+-		if (silent) {
+-			tty.c_lflag &= ~(ECHO | ECHOK | ECHONL);
+-		}
+-		/* if tcgetattr failed, tcsetattr will fail too.
+-		 * Ignoring, it's harmless. */
+-		tcsetattr(fd, TCSANOW, &tty);
+-	}
+-#endif
+ 
+-	status = 0;
+-	startword = 1;
+-	backslash = 0;
+-#if ENABLE_ASH_READ_TIMEOUT
+-	if (timeout) /* NB: ensuring end_ms is nonzero */
+-		end_ms = ((unsigned)monotonic_ms() + timeout) | 1;
+-#endif
+-	STARTSTACKSTR(p);
+-	do {
+-		const char *is_ifs;
+-
+-#if ENABLE_ASH_READ_TIMEOUT
+-		if (end_ms) {
+-			struct pollfd pfd[1];
+-			pfd[0].fd = fd;
+-			pfd[0].events = POLLIN;
+-			timeout = end_ms - (unsigned)monotonic_ms();
+-			if ((int)timeout <= 0 /* already late? */
+-			 || safe_poll(pfd, 1, timeout) != 1 /* no? wait... */
+-			) { /* timed out! */
+-#if ENABLE_ASH_READ_NCHARS
+-				tcsetattr(fd, TCSANOW, &old_tty);
+-#endif
+-				return 1;
+-			}
+-		}
+-#endif
+-		if (nonblock_safe_read(fd, &c, 1) != 1) {
+-			status = 1;
+-			break;
+-		}
+-		if (c == '\0')
+-			continue;
+-		if (backslash) {
+-			backslash = 0;
+-			if (c != '\n')
+-				goto put;
+-			continue;
+-		}
+-		if (!rflag && c == '\\') {
+-			backslash = 1;
+-			continue;
+-		}
+-		if (c == '\n')
+-			break;
+-		/* $IFS splitting */
+-/* http://www.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_06_05 */
+-		is_ifs = strchr(ifs, c);
+-		if (startword && is_ifs) {
+-			if (isspace(c))
+-				continue;
+-			/* it is a non-space ifs char */
+-			startword--;
+-			if (startword == 1) /* first one? */
+-				continue; /* yes, it is not next word yet */
+-		}
+-		startword = 0;
+-		if (ap[1] != NULL && is_ifs) {
+-			const char *beg;
+-			STACKSTRNUL(p);
+-			beg = stackblock();
+-			setvar(*ap, beg, 0);
+-			ap++;
+-			/* can we skip one non-space ifs char? (2: yes) */
+-			startword = isspace(c) ? 2 : 1;
+-			STARTSTACKSTR(p);
+-			continue;
+-		}
+- put:
+-		STPUTC(c, p);
+-	}
+-/* end of do {} while: */
+-#if ENABLE_ASH_READ_NCHARS
+-	while (--nchars);
+-#else
+-	while (1);
+-#endif
++	r = builtin_read(setvar,
++		argptr,
++		bltinlookup("IFS"), /* can be NULL */
++		read_flags,
++		opt_n,
++		opt_p,
++		opt_t,
++		opt_u
++	);
+ 
+-#if ENABLE_ASH_READ_NCHARS
+-	tcsetattr(fd, TCSANOW, &old_tty);
+-#endif
++	if ((uintptr_t)r > 1)
++		ash_msg_and_raise_error(r);
+ 
+-	STACKSTRNUL(p);
+-	/* Remove trailing space ifs chars */
+-	while ((char *)stackblock() <= --p && isspace(*p) && strchr(ifs, *p) != NULL)
+-		*p = '\0';
+-	setvar(*ap, stackblock(), 0);
+-	while (*++ap != NULL)
+-		setvar(*ap, nullstr, 0);
+-	return status;
++	return (uintptr_t)r;
+ }
+ 
+ static int FAST_FUNC
+diff --git a/shell/ash_test/ash-read/read_REPLY.right b/shell/ash_test/ash-read/read_REPLY.right
+new file mode 100644
+index 0000000..59f5d54
+--- /dev/null
++++ b/shell/ash_test/ash-read/read_REPLY.right
+@@ -0,0 +1,5 @@
++test 1: |  abc1  def  |
++test 2: |  \abc2  d\ef  |
++test 3: |abc3  def|
++test 4: |\abc4  d\ef|
++Done
+diff --git a/shell/ash_test/ash-read/read_REPLY.tests b/shell/ash_test/ash-read/read_REPLY.tests
+new file mode 100755
+index 0000000..ba20cae
+--- /dev/null
++++ b/shell/ash_test/ash-read/read_REPLY.tests
+@@ -0,0 +1,5 @@
++echo '  \abc1  d\ef  ' | ( read         ; echo "test 1: |$REPLY|" )
++echo '  \abc2  d\ef  ' | ( read -r      ; echo "test 2: |$REPLY|" )
++echo '  \abc3  d\ef  ' | ( read    REPLY; echo "test 3: |$REPLY|" )
++echo '  \abc4  d\ef  ' | ( read -r REPLY; echo "test 4: |$REPLY|" )
++echo Done
+diff --git a/shell/builtin_read.c b/shell/builtin_read.c
+new file mode 100644
+index 0000000..7f667e9
+--- /dev/null
++++ b/shell/builtin_read.c
+@@ -0,0 +1,205 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Adapted from ash applet code
++ *
++ * This code is derived from software contributed to Berkeley by
++ * Kenneth Almquist.
++ *
++ * Copyright (c) 1989, 1991, 1993, 1994
++ *      The Regents of the University of California.  All rights reserved.
++ *
++ * Copyright (c) 1997-2005 Herbert Xu <herbert@gondor.apana.org.au>
++ * was re-ported from NetBSD and debianized.
++ *
++ * Copyright (c) 2010 Denys Vlasenko
++ * Split from ash.c
++ *
++ * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
++ */
++#include "libbb.h"
++#include "shell_common.h"
++#include "builtin_read.h"
++
++const char* FAST_FUNC
++builtin_read(void (*setvar)(const char *name, const char *val, int flags),
++	char       **argv,
++	const char *ifs,
++	int        read_flags,
++	const char *opt_n,
++	const char *opt_p,
++	const char *opt_t,
++	const char *opt_u
++)
++{
++	static const char *const arg_REPLY[] = { "REPLY", NULL };
++
++	unsigned end_ms; /* -t TIMEOUT */
++	int fd; /* -u FD */
++	int nchars; /* -n NUM */
++	char *buffer;
++	struct termios tty, old_tty;
++	const char *retval;
++	int bufpos; /* need to be able to hold -1 */
++	int startword;
++	smallint backslash;
++
++	nchars = 0; /* if != 0, -n is in effect */
++	if (opt_n) {
++		nchars = bb_strtou(opt_n, NULL, 10);
++		if (nchars < 0 || errno)
++			return "invalid count";
++		/* note: "-n 0": off (bash 3.2 does this too) */
++	}
++	end_ms = 0;
++	if (opt_t) {
++		end_ms = bb_strtou(opt_t, NULL, 10);
++		if (errno || end_ms > UINT_MAX / 2048)
++			return "invalid timeout";
++		end_ms *= 1000;
++#if 0 /* even bash has no -t N.NNN support */
++		ts.tv_sec = bb_strtou(opt_t, &p, 10);
++		ts.tv_usec = 0;
++		/* EINVAL means number is ok, but not terminated by NUL */
++		if (*p == '.' && errno == EINVAL) {
++			char *p2;
++			if (*++p) {
++				int scale;
++				ts.tv_usec = bb_strtou(p, &p2, 10);
++				if (errno)
++					return "invalid timeout";
++				scale = p2 - p;
++				/* normalize to usec */
++				if (scale > 6)
++					return "invalid timeout";
++				while (scale++ < 6)
++					ts.tv_usec *= 10;
++			}
++		} else if (ts.tv_sec < 0 || errno) {
++			return "invalid timeout";
++		}
++		if (!(ts.tv_sec | ts.tv_usec)) { /* both are 0? */
++			return "invalid timeout";
++		}
++#endif /* if 0 */
++	}
++	fd = STDIN_FILENO;
++	if (opt_u) {
++		fd = bb_strtou(opt_u, NULL, 10);
++		if (fd < 0 || errno)
++			return "invalid file descriptor";
++	}
++
++	if (opt_p && isatty(fd)) {
++		fputs(opt_p, stderr);
++		fflush_all();
++	}
++
++	if (argv[0] == NULL)
++		argv = (char**)arg_REPLY;
++	if (ifs == NULL)
++		ifs = defifs;
++
++	if (nchars || (read_flags & BUILTIN_READ_SILENT)) {
++		tcgetattr(fd, &tty);
++		old_tty = tty;
++		if (nchars) {
++			tty.c_lflag &= ~ICANON;
++			tty.c_cc[VMIN] = nchars < 256 ? nchars : 255;
++		}
++		if (read_flags & BUILTIN_READ_SILENT) {
++			tty.c_lflag &= ~(ECHO | ECHOK | ECHONL);
++		}
++		/* This forces execution of "restoring" tcgetattr later */
++		read_flags |= BUILTIN_READ_SILENT;
++		/* if tcgetattr failed, tcsetattr will fail too.
++		 * Ignoring, it's harmless. */
++		tcsetattr(fd, TCSANOW, &tty);
++	}
++
++	retval = (const char *)(uintptr_t)0;
++	startword = 1;
++	backslash = 0;
++	if (end_ms) /* NB: end_ms stays nonzero: */
++		end_ms = ((unsigned)monotonic_ms() + end_ms) | 1;
++	buffer = NULL;
++	bufpos = 0;
++	do {
++		char c;
++		const char *is_ifs;
++
++		if (end_ms) {
++			int timeout;
++			struct pollfd pfd[1];
++
++			pfd[0].fd = fd;
++			pfd[0].events = POLLIN;
++			timeout = end_ms - (unsigned)monotonic_ms();
++			if (timeout <= 0 /* already late? */
++			 || safe_poll(pfd, 1, timeout) != 1 /* no? wait... */
++			) { /* timed out! */
++				retval = (const char *)(uintptr_t)1;
++				goto ret;
++			}
++		}
++
++		if ((bufpos & 0xff) == 0)
++			buffer = xrealloc(buffer, bufpos + 0x100);
++		if (nonblock_safe_read(fd, &buffer[bufpos], 1) != 1) {
++			retval = (const char *)(uintptr_t)1;
++			break;
++		}
++		c = buffer[bufpos];
++		if (c == '\0')
++			continue;
++		if (backslash) {
++			backslash = 0;
++			if (c != '\n')
++				goto put;
++			continue;
++		}
++		if (!(read_flags & BUILTIN_READ_RAW) && c == '\\') {
++			backslash = 1;
++			continue;
++		}
++		if (c == '\n')
++			break;
++		/* $IFS splitting */
++/* http://www.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_06_05 */
++		is_ifs = strchr(ifs, c);
++		if (startword && is_ifs) {
++			if (isspace(c))
++				continue;
++			/* it is a non-space ifs char */
++			startword--;
++			if (startword == 1) /* first one? */
++				continue; /* yes, it is not next word yet */
++		}
++		startword = 0;
++		if (argv[1] != NULL && is_ifs) {
++			buffer[bufpos] = '\0';
++			bufpos = 0;
++			setvar(*argv, buffer, 0);
++			argv++;
++			/* can we skip one non-space ifs char? (2: yes) */
++			startword = isspace(c) ? 2 : 1;
++			continue;
++		}
++ put:
++		bufpos++;
++	} while (--nchars);
++
++	/* Remove trailing space ifs chars */
++	while (--bufpos >= 0 && isspace(buffer[bufpos]) && strchr(ifs, buffer[bufpos]) != NULL)
++		continue;
++	buffer[bufpos + 1] = '\0';
++
++	setvar(*argv, buffer, 0);
++
++	while (*++argv != NULL)
++		setvar(*argv, "", 0);
++ ret:
++	free(buffer);
++	if (read_flags & BUILTIN_READ_SILENT)
++		tcsetattr(fd, TCSANOW, &old_tty);
++	return retval;
++}
+diff --git a/shell/builtin_read.h b/shell/builtin_read.h
+new file mode 100644
+index 0000000..930d014
+--- /dev/null
++++ b/shell/builtin_read.h
+@@ -0,0 +1,42 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Adapted from ash applet code
++ *
++ * This code is derived from software contributed to Berkeley by
++ * Kenneth Almquist.
++ *
++ * Copyright (c) 1989, 1991, 1993, 1994
++ *      The Regents of the University of California.  All rights reserved.
++ *
++ * Copyright (c) 1997-2005 Herbert Xu <herbert@gondor.apana.org.au>
++ * was re-ported from NetBSD and debianized.
++ *
++ * Copyright (c) 2010 Denys Vlasenko
++ * Split from ash.c
++ *
++ * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
++ */
++#ifndef SHELL_BUILTIN_READ_H
++#define SHELL_BUILTIN_READ_H 1
++
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
++
++enum {
++	BUILTIN_READ_SILENT = 1 << 0,
++	BUILTIN_READ_RAW    = 1 << 1,
++};
++
++const char* FAST_FUNC
++builtin_read(void (*setvar)(const char *name, const char *val, int flags),
++	char       **argv,
++	const char *ifs,
++	int        read_flags,
++	const char *opt_n,
++	const char *opt_p,
++	const char *opt_t,
++	const char *opt_u
++);
++
++POP_SAVED_FUNCTION_VISIBILITY
++
++#endif
+diff --git a/shell/match.c b/shell/match.c
+index a7101ef..fb6a38e 100644
+--- a/shell/match.c
++++ b/shell/match.c
+@@ -1,16 +1,16 @@
+ /*
+  * ##/%% variable matching code ripped out of ash shell for code sharing
+  *
++ * This code is derived from software contributed to Berkeley by
++ * Kenneth Almquist.
++ *
++ * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
++ *
+  * Copyright (c) 1989, 1991, 1993, 1994
+  *      The Regents of the University of California.  All rights reserved.
+  *
+  * Copyright (c) 1997-2005 Herbert Xu <herbert@gondor.apana.org.au>
+  * was re-ported from NetBSD and debianized.
+- *
+- * This code is derived from software contributed to Berkeley by
+- * Kenneth Almquist.
+- *
+- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ #ifdef STANDALONE
+ # include <stdbool.h>
+diff --git a/shell/match.h b/shell/match.h
+index 90597ee..98ff874 100644
+--- a/shell/match.h
++++ b/shell/match.h
+@@ -1,5 +1,8 @@
+ /* match.h - interface to shell ##/%% matching code */
+ 
++#ifndef SHELL_MATCH_H
++#define SHELL_MATCH_H 1
++
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ typedef char *(*scan_t)(char *string, char *match, bool match_at_left);
+@@ -24,3 +27,5 @@ static inline scan_t pick_scan(char op1, char op2, bool *match_at_left)
+ }
+ 
+ POP_SAVED_FUNCTION_VISIBILITY
++
++#endif
+diff --git a/shell/math.c b/shell/math.c
+index fc20def..76159b2 100644
+--- a/shell/math.c
++++ b/shell/math.c
+@@ -1,20 +1,17 @@
+ /*
+  * arithmetic code ripped out of ash shell for code sharing
+  *
++ * This code is derived from software contributed to Berkeley by
++ * Kenneth Almquist.
++ *
++ * Original BSD copyright notice is retained at the end of this file.
++ *
+  * Copyright (c) 1989, 1991, 1993, 1994
+  *      The Regents of the University of California.  All rights reserved.
+  *
+  * Copyright (c) 1997-2005 Herbert Xu <herbert@gondor.apana.org.au>
+  * was re-ported from NetBSD and debianized.
+  *
+- * This code is derived from software contributed to Berkeley by
+- * Kenneth Almquist.
+- *
+- * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+- *
+- * Original BSD copyright notice is retained at the end of this file.
+- */
+-/*
+  * rewrite arith.y to micro stack based cryptic algorithm by
+  * Copyright (c) 2001 Aaron Lehmann <aaronl@vitelus.com>
+  *
+@@ -25,6 +22,8 @@
+  * used in busybox and size optimizations,
+  * rewrote arith (see notes to this), added locale support,
+  * rewrote dynamic variables.
++ *
++ * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ #include "libbb.h"
+ #include "math.h"
+diff --git a/shell/random.h b/shell/random.h
+index e22a2e8..0856340 100644
+--- a/shell/random.h
++++ b/shell/random.h
+@@ -6,6 +6,10 @@
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
++#ifndef SHELL_RANDOM_H
++#define SHELL_RANDOM_H 1
++
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ typedef struct random_t {
+ 	/* Random number generators */
+@@ -23,3 +27,7 @@ typedef struct random_t {
+ 	((rnd)->galois_LFSR = 0)
+ 
+ uint32_t next_random(random_t *rnd) FAST_FUNC;
++
++POP_SAVED_FUNCTION_VISIBILITY
++
++#endif
+diff --git a/shell/shell_common.c b/shell/shell_common.c
+new file mode 100644
+index 0000000..99bb91c
+--- /dev/null
++++ b/shell/shell_common.c
+@@ -0,0 +1,26 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Adapted from ash applet code
++ *
++ * This code is derived from software contributed to Berkeley by
++ * Kenneth Almquist.
++ *
++ * Copyright (c) 1989, 1991, 1993, 1994
++ *      The Regents of the University of California.  All rights reserved.
++ *
++ * Copyright (c) 1997-2005 Herbert Xu <herbert@gondor.apana.org.au>
++ * was re-ported from NetBSD and debianized.
++ *
++ * Copyright (c) 2010 Denys Vlasenko
++ * Split from ash.c
++ *
++ * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
++ */
++#include "libbb.h"
++#include "shell_common.h"
++
++#if IFS_BROKEN
++const char defifsvar[] ALIGN1 = "IFS= \t\n";
++#else
++const char defifs[] ALIGN1 = " \t\n";
++#endif
+diff --git a/shell/shell_common.h b/shell/shell_common.h
+new file mode 100644
+index 0000000..a9e9a22
+--- /dev/null
++++ b/shell/shell_common.h
+@@ -0,0 +1,35 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Adapted from ash applet code
++ *
++ * This code is derived from software contributed to Berkeley by
++ * Kenneth Almquist.
++ *
++ * Copyright (c) 1989, 1991, 1993, 1994
++ *      The Regents of the University of California.  All rights reserved.
++ *
++ * Copyright (c) 1997-2005 Herbert Xu <herbert@gondor.apana.org.au>
++ * was re-ported from NetBSD and debianized.
++ *
++ * Copyright (c) 2010 Denys Vlasenko
++ * Split from ash.c
++ *
++ * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
++ */
++#ifndef SHELL_COMMON_H
++#define SHELL_COMMON_H 1
++
++PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
++
++#define IFS_BROKEN 1
++
++#if IFS_BROKEN
++extern const char defifsvar[]; /* "IFS= \t\n" */
++#define defifs (defifsvar + 4)
++#else
++extern const char defifs[]; /* " \t\n" */
++#endif
++
++POP_SAVED_FUNCTION_VISIBILITY
++
++#endif

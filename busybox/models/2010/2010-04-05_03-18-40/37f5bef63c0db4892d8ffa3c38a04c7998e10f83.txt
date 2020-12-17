@@ -1,0 +1,420 @@
+2010-04-05 03:18:40 +0200
+diff --git a/coreutils/who.c b/coreutils/who.c
+index dfbb4c0..2b43310 100644
+--- a/coreutils/who.c
++++ b/coreutils/who.c
+@@ -16,7 +16,7 @@
+  *
+  *----------------------------------------------------------------------
+  */
+-/* BB_AUDIT SUSv3 _NOT_ compliant -- missing options -b, -d, -H, -l, -m, -p, -q, -r, -s, -t, -T, -u; Missing argument 'file'.  */
++/* BB_AUDIT SUSv3 _NOT_ compliant -- missing options -b, -d, -l, -m, -p, -q, -r, -s, -t, -T, -u; Missing argument 'file'.  */
+ 
+ #include "libbb.h"
+ #include <utmp.h>
+diff --git a/include/libbb.h b/include/libbb.h
+index e674e4a..ea61701 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -796,6 +796,12 @@ void die_if_bad_username(const char* name) FAST_FUNC;
+ #define die_if_bad_username(name) ((void)(name))
+ #endif
+ 
++#if ENABLE_FEATURE_UTMP
++void FAST_FUNC update_utmp(int new_type, const char *short_tty, const char *username, const char *opt_host);
++#else
++# define update_utmp(new_type, short_tty, username, opt_host) ((void)0)
++#endif
++
+ int execable_file(const char *name) FAST_FUNC;
+ char *find_execable(const char *filename, char **PATHp) FAST_FUNC;
+ int exists_execable(const char *filename) FAST_FUNC;
+diff --git a/init/halt.c b/init/halt.c
+index 16906df..a3459ee 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -30,7 +30,6 @@ static void write_wtmp(void)
+ 	if (uname(&uts) == 0)
+ 		safe_strncpy(utmp.ut_host, uts.release, sizeof(utmp.ut_host));
+ 	updwtmp(bb_path_wtmp_file, &utmp);
+-
+ }
+ #else
+ #define write_wtmp() ((void)0)
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 4606d5a..1b11d5d 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -120,6 +120,8 @@ lib-y += xgethostbyname.o
+ lib-y += xreadlink.o
+ lib-y += xrealloc_vector.o
+ 
++lib-$(CONFIG_FEATURE_UTMP) += utmp.o
++
+ # A mix of optimizations (why build stuff we know won't be used)
+ # and objects which may fail to build (SELinux on selinux-less system)
+ lib-$(CONFIG_SELINUX) += selinux_common.o
+diff --git a/libbb/utmp.c b/libbb/utmp.c
+new file mode 100644
+index 0000000..06b939b
+--- /dev/null
++++ b/libbb/utmp.c
+@@ -0,0 +1,92 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * utmp/wtmp support routines.
++ *
++ * Copyright (C) 2010 Denys Vlasenko
++ *
++ * Licensed under GPL version 2, see file LICENSE in this tarball for details.
++ */
++#include "libbb.h"
++#include <utmp.h>
++
++static void touch(const char *filename)
++{
++	if (access(filename, R_OK | W_OK) == -1)
++		close(open(filename, O_WRONLY | O_CREAT, 0664));
++}
++
++/*
++ * Read "man utmp" to make sense out of it.
++ */
++void FAST_FUNC update_utmp(int new_type, const char *short_tty, const char *username, const char *opt_host)
++{
++	struct utmp utent;
++	struct utmp *ut;
++	pid_t pid;
++
++	touch(_PATH_UTMP);
++	utmpname(_PATH_UTMP);
++	setutent();
++
++	pid = getpid();
++	/* Did init/getty/telnetd/sshd/... create an entry for us?
++	 * It should be (new_type-1), but we'd also reuse
++	 * any other potentially stale xxx_PROCESS entry */
++	while ((ut = getutent()) != NULL) {
++		if (ut->ut_pid == pid
++		// && ut->ut_line[0]
++		 && ut->ut_id[0] /* must have nonzero id */
++		 && (  ut->ut_type == INIT_PROCESS
++		    || ut->ut_type == LOGIN_PROCESS
++		    || ut->ut_type == USER_PROCESS
++		    || ut->ut_type == DEAD_PROCESS
++		    )
++		) {
++			utent = *ut; /* struct copy */
++			if (ut->ut_type >= new_type) {
++				/* Stale record. Nuke hostname */
++				memset(utent.ut_host, 0, sizeof(utent.ut_host));
++			}
++			/* NB: pututline (see later) searches for matching utent
++			 * using getutid(utent) - we must not change ut_id
++			 * if we want *exactly this* record to be overwritten!
++			 */
++			break;
++		}
++	}
++	endutent();
++
++	if (!ut) {
++		/* Didn't find anything, create new one */
++		memset(&utent, 0, sizeof(utent));
++		utent.ut_pid = pid;
++		/* Invent our own ut_id. ut_id is only 4 chars wide.
++		 * Try to fit something remotely meaningful... */
++		if (short_tty[0] == 'p') {
++			/* if "ptyXXX", map to "pXXX" */
++			/* if "pts/XX", map to "p/XX" */
++			utent.ut_id[0] = 'p';
++			strncpy(utent.ut_id + 1, short_tty + 3, sizeof(utent.ut_id)-1);
++		} else {
++			/* assuming it's "ttyXXXX", map to "XXXX" */
++			strncpy(utent.ut_id, short_tty + 3, sizeof(utent.ut_id));
++		}
++	}
++
++	utent.ut_type = new_type;
++	safe_strncpy(utent.ut_line, short_tty, sizeof(utent.ut_line));
++	safe_strncpy(utent.ut_user, username, sizeof(utent.ut_user));
++	if (opt_host)
++		safe_strncpy(utent.ut_host, opt_host, sizeof(utent.ut_host));
++	utent.ut_tv.tv_sec = time(NULL);
++
++	/* Update, or append new one */
++	setutent();
++	pututline(&utent);
++	endutent();
++
++#if ENABLE_FEATURE_WTMP
++	touch(bb_path_wtmp_file);
++	updwtmp(bb_path_wtmp_file, &utent);
++#endif
++}
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 20411b0..8d1d525 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -19,7 +19,7 @@
+ #include <syslog.h>
+ 
+ #if ENABLE_FEATURE_UTMP
+-#include <utmp.h> /* updwtmp() */
++#include <utmp.h> /* LOGIN_PROCESS */
+ #endif
+ 
+ #ifndef IUCLC
+@@ -575,61 +575,6 @@ static void termios_final(struct options *op, struct termios *tp, struct chardat
+ 	ioctl_or_perror_and_die(0, TCSETS, tp, "%s: TCSETS", op->tty);
+ }
+ 
+-#if ENABLE_FEATURE_UTMP
+-static void touch(const char *filename)
+-{
+-	if (access(filename, R_OK | W_OK) == -1)
+-		close(open(filename, O_WRONLY | O_CREAT, 0664));
+-}
+-
+-/* update_utmp - update our utmp entry */
+-static NOINLINE void update_utmp(const char *line, char *fakehost)
+-{
+-	struct utmp ut;
+-	struct utmp *utp;
+-	int mypid = getpid();
+-
+-	/* In case we won't find an entry below... */
+-	memset(&ut, 0, sizeof(ut));
+-	safe_strncpy(ut.ut_id, line + 3, sizeof(ut.ut_id));
+-
+-	/*
+-	 * The utmp file holds miscellaneous information about things started by
+-	 * /sbin/init and other system-related events. Our purpose is to update
+-	 * the utmp entry for the current process, in particular the process type
+-	 * and the tty line we are listening to. Return successfully only if the
+-	 * utmp file can be opened for update, and if we are able to find our
+-	 * entry in the utmp file.
+-	 */
+-	touch(_PATH_UTMP);
+-
+-	utmpname(_PATH_UTMP);
+-	setutent();
+-	while ((utp = getutent()) != NULL) {
+-		if (utp->ut_type == INIT_PROCESS && utp->ut_pid == mypid) {
+-			memcpy(&ut, utp, sizeof(ut));
+-			break;
+-		}
+-	}
+-
+-	strcpy(ut.ut_user, "LOGIN");
+-	safe_strncpy(ut.ut_line, line, sizeof(ut.ut_line));
+-	if (fakehost)
+-		safe_strncpy(ut.ut_host, fakehost, sizeof(ut.ut_host));
+-	ut.ut_tv.tv_sec = time(NULL);
+-	ut.ut_type = LOGIN_PROCESS;
+-	ut.ut_pid = mypid;
+-
+-	pututline(&ut);
+-	endutent();
+-
+-#if ENABLE_FEATURE_WTMP
+-	touch(bb_path_wtmp_file);
+-	updwtmp(bb_path_wtmp_file, &ut);
+-#endif
+-}
+-#endif /* CONFIG_FEATURE_UTMP */
+-
+ int getty_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int getty_main(int argc UNUSED_PARAM, char **argv)
+ {
+@@ -715,10 +660,8 @@ int getty_main(int argc UNUSED_PARAM, char **argv)
+ 	tcsetpgrp(0, getpid());
+ #endif
+ 
+-#if ENABLE_FEATURE_UTMP
+ 	/* Update the utmp file. This tty is ours now! */
+-	update_utmp(options.tty, fakehost);
+-#endif
++	update_utmp(LOGIN_PROCESS, options.tty, "LOGIN", fakehost);
+ 
+ 	/* Initialize the termios settings (raw mode, eight-bit, blocking i/o). */
+ 	debug("calling termios_init\n");
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 256c7c4..4a82037 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -2,25 +2,26 @@
+ /*
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+ #include "libbb.h"
+ #include <syslog.h>
+-#include <utmp.h>
++#if ENABLE_FEATURE_UTMP
++# include <utmp.h> /* USER_PROCESS */
++#endif
+ #include <sys/resource.h>
+ 
+ #if ENABLE_SELINUX
+-#include <selinux/selinux.h>  /* for is_selinux_enabled()  */
+-#include <selinux/get_context_list.h> /* for get_default_context() */
+-#include <selinux/flask.h> /* for security class definitions  */
++# include <selinux/selinux.h>  /* for is_selinux_enabled()  */
++# include <selinux/get_context_list.h> /* for get_default_context() */
++# include <selinux/flask.h> /* for security class definitions  */
+ #endif
+ 
+ #if ENABLE_PAM
+ /* PAM may include <locale.h>. We may need to undefine bbox's stub define: */
+-#undef setlocale
++# undef setlocale
+ /* For some obscure reason, PAM is not in pam/xxx, but in security/xxx.
+  * Apparently they like to confuse people. */
+-#include <security/pam_appl.h>
+-#include <security/pam_misc.h>
++# include <security/pam_appl.h>
++# include <security/pam_misc.h>
+ static const struct pam_conv conv = {
+ 	misc_conv,
+ 	NULL
+@@ -36,87 +37,6 @@ enum {
+ 
+ static char* short_tty;
+ 
+-#if ENABLE_FEATURE_UTMP
+-/* vv  Taken from tinylogin utmp.c  vv */
+-/*
+- * read_or_build_utent - see if utmp file is correct for this process
+- *
+- *	System V is very picky about the contents of the utmp file
+- *	and requires that a slot for the current process exist.
+- *	The utmp file is scanned for an entry with the same process
+- *	ID.  If no entry exists the process exits with a message.
+- *
+- *	The "picky" flag is for network and other logins that may
+- *	use special flags.  It allows the pid checks to be overridden.
+- *	This means that getty should never invoke login with any
+- *	command line flags.
+- */
+-
+-static void read_or_build_utent(struct utmp *utptr, int run_by_root)
+-{
+-	struct utmp *ut;
+-	pid_t pid = getpid();
+-
+-	setutent();
+-
+-	/* First, try to find a valid utmp entry for this process.  */
+-	/* If there is one, just use it.  */
+-	while ((ut = getutent()) != NULL) {
+-		if (ut->ut_pid == pid && ut->ut_line[0] && ut->ut_id[0]
+-		 && (ut->ut_type == LOGIN_PROCESS || ut->ut_type == USER_PROCESS)
+-		) {
+-			*utptr = *ut; /* struct copy */
+-			if (run_by_root) /* why only for root? */
+-				memset(utptr->ut_host, 0, sizeof(utptr->ut_host));
+-			return;
+-		}
+-	}
+-
+-// Why? Do we require non-root to exec login from another
+-// former login process (e.g. login shell)? Some login's have
+-// login shells as children, so it won't work...
+-//	if (!run_by_root)
+-//		bb_error_msg_and_die("no utmp entry found");
+-
+-	/* Otherwise create a new one.  */
+-	memset(utptr, 0, sizeof(*utptr));
+-	utptr->ut_type = LOGIN_PROCESS;
+-	utptr->ut_pid = pid;
+-	strncpy(utptr->ut_line, short_tty, sizeof(utptr->ut_line));
+-	/* This one is only 4 chars wide. Try to fit something
+-	 * remotely meaningful by skipping "tty"... */
+-	strncpy(utptr->ut_id, short_tty + 3, sizeof(utptr->ut_id));
+-	strncpy(utptr->ut_user, "LOGIN", sizeof(utptr->ut_user));
+-	utptr->ut_tv.tv_sec = time(NULL);
+-}
+-
+-/*
+- * write_utent - put a USER_PROCESS entry in the utmp file
+- *
+- *	write_utent changes the type of the current utmp entry to
+- *	USER_PROCESS.  the wtmp file will be updated as well.
+- */
+-static void write_utent(struct utmp *utptr, const char *username)
+-{
+-	utptr->ut_type = USER_PROCESS;
+-	strncpy(utptr->ut_user, username, sizeof(utptr->ut_user));
+-	utptr->ut_tv.tv_sec = time(NULL);
+-	/* other fields already filled in by read_or_build_utent above */
+-	setutent();
+-	pututline(utptr);
+-	endutent();
+-#if ENABLE_FEATURE_WTMP
+-	if (access(bb_path_wtmp_file, R_OK|W_OK) == -1) {
+-		close(creat(bb_path_wtmp_file, 0664));
+-	}
+-	updwtmp(bb_path_wtmp_file, utptr);
+-#endif
+-}
+-#else /* !ENABLE_FEATURE_UTMP */
+-#define read_or_build_utent(utptr, run_by_root) ((void)0)
+-#define write_utent(utptr, username) ((void)0)
+-#endif /* !ENABLE_FEATURE_UTMP */
+-
+ #if ENABLE_FEATURE_NOLOGIN
+ static void die_if_nologin(void)
+ {
+@@ -144,7 +64,7 @@ static void die_if_nologin(void)
+ 	exit(EXIT_FAILURE);
+ }
+ #else
+-static ALWAYS_INLINE void die_if_nologin(void) {}
++# define die_if_nologin() ((void)0)
+ #endif
+ 
+ #if ENABLE_FEATURE_SECURETTY && !ENABLE_PAM
+@@ -286,11 +206,10 @@ int login_main(int argc UNUSED_PARAM, char **argv)
+ 	unsigned opt;
+ 	int count = 0;
+ 	struct passwd *pw;
+-	char *opt_host = opt_host; /* for compiler */
++	char *opt_host = NULL;
+ 	char *opt_user = opt_user; /* for compiler */
+ 	char *full_tty;
+ 	IF_SELINUX(security_context_t user_sid = NULL;)
+-	IF_FEATURE_UTMP(struct utmp utent;)
+ #if ENABLE_PAM
+ 	int pamret;
+ 	pam_handle_t *pamh;
+@@ -334,10 +253,7 @@ int login_main(int argc UNUSED_PARAM, char **argv)
+ 	if (strncmp(full_tty, "/dev/", 5) == 0)
+ 		short_tty += 5;
+ 
+-	read_or_build_utent(&utent, run_by_root);
+-
+-	if (opt & LOGIN_OPT_h) {
+-		IF_FEATURE_UTMP(safe_strncpy(utent.ut_host, opt_host, sizeof(utent.ut_host));)
++	if (opt_host) {
+ 		fromhost = xasprintf(" on '%s' from '%s'", short_tty, opt_host);
+ 	} else {
+ 		fromhost = xasprintf(" on '%s'", short_tty);
+@@ -461,8 +377,6 @@ int login_main(int argc UNUSED_PARAM, char **argv)
+ 	if (pw->pw_uid != 0)
+ 		die_if_nologin();
+ 
+-	write_utent(&utent, username);
+-
+ 	IF_SELINUX(initselinux(username, full_tty, &user_sid));
+ 
+ 	/* Try these, but don't complain if they fail.
+@@ -470,6 +384,8 @@ int login_main(int argc UNUSED_PARAM, char **argv)
+ 	fchown(0, pw->pw_uid, pw->pw_gid);
+ 	fchmod(0, 0600);
+ 
++	update_utmp(USER_PROCESS, short_tty, username, run_by_root ? opt_host : NULL);
++
+ 	/* We trust environment only if we run by root */
+ 	if (ENABLE_LOGIN_SCRIPTS && run_by_root)
+ 		run_login_script(pw, full_tty);

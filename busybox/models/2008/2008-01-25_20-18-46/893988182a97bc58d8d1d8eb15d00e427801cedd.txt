@@ -1,0 +1,21 @@
+2008-01-25 20:18:46 +0000
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 00b8566..cd053b8 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -702,6 +702,7 @@ get_partition_start(const struct pte *pe)
+  * We might also do the opposite and warn in all cases except
+  * for "is probably nondos partition".
+  */
++#ifdef UNUSED
+ static int
+ is_dos_partition(int t)
+ {
+@@ -711,6 +712,7 @@ is_dos_partition(int t)
+ 		t == 0x1b || t == 0x1c || t == 0x1e || t == 0x24 ||
+ 		t == 0xc1 || t == 0xc4 || t == 0xc6);
+ }
++#endif
+ 
+ static void
+ menu(void)

@@ -1,0 +1,115 @@
+2010-04-06 18:50:05 +0200
+diff --git a/e2fsprogs/fsck.c b/e2fsprogs/fsck.c
+index 0192f3c..7c449e3 100644
+--- a/e2fsprogs/fsck.c
++++ b/e2fsprogs/fsck.c
+@@ -169,12 +169,12 @@ static char *base_device(const char *device)
+ 	const char *disk;
+ 	int len;
+ #endif
+-	cp = str = xstrdup(device);
++	str = xstrdup(device);
+ 
+-	/* Skip over /dev/; if it's not present, give up. */
+-	if (strncmp(cp, "/dev/", 5) != 0)
++	/* Skip over "/dev/"; if it's not present, give up */
++	cp = skip_dev_pfx(str);
++	if (cp == str)
+ 		goto errout;
+-	cp += 5;
+ 
+ 	/*
+ 	 * For md devices, we treat them all as if they were all
+diff --git a/include/libbb.h b/include/libbb.h
+index 357571f..976120e 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -263,6 +263,8 @@ extern void chomp(char *s) FAST_FUNC;
+ extern void trim(char *s) FAST_FUNC;
+ extern char *skip_whitespace(const char *) FAST_FUNC;
+ extern char *skip_non_whitespace(const char *) FAST_FUNC;
++extern char *skip_dev_pfx(const char *tty_name) FAST_FUNC;
++
+ extern char *strrstr(const char *haystack, const char *needle) FAST_FUNC;
+ 
+ //TODO: supply a pointer to char[11] buffer (avoid statics)?
+diff --git a/init/init.c b/init/init.c
+index 481f551..2eb8f1a 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -568,9 +568,7 @@ static void parse_inittab(void)
+ 			goto bad_entry;
+ 		/* turn .*TTY -> /dev/TTY */
+ 		if (tty[0]) {
+-			if (strncmp(tty, "/dev/", 5) == 0)
+-				tty += 5;
+-			tty = concat_path_file("/dev/", tty);
++			tty = concat_path_file("/dev/", skip_dev_pfx(tty));
+ 		}
+ 		new_init_action(1 << action, token[3], tty);
+ 		if (tty[0])
+diff --git a/libbb/skip_whitespace.c b/libbb/skip_whitespace.c
+index 7b12326..f5a61a3 100644
+--- a/libbb/skip_whitespace.c
++++ b/libbb/skip_whitespace.c
+@@ -30,3 +30,10 @@ char* FAST_FUNC skip_non_whitespace(const char *s)
+ 
+ 	return (char *) s;
+ }
++
++char* FAST_FUNC skip_dev_pfx(const char *tty_name)
++{
++	if (strncmp(tty_name, "/dev/", 5) == 0)
++		tty_name += 5;
++	return (char*)tty_name;
++}
+diff --git a/libbb/utmp.c b/libbb/utmp.c
+index d6ba336..68c358e 100644
+--- a/libbb/utmp.c
++++ b/libbb/utmp.c
+@@ -15,14 +15,6 @@ static void touch(const char *filename)
+ 		close(open(filename, O_WRONLY | O_CREAT, 0664));
+ }
+ 
+-// TODO: move to libbb
+-static const char* skip_dev_pfx(const char *tty_name)
+-{
+-	if (strncmp(tty_name, "/dev/", 5) == 0)
+-		tty_name += 5;
+-	return tty_name;
+-}
+-
+ void FAST_FUNC write_new_utmp(pid_t pid, int new_type, const char *tty_name, const char *username, const char *hostname)
+ {
+ 	struct utmp utent;
+diff --git a/loginutils/login.c b/loginutils/login.c
+index bf21d61..078cd68 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -249,9 +249,7 @@ int login_main(int argc UNUSED_PARAM, char **argv)
+ 	full_tty = xmalloc_ttyname(STDIN_FILENO);
+ 	if (!full_tty)
+ 		full_tty = xstrdup("UNKNOWN");
+-	short_tty = full_tty;
+-	if (strncmp(full_tty, "/dev/", 5) == 0)
+-		short_tty += 5;
++	short_tty = skip_dev_pfx(full_tty);
+ 
+ 	if (opt_host) {
+ 		fromhost = xasprintf(" on '%s' from '%s'", short_tty, opt_host);
+diff --git a/util-linux/rtcwake.c b/util-linux/rtcwake.c
+index 66b08e3..b163766 100644
+--- a/util-linux/rtcwake.c
++++ b/util-linux/rtcwake.c
+@@ -35,9 +35,8 @@ static NOINLINE bool may_wakeup(const char *rtcname)
+ 	ssize_t ret;
+ 	char buf[128];
+ 
+-	/* strip the '/dev/' from the rtcname here */
+-	if (!strncmp(rtcname, "/dev/", 5))
+-		rtcname += 5;
++	/* strip "/dev/" from the rtcname here */
++	rtcname = skip_dev_pfx(rtcname);
+ 
+ 	snprintf(buf, sizeof(buf), SYS_RTC_PATH, rtcname);
+ 	ret = open_read_close(buf, buf, sizeof(buf));

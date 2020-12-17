@@ -1,0 +1,14 @@
+2007-06-18 07:12:31 +0000
+diff --git a/libbb/time.c b/libbb/time.c
+index 3e35542..525032d 100644
+--- a/libbb/time.c
++++ b/libbb/time.c
+@@ -33,7 +33,7 @@ unsigned long long monotonic_us(void)
+ {
+ 	struct timeval tv;
+ 	gettimeofday(&tv, NULL);
+-	return tv.tv_sec * 1000000ULL + tv_usec;
++	return tv.tv_sec * 1000000ULL + tv.tv_usec;
+ }
+ 
+ unsigned monotonic_sec(void)

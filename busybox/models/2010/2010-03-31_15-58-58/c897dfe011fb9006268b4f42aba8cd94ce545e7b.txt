@@ -1,0 +1,35 @@
+2010-03-31 15:58:58 +0200
+diff --git a/sysklogd/Config.in b/sysklogd/Config.in
+index 0664be0..0d819e1 100644
+--- a/sysklogd/Config.in
++++ b/sysklogd/Config.in
+@@ -50,6 +50,16 @@ config FEATURE_SYSLOGD_DUP
+ 	  Option -D instructs syslogd to drop consecutive messages
+ 	  which are totally the same.
+ 
++config FEATURE_SYSLOGD_READ_BUFFER_SIZE
++       int "Read buffer size in bytes"
++       default 256
++       range 256 20000
++       depends on SYSLOGD
++       help
++         This option sets the size of the syslog read buffer.
++         Actual memory usage increases around five times the
++         change done here.
++
+ config FEATURE_IPC_SYSLOG
+ 	bool "Circular Buffer support"
+ 	default n
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 3320369..6bc450b 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -46,7 +46,7 @@
+ #undef SYSLOGD_WRLOCK
+ 
+ enum {
+-	MAX_READ = 256,
++	MAX_READ = CONFIG_FEATURE_SYSLOGD_READ_BUFFER_SIZE,
+ 	DNS_WAIT_SEC = 2 * 60,
+ };
+ 

@@ -1,0 +1,14 @@
+2009-08-14 01:36:28 +0200
+diff --git a/miscutils/volname.c b/miscutils/volname.c
+index a5174e6..6e86156 100644
+--- a/miscutils/volname.c
++++ b/miscutils/volname.c
+@@ -24,7 +24,7 @@
+  */
+ 
+ /*
+- * mods from  distrubuted source (eject-2.0.13) are by
++ * mods from distributed source (eject-2.0.13) are by
+  * Matthew Stoltenberg <d3matt@gmail.com>
+  */
+ #include "libbb.h"

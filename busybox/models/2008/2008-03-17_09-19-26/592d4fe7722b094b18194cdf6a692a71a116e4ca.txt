@@ -1,0 +1,292 @@
+2008-03-17 09:19:26 +0000
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index 03111c1..29c7580 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -1,7 +1,7 @@
+ #
+ # Automatically generated make config: don't edit
+ # Busybox version: 1.10.0.svn
+-# Sat Mar 15 20:36:24 2008
++# Sat Mar 15 22:51:03 2008
+ #
+ CONFIG_HAVE_DOT_CONFIG=y
+ 
+@@ -29,7 +29,7 @@ CONFIG_FEATURE_PIDFILE=y
+ CONFIG_FEATURE_SUID=y
+ CONFIG_FEATURE_SUID_CONFIG=y
+ CONFIG_FEATURE_SUID_CONFIG_QUIET=y
+-# CONFIG_SELINUX is not set
++CONFIG_SELINUX=y
+ CONFIG_FEATURE_PREFER_APPLETS=y
+ CONFIG_BUSYBOX_EXEC_PATH="/proc/self/exe"
+ CONFIG_FEATURE_SYSLOG=y
+@@ -356,7 +356,7 @@ CONFIG_FEATURE_FIND_PRUNE=y
+ CONFIG_FEATURE_FIND_DELETE=y
+ CONFIG_FEATURE_FIND_PATH=y
+ CONFIG_FEATURE_FIND_REGEX=y
+-# CONFIG_FEATURE_FIND_CONTEXT is not set
++CONFIG_FEATURE_FIND_CONTEXT=y
+ CONFIG_GREP=y
+ CONFIG_FEATURE_GREP_EGREP_ALIAS=y
+ CONFIG_FEATURE_GREP_FGREP_ALIAS=y
+@@ -474,8 +474,8 @@ CONFIG_MKFS_MINIX=y
+ CONFIG_FEATURE_MINIX2=y
+ CONFIG_GETOPT=y
+ CONFIG_HEXDUMP=y
+-CONFIG_HD=y
+ CONFIG_FEATURE_HEXDUMP_REVERSE=y
++CONFIG_HD=y
+ CONFIG_HWCLOCK=y
+ CONFIG_FEATURE_HWCLOCK_LONG_OPTIONS=y
+ CONFIG_FEATURE_HWCLOCK_ADJTIME_FHS=y
+@@ -550,7 +550,7 @@ CONFIG_FEATURE_MOUNT_LOOP=y
+ # Miscellaneous Utilities
+ #
+ CONFIG_ADJTIMEX=y
+-# CONFIG_BBCONFIG is not set
++CONFIG_BBCONFIG=y
+ CONFIG_CHAT=y
+ CONFIG_FEATURE_CHAT_NOFAIL=y
+ CONFIG_FEATURE_CHAT_TTY_HIFI=y
+@@ -745,7 +745,7 @@ CONFIG_PKILL=y
+ CONFIG_PS=y
+ CONFIG_FEATURE_PS_WIDE=y
+ CONFIG_FEATURE_PS_TIME=y
+-# CONFIG_FEATURE_PS_UNUSUAL_SYSTEMS is not set
++CONFIG_FEATURE_PS_UNUSUAL_SYSTEMS=y
+ CONFIG_RENICE=y
+ CONFIG_BB_SYSCTL=y
+ CONFIG_TOP=y
+@@ -812,7 +812,7 @@ CONFIG_LOGGER=y
+ #
+ # Runit Utilities
+ #
+-# CONFIG_RUNSV is not set
++CONFIG_RUNSV=y
+ CONFIG_RUNSVDIR=y
+ CONFIG_SV=y
+ CONFIG_SVLOGD=y
+@@ -821,21 +821,25 @@ CONFIG_SETUIDGID=y
+ CONFIG_ENVUIDGID=y
+ CONFIG_ENVDIR=y
+ CONFIG_SOFTLIMIT=y
+-# CONFIG_CHCON is not set
+-# CONFIG_FEATURE_CHCON_LONG_OPTIONS is not set
+-# CONFIG_GETENFORCE is not set
+-# CONFIG_GETSEBOOL is not set
+-# CONFIG_LOAD_POLICY is not set
+-# CONFIG_MATCHPATHCON is not set
+-# CONFIG_RESTORECON is not set
+-# CONFIG_RUNCON is not set
+-# CONFIG_FEATURE_RUNCON_LONG_OPTIONS is not set
+-# CONFIG_SELINUXENABLED is not set
+-# CONFIG_SETENFORCE is not set
+-# CONFIG_SETFILES is not set
+-# CONFIG_FEATURE_SETFILES_CHECK_OPTION is not set
+-# CONFIG_SETSEBOOL is not set
+-# CONFIG_SESTATUS is not set
++
++#
++# Selinux Utilities
++#
++CONFIG_CHCON=y
++CONFIG_FEATURE_CHCON_LONG_OPTIONS=y
++CONFIG_GETENFORCE=y
++CONFIG_GETSEBOOL=y
++CONFIG_LOAD_POLICY=y
++CONFIG_MATCHPATHCON=y
++CONFIG_RESTORECON=y
++CONFIG_RUNCON=y
++CONFIG_FEATURE_RUNCON_LONG_OPTIONS=y
++CONFIG_SELINUXENABLED=y
++CONFIG_SETENFORCE=y
++CONFIG_SETFILES=y
++CONFIG_FEATURE_SETFILES_CHECK_OPTION=y
++CONFIG_SETSEBOOL=y
++CONFIG_SESTATUS=y
+ 
+ #
+ # Print Utilities
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 0da03e6..2ab034a 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -256,15 +256,16 @@ static unsigned custom(struct svdir *s, char c)
+ 
+ 	if (s->islog) return 0;
+ 	strcpy(a, "control/?");
+-	a[8] = c;
++	a[8] = c; /* replace '?' */
+ 	if (stat(a, &st) == 0) {
+ 		if (st.st_mode & S_IXUSR) {
+-			pid = fork();
++			pid = vfork();
+ 			if (pid == -1) {
+-				warn_cannot("fork for control/?");
++				warn_cannot("vfork for control/?");
+ 				return 0;
+ 			}
+ 			if (!pid) {
++				/* child */
+ 				if (haslog && dup2(logpipe.wr, 1) == -1)
+ 					warn_cannot("setup stdout for control/?");
+ 				prog[0] = a;
+@@ -272,6 +273,7 @@ static unsigned custom(struct svdir *s, char c)
+ 				execv(a, prog);
+ 				fatal_cannot("run control/?");
+ 			}
++			/* parent */
+ 			while (safe_waitpid(pid, &w, 0) == -1) {
+ 				warn_cannot("wait for child control/?");
+ 				return 0;
+@@ -318,8 +320,8 @@ static void startservice(struct svdir *s)
+ 
+ 	if (s->pid != 0)
+ 		stopservice(s); /* should never happen */
+-	while ((p = fork()) == -1) {
+-		warn_cannot("fork, sleeping");
++	while ((p = vfork()) == -1) {
++		warn_cannot("vfork, sleeping");
+ 		sleep(5);
+ 	}
+ 	if (p == 0) {
+@@ -344,6 +346,7 @@ static void startservice(struct svdir *s)
+ 		execvp(*run, run);
+ 		fatal2_cannot(s->islog ? "start log/" : "start ", *run);
+ 	}
++	/* parent */
+ 	if (s->state != S_FINISH) {
+ 		gettimeofday_ns(&s->start);
+ 		s->state = S_RUN;
+diff --git a/selinux/chcon.c b/selinux/chcon.c
+index f00e242..288e93a 100644
+--- a/selinux/chcon.c
++++ b/selinux/chcon.c
+@@ -28,7 +28,11 @@ static char *type = NULL;
+ static char *range = NULL;
+ static char *specified_context = NULL;
+ 
+-static int change_filedir_context(const char *fname, struct stat *stbuf, void *userData, int depth)
++static int change_filedir_context(
++		const char *fname,
++		struct stat *stbuf ATTRIBUTE_UNUSED,
++		void *userData ATTRIBUTE_UNUSED,
++		int depth ATTRIBUTE_UNUSED)
+ {
+ 	context_t context = NULL;
+ 	security_context_t file_context = NULL;
+@@ -121,7 +125,7 @@ static const char chcon_longopts[] ALIGN1 =
+ #endif
+ 
+ int chcon_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int chcon_main(int argc, char **argv)
++int chcon_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *reference_file;
+ 	char *fname;
+diff --git a/selinux/getenforce.c b/selinux/getenforce.c
+index e11e78e..a39ce6d 100644
+--- a/selinux/getenforce.c
++++ b/selinux/getenforce.c
+@@ -9,7 +9,7 @@
+ #include "libbb.h"
+ 
+ int getenforce_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int getenforce_main(int argc, char **argv)
++int getenforce_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	int rc;
+ 
+diff --git a/selinux/load_policy.c b/selinux/load_policy.c
+index f9aa49d..c5b0e7a 100644
+--- a/selinux/load_policy.c
++++ b/selinux/load_policy.c
+@@ -5,7 +5,7 @@
+ #include "libbb.h"
+ 
+ int load_policy_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int load_policy_main(int argc, char **argv)
++int load_policy_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	int rc;
+ 
+diff --git a/selinux/matchpathcon.c b/selinux/matchpathcon.c
+index 6de68bc..e0b374a 100644
+--- a/selinux/matchpathcon.c
++++ b/selinux/matchpathcon.c
+@@ -30,7 +30,7 @@ static int print_matchpathcon(char *path, int noprint)
+ #define OPT_VERIFY      (1<<4)  /* -V */
+ 
+ int matchpathcon_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int matchpathcon_main(int argc, char **argv)
++int matchpathcon_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	int error = 0;
+ 	unsigned opts;
+diff --git a/selinux/runcon.c b/selinux/runcon.c
+index 89a4b05..0f573d1 100644
+--- a/selinux/runcon.c
++++ b/selinux/runcon.c
+@@ -88,7 +88,7 @@ static const char runcon_longopts[] ALIGN1 =
+ #define OPTS_CONTEXT_COMPONENT		(OPTS_ROLE | OPTS_TYPE | OPTS_USER | OPTS_RANGE)
+ 
+ int runcon_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int runcon_main(int argc, char **argv)
++int runcon_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	char *role = NULL;
+ 	char *range = NULL;
+diff --git a/selinux/selinuxenabled.c b/selinux/selinuxenabled.c
+index 114d2b6..c6e947c 100644
+--- a/selinux/selinuxenabled.c
++++ b/selinux/selinuxenabled.c
+@@ -8,7 +8,7 @@
+ #include "libbb.h"
+ 
+ int selinuxenabled_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int selinuxenabled_main(int argc, char **argv)
++int selinuxenabled_main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
+ {
+ 	return !is_selinux_enabled();
+ }
+diff --git a/selinux/sestatus.c b/selinux/sestatus.c
+index cc17b17..43e31d4 100644
+--- a/selinux/sestatus.c
++++ b/selinux/sestatus.c
+@@ -159,7 +159,7 @@ static void display_verbose(void)
+ }
+ 
+ int sestatus_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int sestatus_main(int argc, char **argv)
++int sestatus_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	unsigned opts;
+ 	const char *pol_path;
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index 905333f..02bb911 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -99,7 +99,7 @@ enum {
+ #define FLAG_R               (option_mask32 & OPT_R)
+ 
+ 
+-static void qprintf(const char *fmt, ...)
++static void qprintf(const char *fmt ATTRIBUTE_UNUSED, ...)
+ {
+ 	/* quiet, do nothing */
+ }
+@@ -391,8 +391,11 @@ static int restore(const char *file)
+  * This function is called by recursive_action on each file during
+  * the directory traversal.
+  */
+-static int apply_spec(const char *file,
+-		      struct stat *sb, void *userData, int depth)
++static int apply_spec(
++		const char *file,
++		struct stat *sb,
++		void *userData ATTRIBUTE_UNUSED,
++		int depth ATTRIBUTE_UNUSED)
+ {
+ 	if (!follow_mounts) {
+ 		/* setfiles does not process across different mount points */

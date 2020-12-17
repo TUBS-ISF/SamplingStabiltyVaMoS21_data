@@ -1,0 +1,25 @@
+2009-03-22 22:48:41 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 0e43b63..6e2ef5d 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3363,6 +3363,9 @@ static int redirect_opt_num(o_string *o)
+ 	return num;
+ }
+ 
++static int parse_stream(o_string *dest, struct parse_context *ctx,
++		struct in_str *input0, const char *end_trigger);
++
+ #if ENABLE_HUSH_TICK
+ static FILE *generate_stream_from_list(struct pipe *head)
+ {
+@@ -3407,9 +3410,6 @@ static FILE *generate_stream_from_list(struct pipe *head)
+ 	/* 'head' is freed by the caller */
+ }
+ 
+-static int parse_stream(o_string *dest, struct parse_context *ctx,
+-		struct in_str *input0, const char *end_trigger);
+-
+ /* Return code is exit status of the process that is run. */
+ static int process_command_subs(o_string *dest,
+ 		struct in_str *input,

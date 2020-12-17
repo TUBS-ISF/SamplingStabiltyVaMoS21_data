@@ -1,0 +1,54 @@
+2010-03-28 00:02:20 +0100
+diff --git a/include/usage.h b/include/usage.h
+index a343b41..f3d89d3 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1003,14 +1003,14 @@
+        "Display DHCP leases granted by udhcpd\n" \
+      "\nOptions:" \
+ 	IF_LONG_OPTS( \
+-     "\n	-f,--file=FILE	Leases file to load" \
+-     "\n	-r,--remaining	Interpret lease times as time remaining" \
+-     "\n	-a,--absolute	Interpret lease times as expire time" \
++     "\n	-f,--file=FILE	Lease file" \
++     "\n	-r,--remaining	Show remaining time" \
++     "\n	-a,--absolute	Show expiration time" \
+ 	) \
+ 	IF_NOT_LONG_OPTS( \
+-     "\n	-f FILE	Leases file to load" \
+-     "\n	-r	Interpret lease times as time remaining" \
+-     "\n	-a	Interpret lease times as expire time" \
++     "\n	-f FILE	Lease file" \
++     "\n	-r	Show remaining time" \
++     "\n	-a	Show expiration time" \
+ 	)
+ 
+ /*
+@@ -1042,8 +1042,8 @@
+ 	IF_FEATURE_FANCY_ECHO( "\n" \
+      "\nOptions:" \
+      "\n	-n	Suppress trailing newline" \
+-     "\n	-e	Interpret backslash-escaped characters (i.e., \\t=tab)" \
+-     "\n	-E	Disable interpretation of backslash-escaped characters" \
++     "\n	-e	Interpret backslash escapes (i.e., \\t=tab)" \
++     "\n	-E	Don't interpret backslash escapes (default)" \
+ 	)
+ #define echo_example_usage \
+        "$ echo \"Erik is cool\"\n" \
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 149300b..eea9017 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -71,11 +71,11 @@ typedef uint32_t leasetime_t;
+ typedef int32_t signed_leasetime_t;
+ 
+ struct dyn_lease {
+-	/* "nip": IP in network order */
+ 	/* Unix time when lease expires. Kept in memory in host order.
+ 	 * When written to file, converted to network order
+ 	 * and adjusted (current time subtracted) */
+ 	leasetime_t expires;
++	/* "nip": IP in network order */
+ 	uint32_t lease_nip;
+ 	/* We use lease_mac[6], since e.g. ARP probing uses
+ 	 * only 6 first bytes anyway. We check received dhcp packets

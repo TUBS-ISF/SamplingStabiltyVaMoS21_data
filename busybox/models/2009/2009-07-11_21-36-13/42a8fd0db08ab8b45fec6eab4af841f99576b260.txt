@@ -1,0 +1,449 @@
+2009-07-11 21:36:13 +0200
+diff --git a/Config.in b/Config.in
+index ee706eb..99f814e 100644
+--- a/Config.in
++++ b/Config.in
+@@ -30,18 +30,6 @@ config EXTRA_COMPAT
+ 	  some GNU extensions in libc. You probably only need this option
+ 	  if you plan to run busybox on desktop.
+ 
+-config FEATURE_ASSUME_UNICODE
+-	bool "Assume that 1:1 char/glyph correspondence is not true"
+-	default n
+-	help
+-	  This makes various applets aware that one byte is not
+-	  one character on screen.
+-
+-	  Busybox aims to eventually work correctly with Unicode displays.
+-	  Any older encodings are not guaranteed to work.
+-	  Probably by the time when busybox will be fully Unicode-clean,
+-	  other encodings will be mainly of historic interest.
+-
+ choice
+ 	prompt "Buffer allocation policy"
+ 	default FEATURE_BUFFERS_USE_MALLOC
+@@ -114,6 +102,28 @@ config LOCALE_SUPPORT
+ 	  Enable this if your system has locale support and you would like
+ 	  busybox to support locale settings.
+ 
++config FEATURE_ASSUME_UNICODE
++	bool "Support Unicode"
++	default n
++	help
++	  This makes various applets aware that one byte is not
++	  one character on screen.
++
++	  Busybox aims to eventually work correctly with Unicode displays.
++	  Any older encodings are not guaranteed to work.
++	  Probably by the time when busybox will be fully Unicode-clean,
++	  other encodings will be mainly of historic interest.
++
++config FEATURE_CHECK_UNICODE_IN_ENV
++	bool "Check $LANG environment variable"
++	default y
++	depends on FEATURE_ASSUME_UNICODE && !LOCALE_SUPPORT
++	help
++	  With this option on, Unicode support is activated
++	  only if LANG variable has the value of the form "xxxx.utf8"
++
++	  Otherwise, Unicode support will be always enabled and active.
++
+ config LONG_OPTS
+ 	bool "Support for --long-options"
+ 	default y
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 8a6faf2..20b979d 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -30,12 +30,9 @@
+  * [2009-03]
+  * ls sorts listing now, and supports almost all options.
+  */
+-
+ #include "libbb.h"
++#include "unicode.h"
+ 
+-#if ENABLE_FEATURE_ASSUME_UNICODE
+-#include <wchar.h>
+-#endif
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+@@ -296,9 +293,8 @@ enum {
+ /* libbb candidate */
+ static size_t mbstrlen(const char *string)
+ {
+-	size_t width = mbsrtowcs(NULL /*dest*/, &string,
+-				MAXINT(size_t) /*len*/, NULL /*state*/);
+-	if (width == (size_t)-1)
++	size_t width = mbstowcs(NULL, string, INT_MAX);
++	if (width == (size_t)-1L)
+ 		return strlen(string);
+ 	return width;
+ }
+@@ -932,6 +928,8 @@ int ls_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	INIT_G();
+ 
++	check_unicode_in_env();
++
+ 	all_fmt = LIST_SHORT |
+ 		(ENABLE_FEATURE_LS_SORTFILES * (SORT_NAME | SORT_FORWARD));
+ 
+diff --git a/include/unicode.h b/include/unicode.h
+new file mode 100644
+index 0000000..be64a50
+--- /dev/null
++++ b/include/unicode.h
+@@ -0,0 +1,57 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Licensed under the GPL version 2, see the file LICENSE in this tarball.
++ */
++#ifndef UNICODE_H
++#define UNICODE_H 1
++
++#if !ENABLE_FEATURE_ASSUME_UNICODE
++
++# define check_unicode_in_env() ((void)0)
++
++#else
++
++# if ENABLE_LOCALE_SUPPORT
++
++#  include <wchar.h>
++#  include <wctype.h>
++#  define check_unicode_in_env() ((void)0)
++
++# else
++
++#  if !ENABLE_FEATURE_CHECK_UNICODE_IN_ENV
++#   define check_unicode_in_env() ((void)0)
++#  else
++void check_unicode_in_env(void) FAST_FUNC;
++#  endif
++
++#  undef MB_CUR_MAX
++#  define MB_CUR_MAX 6
++
++/* Prevent name collisions */
++#  define wint_t    bb_wint_t
++#  define mbstate_t bb_mbstate_t
++#  define mbstowcs  bb_mbstowcs
++#  define wcstombs  bb_wcstombs
++#  define wcrtomb   bb_wcrtomb
++#  define iswspace  bb_iswspace
++#  define iswalnum  bb_iswalnum
++#  define iswpunct  bb_iswpunct
++
++typedef int32_t wint_t;
++typedef struct {
++	char bogus;
++} mbstate_t;
++
++size_t mbstowcs(wchar_t *dest, const char *src, size_t n) FAST_FUNC;
++size_t wcstombs(char *dest, const wchar_t *src, size_t n) FAST_FUNC;
++size_t wcrtomb(char *s, wchar_t wc, mbstate_t *ps) FAST_FUNC;
++int iswspace(wint_t wc) FAST_FUNC;
++int iswalnum(wint_t wc) FAST_FUNC;
++int iswpunct(wint_t wc) FAST_FUNC;
++
++# endif
++
++#endif
++
++#endif
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 70dc48d..efd04e3 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -139,6 +139,8 @@ lib-$(CONFIG_HWCLOCK) += rtc.o
+ lib-$(CONFIG_RTCWAKE) += rtc.o
+ lib-$(CONFIG_FEATURE_CHECK_NAMES) += die_if_bad_username.o
+ 
++lib-$(CONFIG_FEATURE_ASSUME_UNICODE) += unicode.o
++
+ # We shouldn't build xregcomp.c if we don't need it - this ensures we don't
+ # require regex.h to be in the include dir even if we don't need it thereby
+ # allowing us to build busybox even if uclibc regex support is disabled.
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index e5d0c1b..ab32972 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -34,10 +34,7 @@
+  * PS1='\[\033[01;32m\]\u@\h\[\033[01;34m\] \w \$\[\033[00m\] '
+  */
+ #include "libbb.h"
+-#if ENABLE_FEATURE_ASSUME_UNICODE
+-# include <wchar.h>
+-# include <wctype.h>
+-#endif
++#include "unicode.h"
+ 
+ /* FIXME: obsolete CONFIG item? */
+ #define ENABLE_FEATURE_NONPRINTABLE_INVERSE_PUT 0
+@@ -1581,7 +1578,7 @@ static int lineedit_read_key(char *read_key_buffer)
+ 				return ic;
+ 			unicode_buf[unicode_idx++] = ic;
+ 			unicode_buf[unicode_idx] = '\0';
+-			if (mbstowcs(&wc, unicode_buf, 1) < 1 && unicode_idx < MB_CUR_MAX) {
++			if (mbstowcs(&wc, unicode_buf, 1) != 1 && unicode_idx < MB_CUR_MAX) {
+ 				delay = 50;
+ 				goto poll_again;
+ 			}
+@@ -1636,6 +1633,8 @@ int FAST_FUNC read_line_input(const char *prompt, char *command, int maxsize, li
+ 		return len;
+ 	}
+ 
++	check_unicode_in_env();
++
+ // FIXME: audit & improve this
+ 	if (maxsize > MAX_LINELEN)
+ 		maxsize = MAX_LINELEN;
+diff --git a/libbb/unicode.c b/libbb/unicode.c
+new file mode 100644
+index 0000000..a99f5ed
+--- /dev/null
++++ b/libbb/unicode.c
+@@ -0,0 +1,241 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Unicode support routines.
++ *
++ * Copyright (C) 2008 Denys Vlasenko
++ *
++ * Licensed under GPL version 2, see file LICENSE in this tarball for details.
++ */
++#include "libbb.h"
++
++/* if LOCALE_SUPPORT, libc locale stuff takes care of it, else: */
++
++#if !ENABLE_LOCALE_SUPPORT
++#include "unicode.h"
++
++/* 0: not known yet,
++ * 1: not unicode (IOW: assuming one char == one byte)
++ * 2: unicode
++ */
++# if !ENABLE_FEATURE_CHECK_UNICODE_IN_ENV
++#  define unicode_is_enabled 2
++# else
++static smallint unicode_is_enabled;
++void FAST_FUNC check_unicode_in_env(void)
++{
++	char *lang;
++
++	if (unicode_is_enabled)
++		return;
++	unicode_is_enabled = 1;
++
++	lang = getenv("LANG");
++	if (!lang || !strstr(lang, ".utf8"))
++		return;
++
++	unicode_is_enabled = 2;
++}
++# endif
++
++static size_t wcrtomb_internal(char *s, wchar_t wc)
++{
++	uint32_t v = wc;
++
++	if (v <= 0x7f) {
++		*s = v;
++		return 1;
++	}
++
++	/* 80-7FF -> 110yyyxx 10xxxxxx */
++	if (v <= 0x7ff) {
++		s[1] = (v & 0x3f) | 0x80;
++		v >>= 6;
++		s[0] = v | 0xc0;
++		return 2;
++	}
++
++	/* 800-FFFF -> 1110yyyy 10yyyyxx 10xxxxxx */
++	if (v <= 0xffff) {
++		s[2] = (v & 0x3f) | 0x80;
++		v >>= 6;
++		s[1] = (v & 0x3f) | 0x80;
++		v >>= 6;
++		s[0] = v | 0xe0;
++		return 3;
++	}
++
++	/* RFC 3629 says that Unicode ends at 10FFFF */
++
++	/* 10000-1FFFFF -> 11110zzz 10zzyyyy 10yyyyxx 10xxxxxx */
++	if (v <= 0x1fffff) {
++		s[3] = (v & 0x3f) | 0x80;
++		v >>= 6;
++		s[2] = (v & 0x3f) | 0x80;
++		v >>= 6;
++		s[1] = (v & 0x3f) | 0x80;
++		v >>= 6;
++		s[0] = v | 0xf0;
++		return 4;
++	}
++
++	/* 200000-3FFFFFF -> 111110tt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
++	if (v <= 0x3ffffff) {
++		s[4] = (v & 0x3f) | 0x80;
++		v >>= 6;
++		s[3] = (v & 0x3f) | 0x80;
++		v >>= 6;
++		s[2] = (v & 0x3f) | 0x80;
++		v >>= 6;
++		s[1] = (v & 0x3f) | 0x80;
++		v >>= 6;
++		s[0] = v | 0xf8;
++		return 5;
++	}
++
++	/* 4000000-FFFFFFFF -> 111111tt 10tttttt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
++	s[5] = (v & 0x3f) | 0x80;
++	v >>= 6;
++	s[4] = (v & 0x3f) | 0x80;
++	v >>= 6;
++	s[3] = (v & 0x3f) | 0x80;
++	v >>= 6;
++	s[2] = (v & 0x3f) | 0x80;
++	v >>= 6;
++	s[1] = (v & 0x3f) | 0x80;
++	v >>= 6;
++	s[0] = v | 0xfc;
++	return 6;
++}
++
++size_t FAST_FUNC wcrtomb(char *s, wchar_t wc, mbstate_t *ps UNUSED_PARAM)
++{
++	if (unicode_is_enabled != 2) {
++		*s = wc;
++		return 1;
++	}
++
++	return wcrtomb_internal(s, wc);
++}
++
++size_t FAST_FUNC wcstombs(char *dest, const wchar_t *src, size_t n)
++{
++	size_t org_n = n;
++
++	if (unicode_is_enabled != 2) {
++		while (n) {
++			wchar_t c = *src++;
++			*dest++ = c;
++			if (c == 0)
++				break;
++			n--;
++		}
++		return org_n - n;
++	}
++
++	while (n >= MB_CUR_MAX) {
++		wchar_t wc = *src++;
++		size_t len = wcrtomb_internal(dest, wc);
++
++		if (wc == L'\0')
++			return org_n - n;
++		dest += len;
++		n -= len;
++	}
++	while (n) {
++		char tbuf[MB_CUR_MAX];
++		wchar_t wc = *src++;
++		size_t len = wcrtomb_internal(tbuf, wc);
++
++		if (len > n)
++			len = n;
++		memcpy(dest, tbuf, len);
++		if (wc == L'\0')
++			return org_n - n;
++		dest += len;
++		n -= len;
++	}
++	return org_n - n;
++}
++
++size_t FAST_FUNC mbstowcs(wchar_t *dest, const char *src, size_t n)
++{
++	size_t org_n = n;
++
++	if (unicode_is_enabled != 2) {
++		while (n) {
++			unsigned char c = *src++;
++			*dest++ = c;
++			if (c == 0)
++				break;
++			n--;
++		}
++		return org_n - n;
++	}
++
++	while (n) {
++		int bytes;
++		unsigned c = (unsigned char) *src++;
++
++		if (c <= 0x7f) {
++			*dest++ = c;
++			if (c == '\0')
++				break;
++			n--;
++			continue;
++		}
++
++		/* 80-7FF -> 110yyyxx 10xxxxxx */
++		/* 800-FFFF -> 1110yyyy 10yyyyxx 10xxxxxx */
++		/* 10000-1FFFFF -> 11110zzz 10zzyyyy 10yyyyxx 10xxxxxx */
++		/* 200000-3FFFFFF -> 111110tt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
++		/* 4000000-FFFFFFFF -> 111111tt 10tttttt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
++		bytes = 0;
++		do {
++			c <<= 1;
++			bytes++;
++		} while ((c & 0x80) && bytes < 6);
++		if (bytes == 1)
++			return (size_t) -1L;
++		c = (uint8_t)(c) >> bytes;
++
++		while (--bytes) {
++			unsigned ch = (unsigned char) *src++;
++			if ((ch & 0xc0) != 0x80) {
++				return (size_t) -1L;
++			}
++			c = (c << 6) + (ch & 0x3f);
++		}
++
++		/* TODO */
++		/* Need to check that c isn't produced by overlong encoding */
++		/* Example: 11000000 10000000 converts to NUL */
++		/* 11110000 10000000 10000100 10000000 converts to 0x100 */
++		/* correct encoding: 11000100 10000000 */
++		if (c <= 0x7f) { /* crude check */
++			return (size_t) -1L;
++			//or maybe: c = 0xfffd; /* replacement character */
++		}
++
++		*dest++ = c;
++		n--;
++	}
++
++	return org_n - n;
++}
++
++int FAST_FUNC iswspace(wint_t wc)
++{
++	return (unsigned)wc <= 0x7f && isspace(wc);
++}
++
++int FAST_FUNC iswalnum(wint_t wc)
++{
++	return (unsigned)wc <= 0x7f && isalnum(wc);
++}
++
++int FAST_FUNC iswpunct(wint_t wc)
++{
++	return (unsigned)wc <= 0x7f && ispunct(wc);
++}
++
++#endif

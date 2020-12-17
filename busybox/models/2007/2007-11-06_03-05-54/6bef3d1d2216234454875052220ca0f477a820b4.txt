@@ -1,0 +1,441 @@
+2007-11-06 03:05:54 +0000
+diff --git a/coreutils/mknod.c b/coreutils/mknod.c
+index ee539e3..55f5310 100644
+--- a/coreutils/mknod.c
++++ b/coreutils/mknod.c
+@@ -28,23 +28,29 @@ int mknod_main(int argc, char **argv)
+ 	argv += optind;
+ 	argc -= optind;
+ 
+-	if ((argc >= 2) && ((name = strchr(modes_chars, argv[1][0])) != NULL)) {
+-		mode |= modes_cubp[(int)(name[4])];
+-
+-		dev = 0;
+-		if ((*name != 'p') && ((argc -= 2) == 2)) {
+-			/* Autodetect what the system supports; these macros should
+-			 * optimize out to two constants. */
+-			dev = makedev(xatoul_range(argv[2], 0, major(UINT_MAX)),
+-			              xatoul_range(argv[3], 0, minor(UINT_MAX)));
+-		}
++	if (argc >= 2) {
++		name = strchr(modes_chars, argv[1][0]);
++		if (name != NULL) {
++			mode |= modes_cubp[(int)(name[4])];
++
++			dev = 0;
++			if (*name != 'p') {
++				argc -= 2;
++				if (argc == 2) {
++					/* Autodetect what the system supports; these macros should
++					 * optimize out to two constants. */
++					dev = makedev(xatoul_range(argv[2], 0, major(UINT_MAX)),
++					              xatoul_range(argv[3], 0, minor(UINT_MAX)));
++				}
++			}
+ 
+-		if (argc == 2) {
+-			name = *argv;
+-			if (mknod(name, mode, dev) == 0) {
+-				return EXIT_SUCCESS;
++			if (argc == 2) {
++				name = *argv;
++				if (mknod(name, mode, dev) == 0) {
++					return EXIT_SUCCESS;
++				}
++				bb_simple_perror_msg_and_die(name);
+ 			}
+-			bb_simple_perror_msg_and_die(name);
+ 		}
+ 	}
+ 	bb_show_usage();
+diff --git a/editors/diff.c b/editors/diff.c
+index c158c87..64b7daa 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -588,7 +588,9 @@ static void check(FILE * f1, FILE * f2)
+ 			while (1) {
+ 				ctold++;
+ 				ctnew++;
+-				if ((c = getc(f1)) != (d = getc(f2))) {
++				c = getc(f1);
++				d = getc(f2);
++				if (c != d) {
+ 					J[i] = 0;
+ 					if (c != '\n' && c != EOF)
+ 						ctold += skipline(f1);
+@@ -668,7 +670,8 @@ static void fetch(long *f, int a, int b, FILE * lb, int ch)
+ 		}
+ 		col = 0;
+ 		for (j = 0, lastc = '\0'; j < nc; j++, lastc = c) {
+-			if ((c = getc(lb)) == EOF) {
++			c = getc(lb);
++			if (c == EOF) {
+ 				printf("\n\\ No newline at end of file\n");
+ 				return;
+ 			}
+diff --git a/init/init.c b/init/init.c
+index 409e8c4..4b543a4 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -369,7 +369,8 @@ static pid_t run(const struct init_action *a)
+ 	if (a->action & (SYSINIT | WAIT | CTRLALTDEL | SHUTDOWN | RESTART)) {
+ 
+ 		/* Now fork off another process to just hang around */
+-		if ((pid = fork()) < 0) {
++		pid = fork();
++		if (pid) {
+ 			message(L_LOG | L_CONSOLE, "Can't fork");
+ 			_exit(1);
+ 		}
+@@ -388,7 +389,8 @@ static pid_t run(const struct init_action *a)
+ 				_exit(0);
+ 
+ 			/* Use a temporary process to steal the controlling tty. */
+-			if ((pid = fork()) < 0) {
++			pid = fork();
++			if (pid < 0) {
+ 				message(L_LOG | L_CONSOLE, "Can't fork");
+ 				_exit(1);
+ 			}
+diff --git a/libbb/device_open.c b/libbb/device_open.c
+index 2b35ad8..6907e98 100644
+--- a/libbb/device_open.c
++++ b/libbb/device_open.c
+@@ -12,15 +12,17 @@
+ /* try to open up the specified device */
+ int device_open(const char *device, int mode)
+ {
+-	int m, f, fd = -1;
++	int m, f, fd;
+ 
+ 	m = mode | O_NONBLOCK;
+ 
+ 	/* Retry up to 5 times */
+ 	/* TODO: explain why it can't be considered insane */
+-	for (f = 0; f < 5; f++)
+-		if ((fd = open(device, m, 0600)) >= 0)
++	for (f = 0; f < 5; f++) {
++		fd = open(device, m, 0600);
++		if (fd >= 0)
+ 			break;
++	}
+ 	if (fd < 0)
+ 		return fd;
+ 	/* Reset original flags. */
+diff --git a/libbb/dump.c b/libbb/dump.c
+index 829050d..71e35c6 100644
+--- a/libbb/dump.c
++++ b/libbb/dump.c
+@@ -59,7 +59,8 @@ int bb_dump_size(FS * fs)
+ 				prec = atoi(fmt);
+ 				while (isdigit(*++fmt));
+ 			}
+-			if (!(p = strchr(size_conv_str + 12, *fmt))) {
++			p = strchr(size_conv_str + 12, *fmt);
++			if (!p) {
+ 				if (*fmt == 's') {
+ 					bcnt += prec;
+ 				} else if (*fmt == '_') {
+@@ -162,7 +163,8 @@ static void rewrite(FS * fs)
+ 			DO_INT_CONV:
+ 				{
+ 					const char *e;
+-					if (!(e = strchr(lcc, *p1))) {
++					e = strchr(lcc, *p1);
++					if (!e) {
+ 						goto DO_BAD_CONV_CHAR;
+ 					}
+ 					pr->flags = F_INT;
+diff --git a/libbb/obscure.c b/libbb/obscure.c
+index 2599095..5cc9062 100644
+--- a/libbb/obscure.c
++++ b/libbb/obscure.c
+@@ -130,7 +130,8 @@ static const char *obscure_msg(const char *old_p, const char *new_p, const struc
+ 		c = 0;
+ 		p = new_p;
+ 		while (1) {
+-			if ((p = strchr(p, new_p[i])) == NULL) {
++			p = strchr(p, new_p[i]);
++			if (p == NULL) {
+ 				break;
+ 			}
+ 			c++;
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index bc735d0..d32d189 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -166,8 +166,10 @@ static void parse_speeds(struct options *op, char *arg)
+ 
+ 	debug("entered parse_speeds\n");
+ 	for (cp = strtok(arg, ","); cp != 0; cp = strtok((char *) 0, ",")) {
+-		if ((op->speeds[op->numspeed++] = bcode(cp)) <= 0)
++		op->speeds[op->numspeed] = bcode(cp);
++		if (op->speeds[op->numspeed] <= 0)
+ 			bb_error_msg_and_die("bad speed: %s", cp);
++		op->numspeed++;
+ 		if (op->numspeed > MAX_SPEED)
+ 			bb_error_msg_and_die("too many alternate speeds");
+ 	}
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index cd94869..9990142 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -465,7 +465,8 @@ static void read_config_file(char *path, int optional, unsigned long *event_mask
+ 			free(p);
+ 			return;
+ 		}
+-		if ((fp = fopen(path, "r")) != NULL) {
++		fp = fopen(path, "r");
++		if (fp != NULL) {
+ 			while (fgets(buf, STRING_LENGTH, fp) != NULL) {
+ 				/*  Skip whitespace  */
+ 				line = buf;
+@@ -560,7 +561,8 @@ static void process_config_line(const char *line, unsigned long *event_mask)
+ 		case 4:	/* "PERMISSIONS" */
+ 			new->action.what = AC_PERMISSIONS;
+ 			/*  Get user and group  */
+-			if ((ptr = strchr(p[0], '.')) == NULL) {
++			ptr = strchr(p[0], '.');
++			if (ptr == NULL) {
+ 				msg = "UID.GID";
+ 				goto process_config_line_err; /*"missing '.' in UID.GID"*/
+ 			}
+@@ -979,8 +981,9 @@ static int copy_inode(const char *destpath, const struct stat *dest_stat,
+ 	if ((source_stat->st_mode & S_IFMT) ==(dest_stat->st_mode & S_IFMT)) {
+ 		/*  Same type  */
+ 		if (S_ISLNK(source_stat->st_mode)) {
+-			if ((source_len = readlink(sourcepath, source_link, STRING_LENGTH - 1)) < 0
+-				|| (dest_len   = readlink(destpath  , dest_link  , STRING_LENGTH - 1)) < 0
++			source_len = readlink(sourcepath, source_link, STRING_LENGTH - 1);
++			if ((source_len < 0)
++			 || (dest_len = readlink(destpath, dest_link, STRING_LENGTH - 1)) < 0
+ 			)
+ 				return FALSE;
+ 			source_link[source_len]	= '\0';
+@@ -999,7 +1002,8 @@ static int copy_inode(const char *destpath, const struct stat *dest_stat,
+ 	unlink(destpath);
+ 	switch (source_stat->st_mode & S_IFMT) {
+ 		case S_IFSOCK:
+-			if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
++			fd = socket(AF_UNIX, SOCK_STREAM, 0);
++			if (fd < 0)
+ 				break;
+ 			un_addr.sun_family = AF_UNIX;
+ 			snprintf(un_addr.sun_path, sizeof(un_addr.sun_path), "%s", destpath);
+@@ -1009,14 +1013,16 @@ static int copy_inode(const char *destpath, const struct stat *dest_stat,
+ 				break;
+ 			goto do_chown;
+ 		case S_IFLNK:
+-			if ((val = readlink(sourcepath, symlink_val, STRING_LENGTH - 1)) < 0)
++			val = readlink(sourcepath, symlink_val, STRING_LENGTH - 1);
++			if (val < 0)
+ 				break;
+ 			symlink_val[val] = '\0';
+ 			if (symlink(symlink_val, destpath) == 0)
+ 				return TRUE;
+ 			break;
+ 		case S_IFREG:
+-			if ((fd = open(destpath, O_RDONLY | O_CREAT, new_mode & ~S_IFMT)) < 0)
++			fd = open(destpath, O_RDONLY | O_CREAT, new_mode & ~S_IFMT);
++			if (fd < 0)
+ 				break;
+ 			close(fd);
+ 			if (chmod(destpath, new_mode & ~S_IFMT) != 0)
+@@ -1082,7 +1088,7 @@ static int get_uid_gid(int flag, const char *string)
+ 	if (isdigit(string[0]) ||((string[0] == '-') && isdigit(string[1])))
+ 		return atoi(string);
+ 
+-	if (flag == UID && (pw_ent  = getpwnam(string)) != NULL)
++	if (flag == UID && (pw_ent = getpwnam(string)) != NULL)
+ 		return pw_ent->pw_uid;
+ 
+ 	if (flag == GID && (grp_ent = getgrnam(string)) != NULL)
+@@ -1197,7 +1203,8 @@ static void dir_operation(int type, const char * dir_name, int var, unsigned lon
+ 	struct dirent *de;
+ 	char *path;
+ 
+-	if ((dp = warn_opendir(dir_name)) == NULL)
++	dp = warn_opendir(dir_name);
++	if (dp == NULL)
+ 		return;
+ 
+ 	while ((de = readdir(dp)) != NULL) {
+@@ -1581,7 +1588,8 @@ int st_expr_expand(char *output, unsigned int length, const char *input,
+ 				ch = input[1];
+ 				if (isspace(ch) ||(ch == '/') ||(ch == '\0')) {
+ 					/* User's own home directory: leave separator for next time */
+-					if ((env = getenv("HOME")) == NULL) {
++					env = getenv("HOME");
++					if (env == NULL) {
+ 						info_logger(LOG_INFO, bb_msg_variable_not_found, "HOME");
+ 						return FALSE;
+ 					}
+@@ -1600,7 +1608,8 @@ int st_expr_expand(char *output, unsigned int length, const char *input,
+ 					goto st_expr_expand_out;
+ 				safe_memcpy(tmp, input, len);
+ 				input = ptr - 1;
+-				if ((pwent = getpwnam(tmp)) == NULL) {
++				pwent = getpwnam(tmp);
++				if (pwent == NULL) {
+ 					info_logger(LOG_INFO, "no pwent for: %s", tmp);
+ 					return FALSE;
+ 				}
+@@ -1680,7 +1689,8 @@ static const char *expand_variable(char *buffer, unsigned int length,
+ 
+ 		safe_memcpy(tmp, input, len);
+ 		input = ptr - 1;
+-		if ((env = get_variable_v2(tmp, func, info)) == NULL) {
++		env = get_variable_v2(tmp, func, info);
++		if (env == NULL) {
+ 			info_logger(LOG_INFO, bb_msg_variable_not_found, tmp);
+ 			return NULL;
+ 		}
+@@ -1740,7 +1750,8 @@ static const char *expand_variable(char *buffer, unsigned int length,
+ 	}
+ 	--ptr;
+ 	/*  At this point ptr should point to closing brace of "${var:-word}"  */
+-	if ((env = get_variable_v2(tmp, func, info)) != NULL) {
++	env = get_variable_v2(tmp, func, info);
++	if (env != NULL) {
+ 		/*  Found environment variable, so skip the input to the closing brace
+ 			and return the variable  */
+ 		input = ptr;
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 93b1aac..03a30e6 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -1111,7 +1111,8 @@ static void identify(uint16_t *val)
+ 	/* reset result */
+ 	jj = val[HWRST_RSLT];
+ 	if ((jj & VALID) == VALID_VAL) {
+-		if (!(oo = (jj & RST0)))
++		oo = (jj & RST0);
++		if (!oo)
+ 			jj >>= 8;
+ 		if ((jj & DEV_DET) == JUMPER_VAL)
+ 			strng = " determined by the jumper";
+diff --git a/miscutils/readahead.c b/miscutils/readahead.c
+index 647eb31..7b375cf 100644
+--- a/miscutils/readahead.c
++++ b/miscutils/readahead.c
+@@ -15,17 +15,15 @@
+ int readahead_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int readahead_main(int argc, char **argv)
+ {
+-	FILE *f;
+ 	int retval = EXIT_SUCCESS;
+ 
+ 	if (argc == 1) bb_show_usage();
+ 
+ 	while (*++argv) {
+-		if ((f = fopen_or_warn(*argv, "r")) != NULL) {
+-			int r, fd=fileno(f);
+-
+-			r = readahead(fd, 0, fdlength(fd));
+-			fclose(f);
++		int fd = open_or_warn(*argv, O_RDONLY);
++		if (fd >= 0) {
++			int r = readahead(fd, 0, fdlength(fd));
++			close(fd);
+ 			if (r >= 0) continue;
+ 		}
+ 		retval = EXIT_FAILURE;
+diff --git a/runit/runit_lib.c b/runit/runit_lib.c
+index 2ed9054..bedd540 100644
+--- a/runit/runit_lib.c
++++ b/runit/runit_lib.c
+@@ -233,19 +233,23 @@ unsigned pmatch(const char *p, const char *s, unsigned len)
+ 		if (!c) return !len;
+ 		switch (c) {
+ 		case '*':
+-			if (!(c = *p)) return 1;
++			c = *p;
++			if (!c) return 1;
+ 			for (;;) {
+ 				if (!len) return 0;
+ 				if (*s == c) break;
+-				++s; --len;
++				++s;
++				--len;
+ 			}
+ 			continue;
+ 		case '+':
+-			if ((c = *p++) != *s) return 0;
++			c = *p++;
++			if (c != *s) return 0;
+ 			for (;;) {
+ 				if (!len) return 1;
+ 				if (*s != c) break;
+-				++s; --len;
++				++s;
++				--len;
+ 			}
+ 			continue;
+ 			/*
+@@ -260,7 +264,8 @@ unsigned pmatch(const char *p, const char *s, unsigned len)
+ 		default:
+ 			if (!len) return 0;
+ 			if (*s != c) return 0;
+-			++s; --len;
++			++s;
++			--len;
+ 			continue;
+ 		}
+ 	}
+diff --git a/util-linux/dmesg.c b/util-linux/dmesg.c
+index 1adb0fc..90b327b 100644
+--- a/util-linux/dmesg.c
++++ b/util-linux/dmesg.c
+@@ -27,7 +27,8 @@ int dmesg_main(int argc, char **argv)
+ 
+ 		len = (flags & 2) ? xatoul_range(size, 2, INT_MAX) : 16384;
+ 		buf = xmalloc(len);
+-		if (0 > (len = klogctl(3 + (flags & 1), buf, len)))
++		len = klogctl(3 + (flags & 1), buf, len);
++		if (len < 0)
+ 			bb_perror_msg_and_die("klogctl");
+ 
+ 		// Skip <#> at the start of lines, and make sure we end with a newline.
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index f67a283..d616abd 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -181,10 +181,11 @@ static int readmode(struct fb_var_screeninfo *base, const char *fn,
+ 	f = xfopen(fn, "r");
+ 	while (!feof(f)) {
+ 		fgets(buf, sizeof(buf), f);
+-		if (!(p = strstr(buf, "mode ")) && !(p = strstr(buf, "mode\t")))
++		p = strstr(buf, "mode ");
++		if (!p && !(p = strstr(buf, "mode\t")))
+ 			continue;
+-		p += 5;
+-		if (!(p = strstr(buf, mode)))
++		p = strstr(p + 5, mode);
++		if (!p)
+ 			continue;
+ 		p += strlen(mode);
+ 		if (!isspace(*p) && (*p != 0) && (*p != '"')
+@@ -193,7 +194,8 @@ static int readmode(struct fb_var_screeninfo *base, const char *fn,
+ 
+ 		while (!feof(f)) {
+ 			fgets(buf, sizeof(buf), f);
+-			if ((p = strstr(buf, "geometry "))) {
++			p = strstr(buf, "geometry ");
++			if (p) {
+ 				p += 9;
+ 				/* FIXME: catastrophic on arches with 64bit ints */
+ 				sscanf(p, "%d %d %d %d %d",
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 01c01bd..3b60847 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -1837,7 +1837,8 @@ wrong_p_order(int *prev)
+ 			last_p_start_pos = 0;
+ 		}
+ 		pe = &ptes[i];
+-		if ((p = pe->part_table)->sys_ind) {
++		p = pe->part_table;
++		if (p->sys_ind) {
+ 			p_start_pos = get_partition_start(pe);
+ 
+ 			if (last_p_start_pos > p_start_pos) {

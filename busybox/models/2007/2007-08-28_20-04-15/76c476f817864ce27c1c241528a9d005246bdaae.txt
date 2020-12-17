@@ -1,0 +1,15 @@
+2007-08-28 20:04:15 +0000
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 140c7bb..2215bb8 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -323,7 +323,8 @@ void smart_ulltoa5(unsigned long long ul, char buf[5])
+ 		}
+ 		buf[2] = "0123456789"[v];
+ 		// see http://en.wikipedia.org/wiki/Tera
+-		buf[3] = " kMGTPEZY"[idx];
++		// (small letters stand out better versus numbers)
++		buf[3] = " kmgtpezy"[idx];
+ 	}
+ 	buf[4] = '\0';
+ }

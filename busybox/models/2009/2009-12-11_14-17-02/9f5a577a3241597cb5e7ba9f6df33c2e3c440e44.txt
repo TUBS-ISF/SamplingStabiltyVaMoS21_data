@@ -1,0 +1,13 @@
+2009-12-11 14:17:02 +0100
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index 0485b80..776a16a 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -1360,6 +1360,7 @@ int stty_main(int argc UNUSED_PARAM, char **argv)
+ #endif
+ #ifdef TIOCGWINSZ
+ 		case param_cols:
++		case param_columns:
+ 			set_window_size(-1, xatoul_sfx(argnext, stty_suffixes));
+ 			break;
+ 		case param_size:

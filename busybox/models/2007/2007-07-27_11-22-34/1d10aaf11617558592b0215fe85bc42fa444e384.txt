@@ -1,0 +1,64 @@
+2007-07-27 11:22:34 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 82cee38..b438ec2 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -482,10 +482,10 @@ int get_uidgid(struct bb_uidgid_t*, const char*, int numeric_ok);
+ /* chown-like handling of "user[:[group]" */
+ void parse_chown_usergroup_or_die(struct bb_uidgid_t *u, char *user_group);
+ /* bb_getpwuid, bb_getgrgid:
+-bb_getXXXid(buf, bufsz, id) - copy user/group name or id
+-                as a string to buf, return user/group name or NULL
+-bb_getXXXid(NULL, 0, id) - return user/group name or NULL
+-bb_getXXXid(NULL, -1, id) - return user/group name or exit
++ * bb_getXXXid(buf, bufsz, id) - copy user/group name or id
++ *              as a string to buf, return user/group name or NULL
++ * bb_getXXXid(NULL, 0, id) - return user/group name or NULL
++ * bb_getXXXid(NULL, -1, id) - return user/group name or exit
+ */
+ char *bb_getpwuid(char *name, int bufsize, long uid);
+ char *bb_getgrgid(char *group, int bufsize, long gid);
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index a293ee9..4f7094a 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -127,15 +127,16 @@ int passwd_main(int argc, char **argv)
+ 		bb_error_msg_and_die("%s can't change password for %s", myname, name);
+ 	}
+ 
+-	filename = bb_path_passwd_file;
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+-	if (getspnam_r(pw->pw_name, &spw, buffer, sizeof(buffer), &result)) {
++	/* getspnam_r() can lie! Even if user isn't in shadow, it can
++	 * return success (pwd field was seen set to "!" in this case) */
++	if (getspnam_r(pw->pw_name, &spw, buffer, sizeof(buffer), &result)
++	 || LONE_CHAR(spw.sp_pwdp, '!')) {
+ 		/* LOGMODE_BOTH */
+ 		bb_error_msg("no record of %s in %s, using %s",
+ 				name, bb_path_shadow_file,
+ 				bb_path_passwd_file);
+ 	} else {
+-		filename = bb_path_shadow_file;
+ 		pw->pw_passwd = spw.sp_pwdp;
+ 	}
+ #endif
+@@ -175,8 +176,17 @@ int passwd_main(int argc, char **argv)
+ 	signal(SIGQUIT, SIG_IGN);
+ 	umask(077);
+ 	xsetuid(0);
+-	rc = update_passwd(filename, name, newp);
+-	logmode = LOGMODE_BOTH;
++
++#if ENABLE_FEATURE_SHADOWPASSWDS
++	filename = bb_path_shadow_file;
++	rc = update_passwd(bb_path_shadow_file, name, newp);
++	if (rc == 0) /* no lines updated, no errors detected */
++#endif
++	{
++		filename = bb_path_passwd_file;
++		rc = update_passwd(bb_path_passwd_file, name, newp);
++	}
++	/* LOGMODE_BOTH */
+ 	if (rc < 0)
+ 		bb_error_msg_and_die("cannot update password file %s",
+ 				filename);

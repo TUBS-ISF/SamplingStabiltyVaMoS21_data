@@ -1,0 +1,155 @@
+2008-05-28 11:59:32 +0000
+diff --git a/scripts/kconfig/conf.c b/scripts/kconfig/conf.c
+index 2a1a59f..e65e25c 100644
+--- a/scripts/kconfig/conf.c
++++ b/scripts/kconfig/conf.c
+@@ -605,7 +605,7 @@ int main(int ac, char **av)
+ 		check_conf(&rootmenu);
+ 	} while (conf_cnt);
+ 	if (conf_write(NULL)) {
+-		fprintf(stderr, _("\n*** Error during writing of the busybox configuration.\n\n"));
++		fprintf(stderr, _("\n*** Error during writing of the configuration.\n\n"));
+ 		return 1;
+ 	}
+ 	return 0;
+diff --git a/scripts/kconfig/confdata.c b/scripts/kconfig/confdata.c
+index e43c92e..ec107bf 100644
+--- a/scripts/kconfig/confdata.c
++++ b/scripts/kconfig/confdata.c
+@@ -437,7 +437,7 @@ int conf_write(const char *name)
+ 					       " */\n", str);
+ 		} else if (!(sym->flags & SYMBOL_CHOICE)) {
+ 			sym_calc_value(sym);
+-/* bbox: we want to all syms
++/* bbox: we want to see all syms
+ 			if (!(sym->flags & SYMBOL_WRITE))
+ 				goto next;
+ */
+diff --git a/scripts/kconfig/gconf.c b/scripts/kconfig/gconf.c
+index fd3002b..9bab17d 100644
+--- a/scripts/kconfig/gconf.c
++++ b/scripts/kconfig/gconf.c
+@@ -741,8 +741,7 @@ void on_introduction1_activate(GtkMenuItem * menuitem, gpointer user_data)
+ {
+ 	GtkWidget *dialog;
+ 	const gchar *intro_text = _(
+-	    "Welcome to gkc, the GTK+ graphical busybox configuration tool\n"
+-	    "for Linux.\n"
++	    "Welcome to gkc, the GTK+ graphical configuration tool.\n"
+ 	    "For each option, a blank box indicates the feature is disabled, a\n"
+ 	    "check indicates it is enabled, and a dot indicates that it is to\n"
+ 	    "be compiled as a module.  Clicking on the box will cycle through the three states.\n"
+diff --git a/scripts/kconfig/lxdialog/BIG.FAT.WARNING b/scripts/kconfig/lxdialog/BIG.FAT.WARNING
+index b5d3b10..4cadb80 100644
+--- a/scripts/kconfig/lxdialog/BIG.FAT.WARNING
++++ b/scripts/kconfig/lxdialog/BIG.FAT.WARNING
+@@ -1,4 +1,4 @@
+ This is NOT the official version of dialog.  This version has been
+-significantly modified from the original.  It is for use by the Linux
+-busybox configuration script.  Please do not bother Savio Lam with
+-questions about this program.
++significantly modified from the original.  It was used by the Linux
++kernel configuration script, and subsequently adapted for busybox.
++Please do not bother Savio Lam with questions about this program.
+diff --git a/scripts/kconfig/mconf.c b/scripts/kconfig/mconf.c
+index 810b018..647ec09 100644
+--- a/scripts/kconfig/mconf.c
++++ b/scripts/kconfig/mconf.c
+@@ -115,7 +115,7 @@ static const char mconf_readme[] = N_(
+ "-----------------------------\n"
+ "Menuconfig supports the use of alternate configuration files for\n"
+ "those who, for various reasons, find it necessary to switch\n"
+-"between different busybox configurations.\n"
++"between different configurations.\n"
+ "\n"
+ "At the end of the main menu you will find two options.  One is\n"
+ "for saving the current configuration to a file of your choosing.\n"
+@@ -148,7 +148,7 @@ static const char mconf_readme[] = N_(
+ "\n"
+ "Optional personality available\n"
+ "------------------------------\n"
+-"If you prefer to have all of the busybox options listed in a single\n"
++"If you prefer to have all of the options listed in a single\n"
+ "menu, rather than the default multimenu hierarchy, run the menuconfig\n"
+ "with MENUCONFIG_MODE environment variable set to single_menu. Example:\n"
+ "\n"
+@@ -193,11 +193,11 @@ load_config_text[] = N_(
+ 	"last retrieved.  Leave blank to abort."),
+ load_config_help[] = N_(
+ 	"\n"
+-	"For various reasons, one may wish to keep several different busybox\n"
++	"For various reasons, one may wish to keep several different\n"
+ 	"configurations available on a single machine.\n"
+ 	"\n"
+-	"If you have saved a previous configuration in a file other than \n"
+-	"busybox's default, entering the name of the file here will allow you\n"
++	"If you have saved a previous configuration in a file other than\n"
++	"default, entering the name of the file here will allow you\n"
+ 	"to modify that configuration.\n"
+ 	"\n"
+ 	"If you are uncertain, then you have probably never used alternate\n"
+@@ -207,7 +207,7 @@ save_config_text[] = N_(
+ 	"as an alternate.  Leave blank to abort."),
+ save_config_help[] = N_(
+ 	"\n"
+-	"For various reasons, one may wish to keep different busybox\n"
++	"For various reasons, one may wish to keep different\n"
+ 	"configurations available on a single machine.\n"
+ 	"\n"
+ 	"Entering a file name here will allow you to later retrieve, modify\n"
+@@ -1070,7 +1070,7 @@ int main(int ac, char **av)
+ 	do {
+ 		cprint_init();
+ 		cprint("--yesno");
+-		cprint(_("Do you wish to save your new busybox configuration?"));
++		cprint(_("Do you wish to save your new configuration?"));
+ 		cprint("5");
+ 		cprint("60");
+ 		stat = exec_conf();
+@@ -1079,18 +1079,18 @@ int main(int ac, char **av)
+ 	if (stat == 0) {
+ 		if (conf_write(NULL)) {
+ 			fprintf(stderr, _("\n\n"
+-				"Error during writing of the busybox configuration.\n"
+-				"Your busybox configuration changes were NOT saved."
++				"Error during writing of the configuration.\n"
++				"Your configuration changes were NOT saved."
+ 				"\n\n"));
+ 			return 1;
+ 		}
+ 		printf(_("\n\n"
+-			"*** End of busybox configuration.\n"
+-			"*** Execute 'make' to build busybox or try 'make help'."
++			"*** End of configuration.\n"
++			"*** Execute 'make' to build the project or try 'make help'."
+ 			"\n\n"));
+ 	} else {
+ 		fprintf(stderr, _("\n\n"
+-			"Your busybox configuration changes were NOT saved."
++			"Your configuration changes were NOT saved."
+ 			"\n\n"));
+ 	}
+ 
+diff --git a/scripts/kconfig/qconf.cc b/scripts/kconfig/qconf.cc
+index 605b025..2a189c1 100644
+--- a/scripts/kconfig/qconf.cc
++++ b/scripts/kconfig/qconf.cc
+@@ -1299,7 +1299,7 @@ void ConfigMainWindow::closeEvent(QCloseEvent* e)
+ 
+ void ConfigMainWindow::showIntro(void)
+ {
+-	static char str[] = "Welcome to the qconf graphical busybox configuration tool for Linux.\n\n"
++	static char str[] = "Welcome to the qconf graphical configuration tool.\n\n"
+ 		"For each option, a blank box indicates the feature is disabled, a check\n"
+ 		"indicates it is enabled, and a dot indicates that it is to be compiled\n"
+ 		"as a module.  Clicking on the box will cycle through the three states.\n\n"
+@@ -1316,8 +1316,7 @@ void ConfigMainWindow::showIntro(void)
+ 
+ void ConfigMainWindow::showAbout(void)
+ {
+-	static char str[] = "qconf is Copyright (C) 2002 Roman Zippel <zippel@linux-m68k.org>.\n\n"
+-		"Bug reports and feature request can also be entered at http://bugs.busybox.net/\n";
++	static char str[] = "qconf is Copyright (C) 2002 Roman Zippel <zippel@linux-m68k.org>.\n";
+ 
+ 	QMessageBox::information(this, "qconf", str);
+ }

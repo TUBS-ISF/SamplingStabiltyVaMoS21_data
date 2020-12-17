@@ -1,0 +1,166 @@
+2009-10-08 12:28:08 +0200
+diff --git a/archival/bz/blocksort.c b/archival/bz/blocksort.c
+index 0e73ffe..f70c370 100644
+--- a/archival/bz/blocksort.c
++++ b/archival/bz/blocksort.c
+@@ -585,7 +585,7 @@ uint8_t mmed3(uint8_t a, uint8_t b, uint8_t c)
+ #define MAIN_QSORT_DEPTH_THRESH (BZ_N_RADIX + BZ_N_QSORT)
+ #define MAIN_QSORT_STACK_SIZE   100
+ 
+-static
++static NOINLINE
+ void mainQSort3(uint32_t* ptr,
+ 		uint8_t*  block,
+ 		uint16_t* quadrant,
+diff --git a/archival/cpio.c b/archival/cpio.c
+index bb57857..ef22899 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -117,7 +117,7 @@ static off_t cpio_pad4(off_t size)
+ 
+ /* Return value will become exit code.
+  * It's ok to exit instead of return. */
+-static int cpio_o(void)
++static NOINLINE int cpio_o(void)
+ {
+ 	static const char trailer[] ALIGN1 = "TRAILER!!!";
+ 	struct name_s {
+diff --git a/archival/lzop.c b/archival/lzop.c
+index b4757e8..5f2744d 100644
+--- a/archival/lzop.c
++++ b/archival/lzop.c
+@@ -75,7 +75,7 @@ static void copy3(uint8_t* ip, const uint8_t* m_pos, unsigned off)
+ #define TEST_IP		(ip < ip_end)
+ #define TEST_OP		(op <= op_end)
+ 
+-static int lzo1x_optimize(uint8_t *in, unsigned in_len,
++static NOINLINE int lzo1x_optimize(uint8_t *in, unsigned in_len,
+ 		uint8_t *out, unsigned *out_len,
+ 		void* wrkmem UNUSED_PARAM)
+ {
+diff --git a/docs/keep_data_small.txt b/docs/keep_data_small.txt
+index 2ddbefa..2ba24e4 100644
+--- a/docs/keep_data_small.txt
++++ b/docs/keep_data_small.txt
+@@ -214,3 +214,34 @@ Result (non-static busybox built against glibc):
+    text    data     bss     dec     hex filename
+  634416    2736   23856  661008   a1610 busybox
+  632580    2672   22944  658196   a0b14 busybox_noalign
++
++
++
++		Keeping code small
++
++Set CONFIG_EXTRA_CFLAGS="-fno-inline-functions-called-once",
++produce "make bloatcheck", see the biggest auto-inlined functions.
++Now, set CONFIG_EXTRA_CFLAGS back to "", but add NOINLINE
++to some of these functions. In 1.16.x timeframe, the results were
++(annotated "make bloatcheck" output):
++
++function             old     new   delta
++expand_vars_to_list    -    1712   +1712 win
++lzo1x_optimize         -    1429   +1429 win
++arith_apply            -    1326   +1326 win
++read_interfaces        -    1163   +1163 loss, leave w/o NOINLINE
++logdir_open            -    1148   +1148 win
++check_deps             -    1148   +1148 loss
++rewrite                -    1039   +1039 win
++run_pipe             358    1396   +1038 win
++write_status_file      -    1029   +1029 almost the same, leave w/o NOINLINE
++dump_identity          -     987    +987 win
++mainQSort3             -     921    +921 win
++parse_one_line         -     916    +916 loss
++summarize              -     897    +897 almost the same
++do_shm                 -     884    +884 win
++cpio_o                 -     863    +863 win
++subCommand             -     841    +841 loss
++receive                -     834    +834 loss
++
++855 bytes saved in total.
+diff --git a/libbb/dump.c b/libbb/dump.c
+index 2e777c3..bef485e 100644
+--- a/libbb/dump.c
++++ b/libbb/dump.c
+@@ -96,7 +96,7 @@ static NOINLINE int bb_dump_size(FS *fs)
+ 	return cur_size;
+ }
+ 
+-static void rewrite(priv_dumper_t *dumper, FS *fs)
++static NOINLINE void rewrite(priv_dumper_t *dumper, FS *fs)
+ {
+ 	enum { NOTOKAY, USEBCNT, USEPREC } sokay;
+ 	PR *pr, **nextpr = NULL;
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 0917b41..65c11ec 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -1185,7 +1185,7 @@ static const char BuffType[] ALIGN1 =
+ 	"unknown""\0"     "1Sect""\0"      "DualPort""\0"  "DualPortCache"
+ ;
+ 
+-static void dump_identity(const struct hd_driveid *id)
++static NOINLINE void dump_identity(const struct hd_driveid *id)
+ {
+ 	int i;
+ 	const unsigned short *id_regs = (const void*) id;
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 34ceadf..b7fd152 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -603,7 +603,7 @@ static void logdir_close(struct logdir *ld)
+ 	ld->processor = NULL;
+ }
+ 
+-static unsigned logdir_open(struct logdir *ld, const char *fn)
++static NOINLINE unsigned logdir_open(struct logdir *ld, const char *fn)
+ {
+ 	char buf[128];
+ 	unsigned now;
+diff --git a/shell/hush.c b/shell/hush.c
+index 3012a1f..ec38023 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2151,7 +2151,7 @@ static char *expand_pseudo_dquoted(const char *str)
+  * to be filled). This routine is extremely tricky: has to deal with
+  * variables/parameters with whitespace, $* and $@, and constructs like
+  * 'echo -$*-'. If you play here, you must run testsuite afterwards! */
+-static int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
++static NOINLINE int expand_vars_to_list(o_string *output, int n, char *arg, char or_mask)
+ {
+ 	/* or_mask is either 0 (normal case) or 0x80 -
+ 	 * expansion of right-hand side of assignment == 1-element expand.
+@@ -3750,7 +3750,7 @@ static int checkjobs_and_fg_shell(struct pipe* fg_pipe)
+  * backgrounded: cmd &     { list } &
+  * subshell:     ( list ) [&]
+  */
+-static int run_pipe(struct pipe *pi)
++static NOINLINE int run_pipe(struct pipe *pi)
+ {
+ 	static const char *const null_ptr = NULL;
+ 	int i;
+diff --git a/shell/math.c b/shell/math.c
+index d75bcae..3791b84 100644
+--- a/shell/math.c
++++ b/shell/math.c
+@@ -293,7 +293,7 @@ arith_lookup_val(v_n_t *t, a_e_h_t *math_hooks)
+ /* "applying" a token means performing it on the top elements on the integer
+  * stack. For a unary operator it will only change the top element, but a
+  * binary operator will pop two arguments and push a result */
+-static int
++static NOINLINE int
+ arith_apply(operator op, v_n_t *numstack, v_n_t **numstackptr, a_e_h_t *math_hooks)
+ {
+ 	v_n_t *numptr_m1;
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index 9201257..c8c6d76 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -115,7 +115,7 @@ static void print_perms(int id, struct ipc_perm *ipcp)
+ }
+ 
+ 
+-static void do_shm(void)
++static NOINLINE void do_shm(void)
+ {
+ 	int maxid, shmid, id;
+ 	struct shmid_ds shmseg;

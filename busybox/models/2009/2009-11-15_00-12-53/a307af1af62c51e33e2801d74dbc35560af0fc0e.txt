@@ -1,0 +1,105 @@
+2009-11-15 00:12:53 +0100
+diff --git a/archival/libunarchive/data_extract_all.c b/archival/libunarchive/data_extract_all.c
+index 0d529a6..889face 100644
+--- a/archival/libunarchive/data_extract_all.c
++++ b/archival/libunarchive/data_extract_all.c
+@@ -143,9 +143,9 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 		}
+ 		/* same for utime */
+ 		if (archive_handle->ah_flags & ARCHIVE_RESTORE_DATE) {
+-			struct utimbuf t;
+-			t.actime = t.modtime = file_header->mtime;
+-			utime(file_header->name, &t);
++			struct timeval t = {.tv_sec = file_header->mtime,
++								.tv_usec = 0};
++			utimes(file_header->name, &t);
+ 		}
+ 	}
+ }
+diff --git a/coreutils/touch.c b/coreutils/touch.c
+index e79092f..7d1bf0d 100644
+--- a/coreutils/touch.c
++++ b/coreutils/touch.c
+@@ -49,13 +49,13 @@ int touch_main(int argc UNUSED_PARAM, char **argv)
+ 		"date\0"              Required_argument "d"
+ 	;
+ # endif
+-	struct utimbuf timebuf;
++	struct timeval timebuf = {.tv_usec = 0};
+ 	char *reference_file = NULL;
+ 	char *date_str = NULL;
+ #else
+ # define reference_file NULL
+ # define date_str       NULL
+-# define timebuf        (*(struct utimbuf*)NULL)
++# define timebuf        (*(struct timeval*)NULL)
+ #endif
+ 	int fd;
+ 	int status = EXIT_SUCCESS;
+@@ -83,8 +83,7 @@ int touch_main(int argc UNUSED_PARAM, char **argv)
+ 	if (reference_file) {
+ 		struct stat stbuf;
+ 		xstat(reference_file, &stbuf);
+-		timebuf.actime = stbuf.st_atime;
+-		timebuf.modtime = stbuf.st_mtime;
++		timebuf.tv_sec = stbuf.st_mtime;
+ 	}
+ 
+ 	if (date_str) {
+@@ -100,12 +99,11 @@ int touch_main(int argc UNUSED_PARAM, char **argv)
+ 		tm_time.tm_isdst = -1;	/* Be sure to recheck dst */
+ 		t = validate_tm_time(date_str, &tm_time);
+ 
+-		timebuf.actime = t;
+-		timebuf.modtime = t;
++		timebuf.tv_sec = t;
+ 	}
+ 
+ 	do {
+-		if (utime(*argv, reference_file ? &timebuf : NULL)) {
++		if (utimes(*argv, reference_file ? &timebuf : NULL)) {
+ 			if (errno == ENOENT) { /* no such file */
+ 				if (opts) { /* creation is disabled, so ignore */
+ 					continue;
+@@ -116,7 +114,7 @@ int touch_main(int argc UNUSED_PARAM, char **argv)
+ 						  );
+ 				if ((fd >= 0) && !close(fd)) {
+ 					if (reference_file)
+-						utime(*argv, &timebuf);
++						utimes(*argv, &timebuf);
+ 					continue;
+ 				}
+ 			}
+diff --git a/libbb/copy_file.c b/libbb/copy_file.c
+index ff29885..a96691b 100644
+--- a/libbb/copy_file.c
++++ b/libbb/copy_file.c
+@@ -374,12 +374,10 @@ int FAST_FUNC copy_file(const char *source, const char *dest, int flags)
+ 	/* Cannot happen: */
+ 	/* && !(flags & (FILEUTILS_MAKE_SOFTLINK|FILEUTILS_MAKE_HARDLINK)) */
+ 	) {
+-		struct utimbuf times;
+-
+-		times.actime = source_stat.st_atime;
+-		times.modtime = source_stat.st_mtime;
++		struct timeval times = {.tv_sec = source_stat.st_mtime,
++								.tv_usec = 0};
+ 		/* BTW, utimes sets usec-precision time - just FYI */
+-		if (utime(dest, &times) < 0)
++		if (utimes(dest, &times) < 0)
+ 			bb_perror_msg("can't preserve %s of '%s'", "times", dest);
+ 		if (chown(dest, source_stat.st_uid, source_stat.st_gid) < 0) {
+ 			source_stat.st_mode &= ~(S_ISUID | S_ISGID);
+diff --git a/testsuite/all_sourcecode.tests b/testsuite/all_sourcecode.tests
+index 94f4360..071399c 100755
+--- a/testsuite/all_sourcecode.tests
++++ b/testsuite/all_sourcecode.tests
+@@ -73,7 +73,7 @@ rm -f src.typos
+ # don't allow obsolete functions
+ #
+ find $srcdir/.. '(' -name '*.c' -o -name '*.h' ')' -print0 | xargs -0 \
+-	grep -E -e '\<(bcmp|bcopy|bzero|getwd|index|mktemp|rindex|utimes|sigblock|siggetmask|sigsetmask)\>[[:space:]]*\(' \
++	grep -E -e '\<(bcmp|bcopy|bzero|getwd|index|mktemp|rindex|utime|sigblock|siggetmask|sigsetmask)\>[[:space:]]*\(' \
+ 	| sed -e "s:^$srcdir/\.\./::g" > src.obsolete.funcs
+ testing "Obsolete function usage" "cat src.obsolete.funcs" "" "" ""
+ rm -f src.obsolete.funcs

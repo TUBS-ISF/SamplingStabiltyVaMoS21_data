@@ -1,0 +1,13 @@
+2007-12-13 00:15:50 +0000
+diff --git a/docs/busybox.net/header.html b/docs/busybox.net/header.html
+index 310e4bd..60c6481 100644
+--- a/docs/busybox.net/header.html
++++ b/docs/busybox.net/header.html
+@@ -84,6 +84,7 @@
+ 	 <br>-<a href=http://busybox.net/~vda/linld/>linld</a>
+ 	 <br>-<a href=http://busybox.net/~vda/init_vs_runsv.html>init must die</a>
+ 	 <br>-<a href=http://busybox.net/~vda/no_ifup.txt>no ifup</a>
++	 <br>-<a href=http://busybox.net/~vda/unscd/>unscd</a>
+ 	</li>
+     </ul>
+ 

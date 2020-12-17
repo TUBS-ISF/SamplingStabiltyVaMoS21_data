@@ -1,0 +1,109 @@
+2008-07-01 16:09:07 +0000
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index a6bc623..a5ee971 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -23,11 +23,11 @@ int FAST_FUNC open_transformer(int src_fd,
+ #if BB_MMU
+ 	pid = fork();
+ 	if (pid == -1)
+-		bb_perror_msg_and_die("can't fork");
++		bb_perror_msg_and_die("vfork" + 1);
+ #else
+ 	pid = vfork();
+ 	if (pid == -1)
+-		bb_perror_msg_and_die("can't vfork");
++		bb_perror_msg_and_die("vfork");
+ #endif
+ 
+ 	if (pid == 0) {
+diff --git a/archival/tar.c b/archival/tar.c
+index 526edb6..bb8920a 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -538,7 +538,7 @@ static void NOINLINE vfork_compressor(int tar_fd, int gzip)
+ 
+ 	gzipPid = vfork();
+ 	if (gzipPid < 0)
+-		bb_perror_msg_and_die("can't vfork");
++		bb_perror_msg_and_die("vfork");
+ 
+ 	if (gzipPid == 0) {
+ 		/* child */
+diff --git a/miscutils/time.c b/miscutils/time.c
+index a6d158c..cce7d5b 100644
+--- a/miscutils/time.c
++++ b/miscutils/time.c
+@@ -374,7 +374,7 @@ static void run_command(char *const *cmd, resource_t *resp)
+ 	resp->elapsed_ms = monotonic_us() / 1000;
+ 	pid = vfork();		/* Run CMD as child process.  */
+ 	if (pid < 0)
+-		bb_error_msg_and_die("cannot fork");
++		bb_perror_msg_and_die("fork");
+ 	if (pid == 0) {	/* If child.  */
+ 		/* Don't cast execvp arguments; that causes errors on some systems,
+ 		   versus merely warnings if the cast is left off.  */
+diff --git a/networking/nc.c b/networking/nc.c
+index 27c58a8..2fd42d5 100644
+--- a/networking/nc.c
++++ b/networking/nc.c
+@@ -150,12 +150,9 @@ int nc_main(int argc, char **argv)
+ 			goto accept_again;
+ 		}
+ 		/* child (or main thread if no multiple -l) */
+-		if (cfd) {
+-			dup2(cfd, 0);
+-			close(cfd);
+-		}
+-		dup2(0, 1);
+-		dup2(0, 2);
++		xmove_fd(cfd, 0);
++		xdup2(0, 1);
++		xdup2(0, 2);
+ 		USE_NC_EXTRA(BB_EXECVP(execparam[0], execparam);)
+ 		/* Don't print stuff or it will go over the wire.... */
+ 		_exit(127);
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index 1c23ca2..b58055d 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -120,15 +120,6 @@ static void signal_handler(int signo)
+ #undef err
+ }
+ 
+-/* libbb candidate */
+-static pid_t vfork_or_die(void)
+-{
+-	pid_t pid = vfork();
+-	if (pid < 0)
+-		bb_perror_msg_and_die("vfork");
+-	return pid;
+-}
+-
+ static void launch_helper(const char **argv)
+ {
+ 	// setup vanilla unidirectional pipes interchange
+@@ -137,7 +128,9 @@ static void launch_helper(const char **argv)
+ 
+ 	xpipe(pipes);
+ 	xpipe(pipes+2);
+-	helper_pid = vfork_or_die();
++	helper_pid = vfork();
++	if (helper_pid < 0)
++		bb_perror_msg_and_die("vfork");
+ 	idx = (!helper_pid) * 2;
+ 	xdup2(pipes[idx], STDIN_FILENO);
+ 	xdup2(pipes[3-idx], STDOUT_FILENO);
+diff --git a/shell/ash.c b/shell/ash.c
+index 85064d5..58bfc52 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -4581,7 +4581,7 @@ forkshell(struct job *jp, union node *n, int mode)
+ 		TRACE(("Fork failed, errno=%d", errno));
+ 		if (jp)
+ 			freejob(jp);
+-		ash_msg_and_raise_error("cannot fork");
++		ash_msg_and_raise_error("can't fork");
+ 	}
+ 	if (pid == 0)
+ 		forkchild(jp, /*n,*/ mode);

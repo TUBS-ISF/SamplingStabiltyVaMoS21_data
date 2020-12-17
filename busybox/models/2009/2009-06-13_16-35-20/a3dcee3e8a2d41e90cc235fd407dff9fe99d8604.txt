@@ -1,0 +1,4 @@
+2009-06-13 16:35:20 +0200
+diff --git a/testsuite/tr.tests b/testsuite/tr.tests
+old mode 100644
+new mode 100755

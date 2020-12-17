@@ -1,0 +1,12 @@
+2009-05-21 17:58:15 -0400
+diff --git a/shell/hush_test/hush-vars/unset.right b/shell/hush_test/hush-vars/unset.right
+index 1fbe76a..0da0e57 100644
+--- a/shell/hush_test/hush-vars/unset.right
++++ b/shell/hush_test/hush-vars/unset.right
+@@ -1,5 +1,5 @@
+ 0
+-unset: invalid option -- m
++unset: invalid option -- 'm'
+ 1
+ 0
+ ___

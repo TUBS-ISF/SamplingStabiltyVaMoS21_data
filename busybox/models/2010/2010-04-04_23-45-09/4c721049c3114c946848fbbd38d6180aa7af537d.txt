@@ -1,0 +1,108 @@
+2010-04-04 23:45:09 +0200
+diff --git a/coreutils/who.c b/coreutils/who.c
+index 85a0025..dfbb4c0 100644
+--- a/coreutils/who.c
++++ b/coreutils/who.c
+@@ -42,35 +42,47 @@ static void idle_string(char *str6, time_t t)
+ int who_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int who_main(int argc UNUSED_PARAM, char **argv)
+ {
+-	char str6[6];
+ 	struct utmp *ut;
+-	struct stat st;
+-	char *name;
+ 	unsigned opt;
+ 
+ 	opt_complementary = "=0";
+-	opt = getopt32(argv, "a");
++	opt = getopt32(argv, "aH");
++	if (opt & 2) // -H
++		printf("USER\t\tTTY\t\tIDLE\tTIME\t\t HOST\n");
+ 
+ 	setutent();
+-	printf("USER       TTY      IDLE      TIME            HOST\n");
+ 	while ((ut = getutent()) != NULL) {
+-		if (ut->ut_user[0] && (opt || ut->ut_type == USER_PROCESS)) {
+-			time_t tmp;
+-			/* ut->ut_line is device name of tty - "/dev/" */
+-			name = concat_path_file("/dev", ut->ut_line);
++		if (ut->ut_user[0]
++		 && ((opt & 1) || ut->ut_type == USER_PROCESS)
++		) {
++			char str6[6];
++			char name[sizeof("/dev/") + sizeof(ut->ut_line) + 1];
++			struct stat st;
++			time_t seconds;
++
+ 			str6[0] = '?';
+ 			str6[1] = '\0';
++			strcpy(name, "/dev/");
++			safe_strncpy(ut->ut_line[0] == '/' ? name : name + sizeof("/dev/")-1,
++				ut->ut_line,
++				sizeof(ut->ut_line)+1
++			);
+ 			if (stat(name, &st) == 0)
+ 				idle_string(str6, st.st_atime);
+ 			/* manpages say ut_tv.tv_sec *is* time_t,
+ 			 * but some systems have it wrong */
+-			tmp = ut->ut_tv.tv_sec;
+-			/* 15 chars for time:   Nov 10 19:33:20 */
+-			printf("%-10s %-8s %-9s %-15.15s %s\n",
+-					ut->ut_user, ut->ut_line, str6,
+-					ctime(&tmp) + 4, ut->ut_host);
+-			if (ENABLE_FEATURE_CLEAN_UP)
+-				free(name);
++			seconds = ut->ut_tv.tv_sec;
++			/* How wide time field can be?
++			 * "Nov 10 19:33:20": 15 chars
++			 * "2010-11-10 19:33": 16 chars
++			 */
++			printf("%-15.*s %-15.*s %-7s %-16.16s %.*s\n",
++					(int)sizeof(ut->ut_user), ut->ut_user,
++					(int)sizeof(ut->ut_line), ut->ut_line,
++					str6,
++					ctime(&seconds) + 4,
++					(int)sizeof(ut->ut_host), ut->ut_host
++			);
+ 		}
+ 	}
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+diff --git a/loginutils/login.c b/loginutils/login.c
+index b5e348b..256c7c4 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -61,7 +61,7 @@ static void read_or_build_utent(struct utmp *utptr, int run_by_root)
+ 
+ 	/* First, try to find a valid utmp entry for this process.  */
+ 	/* If there is one, just use it.  */
+-	while ((ut = getutent()) != NULL)
++	while ((ut = getutent()) != NULL) {
+ 		if (ut->ut_pid == pid && ut->ut_line[0] && ut->ut_id[0]
+ 		 && (ut->ut_type == LOGIN_PROCESS || ut->ut_type == USER_PROCESS)
+ 		) {
+@@ -70,6 +70,7 @@ static void read_or_build_utent(struct utmp *utptr, int run_by_root)
+ 				memset(utptr->ut_host, 0, sizeof(utptr->ut_host));
+ 			return;
+ 		}
++	}
+ 
+ // Why? Do we require non-root to exec login from another
+ // former login process (e.g. login shell)? Some login's have
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index dd59de9..cab94f0 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -74,11 +74,11 @@ struct globals {
+    string of characters fit for the terminal.  Do this by packing
+    all characters meant for the terminal sequentially towards the end of buf.
+ 
+-   Return a pointer to the beginning of the characters meant for the terminal.
++   Return a pointer to the beginning of the characters meant for the terminal
+    and make *num_totty the number of characters that should be sent to
+    the terminal.
+ 
+-   Note - If an IAC (3 byte quantity) starts before (bf + len) but extends
++   Note - if an IAC (3 byte quantity) starts before (bf + len) but extends
+    past (bf + len) then that IAC will be left unprocessed and *processed
+    will be less than len.
+ 

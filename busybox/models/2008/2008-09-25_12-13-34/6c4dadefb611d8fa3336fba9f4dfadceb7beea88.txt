@@ -1,0 +1,433 @@
+2008-09-25 12:13:34 +0000
+diff --git a/AUTHORS b/AUTHORS
+index 9755ad9..378c332 100644
+--- a/AUTHORS
++++ b/AUTHORS
+@@ -166,7 +166,7 @@ Paul Fox <pgf@foxharp.boston.ma.us>
+ Roberto A. Foglietta <me@roberto.foglietta.name>
+     port: dnsd
+ 
+-Bernhard Fischer <rep.nop@aon.at>
++Bernhard Reutner-Fischer <rep.dot.nop@gmail.com>
+     misc
+ 
+ Mike Frysinger <vapier@gentoo.org>
+diff --git a/TODO b/TODO
+index 133fd4b..f887905 100644
+--- a/TODO
++++ b/TODO
+@@ -99,7 +99,7 @@ Rob Landley suggested these:
+     This one's open to everybody, but I'll wind up doing it...
+ 
+ 
+-Bernhard Fischer <busybox@busybox.net> suggests to look at these:
++Bernhard Reutner-Fischer <busybox@busybox.net> suggests to look at these:
+   New debug options:
+     -Wlarger-than-127
+     Cleanup any big users
+diff --git a/console-tools/resize.c b/console-tools/resize.c
+index ea7fe5f..4504cc8 100644
+--- a/console-tools/resize.c
++++ b/console-tools/resize.c
+@@ -2,7 +2,7 @@
+ /*
+  * resize - set terminal width and height.
+  *
+- * Copyright 2006 Bernhard Fischer
++ * Copyright 2006 Bernhard Reutner-Fischer
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+diff --git a/console-tools/setconsole.c b/console-tools/setconsole.c
+index b685937..8ad9948 100644
+--- a/console-tools/setconsole.c
++++ b/console-tools/setconsole.c
+@@ -3,7 +3,7 @@
+  *  setconsole.c - redirect system console output
+  *
+  *  Copyright (C) 2004,2005  Enrik Berkhan <Enrik.Berkhan@inka.de>
+- *  Copyright (C) 2008 Bernhard Fischer
++ *  Copyright (C) 2008 Bernhard Reutner-Fischer
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index 3c9fdbd..9cc22be 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -4,7 +4,7 @@
+  *
+  * Copyright (C) 1999,2000,2001 by Lineo, inc.
+  * Written by Mark Whitley <markw@codepoet.org>
+- * debloated by Bernhard Fischer
++ * debloated by Bernhard Reutner-Fischer
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+diff --git a/coreutils/date.c b/coreutils/date.c
+index 8469190..177b7d0 100644
+--- a/coreutils/date.c
++++ b/coreutils/date.c
+@@ -5,7 +5,7 @@
+  * by Matthew Grant <grantma@anathoth.gen.nz>
+  *
+  * iso-format handling added by Robert Griebl <griebl@gmx.de>
+- * bugfixes and cleanup by Bernhard Fischer
++ * bugfixes and cleanup by Bernhard Reutner-Fischer
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+ */
+diff --git a/coreutils/nohup.c b/coreutils/nohup.c
+index 7d6a51a..f44e2af 100644
+--- a/coreutils/nohup.c
++++ b/coreutils/nohup.c
+@@ -5,7 +5,7 @@
+  * http://www.opengroup.org/onlinepubs/007904975/utilities/nohup.html
+  *
+  * Copyright 2006 Rob Landley <rob@landley.net>
+- * Copyright 2006 Bernhard Fischer
++ * Copyright 2006 Bernhard Reutner-Fischer
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+diff --git a/coreutils/split.c b/coreutils/split.c
+index 77cb66d..f1ec64b 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -1,7 +1,7 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+  * split - split a file into pieces
+- * Copyright (c) 2007 Bernhard Fischer
++ * Copyright (c) 2007 Bernhard Reutner-Fischer
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+diff --git a/coreutils/test.c b/coreutils/test.c
+index dbfe4af..ae40192 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -12,7 +12,7 @@
+  *     modified by Herbert Xu to be used as built-in in ash.
+  *     modified by Erik Andersen <andersen@codepoet.org> to be used
+  *     in busybox.
+- *     modified by Bernhard Fischer to be useable (i.e. a bit less bloaty).
++ *     modified by Bernhard Reutner-Fischer to be useable (i.e. a bit less bloaty).
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  *
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index a58fab3..7c38fa1 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -2,7 +2,7 @@
+ /*
+  * Mini run-parts implementation for busybox
+  *
+- * Copyright (C) 2007 Bernhard Fischer
++ * Copyright (C) 2007 Bernhard Reutner-Fischer
+  *
+  * Based on a older version that was in busybox which was 1k big..
+  *   Copyright (C) 2001 by Emanuele Aina <emanuele.aina@tiscali.it>
+diff --git a/docs/busybox.net/FAQ.html b/docs/busybox.net/FAQ.html
+index fbaec04..5ff879d 100644
+--- a/docs/busybox.net/FAQ.html
++++ b/docs/busybox.net/FAQ.html
+@@ -316,9 +316,10 @@ within each applet.  More build coverage testing.</p></li>
+     BusyBox mailing list at busybox@busybox.net.</p>
+ 
+ <p> In addition to the mailing list, Erik Andersen (andersee), Manuel Nova
+-    (mjn3), Rob Landley (landley), Mike Frysinger (SpanKY), Bernhard Fischer
+-    (blindvt), and other long-time BusyBox developers are known to hang out
+-    on the uClibc IRC channel: #uclibc on irc.freenode.net.  There is a
++    (mjn3), Rob Landley (landley), Mike Frysinger (SpanKY),
++    Bernhard Reutner-Fischer (blindvt), and other long-time BusyBox developers
++    are known to hang out on the uClibc IRC channel: #uclibc on
++    irc.freenode.net. There is a
+     <a href="http://ibot.Rikers.org/%23uclibc/">web archive of
+     daily logs of the #uclibc IRC channel</a> going back to 2002.
+ </p>
+diff --git a/docs/busybox.net/oldnews.html b/docs/busybox.net/oldnews.html
+index 2a7182c..5747136 100644
+--- a/docs/busybox.net/oldnews.html
++++ b/docs/busybox.net/oldnews.html
+@@ -20,7 +20,7 @@
+ </pre>
+ 
+     <p>New applets: inotify (Vladimir Dronnikov), man (Ivana Varekova),
+-    fbsplash (Michele Sanges), depmod (Bernhard Fischer)
++    fbsplash (Michele Sanges), depmod (Bernhard Reutner-Fischer)
+ 
+     <p>Changes since previous release:
+       <ul>
+diff --git a/include/platform.h b/include/platform.h
+index 0f2f83a..b311082 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -1,6 +1,6 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+-   Copyright 2006, Bernhard Fischer
++   Copyright 2006, Bernhard Reutner-Fischer
+ 
+    Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+ */
+diff --git a/libbb/llist.c b/libbb/llist.c
+index 2bef431..7e78f7c 100644
+--- a/libbb/llist.c
++++ b/libbb/llist.c
+@@ -4,7 +4,7 @@
+  *
+  * Copyright (C) 2003 Glenn McGrath
+  * Copyright (C) 2005 Vladimir Oleynik
+- * Copyright (C) 2005 Bernhard Fischer
++ * Copyright (C) 2005 Bernhard Reutner-Fischer
+  * Copyright (C) 2006 Rob Landley <rob@landley.net>
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+diff --git a/libbb/strrstr.c b/libbb/strrstr.c
+index d5cd44b..a803dd9 100644
+--- a/libbb/strrstr.c
++++ b/libbb/strrstr.c
+@@ -2,7 +2,7 @@
+ /*
+  * Utility routines.
+  *
+- * Copyright (C) 2008 Bernhard Fischer
++ * Copyright (C) 2008 Bernhard Reutner-Fischer
+  *
+  * Licensed under GPLv2 or later, see file License in this tarball for details.
+  */
+diff --git a/libbb/write.c b/libbb/write.c
+index e8a9eff..37f4617 100644
+--- a/libbb/write.c
++++ b/libbb/write.c
+@@ -2,7 +2,7 @@
+ /*
+  * Utility routines.
+  *
+- * Copyright (C) 2008 Bernhard Fischer
++ * Copyright (C) 2008 Bernhard Reutner-Fischer
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+diff --git a/miscutils/chrt.c b/miscutils/chrt.c
+index 23ef58c..cc5660b 100644
+--- a/miscutils/chrt.c
++++ b/miscutils/chrt.c
+@@ -1,7 +1,7 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+  * chrt - manipulate real-time attributes of a process
+- * Copyright (c) 2006-2007 Bernhard Fischer
++ * Copyright (c) 2006-2007 Bernhard Reutner-Fischer
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+diff --git a/miscutils/mountpoint.c b/miscutils/mountpoint.c
+index 5647e4c..81ce429 100644
+--- a/miscutils/mountpoint.c
++++ b/miscutils/mountpoint.c
+@@ -2,7 +2,7 @@
+ /*
+  * mountpoint implementation for busybox
+  *
+- * Copyright (C) 2005 Bernhard Fischer
++ * Copyright (C) 2005 Bernhard Reutner-Fischer
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  *
+diff --git a/miscutils/raidautorun.c b/miscutils/raidautorun.c
+index 2766245..a2a852b 100644
+--- a/miscutils/raidautorun.c
++++ b/miscutils/raidautorun.c
+@@ -2,7 +2,7 @@
+ /*
+  * raidautorun implementation for busybox
+  *
+- * Copyright (C) 2006 Bernhard Fischer
++ * Copyright (C) 2006 Bernhard Reutner-Fischer
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  *
+diff --git a/miscutils/runlevel.c b/miscutils/runlevel.c
+index 04064ee..6e10d9c 100644
+--- a/miscutils/runlevel.c
++++ b/miscutils/runlevel.c
+@@ -9,7 +9,7 @@
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  *
+- * initially busyboxified by Bernhard Fischer
++ * initially busyboxified by Bernhard Reutner-Fischer
+  */
+ 
+ #include <utmp.h>
+diff --git a/miscutils/taskset.c b/miscutils/taskset.c
+index b43d42e..a0bbf0a 100644
+--- a/miscutils/taskset.c
++++ b/miscutils/taskset.c
+@@ -1,7 +1,7 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+  * taskset - retrieve or set a processes' CPU affinity
+- * Copyright (c) 2006 Bernhard Fischer
++ * Copyright (c) 2006 Bernhard Reutner-Fischer
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+diff --git a/miscutils/watchdog.c b/miscutils/watchdog.c
+index e102a59..9bcd4b8 100644
+--- a/miscutils/watchdog.c
++++ b/miscutils/watchdog.c
+@@ -3,7 +3,7 @@
+  * Mini watchdog implementation for busybox
+  *
+  * Copyright (C) 2003  Paul Mundt <lethal@linux-sh.org>
+- * Copyright (C) 2006  Bernhard Fischer <busybox@busybox.net>
++ * Copyright (C) 2006  Bernhard Reutner-Fischer <busybox@busybox.net>
+  * Copyright (C) 2008  Darius Augulis <augulis.darius@gmail.com>
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+diff --git a/modutils/depmod.c b/modutils/depmod.c
+index 35df4a8..5b9e9e8 100644
+--- a/modutils/depmod.c
++++ b/modutils/depmod.c
+@@ -1,7 +1,7 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+  * depmod - generate modules.dep
+- * Copyright (c) 2008 Bernhard Fischer
++ * Copyright (c) 2008 Bernhard Reutner-Fischer
+  * Copyrihgt (c) 2008 Timo Teras <timo.teras@iki.fi>
+  * Copyright (c) 2008 Vladimir Dronnikov
+  *
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index 8e765b2..96a0a08 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -3,7 +3,7 @@
+  * simplified modprobe
+  *
+  * Copyright (c) 2008 Vladimir Dronnikov
+- * Copyright (c) 2008 Bernhard Fischer (initial depmod code)
++ * Copyright (c) 2008 Bernhard Reutner-Fischer (initial depmod code)
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */
+diff --git a/networking/brctl.c b/networking/brctl.c
+index 102776e..8475179 100644
+--- a/networking/brctl.c
++++ b/networking/brctl.c
+@@ -2,7 +2,7 @@
+ /*
+  * Small implementation of brctl for busybox.
+  *
+- * Copyright (C) 2008 by Bernhard Fischer
++ * Copyright (C) 2008 by Bernhard Reutner-Fischer
+  *
+  * Some helper functions from bridge-utils are
+  * Copyright (C) 2000 Lennert Buytenhek
+diff --git a/networking/ip.c b/networking/ip.c
+index 7dcddfd..10059c5 100644
+--- a/networking/ip.c
++++ b/networking/ip.c
+@@ -10,7 +10,7 @@
+  * Changes:
+  *
+  * Rani Assaf <rani@magic.metawire.com> 980929:	resolve addresses
+- * Bernhard Fischer rewrote to use index_in_substr_array
++ * Bernhard Reutner-Fischer rewrote to use index_in_substr_array
+  */
+ 
+ #include "libbb.h"
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index f926078..ca22546 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -13,7 +13,7 @@
+  * Changes:
+  *
+  * Rani Assaf <rani@magic.metawire.com> 980929:	resolve addresses
+- * initially integrated into busybox by Bernhard Fischer
++ * initially integrated into busybox by Bernhard Reutner-Fischer
+  */
+ 
+ #include <netinet/in.h>
+diff --git a/networking/tc.c b/networking/tc.c
+index a815b4b..6e31074 100644
+--- a/networking/tc.c
++++ b/networking/tc.c
+@@ -6,7 +6,7 @@
+  *
+  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
+  *
+- * Bernhard Fischer adjusted for busybox
++ * Bernhard Reutner-Fischer adjusted for busybox
+  */
+ 
+ #include "libbb.h"
+diff --git a/scripts/checkhelp.awk b/scripts/checkhelp.awk
+index 4bb4996..2468db2 100755
+--- a/scripts/checkhelp.awk
++++ b/scripts/checkhelp.awk
+@@ -1,7 +1,7 @@
+ #!/usr/bin/awk -f
+ # AWK script to check for missing help entries for config options
+ #
+-# Copyright (C) 2006 Bernhard Fischer
++# Copyright (C) 2006 Bernhard Reutner-Fischer
+ #
+ # This file is distributed under the terms and conditions of the
+ # MIT/X public licenses. See http://opensource.org/licenses/mit-license.html
+diff --git a/testsuite/pidof.tests b/testsuite/pidof.tests
+index 29cfa94..a05a302 100755
+--- a/testsuite/pidof.tests
++++ b/testsuite/pidof.tests
+@@ -1,7 +1,7 @@
+ #!/bin/sh
+ 
+ # pidof tests.
+-# Copyright 2005 by Bernhard Fischer
++# Copyright 2005 by Bernhard Reutner-Fischer
+ # Licensed under GPL v2, see file LICENSE for details.
+ 
+ # AUDIT:
+diff --git a/testsuite/sum.tests b/testsuite/sum.tests
+index 0993f03..e537cf6 100755
+--- a/testsuite/sum.tests
++++ b/testsuite/sum.tests
+@@ -1,7 +1,7 @@
+ #!/bin/sh
+ 
+ # unit test for sum.
+-# Copyright 2007 by Bernhard Fischer
++# Copyright 2007 by Bernhard Reutner-Fischer
+ # Licensed under GPL v2 or later, see file LICENSE for details.
+ 
+ # AUDIT: Unit tests for sum
+diff --git a/testsuite/taskset.tests b/testsuite/taskset.tests
+index a3757ab..4599364 100755
+--- a/testsuite/taskset.tests
++++ b/testsuite/taskset.tests
+@@ -1,6 +1,6 @@
+ #!/bin/sh
+ 
+-# Copyright 2006 Bernhard Fischer
++# Copyright 2006 Bernhard Reutner-Fischer
+ # Licensed under GPL v2 or later, see file LICENSE for details.
+ 
+ . testing.sh
+diff --git a/util-linux/dmesg.c b/util-linux/dmesg.c
+index 840358c..f52026c 100644
+--- a/util-linux/dmesg.c
++++ b/util-linux/dmesg.c
+@@ -4,7 +4,7 @@
+  * dmesg - display/control kernel ring buffer.
+  *
+  * Copyright 2006 Rob Landley <rob@landley.net>
+- * Copyright 2006 Bernhard Fischer <rep.nop@aon.at>
++ * Copyright 2006 Bernhard Reutner-Fischer <rep.nop@aon.at>
+  *
+  * Licensed under GPLv2, see file LICENSE in this tarball for details.
+  */

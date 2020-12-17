@@ -1,0 +1,26 @@
+2007-07-27 15:30:39 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index 780bd45..ddbde18 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -450,6 +450,7 @@ const char *make_human_readable_str(unsigned long long size,
+ /* Put a string of hex bytes ("1b2e66fe"...), return advanced pointer */
+ char *bin2hex(char *buf, const char *cp, int count);
+ 
++/* Last element is marked by mult == 0 */
+ struct suffix_mult {
+ 	char suffix[4];
+ 	unsigned mult;
+diff --git a/libbb/xatonum_template.c b/libbb/xatonum_template.c
+index bc81160..205da53 100644
+--- a/libbb/xatonum_template.c
++++ b/libbb/xatonum_template.c
+@@ -45,7 +45,7 @@ unsigned type xstrtou(_range_sfx)(const char *numstr, int base,
+ 	 * Note that we also allow nul suffixes with associated multipliers,
+ 	 * to allow for scaling of the numstr by some default multiplier. */
+ 	if (suffixes) {
+-		while (suffixes->suffix) {
++		while (suffixes->mult) {
+ 			if (strcmp(suffixes->suffix, e) == 0) {
+ 				if (XSTR_UTYPE_MAX / suffixes->mult < r)
+ 					goto range; /* overflow! */

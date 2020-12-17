@@ -1,0 +1,21 @@
+2007-06-21 10:39:20 +0000
+diff --git a/include/platform.h b/include/platform.h
+index 9c93efb..dcdb5c8 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -56,12 +56,15 @@
+ #  define ALWAYS_INLINE __attribute__ ((always_inline)) inline
+ #  if !ENABLE_WERROR
+ #   define ATTRIBUTE_DEPRECATED __attribute__ ((__deprecated__))
++#   define ATTRIBUTE_UNUSED_RESULT __attribute__ ((warn_unused_result))
+ #  else
+ #   define ATTRIBUTE_DEPRECATED /* n/a */
++#   define ATTRIBUTE_UNUSED_RESULT /* n/a */
+ #  endif
+ # else
+ #  define ALWAYS_INLINE inline
+ #  define ATTRIBUTE_DEPRECATED /* n/a */
++#  define ATTRIBUTE_UNUSED_RESULT /* n/a */
+ # endif
+ 
+ /* -fwhole-program makes all symbols local. The attribute externally_visible

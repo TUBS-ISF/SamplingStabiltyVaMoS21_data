@@ -1,0 +1,253 @@
+2009-07-11 22:26:48 +0200
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 20b979d..827b350 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -289,20 +289,6 @@ enum {
+ } while (0)
+ 
+ 
+-#if ENABLE_FEATURE_ASSUME_UNICODE
+-/* libbb candidate */
+-static size_t mbstrlen(const char *string)
+-{
+-	size_t width = mbstowcs(NULL, string, INT_MAX);
+-	if (width == (size_t)-1L)
+-		return strlen(string);
+-	return width;
+-}
+-#else
+-#define mbstrlen(string) strlen(string)
+-#endif
+-
+-
+ static struct dnode *my_stat(const char *fullname, const char *name, int force_follow)
+ {
+ 	struct stat dstat;
+@@ -570,7 +556,7 @@ static void showfiles(struct dnode **dn, int nfiles)
+ 	} else {
+ 		/* find the longest file name, use that as the column width */
+ 		for (i = 0; i < nfiles; i++) {
+-			int len = mbstrlen(dn[i]->name);
++			int len = bb_mbstrlen(dn[i]->name);
+ 			if (column_width < len)
+ 				column_width = len;
+ 		}
+@@ -717,7 +703,7 @@ static int print_name(const char *name)
+ {
+ 	if (option_mask32 & OPT_Q) {
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+-		int len = 2 + mbstrlen(name);
++		int len = 2 + bb_mbstrlen(name);
+ #else
+ 		int len = 2;
+ #endif
+@@ -737,7 +723,7 @@ static int print_name(const char *name)
+ 	/* No -Q: */
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+ 	fputs(name, stdout);
+-	return mbstrlen(name);
++	return bb_mbstrlen(name);
+ #else
+ 	return printf("%s", name);
+ #endif
+diff --git a/include/unicode.h b/include/unicode.h
+index be64a50..e006147 100644
+--- a/include/unicode.h
++++ b/include/unicode.h
+@@ -7,10 +7,13 @@
+ 
+ #if !ENABLE_FEATURE_ASSUME_UNICODE
+ 
++# define bb_mbstrlen(string) strlen(string)
+ # define check_unicode_in_env() ((void)0)
+ 
+ #else
+ 
++size_t bb_mbstrlen(const char *string) FAST_FUNC;
++
+ # if ENABLE_LOCALE_SUPPORT
+ 
+ #  include <wchar.h>
+@@ -19,6 +22,8 @@
+ 
+ # else
+ 
++/* Crude "locale support" which knows only C and Unicode locales */
++
+ #  if !ENABLE_FEATURE_CHECK_UNICODE_IN_ENV
+ #   define check_unicode_in_env() ((void)0)
+ #  else
+@@ -50,8 +55,8 @@ int iswspace(wint_t wc) FAST_FUNC;
+ int iswalnum(wint_t wc) FAST_FUNC;
+ int iswpunct(wint_t wc) FAST_FUNC;
+ 
+-# endif
++# endif /* !LOCALE_SUPPORT */
+ 
+-#endif
++#endif /* FEATURE_ASSUME_UNICODE */
+ 
+ #endif
+diff --git a/libbb/unicode.c b/libbb/unicode.c
+index a99f5ed..b977437 100644
+--- a/libbb/unicode.c
++++ b/libbb/unicode.c
+@@ -7,13 +7,22 @@
+  * Licensed under GPL version 2, see file LICENSE in this tarball for details.
+  */
+ #include "libbb.h"
++# include "unicode.h"
+ 
+-/* if LOCALE_SUPPORT, libc locale stuff takes care of it, else: */
++size_t FAST_FUNC bb_mbstrlen(const char *string)
++{
++	size_t width = mbstowcs(NULL, string, INT_MAX);
++	if (width == (size_t)-1L)
++		return strlen(string);
++	return width;
++}
+ 
+ #if !ENABLE_LOCALE_SUPPORT
+-#include "unicode.h"
+ 
+-/* 0: not known yet,
++/* Crude "locale support" which knows only C and Unicode locales */
++
++/* unicode_is_enabled:
++ * 0: not known yet,
+  * 1: not unicode (IOW: assuming one char == one byte)
+  * 2: unicode
+  */
+@@ -39,6 +48,7 @@ void FAST_FUNC check_unicode_in_env(void)
+ 
+ static size_t wcrtomb_internal(char *s, wchar_t wc)
+ {
++	int n;
+ 	uint32_t v = wc;
+ 
+ 	if (v <= 0x7f) {
+@@ -46,65 +56,38 @@ static size_t wcrtomb_internal(char *s, wchar_t wc)
+ 		return 1;
+ 	}
+ 
+-	/* 80-7FF -> 110yyyxx 10xxxxxx */
+-	if (v <= 0x7ff) {
+-		s[1] = (v & 0x3f) | 0x80;
+-		v >>= 6;
+-		s[0] = v | 0xc0;
+-		return 2;
+-	}
++	/* RFC 3629 says that Unicode ends at 10FFFF,
++	 * but we cover entire 32 bits */
+ 
+-	/* 800-FFFF -> 1110yyyy 10yyyyxx 10xxxxxx */
+-	if (v <= 0xffff) {
+-		s[2] = (v & 0x3f) | 0x80;
+-		v >>= 6;
+-		s[1] = (v & 0x3f) | 0x80;
+-		v >>= 6;
+-		s[0] = v | 0xe0;
+-		return 3;
++	n = 2;
++	/* 4000000-FFFFFFFF -> 111111tt 10tttttt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
++	if (v >= 0x4000000) {
++		s[5] = (wc & 0x3f) | 0x80;
++		wc = (uint32_t)wc >> 6; /* ensuring that high bits are 0 */
++		n++;
++	}
++	/* 200000-3FFFFFF -> 111110tt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
++	if (v >= 0x200000) {
++		s[4] = (wc & 0x3f) | 0x80;
++		wc >>= 6;
++		n++;
+ 	}
+-
+-	/* RFC 3629 says that Unicode ends at 10FFFF */
+-
+ 	/* 10000-1FFFFF -> 11110zzz 10zzyyyy 10yyyyxx 10xxxxxx */
+-	if (v <= 0x1fffff) {
+-		s[3] = (v & 0x3f) | 0x80;
+-		v >>= 6;
+-		s[2] = (v & 0x3f) | 0x80;
+-		v >>= 6;
+-		s[1] = (v & 0x3f) | 0x80;
+-		v >>= 6;
+-		s[0] = v | 0xf0;
+-		return 4;
++	if (v >= 0x10000) {
++		s[3] = (wc & 0x3f) | 0x80;
++		wc >>= 6;
++		n++;
+ 	}
+-
+-	/* 200000-3FFFFFF -> 111110tt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
+-	if (v <= 0x3ffffff) {
+-		s[4] = (v & 0x3f) | 0x80;
+-		v >>= 6;
+-		s[3] = (v & 0x3f) | 0x80;
+-		v >>= 6;
+-		s[2] = (v & 0x3f) | 0x80;
+-		v >>= 6;
+-		s[1] = (v & 0x3f) | 0x80;
+-		v >>= 6;
+-		s[0] = v | 0xf8;
+-		return 5;
++	/* 800-FFFF -> 1110yyyy 10yyyyxx 10xxxxxx */
++	if (v >= 0x800) {
++		s[2] = (wc & 0x3f) | 0x80;
++		wc >>= 6;
++		n++;
+ 	}
+-
+-	/* 4000000-FFFFFFFF -> 111111tt 10tttttt 10zzzzzz 10zzyyyy 10yyyyxx 10xxxxxx */
+-	s[5] = (v & 0x3f) | 0x80;
+-	v >>= 6;
+-	s[4] = (v & 0x3f) | 0x80;
+-	v >>= 6;
+-	s[3] = (v & 0x3f) | 0x80;
+-	v >>= 6;
+-	s[2] = (v & 0x3f) | 0x80;
+-	v >>= 6;
+-	s[1] = (v & 0x3f) | 0x80;
+-	v >>= 6;
+-	s[0] = v | 0xfc;
+-	return 6;
++	s[1] = (wc & 0x3f) | 0x80;
++	wc >>= 6;
++	s[0] = wc | (uint8_t)(0x3f00 >> n);
++	return n;
+ }
+ 
+ size_t FAST_FUNC wcrtomb(char *s, wchar_t wc, mbstate_t *ps UNUSED_PARAM)
+@@ -164,7 +147,9 @@ size_t FAST_FUNC mbstowcs(wchar_t *dest, const char *src, size_t n)
+ 	if (unicode_is_enabled != 2) {
+ 		while (n) {
+ 			unsigned char c = *src++;
+-			*dest++ = c;
++
++			if (dest)
++				*dest++ = c;
+ 			if (c == 0)
+ 				break;
+ 			n--;
+@@ -177,7 +162,8 @@ size_t FAST_FUNC mbstowcs(wchar_t *dest, const char *src, size_t n)
+ 		unsigned c = (unsigned char) *src++;
+ 
+ 		if (c <= 0x7f) {
+-			*dest++ = c;
++			if (dest)
++				*dest++ = c;
+ 			if (c == '\0')
+ 				break;
+ 			n--;
+@@ -216,7 +202,8 @@ size_t FAST_FUNC mbstowcs(wchar_t *dest, const char *src, size_t n)
+ 			//or maybe: c = 0xfffd; /* replacement character */
+ 		}
+ 
+-		*dest++ = c;
++		if (dest)
++			*dest++ = c;
+ 		n--;
+ 	}
+ 

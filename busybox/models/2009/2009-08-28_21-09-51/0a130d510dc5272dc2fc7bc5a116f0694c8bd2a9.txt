@@ -1,0 +1,138 @@
+2009-08-28 21:09:51 +0200
+diff --git a/archival/libunarchive/data_align.c b/archival/libunarchive/data_align.c
+index 9f2e843..0c8542b 100644
+--- a/archival/libunarchive/data_align.c
++++ b/archival/libunarchive/data_align.c
+@@ -10,6 +10,6 @@ void FAST_FUNC data_align(archive_handle_t *archive_handle, unsigned boundary)
+ {
+ 	unsigned skip_amount = (boundary - (archive_handle->offset % boundary)) % boundary;
+ 
+-	archive_handle->seek(archive_handle, skip_amount);
++	archive_handle->seek(archive_handle->src_fd, skip_amount);
+ 	archive_handle->offset += skip_amount;
+ }
+diff --git a/archival/libunarchive/data_skip.c b/archival/libunarchive/data_skip.c
+index 438750f..06d3dce 100644
+--- a/archival/libunarchive/data_skip.c
++++ b/archival/libunarchive/data_skip.c
+@@ -8,5 +8,5 @@
+ 
+ void FAST_FUNC data_skip(archive_handle_t *archive_handle)
+ {
+-	archive_handle->seek(archive_handle, archive_handle->file_header->size);
++	archive_handle->seek(archive_handle->src_fd, archive_handle->file_header->size);
+ }
+diff --git a/archival/libunarchive/seek_by_jump.c b/archival/libunarchive/seek_by_jump.c
+index 0a259c9..7181cb3 100644
+--- a/archival/libunarchive/seek_by_jump.c
++++ b/archival/libunarchive/seek_by_jump.c
+@@ -6,13 +6,13 @@
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
+-void FAST_FUNC seek_by_jump(const archive_handle_t *archive_handle, unsigned amount)
++void FAST_FUNC seek_by_jump(int fd, off_t amount)
+ {
+ 	if (amount
+-	 && lseek(archive_handle->src_fd, (off_t) amount, SEEK_CUR) == (off_t) -1
++	 && lseek(fd, amount, SEEK_CUR) == (off_t) -1
+ 	) {
+ 		if (errno == ESPIPE)
+-			seek_by_read(archive_handle, amount);
++			seek_by_read(fd, amount);
+ 		else
+ 			bb_perror_msg_and_die("seek failure");
+ 	}
+diff --git a/archival/libunarchive/seek_by_read.c b/archival/libunarchive/seek_by_read.c
+index 2326a75..af65e5d 100644
+--- a/archival/libunarchive/seek_by_read.c
++++ b/archival/libunarchive/seek_by_read.c
+@@ -9,8 +9,8 @@
+ /*  If we are reading through a pipe, or from stdin then we can't lseek,
+  *  we must read and discard the data to skip over it.
+  */
+-void FAST_FUNC seek_by_read(const archive_handle_t *archive_handle, unsigned jump_size)
++void FAST_FUNC seek_by_read(int fd, off_t amount)
+ {
+-	if (jump_size)
+-		bb_copyfd_exact_size(archive_handle->src_fd, -1, jump_size);
++	if (amount)
++		bb_copyfd_exact_size(fd, -1, amount);
+ }
+diff --git a/archival/rpm2cpio.c b/archival/rpm2cpio.c
+index 566a9f2..30ec80e 100644
+--- a/archival/rpm2cpio.c
++++ b/archival/rpm2cpio.c
+@@ -33,9 +33,10 @@ struct rpm_header {
+ 	uint32_t size; /* Size of store (4 bytes) */
+ };
+ 
+-static off_t skip_header(int rpm_fd)
++static unsigned skip_header(int rpm_fd)
+ {
+ 	struct rpm_header header;
++	unsigned len;
+ 
+ 	xread(rpm_fd, &header, sizeof(header));
+ //	if (strncmp((char *) &header.magic, RPM_HEADER_MAGIC_STR, 3) != 0) {
+@@ -48,10 +49,12 @@ static off_t skip_header(int rpm_fd)
+ 		bb_error_msg_and_die("invalid RPM header magic or unsupported version");
+ 		// ": %x != %x", header.magic_and_ver, htonl(RPM_HEADER_VERnMAGIC));
+ 	}
+-	/* Seek past index entries */
+-	lseek(rpm_fd, 16 * ntohl(header.entries), SEEK_CUR);
+-	/* Seek past store */
+-	return lseek(rpm_fd, ntohl(header.size), SEEK_CUR);
++
++	/* Seek past index entries, and past store */
++	len = 16 * ntohl(header.entries) + ntohl(header.size);
++	seek_by_jump(rpm_fd, len);
++
++	return sizeof(header) + len;
+ }
+ 
+ /* No getopt required */
+@@ -60,7 +63,7 @@ int rpm2cpio_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct rpm_lead lead;
+ 	int rpm_fd;
+-	off_t pos;
++	unsigned pos;
+ 	unsigned char magic[2];
+ 	IF_DESKTOP(long long) int FAST_FUNC (*unpack)(int src_fd, int dst_fd);
+ 
+@@ -78,7 +81,7 @@ int rpm2cpio_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* Skip the signature header, align to 8 bytes */
+ 	pos = skip_header(rpm_fd);
+-	lseek(rpm_fd, (8 - (unsigned)pos) & 7, SEEK_CUR);
++	seek_by_jump(rpm_fd, (8 - pos) & 7);
+ 
+ 	/* Skip the main header */
+ 	skip_header(rpm_fd);
+diff --git a/include/unarchive.h b/include/unarchive.h
+index 682e810..d8cb2a0 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -60,8 +60,8 @@ typedef struct archive_handle_t {
+ 	/* Count the number of bytes processed */
+ 	off_t offset;
+ 
+-	/* Function that skips data: read_by_char or read_by_skip */
+-	void FAST_FUNC (*seek)(const struct archive_handle_t *archive_handle, const unsigned amount);
++	/* Function that skips data */
++	void FAST_FUNC (*seek)(int fd, off_t amount);
+ 
+ 	/* Temporary storage */
+ 	char *buffer;
+@@ -107,8 +107,8 @@ extern char get_header_tar_gz(archive_handle_t *archive_handle) FAST_FUNC;
+ extern char get_header_tar_bz2(archive_handle_t *archive_handle) FAST_FUNC;
+ extern char get_header_tar_lzma(archive_handle_t *archive_handle) FAST_FUNC;
+ 
+-extern void seek_by_jump(const archive_handle_t *archive_handle, unsigned amount) FAST_FUNC;
+-extern void seek_by_read(const archive_handle_t *archive_handle, unsigned amount) FAST_FUNC;
++extern void seek_by_jump(int fd, off_t amount) FAST_FUNC;
++extern void seek_by_read(int fd, off_t amount) FAST_FUNC;
+ 
+ extern void data_align(archive_handle_t *archive_handle, unsigned boundary) FAST_FUNC;
+ extern const llist_t *find_list_entry(const llist_t *list, const char *filename) FAST_FUNC;

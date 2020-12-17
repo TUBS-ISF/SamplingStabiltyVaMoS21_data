@@ -1,0 +1,9 @@
+2007-12-02 01:43:18 +0000
+diff --git a/testsuite/dd/dd-reports-write-errors b/testsuite/dd/dd-reports-write-errors
+new file mode 100644
+index 0000000..4920600
+--- /dev/null
++++ b/testsuite/dd/dd-reports-write-errors
+@@ -0,0 +1,2 @@
++busybox dd if="$0" of=/dev/full 2>/dev/null || status=$?
++test $status = 1

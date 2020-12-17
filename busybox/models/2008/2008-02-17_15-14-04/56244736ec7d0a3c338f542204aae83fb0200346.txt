@@ -1,0 +1,40 @@
+2008-02-17 15:14:04 +0000
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 46807a3..f48ccaa 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -505,7 +505,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 	 * affairs is that BSD-derived versions of getopt() misbehave if
+ 	 * optind is set to 0 in order to reset getopt(), and glibc's getopt()
+ 	 * will core dump if optind is set 1 in order to reset getopt().
+-	 * 
++	 *
+ 	 * More modern versions of BSD require that optreset be set to 1 in
+ 	 * order to reset getopt().   Sigh.  Standards, anyone?
+ 	 */
+diff --git a/miscutils/microcom.c b/miscutils/microcom.c
+index 2857a1b..ea48291 100644
+--- a/miscutils/microcom.c
++++ b/miscutils/microcom.c
+@@ -19,7 +19,7 @@ static void signal_handler(int signo)
+ 
+ // set raw tty mode
+ static void xget1(int fd, struct termios *t, struct termios *oldt)
+-{ 
++{
+ 	tcgetattr(fd, oldt);
+ 	*t = *oldt;
+ 	cfmakeraw(t);
+diff --git a/shell/ash.c b/shell/ash.c
+index 4f9caa4..668953c 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -9115,7 +9115,7 @@ setparam(char **argv)
+  * For a non-interactive shell, an error condition encountered
+  * by a special built-in ... shall cause the shell to write a diagnostic message
+  * to standard error and exit as shown in the following table:
+- * Error                                           Special Built-In 
++ * Error                                           Special Built-In
+  * ...
+  * Utility syntax error (option or operand error)  Shall exit
+  * ...

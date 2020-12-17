@@ -1,0 +1,16 @@
+2010-02-26 18:34:16 +0100
+diff --git a/coreutils/Config.in b/coreutils/Config.in
+index 6bdc85a..297f465 100644
+--- a/coreutils/Config.in
++++ b/coreutils/Config.in
+@@ -686,6 +686,10 @@ config FEATURE_FANCY_TAIL
+ 	  The options (-q, -s, and -v) are provided by GNU tail, but
+ 	  are not specific in the SUSv3 standard.
+ 
++	    -q      Never output headers giving file names
++	    -s SEC  Wait SEC seconds between reads with -f
++	    -v      Always output headers giving file names
++
+ config TEE
+ 	bool "tee"
+ 	default n

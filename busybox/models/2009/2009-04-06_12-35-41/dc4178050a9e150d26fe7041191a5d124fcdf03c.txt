@@ -1,0 +1,15 @@
+2009-04-06 12:35:41 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 7e6d356..4f4012d 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2064,7 +2064,8 @@ static int setup_redirects(struct command *prog, int squirrel[])
+ 				squirrel[redir->fd] = dup(redir->fd);
+ 			}
+ 			if (openfd == -3) {
+-				//close(openfd); // close(-3) ??!
++				/* "-" means "close me" and we use -3 for that */
++				close(redir->fd);
+ 			} else {
+ 				dup2(openfd, redir->fd);
+ 				if (redir->dup == -1)

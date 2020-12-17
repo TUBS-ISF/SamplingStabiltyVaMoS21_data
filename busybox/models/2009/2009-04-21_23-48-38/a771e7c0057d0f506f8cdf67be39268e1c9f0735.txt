@@ -1,0 +1,164 @@
+2009-04-21 23:48:38 +0000
+diff --git a/libbb/xconnect.c b/libbb/xconnect.c
+index 1b4f4f7..f853e95 100644
+--- a/libbb/xconnect.c
++++ b/libbb/xconnect.c
+@@ -37,16 +37,21 @@ int FAST_FUNC setsockopt_bindtodevice(int fd, const char *iface)
+ 
+ len_and_sockaddr* FAST_FUNC get_sock_lsa(int fd)
+ {
+-	len_and_sockaddr *lsa;
+-	socklen_t len = 0;
++	len_and_sockaddr lsa;
++	len_and_sockaddr *lsa_ptr;
+ 
+-	/* Can be optimized to do only one getsockname() */
+-	if (getsockname(fd, NULL, &len) != 0)
++	lsa.len = LSA_SIZEOF_SA;
++	if (getsockname(fd, &lsa.u.sa, &lsa.len) != 0)
+ 		return NULL;
+-	lsa = xzalloc(LSA_LEN_SIZE + len);
+-	lsa->len = len;
+-	getsockname(fd, &lsa->u.sa, &lsa->len);
+-	return lsa;
++
++	lsa_ptr = xzalloc(LSA_LEN_SIZE + lsa.len);
++	if (lsa.len > LSA_SIZEOF_SA) { /* rarely (if ever) happens */
++		lsa_ptr->len = lsa.len;
++		getsockname(fd, &lsa_ptr->u.sa, &lsa_ptr->len);
++	} else {
++		memcpy(lsa_ptr, &lsa, LSA_LEN_SIZE + lsa.len);
++	}
++	return lsa_ptr;
+ }
+ 
+ void FAST_FUNC xconnect(int s, const struct sockaddr *s_addr, socklen_t addrlen)
+diff --git a/networking/arping.c b/networking/arping.c
+index 915af32..ab39c71 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -348,9 +348,10 @@ int arping_main(int argc UNUSED_PARAM, char **argv)
+ 			if (setsockopt(probe_fd, SOL_SOCKET, SO_DONTROUTE, &const_int_1, sizeof(const_int_1)) == -1)
+ 				bb_perror_msg("setsockopt(SO_DONTROUTE)");
+ 			xconnect(probe_fd, (struct sockaddr *) &saddr, sizeof(saddr));
+-			if (getsockname(probe_fd, (struct sockaddr *) &saddr, &alen) == -1) {
+-				bb_perror_msg_and_die("getsockname");
+-			}
++			getsockname(probe_fd, (struct sockaddr *) &saddr, &alen);
++			//never happens:
++			//if (getsockname(probe_fd, (struct sockaddr *) &saddr, &alen) == -1)
++			//	bb_perror_msg_and_die("getsockname");
+ 			if (saddr.sin_family != AF_INET)
+ 				bb_error_msg_and_die("no IP address configured");
+ 			src = saddr.sin_addr;
+@@ -365,10 +366,10 @@ int arping_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	{
+ 		socklen_t alen = sizeof(me);
+-
+-		if (getsockname(sock_fd, (struct sockaddr *) &me, &alen) == -1) {
+-			bb_perror_msg_and_die("getsockname");
+-		}
++		getsockname(sock_fd, (struct sockaddr *) &me, &alen);
++		//never happens:
++		//if (getsockname(sock_fd, (struct sockaddr *) &me, &alen) == -1)
++		//	bb_perror_msg_and_die("getsockname");
+ 	}
+ 	if (me.sll_halen == 0) {
+ 		bb_error_msg(err_str, "is not ARPable (no ll address)");
+diff --git a/networking/libiproute/iplink.c b/networking/libiproute/iplink.c
+index 1e7ee07..de7d640 100644
+--- a/networking/libiproute/iplink.c
++++ b/networking/libiproute/iplink.c
+@@ -112,11 +112,11 @@ static int get_address(char *dev, int *htype)
+ 	me.sll_ifindex = ifr.ifr_ifindex;
+ 	me.sll_protocol = htons(ETH_P_LOOP);
+ 	xbind(s, (struct sockaddr*)&me, sizeof(me));
+-
+ 	alen = sizeof(me);
+-	if (getsockname(s, (struct sockaddr*)&me, &alen) == -1) {
+-		bb_perror_msg_and_die("getsockname");
+-	}
++	getsockname(s, (struct sockaddr*)&me, &alen);
++	//never happens:
++	//if (getsockname(s, (struct sockaddr*)&me, &alen) == -1)
++	//	bb_perror_msg_and_die("getsockname");
+ 	close(s);
+ 	*htype = me.sll_hatype;
+ 	return me.sll_halen;
+diff --git a/networking/libiproute/libnetlink.c b/networking/libiproute/libnetlink.c
+index 6d51d8d..7ad2de9 100644
+--- a/networking/libiproute/libnetlink.c
++++ b/networking/libiproute/libnetlink.c
+@@ -26,22 +26,23 @@ int FAST_FUNC xrtnl_open(struct rtnl_handle *rth/*, unsigned subscriptions*/)
+ {
+ 	socklen_t addr_len;
+ 
+-	memset(rth, 0, sizeof(rth));
+-
++	memset(rth, 0, sizeof(*rth));
+ 	rth->fd = xsocket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+-
+-	memset(&rth->local, 0, sizeof(rth->local));
+ 	rth->local.nl_family = AF_NETLINK;
+ 	/*rth->local.nl_groups = subscriptions;*/
+ 
+ 	xbind(rth->fd, (struct sockaddr*)&rth->local, sizeof(rth->local));
+ 	addr_len = sizeof(rth->local);
++	getsockname(rth->fd, (struct sockaddr*)&rth->local, &addr_len);
++
++/* too much paranoia
+ 	if (getsockname(rth->fd, (struct sockaddr*)&rth->local, &addr_len) < 0)
+ 		bb_perror_msg_and_die("getsockname");
+ 	if (addr_len != sizeof(rth->local))
+ 		bb_error_msg_and_die("wrong address length %d", addr_len);
+ 	if (rth->local.nl_family != AF_NETLINK)
+ 		bb_error_msg_and_die("wrong address family %d", rth->local.nl_family);
++*/
+ 	rth->seq = time(NULL);
+ 	return 0;
+ }
+diff --git a/networking/libiproute/libnetlink.h b/networking/libiproute/libnetlink.h
+index e5fee4d..11a4a10 100644
+--- a/networking/libiproute/libnetlink.h
++++ b/networking/libiproute/libnetlink.h
+@@ -10,8 +10,7 @@
+ 
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+-struct rtnl_handle
+-{
++struct rtnl_handle {
+ 	int			fd;
+ 	struct sockaddr_nl	local;
+ 	struct sockaddr_nl	peer;
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index 47940e9..efe831e 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -278,9 +278,9 @@ static void dolisten(void)
+ 	 random unknown port is probably not very useful without "netstat". */
+ 	if (o_verbose) {
+ 		char *addr;
+-		rr = getsockname(netfd, &ouraddr->u.sa, &ouraddr->len);
+-		if (rr < 0)
+-			bb_perror_msg_and_die("getsockname after bind");
++		getsockname(netfd, &ouraddr->u.sa, &ouraddr->len);
++		//if (rr < 0)
++		//	bb_perror_msg_and_die("getsockname after bind");
+ 		addr = xmalloc_sockaddr2dotted(&ouraddr->u.sa);
+ 		fprintf(stderr, "listening on %s ...\n", addr);
+ 		free(addr);
+@@ -359,9 +359,9 @@ create new one, and bind() it. TODO */
+ 		 doing a listen-on-any on a multihomed machine.  This allows one to
+ 		 offer different services via different alias addresses, such as the
+ 		 "virtual web site" hack. */
+-		rr = getsockname(netfd, &ouraddr->u.sa, &ouraddr->len);
+-		if (rr < 0)
+-			bb_perror_msg_and_die("getsockname after accept");
++		getsockname(netfd, &ouraddr->u.sa, &ouraddr->len);
++		//if (rr < 0)
++		//	bb_perror_msg_and_die("getsockname after accept");
+ 	}
+ 
+ 	if (o_verbose) {

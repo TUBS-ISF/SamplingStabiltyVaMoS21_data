@@ -1,0 +1,13 @@
+2007-06-07 13:22:56 +0000
+diff --git a/sysklogd/Config.in b/sysklogd/Config.in
+index 29c4d9b..78097ee 100644
+--- a/sysklogd/Config.in
++++ b/sysklogd/Config.in
+@@ -59,6 +59,7 @@ config FEATURE_IPC_SYSLOG
+ config FEATURE_IPC_SYSLOG_BUFFER_SIZE
+ 	int "    Circular buffer size in Kbytes (minimum 4KB)"
+ 	default 16
++	range 4 2147483647
+ 	depends on FEATURE_IPC_SYSLOG
+ 	help
+ 	  This option sets the size of the circular buffer

@@ -1,0 +1,329 @@
+2008-03-26 13:32:30 +0000
+diff --git a/editors/patch.c b/editors/patch.c
+index 2a2b130..6f42b83 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -21,7 +21,7 @@
+ 
+ #include "libbb.h"
+ 
+-static unsigned copy_lines(FILE *src_stream, FILE *dest_stream, unsigned lines_count)
++static unsigned copy_lines(FILE *src_stream, FILE *dst_stream, unsigned lines_count)
+ {
+ 	while (src_stream && lines_count) {
+ 		char *line;
+@@ -29,7 +29,7 @@ static unsigned copy_lines(FILE *src_stream, FILE *dest_stream, unsigned lines_c
+ 		if (line == NULL) {
+ 			break;
+ 		}
+-		if (fputs(line, dest_stream) == EOF) {
++		if (fputs(line, dst_stream) == EOF) {
+ 			bb_perror_msg_and_die("error writing to new file");
+ 		}
+ 		free(line);
+@@ -73,12 +73,14 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	FILE *patch_file;
+ 	int patch_level;
+ 	int ret = 0;
++	char plus = '+';
+ 
+ 	xfunc_error_retval = 2;
+ 	{
+ 		const char *p = "-1";
+ 		const char *i = "-"; /* compat */
+-		getopt32(argv, "p:i:", &p, &i);
++		if (getopt32(argv, "p:i:R", &p, &i) & 4)
++			plus = '-';
+ 		patch_level = xatoi(p); /* can be negative! */
+ 		patch_file = xfopen_stdin(i);
+ 	}
+@@ -91,8 +93,8 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		char *new_filename;
+ 		char *backup_filename;
+ 		unsigned src_cur_line = 1;
+-		unsigned dest_cur_line = 0;
+-		unsigned dest_beg_line;
++		unsigned dst_cur_line = 0;
++		unsigned dst_beg_line;
+ 		unsigned bad_hunk_count = 0;
+ 		unsigned hunk_count = 0;
+ 		smallint copy_trailing_lines_flag = 0;
+@@ -143,15 +145,26 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			unsigned src_beg_line;
+ 			unsigned hunk_offset_start;
+ 			unsigned src_last_line = 1;
++			unsigned dst_last_line = 1;
+ 
+-			if ((sscanf(patch_line, "@@ -%d,%d +%d", &src_beg_line, &src_last_line, &dest_beg_line) != 3)
+-			 && (sscanf(patch_line, "@@ -%d +%d", &src_beg_line, &dest_beg_line) != 2)
+-			) { /* No more hunks for this file */
++			if ((sscanf(patch_line, "@@ -%d,%d +%d,%d", &src_beg_line, &src_last_line, &dst_beg_line, &dst_last_line) < 3)
++			 && (sscanf(patch_line, "@@ -%d +%d,%d", &src_beg_line, &dst_beg_line, &dst_last_line) < 2)
++			) {
++				/* No more hunks for this file */
+ 				break;
+ 			}
++			if (plus != '+') {
++				/* reverse patch */
++				unsigned tmp = src_last_line;
++				src_last_line = dst_last_line;
++				dst_last_line = tmp;
++				tmp = src_beg_line;
++				src_beg_line = dst_beg_line;
++				dst_beg_line = tmp;
++			}
+ 			hunk_count++;
+ 
+-			if (src_beg_line && dest_beg_line) {
++			if (src_beg_line && dst_beg_line) {
+ 				/* Copy unmodified lines upto start of hunk */
+ 				/* src_beg_line will be 0 if it's a new file */
+ 				count = src_beg_line - src_cur_line;
+@@ -159,14 +172,15 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 					bb_error_msg_and_die("bad src file");
+ 				}
+ 				src_cur_line += count;
+-				dest_cur_line += count;
++				dst_cur_line += count;
+ 				copy_trailing_lines_flag = 1;
+ 			}
+ 			src_last_line += hunk_offset_start = src_cur_line;
++			dst_last_line += dst_cur_line;
+ 
+ 			while (1) {
+ 				free(patch_line);
+-			        patch_line = xmalloc_fgets(patch_file);
++				patch_line = xmalloc_fgets(patch_file);
+ 				if (patch_line == NULL)
+ 					break; /* EOF */
+ 				if ((*patch_line != '-') && (*patch_line != '+')
+@@ -174,7 +188,7 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 				) {
+ 					break; /* End of hunk */
+ 				}
+-				if (*patch_line != '+') { /* '-', ' ' or '\n' */
++				if (*patch_line != plus) { /* '-' or ' ' */
+ 					char *src_line = NULL;
+ 					if (src_cur_line == src_last_line)
+ 						break;
+@@ -184,7 +198,8 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 							int diff = strcmp(src_line, patch_line + 1);
+ 							src_cur_line++;
+ 							free(src_line);
+-							if (diff) src_line = NULL;
++							if (diff)
++								src_line = NULL;
+ 						}
+ 					}
+ 					if (!src_line) {
+@@ -192,12 +207,14 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 						bad_hunk_count++;
+ 						break;
+ 					}
+-					if (*patch_line == '-') {
++					if (*patch_line != ' ') { /* '-' */
+ 						continue;
+ 					}
+ 				}
++				if (dst_cur_line == dst_last_line)
++					break;
+ 				fputs(patch_line + 1, dst_stream);
+-				dest_cur_line++;
++				dst_cur_line++;
+ 			} /* end of while loop handling one hunk */
+ 		} /* end of while loop handling one file */
+ 
+@@ -217,7 +234,7 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			if (backup_filename) {
+ 				unlink(backup_filename);
+ 			}
+-			if ((dest_cur_line == 0) || (dest_beg_line == 0)) {
++			if ((dst_cur_line == 0) || (dst_beg_line == 0)) {
+ 				/* The new patched file is empty, remove it */
+ 				xunlink(new_filename);
+ 				// /* old_filename and new_filename may be the same file */
+@@ -228,8 +245,7 @@ int patch_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		//free(old_filename);
+ 		free(new_filename);
+ 	} /* end of "while there are patch lines" */
+-quit:
+-
++ quit:
+ 	/* 0 = SUCCESS
+ 	 * 1 = Some hunks failed
+ 	 * 2 = More serious problems (exited earlier)
+diff --git a/include/applets.h b/include/applets.h
+index 13c4648..1917f2a 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -149,6 +149,7 @@ USE_EXPR(APPLET(expr, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_FAKEIDENTD(APPLET(fakeidentd, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_FALSE(APPLET_NOFORK(false, false, _BB_DIR_BIN, _BB_SUID_NEVER, false))
+ USE_FBSET(APPLET(fbset, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
++USE_FBSPLASH(APPLET(fbsplash, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_FDFLUSH(APPLET_ODDNAME(fdflush, freeramdisk, _BB_DIR_BIN, _BB_SUID_NEVER, fdflush))
+ USE_FDFORMAT(APPLET(fdformat, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_FDISK(APPLET(fdisk, _BB_DIR_SBIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index 71c9582..11f235c 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -120,6 +120,17 @@
+        "$ basename /foo/bar.txt .txt\n" \
+        "bar"
+ 
++#define fbsplash_trivial_usage \
++       "[-c] [-d DEV] [-s IMGFILE] [-i INIFILE] [-f CMD]"
++#define fbsplash_full_usage \
++       "Options:\n" \
++     "\n	-c	Hide cursor" \
++     "\n	-d	Framebuffer device (default /dev/fb0)" \
++     "\n	-s	Splash image" \
++     "\n	-i	Config file" \
++     "\n	-f	Control pipe (else exit after drawing image)" \
++     "\n		commands: 'NN' (% for progressbar) or 'exit'" \
++
+ #define brctl_trivial_usage \
+        "COMMAND [BRIDGE [INTERFACE]]"
+ #define brctl_full_usage \
+@@ -2838,10 +2849,11 @@
+ 	)
+ 
+ #define patch_trivial_usage \
+-       "[-p NUM] [-i DIFF]"
++       "[-p NUM] [-i DIFF] [-R]"
+ #define patch_full_usage \
+        "	-p NUM	Strip NUM leading components from file names" \
+      "\n	-i DIFF	Read DIFF instead of stdin" \
++     "\n	-R	Reverse patch" \
+ 
+ #define patch_example_usage \
+        "$ patch -p1 < example.diff\n" \
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index b25386b..5d65665 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -958,14 +958,16 @@ static void load_history(const char *fromfile)
+ 	FILE *fp;
+ 	int hi;
+ 
+-	/* cleanup old */
+-	for (hi = state->cnt_history; hi > 0;) {
+-		hi--;
+-		free(state->history[hi]);
+-	}
++	/* NB: do not trash old history if file can't be opened */
+ 
+ 	fp = fopen(fromfile, "r");
+ 	if (fp) {
++		/* clean up old history */
++		for (hi = state->cnt_history; hi > 0;) {
++			hi--;
++			free(state->history[hi]);
++		}
++
+ 		for (hi = 0; hi < MAX_HISTORY;) {
+ 			char *hl = xmalloc_getline(fp);
+ 			int l;
+@@ -982,8 +984,8 @@ static void load_history(const char *fromfile)
+ 			state->history[hi++] = hl;
+ 		}
+ 		fclose(fp);
++		state->cur_history = state->cnt_history = hi;
+ 	}
+-	state->cur_history = state->cnt_history = hi;
+ }
+ 
+ /* state->flags is already checked to be nonzero */
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index e149e41..04c9a0c 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -194,12 +194,33 @@ config EJECT
+ 	  Used to eject cdroms.  (defaults to /dev/cdrom)
+ 
+ config FEATURE_EJECT_SCSI
+-  bool "SCSI support"
+-  default n
+-  depends on EJECT
+-  help
+-    Add the -s option to eject, this allows to eject SCSI-Devices and
+-    usb-storage devices.
++	bool "SCSI support"
++	default n
++	depends on EJECT
++	help
++	  Add the -s option to eject, this allows to eject SCSI-Devices and
++	  usb-storage devices.
++
++config FBSPLASH
++	bool "fbsplash"
++	default n
++	help
++	  Shows splash image and progress bar on framebuffer device.
++	  Can be used during boot phase of an embedded device. ~2kb.
++	  Usage:
++	  - use kernel option 'vga=xxx' or otherwise enable fb device.
++	  - put somewhere the fbsplash.ini file and image in .ppm format.
++	  - $ setsid fbsplash [params] &
++	       -c: hide cursor
++	       -d /dev/fbN: framebuffer device (if not /dev/fb0)
++	       -s path_of_image_file
++	       -i path_of_ini_file
++	       -f path_of_fifo (can be "-" for stdin)
++	  - if you want to run applet only in presence of kernel parameter:
++	    grep -q "fbsplash=on" </proc/cmdline && setsid fbsplash [params] &
++	  - commands for fifo:
++	    "NN" (ASCII decimal number) - percentage to show on progress bar
++	    "exit" (or just close fifo) - well you guessed it
+ 
+ config LAST
+ 	bool "last"
+diff --git a/miscutils/Kbuild b/miscutils/Kbuild
+index 51187c5..513c038 100644
+--- a/miscutils/Kbuild
++++ b/miscutils/Kbuild
+@@ -14,6 +14,7 @@ lib-$(CONFIG_CRONTAB)     += crontab.o
+ lib-$(CONFIG_DC)          += dc.o
+ lib-$(CONFIG_DEVFSD)      += devfsd.o
+ lib-$(CONFIG_EJECT)       += eject.o
++lib-$(CONFIG_FBSPLASH)    += fbsplash.o
+ lib-$(CONFIG_HDPARM)      += hdparm.o
+ lib-$(CONFIG_LAST)        += last.o
+ lib-$(CONFIG_LESS)        += less.o
+diff --git a/testsuite/patch.tests b/testsuite/patch.tests
+index 8a957d3..cfe69b7 100755
+--- a/testsuite/patch.tests
++++ b/testsuite/patch.tests
+@@ -26,7 +26,7 @@ zxc
+ " \
+ 
+ testing "patch with nonexistent old_file" \
+-	"strace -o zzz patch; echo $?; cat input" \
++	"patch; echo $?; cat input" \
+ "\
+ patching file input
+ 0
+@@ -44,4 +44,22 @@ zxc
+  zxc
+ " \
+ 
++testing "patch -R with nonexistent old_file" \
++	"patch -R; echo $?; cat input" \
++"\
++patching file input
++0
++qwe
++zxc
++" \
++	"qwe\nasd\nzxc\n" \
++"\
++--- input.doesnt_exist	Jan 01 01:01:01 2000
+++++ input	Jan 01 01:01:01 2000
++@@ -1,2 +1,3 @@
++ qwe
+++asd
++ zxc
++" \
++
+ exit $FAILCOUNT

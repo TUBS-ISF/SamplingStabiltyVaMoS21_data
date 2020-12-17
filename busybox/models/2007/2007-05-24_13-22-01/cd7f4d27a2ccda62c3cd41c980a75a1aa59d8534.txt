@@ -1,0 +1,48 @@
+2007-05-24 13:22:01 +0000
+diff --git a/shell/hush_test/hush-misc/shift.right b/shell/hush_test/hush-misc/shift.right
+index afb90be..d281e35 100644
+--- a/shell/hush_test/hush-misc/shift.right
++++ b/shell/hush_test/hush-misc/shift.right
+@@ -1,2 +1,6 @@
+ ./shift.tests abc d e
+-./shift.tests d e
++./shift.tests d e 123
++./shift.tests d e 123
++./shift.tests
++./shift.tests
++./shift.tests
+diff --git a/shell/hush_test/hush-misc/shift.tests b/shell/hush_test/hush-misc/shift.tests
+index 17f2c9f..53ef249 100755
+--- a/shell/hush_test/hush-misc/shift.tests
++++ b/shell/hush_test/hush-misc/shift.tests
+@@ -1,6 +1,14 @@
+ if test $# = 0; then
+-    exec "$THIS_SH" $0 abc "d e"
++    exec "$THIS_SH" $0 abc "d e" 123
+ fi
+ echo $0 $1 $2
+ shift
+ echo $0 $1 $2
++shift 999
++echo $0 $1 $2
++shift 2
++echo $0 $1 $2
++shift 2
++echo $0 $1 $2
++shift
++echo $0 $1 $2
+diff --git a/shell/hush_test/hush-misc/syntax_err.right b/shell/hush_test/hush-misc/syntax_err.right
+index fbf3c9f..08a270c 100644
+--- a/shell/hush_test/hush-misc/syntax_err.right
++++ b/shell/hush_test/hush-misc/syntax_err.right
+@@ -1 +1,2 @@
++shown
+ hush: syntax error: unterminated '
+diff --git a/shell/hush_test/hush-misc/syntax_err.tests b/shell/hush_test/hush-misc/syntax_err.tests
+index c990c64..d10ed42 100755
+--- a/shell/hush_test/hush-misc/syntax_err.tests
++++ b/shell/hush_test/hush-misc/syntax_err.tests
+@@ -1 +1,3 @@
++echo shown
+ echo test `echo 'aa`
++echo not shown

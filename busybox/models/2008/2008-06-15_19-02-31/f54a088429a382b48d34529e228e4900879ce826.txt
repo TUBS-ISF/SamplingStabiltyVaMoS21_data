@@ -1,0 +1,21 @@
+2008-06-15 19:02:31 +0000
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index e39fb6f..89b2b10 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -61,12 +61,12 @@ config USE_BB_CRYPT
+ 	bool "Use internal DES and MD5 crypt functions rather than system functions"
+ 	default y
+ 	help
+-	  If you leave this disabled, busybox will use the system's password
+-	  and group functions.  Most C libraries use large (~70k)
++	  If you leave this disabled, busybox will use the system's
++	  crypt functions.  Most C libraries use large (~70k)
+ 	  static buffers in these functions, and also combine them
+ 	  with more general DES encryption/decryption routines.
+ 	  For busybox, having large static buffers is undesirable,
+-	  especially so on NOMMU machines.
++	  especially on NOMMU machines.
+ 
+ 	  These functions produce results which are identical
+ 	  to corresponding C library functions.

@@ -1,0 +1,582 @@
+2008-05-13 02:27:31 +0000
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index 29aed18..0be29b7 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -138,12 +138,12 @@ char get_header_tar(archive_handle_t *archive_handle)
+ 		/* tar gz/bz autodetect: check for gz/bz2 magic.
+ 		 * If it is the very first block, and we see the magic,
+ 		 * we can switch to get_header_tar_gz/bz2/lzma().
+-		 * Needs seekable fd. I wish recv(MSG_PEEK) would work
++		 * Needs seekable fd. I wish recv(MSG_PEEK) works
+ 		 * on any fd... */
+ 		if (not_first)
+ 			goto err;
+ #if ENABLE_FEATURE_TAR_GZIP
+-		if (tar.name[0] == 0x1f && tar.name[1] == 0x8b) { /* gzip */
++		if (tar.name[0] == 0x1f && tar.name[1] == (char)0x8b) { /* gzip */
+ 			get_header_ptr = get_header_tar_gz;
+ 		} else
+ #endif
+diff --git a/coreutils/basename.c b/coreutils/basename.c
+index 2216182..a3085ed 100644
+--- a/coreutils/basename.c
++++ b/coreutils/basename.c
+@@ -48,5 +48,5 @@ int basename_main(int argc, char **argv)
+ 
+ 	/* puts(s) will do, but we can do without stdio this way: */
+ 	s[m++] = '\n';
+-	return full_write(STDOUT_FILENO, s, m) == m;
++	return full_write(STDOUT_FILENO, s, m) == (ssize_t)m;
+ }
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index 7a44d10..1634fc8 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -64,7 +64,7 @@ static void cut_file(FILE *file, char delim)
+ 			/* print the chars specified in each cut list */
+ 			for (; cl_pos < nlists; cl_pos++) {
+ 				spos = cut_lists[cl_pos].startpos;
+-				while (spos < strlen(line)) {
++				while (spos < (int)strlen(line)) {
+ 					if (!printed[spos]) {
+ 						printed[spos] = 'X';
+ 						putchar(line[spos]);
+@@ -80,12 +80,12 @@ static void cut_file(FILE *file, char delim)
+ 
+ 			/* get out if we have no more lists to process or if the lines
+ 			 * are lower than what we're interested in */
+-			if (linenum < spos || cl_pos >= nlists)
++			if (((int)linenum < spos) || (cl_pos >= nlists))
+ 				goto next_line;
+ 
+ 			/* if the line we're looking for is lower than the one we were
+ 			 * passed, it means we displayed it already, so move on */
+-			while (spos < linenum) {
++			while (spos < (int)linenum) {
+ 				spos++;
+ 				/* go to the next list if we're at the end of this one */
+ 				if (spos > cut_lists[cl_pos].endpos
+@@ -97,7 +97,7 @@ static void cut_file(FILE *file, char delim)
+ 					spos = cut_lists[cl_pos].startpos;
+ 					/* get out if the current line is lower than the one
+ 					 * we just became interested in */
+-					if (linenum < spos)
++					if ((int)linenum < spos)
+ 						goto next_line;
+ 				}
+ 			}
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index 4d1ef0b..6b66366 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -65,7 +65,7 @@ static bool write_and_stats(const void *buf, size_t len, size_t obs,
+ 	ssize_t n = full_write_or_warn(buf, len, filename);
+ 	if (n < 0)
+ 		return 1;
+-	if (n == obs)
++	if ((size_t)n == obs)
+ 		G.out_full++;
+ 	else if (n) /* > 0 */
+ 		G.out_part++;
+@@ -312,7 +312,7 @@ int dd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			while (n) {
+ 				size_t d = obs - oc;
+ 
+-				if (d > n)
++				if (d > (size_t)n)
+ 					d = n;
+ 				memcpy(obuf + oc, tmp, d);
+ 				n -= d;
+diff --git a/coreutils/expand.c b/coreutils/expand.c
+index a7ac8ea..af2ef86 100644
+--- a/coreutils/expand.c
++++ b/coreutils/expand.c
+@@ -41,7 +41,7 @@ static void expand(FILE *file, unsigned tab_size, unsigned opt)
+ 	char *line;
+ 	char *ptr;
+ 	int convert;
+-	int pos;
++	unsigned pos;
+ 
+ 	/* Increment tab_size by 1 locally.*/
+ 	tab_size++;
+@@ -80,7 +80,7 @@ static void unexpand(FILE *file, unsigned int tab_size, unsigned opt)
+ 	int convert;
+ 	int pos;
+ 	int i = 0;
+-	int column = 0;
++	unsigned column = 0;
+ 
+ 	while ((line = xmalloc_fgets(file)) != NULL) {
+ 		convert = 1;
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index a54be72..12b463a 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -59,7 +59,8 @@ static struct sort_key {
+ 
+ static char *get_key(char *str, struct sort_key *key, int flags)
+ {
+-	int start = 0, end = 0, len, i, j;
++	int start = 0, end = 0, len, j;
++	unsigned i;
+ 
+ 	/* Special case whole string, so we don't have to make a copy */
+ 	if (key->range[0] == 1 && !key->range[1] && !key->range[2] && !key->range[3]
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index 298fb5b..a17955a 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -710,7 +710,7 @@ static void wrapf(const char *message, ...)
+ {
+ 	char buf[128];
+ 	va_list args;
+-	int buflen;
++	unsigned buflen;
+ 
+ 	va_start(args, message);
+ 	buflen = vsnprintf(buf, sizeof(buf), message, args);
+diff --git a/coreutils/tail.c b/coreutils/tail.c
+index 2f997a9..2505fc3 100644
+--- a/coreutils/tail.c
++++ b/coreutils/tail.c
+@@ -92,7 +92,8 @@ int tail_main(int argc, char **argv)
+ 	size_t tailbufsize;
+ 	int taillen = 0;
+ 	int newlines_seen = 0;
+-	int nfiles, nread, nwrite, seen, i, opt;
++	int nfiles, nread, nwrite, i, opt;
++	unsigned seen;
+ 
+ 	int *fds;
+ 	char *s, *buf;
+@@ -210,7 +211,7 @@ int tail_main(int argc, char **argv)
+ 			} else if (count) {
+ 				if (COUNT_BYTES) {
+ 					taillen += nread;
+-					if (taillen > count) {
++					if (taillen > (int)count) {
+ 						memmove(tailbuf, tailbuf + taillen - count, count);
+ 						taillen = count;
+ 					}
+@@ -225,7 +226,7 @@ int tail_main(int argc, char **argv)
+ 						}
+ 					} while (k);
+ 
+-					if (newlines_seen + newlines_in_buf < count) {
++					if (newlines_seen + newlines_in_buf < (int)count) {
+ 						newlines_seen += newlines_in_buf;
+ 						taillen += nread;
+ 					} else {
+@@ -243,7 +244,7 @@ int tail_main(int argc, char **argv)
+ 						memmove(tailbuf, s, taillen);
+ 						newlines_seen = count - extra;
+ 					}
+-					if (tailbufsize < taillen + BUFSIZ) {
++					if (tailbufsize < (size_t)taillen + BUFSIZ) {
+ 						tailbufsize = taillen + BUFSIZ;
+ 						tailbuf = xrealloc(tailbuf, tailbufsize);
+ 					}
+diff --git a/coreutils/test.c b/coreutils/test.c
+index 3c725a2..270ca21 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -412,7 +412,7 @@ static int test_eaccess(char *path, int mode)
+ static int filstat(char *nm, enum token mode)
+ {
+ 	struct stat s;
+-	int i = i; /* gcc 3.x thinks it can be used uninitialized */
++	unsigned i = i; /* gcc 3.x thinks it can be used uninitialized */
+ 
+ 	if (mode == FILSYM) {
+ #ifdef S_IFLNK
+diff --git a/coreutils/tr.c b/coreutils/tr.c
+index 0d32849..8b2d308 100644
+--- a/coreutils/tr.c
++++ b/coreutils/tr.c
+@@ -219,7 +219,7 @@ int tr_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	for (;;) {
+ 		/* If we're out of input, flush output and read more input. */
+-		if (in_index == read_chars) {
++		if ((ssize_t)in_index == read_chars) {
+ 			if (out_index) {
+ 				xwrite(STDOUT_FILENO, (char *)output, out_index);
+ 				out_index = 0;
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 467deed..094b3b1 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -126,7 +126,7 @@ static int pid_is_user(int pid)
+ 	sprintf(buf, "/proc/%u", pid);
+ 	if (stat(buf, &sb) != 0)
+ 		return 0;
+-	return (sb.st_uid == user_id);
++	return (sb.st_uid == (uid_t)user_id);
+ }
+ 
+ static int pid_is_cmd(pid_t pid)
+diff --git a/editors/awk.c b/editors/awk.c
+index f04ea5c..fef3246 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -676,7 +676,7 @@ static char nextchar(char **s)
+ 	return c;
+ }
+ 
+-static int ALWAYS_INLINE isalnum_(int c)
++static ALWAYS_INLINE int isalnum_(int c)
+ {
+ 	return (isalnum(c) || c == '_');
+ }
+@@ -1682,7 +1682,7 @@ static void hashwalk_init(var *v, xhash *array)
+ {
+ 	char **w;
+ 	hash_item *hi;
+-	int i;
++	unsigned i;
+ 
+ 	if (v->type & VF_WALK)
+ 		free(v->x.walker);
+@@ -1996,7 +1996,7 @@ static var *exec_builtin(node *op, var *res)
+ 	}
+ 
+ 	nargs = i;
+-	if (nargs < (info >> 30))
++	if ((uint32_t)nargs < (info >> 30))
+ 		syntax_error(EMSG_TOO_FEW_ARGS);
+ 
+ 	switch (info & OPNMASK) {
+diff --git a/editors/sed.c b/editors/sed.c
+index f858845..817840d 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -628,7 +628,7 @@ static int do_subst_command(sed_cmd_t *sed_cmd, char **line)
+ {
+ 	char *oldline = *line;
+ 	int altered = 0;
+-	int match_count = 0;
++	unsigned match_count = 0;
+ 	regex_t *current_regex;
+ 
+ 	/* Handle empty regex. */
+@@ -665,7 +665,9 @@ static int do_subst_command(sed_cmd_t *sed_cmd, char **line)
+ 
+ 		/* If we aren't interested in this match, output old line to
+ 		   end of match and continue */
+-		if (sed_cmd->which_match && sed_cmd->which_match != match_count) {
++		if (sed_cmd->which_match
++		 && (sed_cmd->which_match != match_count)
++		) {
+ 			for (i = 0; i < G.regmatch[0].rm_eo; i++)
+ 				pipe_putc(*oldline++);
+ 			continue;
+diff --git a/editors/vi.c b/editors/vi.c
+index 4e5a5ac..5013d0d 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -2239,7 +2239,9 @@ static char readit(void)	// read (maybe cursor) key from stdin
+ 			pfd[0].events = POLLIN;
+ 			// keep reading while there are input chars, and room in buffer
+ 			// for a complete ESC sequence (assuming 8 chars is enough)
+-			while (safe_poll(pfd, 1, 0) > 0 && n <= (sizeof(readbuffer) - 8)) {
++			while ((safe_poll(pfd, 1, 0) > 0)
++			 && ((size_t)n <= (sizeof(readbuffer) - 8))
++			) {
+ 				// read the rest of the ESC string
+ 				int r = safe_read(0, readbuffer + n, sizeof(readbuffer) - n);
+ 				if (r > 0)
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index ee16ea6..d1cf192 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -233,7 +233,7 @@ static xlist_t *process_stdin(xlist_t *list_arg,
+ 		}
+ 		if (s == NULL)
+ 			s = p = buf;
+-		if ((p - buf) >= mc)
++		if ((size_t)(p - buf) >= mc)
+ 			bb_error_msg_and_die("argument line too long");
+ 		*p++ = (c == EOF ? '\0' : c);
+ 		if (c == EOF) { /* word's delimiter or EOF detected */
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index d1a7a4b..62dcc55 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -262,7 +262,7 @@ static void input_backward(unsigned num)
+ 		return;
+ 	cursor -= num;
+ 
+-	if (cmdedit_x >= num) {
++	if ((unsigned)cmdedit_x >= num) {
+ 		cmdedit_x -= num;
+ 		if (num <= 4) {
+ 			/* This is longer by 5 bytes on x86.
+@@ -321,7 +321,7 @@ static void input_delete(int save)
+ {
+ 	int j = cursor;
+ 
+-	if (j == command_len)
++	if (j == (int)command_len)
+ 		return;
+ 
+ #if ENABLE_FEATURE_EDITING_VI
+@@ -830,7 +830,7 @@ static void input_tab(smallint *lastWasTab)
+ 
+ 	if (!*lastWasTab) {
+ 		char *tmp, *tmp1;
+-		int len_found;
++		size_t len_found;
+ /*		char matchBuf[MAX_LINELEN]; */
+ #define matchBuf (S.input_tab__matchBuf)
+ 		int find_type;
+@@ -1787,7 +1787,7 @@ int read_line_input(const char *prompt, char *command, int maxsize, line_input_t
+ 			if (vi_cmdmode)  /* Don't self-insert */
+ 				break;
+ #endif
+-			if (command_len >= (maxsize - 2))        /* Need to leave space for enter */
++			if ((int)command_len >= (maxsize - 2))        /* Need to leave space for enter */
+ 				break;
+ 
+ 			command_len++;
+diff --git a/libbb/md5.c b/libbb/md5.c
+index 56f9727..8d4b9fe 100644
+--- a/libbb/md5.c
++++ b/libbb/md5.c
+@@ -383,7 +383,7 @@ void md5_hash(const void *buffer, size_t len, md5_ctx_t *ctx)
+ 	// Process all input.
+ 
+ 	while (len) {
+-		int i = 64 - ctx->buflen;
++		unsigned i = 64 - ctx->buflen;
+ 
+ 		// Copy data into aligned buffer.
+ 
+diff --git a/libbb/read.c b/libbb/read.c
+index 288358d..fb903c1 100644
+--- a/libbb/read.c
++++ b/libbb/read.c
+@@ -111,7 +111,7 @@ void xread(int fd, void *buf, size_t count)
+ {
+ 	if (count) {
+ 		ssize_t size = full_read(fd, buf, count);
+-		if (size != count)
++		if ((size_t)size != count)
+ 			bb_error_msg_and_die("short read");
+ 	}
+ }
+@@ -160,7 +160,7 @@ char *xmalloc_reads(int fd, char *buf, size_t *maxsz_p)
+ 
+ 	goto jump_in;
+ 	while (sz < maxsz) {
+-		if (p - buf == sz) {
++		if ((size_t)(p - buf) == sz) {
+  jump_in:
+ 			buf = xrealloc(buf, sz + 128);
+ 			p = buf + sz;
+diff --git a/libbb/u_signal_names.c b/libbb/u_signal_names.c
+index 97e9949..7a0f75d 100644
+--- a/libbb/u_signal_names.c
++++ b/libbb/u_signal_names.c
+@@ -130,7 +130,7 @@ int get_signum(const char *name)
+ 		return i;
+ 	if (strncasecmp(name, "SIG", 3) == 0)
+ 		name += 3;
+-	for (i = 0; i < ARRAY_SIZE(signals); i++)
++	for (i = 0; (size_t)i < ARRAY_SIZE(signals); i++)
+ 		if (strcasecmp(name, signals[i]) == 0)
+ 			return i;
+ 
+@@ -172,7 +172,7 @@ void print_signames(void)
+ {
+ 	int signo;
+ 
+-	for (signo = 1; signo < ARRAY_SIZE(signals); signo++) {
++	for (signo = 1; (size_t)signo < ARRAY_SIZE(signals); signo++) {
+ 		const char *name = signals[signo];
+ 		if (name[0])
+ 			puts(name);
+diff --git a/libbb/xfuncs_printf.c b/libbb/xfuncs_printf.c
+index d3fb39f..105939b 100644
+--- a/libbb/xfuncs_printf.c
++++ b/libbb/xfuncs_printf.c
+@@ -204,7 +204,7 @@ void xwrite(int fd, const void *buf, size_t count)
+ {
+ 	if (count) {
+ 		ssize_t size = full_write(fd, buf, count);
+-		if (size != count)
++		if ((size_t)size != count)
+ 			bb_error_msg_and_die("short write");
+ 	}
+ }
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 98dd22d..0b2d558 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -145,7 +145,7 @@ static void crondlog(const char *ctl, ...)
+ 	int level = (ctl[0] & 0x1f);
+ 
+ 	va_start(va, ctl);
+-	if (level >= LogLevel) {
++	if (level >= (int)LogLevel) {
+ 		/* Debug mode: all to (non-redirected) stderr, */
+ 		/* Syslog mode: all to syslog (logmode = LOGMODE_SYSLOG), */
+ 		if (!DebugOpt && LogFile) {
+@@ -423,7 +423,7 @@ static char *ParseField(char *user, char *ary, int modvalue, int off,
+ 
+ static void FixDayDow(CronLine *line)
+ {
+-	int i;
++	size_t i;
+ 	int weekUsed = 0;
+ 	int daysUsed = 0;
+ 
+diff --git a/miscutils/eject.c b/miscutils/eject.c
+index 91cf98f..aa22a3a 100644
+--- a/miscutils/eject.c
++++ b/miscutils/eject.c
+@@ -38,7 +38,7 @@ static void eject_scsi(const char *dev)
+ 		{ START_STOP, 0, 0, 0, 2, 0 }
+ 	};
+ 
+-	int i;
++	unsigned i;
+ 	unsigned char sense_buffer[32];
+ 	unsigned char inqBuff[2];
+ 	sg_io_hdr_t io_hdr;
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 4fff20d..14aa593 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -120,8 +120,11 @@ static void make_device(char *path, int delete)
+ 
+ 				/* If not this device, skip rest of line */
+ 				/* (regexec returns whole pattern as "range" 0) */
+-				if (result || off[0].rm_so || off[0].rm_eo != strlen(device_name))
++				if (result || off[0].rm_so
++				 || ((int)off[0].rm_eo != (int)strlen(device_name))
++				) {
+ 					goto next_line;
++				}
+ 			}
+ 
+ 			/* This line matches: stop parsing the file
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 4b8aea8..292f877 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -307,7 +307,7 @@ static long parse_mount_options(char *options, char **unrecognized)
+ 
+ 	// Loop through options
+ 	for (;;) {
+-		int i;
++		size_t i;
+ 		char *comma = strchr(options, ',');
+ 		const char *option_str = mount_option_str;
+ 
+@@ -1004,7 +1004,7 @@ static int nfsmount(struct mntent *mp, long vfsflags, char *filteropts)
+ 			bb_herror_msg("%s", hostname);
+ 			goto fail;
+ 		}
+-		if (hp->h_length > sizeof(struct in_addr)) {
++		if ((size_t)hp->h_length > sizeof(struct in_addr)) {
+ 			bb_error_msg("got bad hp->h_length");
+ 			hp->h_length = sizeof(struct in_addr);
+ 		}
+@@ -1279,15 +1279,14 @@ static int nfsmount(struct mntent *mp, long vfsflags, char *filteropts)
+ 			if (hp == NULL) {
+ 				bb_herror_msg("%s", mounthost);
+ 				goto fail;
+-			} else {
+-				if (hp->h_length > sizeof(struct in_addr)) {
+-					bb_error_msg("got bad hp->h_length?");
+-					hp->h_length = sizeof(struct in_addr);
+-				}
+-				mount_server_addr.sin_family = AF_INET;
+-				memcpy(&mount_server_addr.sin_addr,
+-						hp->h_addr, hp->h_length);
+ 			}
++			if ((size_t)hp->h_length > sizeof(struct in_addr)) {
++				bb_error_msg("got bad hp->h_length");
++				hp->h_length = sizeof(struct in_addr);
++			}
++			mount_server_addr.sin_family = AF_INET;
++			memcpy(&mount_server_addr.sin_addr,
++						hp->h_addr, hp->h_length);
+ 		}
+ 	}
+ 
+diff --git a/util-linux/switch_root.c b/util-linux/switch_root.c
+index c030b99..bae695b 100644
+--- a/util-linux/switch_root.c
++++ b/util-linux/switch_root.c
+@@ -13,15 +13,15 @@
+ // Make up for header deficiencies.
+ 
+ #ifndef RAMFS_MAGIC
+-#define RAMFS_MAGIC		0x858458f6
++#define RAMFS_MAGIC ((unsigned)0x858458f6)
+ #endif
+ 
+ #ifndef TMPFS_MAGIC
+-#define TMPFS_MAGIC		0x01021994
++#define TMPFS_MAGIC ((unsigned)0x01021994)
+ #endif
+ 
+ #ifndef MS_MOVE
+-#define MS_MOVE			8192
++#define MS_MOVE     8192
+ #endif
+ 
+ static dev_t rootdev;
+@@ -91,10 +91,10 @@ int switch_root_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	// we mean it.  (I could make this a CONFIG option, but I would get email
+ 	// from all the people who WILL eat their filesystems.)
+ 
+-	if (lstat("/init", &st1) || !S_ISREG(st1.st_mode) || statfs("/", &stfs) ||
+-		(stfs.f_type != RAMFS_MAGIC && stfs.f_type != TMPFS_MAGIC) ||
+-		getpid() != 1)
+-	{
++	if (lstat("/init", &st1) || !S_ISREG(st1.st_mode) || statfs("/", &stfs)
++	 || (((unsigned)stfs.f_type != RAMFS_MAGIC) && ((unsigned)stfs.f_type != TMPFS_MAGIC))
++	 || (getpid() != 1)
++	) {
+ 		bb_error_msg_and_die("not rootfs");
+ 	}
+ 
+diff --git a/util-linux/volume_id/util.c b/util-linux/volume_id/util.c
+index ce7de23..240b3c1 100644
+--- a/util-linux/volume_id/util.c
++++ b/util-linux/volume_id/util.c
+@@ -212,7 +212,7 @@ void *volume_id_get_buffer(struct volume_id *id, uint64_t off, size_t len)
+ 			}
+ 			dbg("got 0x%zx (%zi) bytes", buf_len, buf_len);
+ 			id->sbbuf_len = buf_len;
+-			if (buf_len < off + len) {
++			if ((uint64_t)buf_len < off + len) {
+ 				dbg("requested 0x%zx bytes, got only 0x%zx bytes", len, buf_len);
+ 				return NULL;
+ 			}
+@@ -243,7 +243,7 @@ void *volume_id_get_buffer(struct volume_id *id, uint64_t off, size_t len)
+ 		dbg("got 0x%zx (%zi) bytes", buf_len, buf_len);
+ 		id->seekbuf_off = off;
+ 		id->seekbuf_len = buf_len;
+-		if (buf_len < len) {
++		if ((size_t)buf_len < len) {
+ 			dbg("requested 0x%zx bytes, got only 0x%zx bytes", len, buf_len);
+ 			return NULL;
+ 		}
+diff --git a/util-linux/volume_id/volume_id.c b/util-linux/volume_id/volume_id.c
+index de9aae2..aec96a2 100644
+--- a/util-linux/volume_id/volume_id.c
++++ b/util-linux/volume_id/volume_id.c
+@@ -152,7 +152,7 @@ static const probe_fptr fs2[] = {
+ 
+ int volume_id_probe_all(struct volume_id *id, uint64_t off, uint64_t size)
+ {
+-	int i;
++	size_t i;
+ 
+ 	if (id == NULL)
+ 		return -EINVAL;

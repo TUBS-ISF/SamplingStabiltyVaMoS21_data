@@ -1,0 +1,27 @@
+2008-05-15 19:44:46 +0000
+diff --git a/networking/interface.c b/networking/interface.c
+index f5c94f1..ee8ab10 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -223,7 +223,7 @@ static char *UNSPEC_print(unsigned char *ptr)
+ 	char *pos;
+ 	unsigned int i;
+ 
+-	if (!buff);
++	if (!buff)
+ 		buff = xmalloc(sizeof(struct sockaddr) * 3 + 1);
+ 	pos = buff;
+ 	for (i = 0; i < sizeof(struct sockaddr); i++) {
+diff --git a/networking/isrv_identd.c b/networking/isrv_identd.c
+index d60c9fb..a96ac60 100644
+--- a/networking/isrv_identd.c
++++ b/networking/isrv_identd.c
+@@ -113,7 +113,7 @@ int fakeidentd_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		strncpy(bogouser, argv[optind], sizeof(bogouser));
+ 
+ 	/* Daemonize if no -f and no -i and no -w */
+-	if (!(opt & OPT_fiw));
++	if (!(opt & OPT_fiw))
+ 		bb_daemonize_or_rexec(0, argv);
+ 
+ 	/* Where to log in inetd modes? "Classic" inetd

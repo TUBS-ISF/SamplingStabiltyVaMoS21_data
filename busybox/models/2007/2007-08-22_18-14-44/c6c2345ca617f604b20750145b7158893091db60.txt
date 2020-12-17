@@ -1,0 +1,20 @@
+2007-08-22 18:14:44 +0000
+diff --git a/loginutils/login.c b/loginutils/login.c
+index b633a7f..3b4cf2a 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -15,8 +15,12 @@
+ #endif
+ 
+ #if ENABLE_PAM
+-#include <pam/pam_appl.h>
+-#include <pam/pam_misc.h>
++/* PAM may include <locale.h>. We may need to undefine bbox's stub define: */
++#undef setlocale
++/* For some obscure reason, PAM is not in pam/xxx, but in security/xxx.
++ * Apparently they like to confuse people. */
++#include <security/pam_appl.h>
++#include <security/pam_misc.h>
+ static const struct pam_conv conv = {
+ 	misc_conv,
+ 	NULL

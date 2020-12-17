@@ -1,0 +1,481 @@
+2008-04-01 14:47:57 +0000
+diff --git a/applets/applet_tables.c b/applets/applet_tables.c
+index 6c3492b..35b099e 100644
+--- a/applets/applet_tables.c
++++ b/applets/applet_tables.c
+@@ -69,9 +69,14 @@ int main(int argc, char **argv)
+ 
+ 	/* Keep in sync with include/busybox.h! */
+ 
+-	puts("/* This is a generated file, don't edit */");
++	puts("/* This is a generated file, don't edit */\n");
+ 
+-	puts("const char applet_names[] ALIGN1 = \"\"\n");
++	if (NUM_APPLETS == 1) {
++		printf("#define SINGLE_APPLET_STR \"%s\"\n", applets[0].name);
++		printf("#define SINGLE_APPLET_MAIN %s_main\n\n", applets[0].name);
++	}
++
++	puts("const char applet_names[] ALIGN1 = \"\"");
+ 	for (i = 0; i < NUM_APPLETS; i++) {
+ 		printf("\"%s\" \"\\0\"\n", applets[i].name);
+ 	}
+diff --git a/coreutils/Kbuild b/coreutils/Kbuild
+index b9ed0d7..253eb6d 100644
+--- a/coreutils/Kbuild
++++ b/coreutils/Kbuild
+@@ -30,6 +30,7 @@ lib-$(CONFIG_DOS2UNIX)  += dos2unix.o
+ lib-$(CONFIG_DU)        += du.o
+ lib-$(CONFIG_ECHO)      += echo.o
+ lib-$(CONFIG_ASH)       += echo.o # used by ash
++lib-$(CONFIG_HUSH)      += echo.o # used by hush
+ lib-$(CONFIG_ENV)       += env.o
+ lib-$(CONFIG_EXPR)      += expr.o
+ lib-$(CONFIG_EXPAND)    += expand.o
+@@ -72,6 +73,8 @@ lib-$(CONFIG_TAIL)      += tail.o
+ lib-$(CONFIG_TEE)       += tee.o
+ lib-$(CONFIG_TEST)      += test.o
+ lib-$(CONFIG_ASH)       += test.o # used by ash
++lib-$(CONFIG_HUSH)      += test.o # used by hush
++lib-$(CONFIG_MSH)       += test.o # used by msh
+ lib-$(CONFIG_TOUCH)     += touch.o
+ lib-$(CONFIG_TR)        += tr.o
+ lib-$(CONFIG_TRUE)      += true.o
+diff --git a/coreutils/basename.c b/coreutils/basename.c
+index d536a1b..ed23779 100644
+--- a/coreutils/basename.c
++++ b/coreutils/basename.c
+@@ -37,15 +37,16 @@ int basename_main(int argc, char **argv)
+ 	/* It should strip slash: /abc/def/ -> def */
+ 	s = bb_get_last_path_component_strip(*++argv);
+ 
++	m = strlen(s);
+ 	if (*++argv) {
+ 		n = strlen(*argv);
+-		m = strlen(s);
+ 		if ((m > n) && ((strcmp)(s+m-n, *argv) == 0)) {
+-			s[m-n] = '\0';
++			m -= n;
++			s[m] = '\0';
+ 		}
+ 	}
+ 
+-	puts(s);
+-
+-	return fflush(stdout);
++	/* puts(s) will do, but we can do without stdio this way: */
++	s[m++] = '\n';
++	return full_write(STDOUT_FILENO, s, m) == m;
+ }
+diff --git a/coreutils/echo.c b/coreutils/echo.c
+index fd6c950..6e25db6 100644
+--- a/coreutils/echo.c
++++ b/coreutils/echo.c
+@@ -27,10 +27,8 @@
+ 
+ /* This is a NOFORK applet. Be very careful! */
+ 
+-/* argc is unused, but removing it precludes compiler from
+- * using call -> jump optimization */
++/* NB: can be used by shell even if not enabled as applet */
+ 
+-int echo_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int echo_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+ 	const char *arg;
+diff --git a/include/busybox.h b/include/busybox.h
+index cad45ac..0c44d2f 100644
+--- a/include/busybox.h
++++ b/include/busybox.h
+@@ -59,9 +59,6 @@ extern const uint8_t applet_install_loc[];
+ /* Length of these names has effect on size of libbusybox
+  * and "individual" binaries. Keep them short.
+  */
+-void lbb_prepare(const char *applet
+-	USE_FEATURE_INDIVIDUAL(, char **argv)
+-	) MAIN_EXTERNALLY_VISIBLE;
+ #if ENABLE_BUILD_LIBBUSYBOX
+ #if ENABLE_FEATURE_SHARED_BUSYBOX
+ int lbb_main(char **argv) EXTERNALLY_VISIBLE;
+diff --git a/include/libbb.h b/include/libbb.h
+index edf27c6..202574a 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -848,23 +848,20 @@ extern void bb_verror_msg(const char *s, va_list p, const char *strerr);
+ 
+ /* applets which are useful from another applets */
+ int bb_cat(char** argv);
+-int echo_main(int argc, char** argv) MAIN_EXTERNALLY_VISIBLE;
+-int test_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int kill_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-#if ENABLE_ROUTE
+-void bb_displayroutes(int noresolve, int netstatfmt);
+-#endif
++/* If shell needs them, these three "exist" even if not enabled as applets */
++int echo_main(int argc, char** argv) USE_ECHO(MAIN_EXTERNALLY_VISIBLE);
++int test_main(int argc, char **argv) USE_TEST(MAIN_EXTERNALLY_VISIBLE);
++int kill_main(int argc, char **argv) USE_KILL(MAIN_EXTERNALLY_VISIBLE);
+ int chown_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-#if ENABLE_GUNZIP
+ int gunzip_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-#endif
+-#if ENABLE_BUNZIP2
+ int bunzip2_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-#endif
+ int bbunpack(char **argv,
+ 	char* (*make_new_name)(char *filename),
+ 	USE_DESKTOP(long long) int (*unpacker)(void)
+ );
++#if ENABLE_ROUTE
++void bb_displayroutes(int noresolve, int netstatfmt);
++#endif
+ 
+ 
+ /* Networking */
+diff --git a/init/Config.in b/init/Config.in
+index 25f4390..a1684d4 100644
+--- a/init/Config.in
++++ b/init/Config.in
+@@ -98,13 +98,13 @@ config FEATURE_INITRD
+ 
+ config HALT
+ 	bool "poweroff, halt, and reboot"
+-	default y
++	default n
+ 	help
+ 	  Stop all processes and either halt, reboot, or power off the system.
+ 
+ config MESG
+ 	bool "mesg"
+-	default y
++	default n
+ 	help
+ 	  Mesg controls access to your terminal by others.  It is typically
+ 	  used to allow or disallow other users to write to your terminal
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 5740d92..11ae10d 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -101,6 +101,7 @@ lib-y += wfopen_input.o
+ lib-y += xatonum.o
+ lib-y += xconnect.o
+ lib-y += xfuncs.o
++lib-y += xfunc_die.o
+ lib-y += xgetcwd.o
+ lib-y += xgethostbyname.o
+ lib-y += xreadlink.o
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index e2bb378..a48a260 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -36,6 +36,13 @@ static const char usage_messages[] ALIGN1 = ""
+ 
+ /* Include generated applet names, pointers to <applet>_main, etc */
+ #include "applet_tables.h"
++/* ...and if applet_tables generator says we have only one applet... */
++#ifdef SINGLE_APPLET_MAIN
++#undef ENABLE_FEATURE_INDIVIDUAL
++#define ENABLE_FEATURE_INDIVIDUAL 1
++#undef USE_FEATURE_INDIVIDUAL
++#define USE_FEATURE_INDIVIDUAL(...) __VA_ARGS__
++#endif
+ 
+ 
+ #if ENABLE_FEATURE_COMPRESS_USAGE
+@@ -77,6 +84,23 @@ static const char *unpack_usage_messages(void)
+ void bb_show_usage(void)
+ {
+ 	if (ENABLE_SHOW_USAGE) {
++#ifdef SINGLE_APPLET_STR
++		/* Imagine that this applet is "true". Dont suck in printf! */
++		const char *p;
++		const char *usage_string = p = unpack_usage_messages();
++
++		if (*p == '\b') {
++			write(2, "\nNo help available.\n\n",
++				sizeof("\nNo help available.\n\n") - 1);
++		} else {
++			write(2, "\nUsage: "SINGLE_APPLET_STR" ",
++				sizeof("\nUsage: "SINGLE_APPLET_STR" ") - 1);
++			write(2, p, strlen(p));
++			write(2, "\n\n", 2);
++		}
++		dealloc_usage_messages((char*)usage_string);
++#else
++// TODO: in this case, stdio is sucked in by busybox_main() anyway...
+ 		const char *format_string;
+ 		const char *p;
+ 		const char *usage_string = p = unpack_usage_messages();
+@@ -84,18 +108,17 @@ void bb_show_usage(void)
+ 
+ 		if (ap < 0) /* never happens, paranoia */
+ 			xfunc_die();
+-
+ 		while (ap) {
+ 			while (*p++) continue;
+ 			ap--;
+ 		}
+-
+ 		fprintf(stderr, "%s multi-call binary\n", bb_banner);
+ 		format_string = "\nUsage: %s %s\n\n";
+ 		if (*p == '\b')
+ 			format_string = "\nNo help available.\n\n";
+ 		fprintf(stderr, format_string, applet_name, p);
+ 		dealloc_usage_messages((char*)usage_string);
++#endif
+ 	}
+ 	xfunc_die();
+ }
+@@ -125,6 +148,9 @@ int *const bb_errno __attribute__ ((section (".data")));
+ 
+ void lbb_prepare(const char *applet
+ 		USE_FEATURE_INDIVIDUAL(, char **argv))
++				MAIN_EXTERNALLY_VISIBLE;
++void lbb_prepare(const char *applet
++		USE_FEATURE_INDIVIDUAL(, char **argv))
+ {
+ #ifdef __GLIBC__
+ 	(*(int **)&bb_errno) = __errno_location();
+@@ -158,6 +184,9 @@ const char *applet_name;
+ bool re_execed;
+ #endif
+ 
++
++#if !ENABLE_FEATURE_INDIVIDUAL
++
+ USE_FEATURE_SUID(static uid_t ruid;)  /* real uid */
+ 
+ #if ENABLE_FEATURE_SUID_CONFIG
+@@ -660,6 +689,9 @@ void run_applet_and_exit(const char *name, char **argv)
+ 		exit(busybox_main(argv));
+ }
+ 
++#endif /* !ENABLE_FEATURE_INDIVIDUAL */
++
++
+ 
+ #if ENABLE_BUILD_LIBBUSYBOX
+ int lbb_main(char **argv)
+@@ -667,6 +699,11 @@ int lbb_main(char **argv)
+ int main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #endif
+ {
++#if ENABLE_FEATURE_INDIVIDUAL
++	/* Only one applet is selected by the user! */
++	lbb_prepare(SINGLE_APPLET_STR USE_FEATURE_INDIVIDUAL(, argv));
++	return SINGLE_APPLET_MAIN(argc, argv);
++#else
+ 	lbb_prepare("busybox" USE_FEATURE_INDIVIDUAL(, argv));
+ 
+ #if !BB_MMU
+@@ -685,4 +722,5 @@ int main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	run_applet_and_exit(applet_name, argv);
+ 	bb_error_msg_and_die("applet not found");
++#endif
+ }
+diff --git a/libbb/error_msg_and_die.c b/libbb/error_msg_and_die.c
+index 0e99a03..addd818 100644
+--- a/libbb/error_msg_and_die.c
++++ b/libbb/error_msg_and_die.c
+@@ -9,33 +9,6 @@
+ 
+ #include "libbb.h"
+ 
+-int die_sleep;
+-#if ENABLE_FEATURE_PREFER_APPLETS || ENABLE_HUSH
+-jmp_buf die_jmp;
+-#endif
+-
+-void xfunc_die(void)
+-{
+-	if (die_sleep) {
+-		if ((ENABLE_FEATURE_PREFER_APPLETS || ENABLE_HUSH)
+-		 && die_sleep < 0
+-		) {
+-			/* Special case. We arrive here if NOFORK applet
+-			 * calls xfunc, which then decides to die.
+-			 * We don't die, but jump instead back to caller.
+-			 * NOFORK applets still cannot carelessly call xfuncs:
+-			 * p = xmalloc(10);
+-			 * q = xmalloc(10); // BUG! if this dies, we leak p!
+-			 */
+-			/* -2222 means "zero" (longjmp can't pass 0)
+-			 * run_nofork_applet() catches -2222. */
+-			longjmp(die_jmp, xfunc_error_retval ? xfunc_error_retval : -2222);
+-		}
+-		sleep(die_sleep);
+-	}
+-	exit(xfunc_error_retval);
+-}
+-
+ void bb_error_msg_and_die(const char *s, ...)
+ {
+ 	va_list p;
+diff --git a/libbb/getopt32.c b/libbb/getopt32.c
+index 51e0306..c0d8856 100644
+--- a/libbb/getopt32.c
++++ b/libbb/getopt32.c
+@@ -285,6 +285,10 @@ const char *const bb_argv_dash[] = { "-", NULL };
+ 
+ const char *opt_complementary;
+ 
++/* Many small applets don't want to suck in stdio.h only because
++ * they need to parse options by calling us */
++#define DONT_USE_PRINTF 1
++
+ enum {
+ 	PARAM_STRING,
+ 	PARAM_LIST,
+@@ -335,7 +339,8 @@ getopt32(char **argv, const char *applet_opts, ...)
+ #define SHOW_USAGE_IF_ERROR     1
+ #define ALL_ARGV_IS_OPTS        2
+ #define FIRST_ARGV_IS_OPT       4
+-#define FREE_FIRST_ARGV_IS_OPT  8
++#define FREE_FIRST_ARGV_IS_OPT  (8 * !DONT_USE_PRINTF)
++
+ 	int spec_flgs = 0;
+ 
+ 	argc = 0;
+@@ -489,10 +494,16 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 	va_end(p);
+ 
+ 	if (spec_flgs & FIRST_ARGV_IS_OPT) {
+-		if (argv[1] && argv[1][0] != '-' && argv[1][0] != '\0') {
++		if (argv[1] && argv[1][0] != '-' && argv[1][1] != '\0') {
++#if DONT_USE_PRINTF
++			char *pp = alloca(strlen(argv[1]) + 2);
++			*pp++ = '-';
++			argv[1] = strcpy(pp, argv[1]);
++#else
+ 			argv[1] = xasprintf("-%s", argv[1]);
+ 			if (ENABLE_FEATURE_CLEAN_UP)
+ 				spec_flgs |= FREE_FIRST_ARGV_IS_OPT;
++#endif
+ 		}
+ 	}
+ 
+@@ -573,7 +584,7 @@ getopt32(char **argv, const char *applet_opts, ...)
+ 		}
+ 	}
+ 
+-#if (ENABLE_AR || ENABLE_TAR) && ENABLE_FEATURE_CLEAN_UP
++#if ENABLE_FEATURE_CLEAN_UP
+ 	if (spec_flgs & FREE_FIRST_ARGV_IS_OPT)
+ 		free(argv[1]);
+ #endif
+diff --git a/procps/kill.c b/procps/kill.c
+index a77d66e..b839b38 100644
+--- a/procps/kill.c
++++ b/procps/kill.c
+@@ -24,7 +24,6 @@
+  * This is needed to avoid collision with kill -9 ... syntax
+  */
+ 
+-int kill_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int kill_main(int argc, char **argv)
+ {
+ 	char *arg;
+diff --git a/shell/Config.in b/shell/Config.in
+index 5ea071c..40e0217 100644
+--- a/shell/Config.in
++++ b/shell/Config.in
+@@ -36,7 +36,6 @@ endchoice
+ config ASH
+ 	bool "ash"
+ 	default n
+-	select TEST
+ 	help
+ 	  Tha 'ash' shell adds about 60k in the default configuration and is
+ 	  the most complete and most pedantically correct shell included with
+@@ -111,7 +110,6 @@ config ASH_GETOPTS
+ config ASH_BUILTIN_ECHO
+ 	bool "Builtin version of 'echo'"
+ 	default y
+-	select ECHO
+ 	depends on ASH
+ 	help
+ 	  Enable support for echo, builtin to ash.
+@@ -119,7 +117,6 @@ config ASH_BUILTIN_ECHO
+ config ASH_BUILTIN_TEST
+ 	bool "Builtin version of 'test'"
+ 	default y
+-	select TEST
+ 	depends on ASH
+ 	help
+ 	  Enable support for test, builtin to ash.
+@@ -170,10 +167,6 @@ config ASH_EXPAND_PRMT
+ config HUSH
+ 	bool "hush"
+ 	default n
+-	select TRUE
+-	select FALSE
+-	select TEST
+-	select ECHO
+ 	help
+ 	  hush is a very small shell (just 18k) and it has fairly complete
+ 	  Bourne shell grammar.  It even handles all the normal flow control
+@@ -240,13 +233,9 @@ config LASH
+ 	help
+ 	  lash is deprecated and will be removed, please migrate to hush.
+ 
+-
+ config MSH
+ 	bool "msh"
+ 	default n
+-	select TRUE
+-	select FALSE
+-	select TEST
+ 	help
+ 	  The minix shell (adds just 30k) is quite complete and handles things
+ 	  like for/do/done, case/esac and all the things you expect a Bourne
+diff --git a/shell/ash.c b/shell/ash.c
+index 3651929..360d39b 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -8417,12 +8417,6 @@ returncmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ static int breakcmd(int, char **);
+ static int dotcmd(int, char **);
+ static int evalcmd(int, char **);
+-#if ENABLE_ASH_BUILTIN_ECHO
+-static int echocmd(int, char **);
+-#endif
+-#if ENABLE_ASH_BUILTIN_TEST
+-static int testcmd(int, char **);
+-#endif
+ static int exitcmd(int, char **);
+ static int exportcmd(int, char **);
+ #if ENABLE_ASH_GETOPTS
+@@ -8464,6 +8458,9 @@ static int ulimitcmd(int, char **);
+  * Apart from the above, [[ expr ]] should work as [ expr ]
+  */
+ 
++#define testcmd test_main
++#define echocmd echo_main
++
+ /* Keep these in proper order since it is searched via bsearch() */
+ static const struct builtincmd builtintab[] = {
+ 	{ BUILTIN_SPEC_REG      ".", dotcmd },
+@@ -11506,22 +11503,6 @@ exitcmd(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	/* NOTREACHED */
+ }
+ 
+-#if ENABLE_ASH_BUILTIN_ECHO
+-static int
+-echocmd(int argc, char **argv)
+-{
+-	return echo_main(argc, argv);
+-}
+-#endif
+-
+-#if ENABLE_ASH_BUILTIN_TEST
+-static int
+-testcmd(int argc, char **argv)
+-{
+-	return test_main(argc, argv);
+-}
+-#endif
+-
+ /*
+  * Read a file containing shell functions.
+  */

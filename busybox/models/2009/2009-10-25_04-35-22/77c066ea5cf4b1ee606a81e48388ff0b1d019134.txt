@@ -1,0 +1,188 @@
+2009-10-25 04:35:22 +0100
+diff --git a/modutils/Config.in b/modutils/Config.in
+index d2a2e04..83c12b6 100644
+--- a/modutils/Config.in
++++ b/modutils/Config.in
+@@ -121,6 +121,22 @@ config FEATURE_2_4_MODULES
+ 	  This increases size considerably. Say N unless you plan
+ 	  to run ancient kernels.
+ 
++config FEATURE_INSMOD_TRY_MMAP
++	bool "Try to load module from a mmap'ed area"
++	default n
++	depends on INSMOD || MODPROBE_SMALL
++	help
++	  This option causes module loading code to try to mmap
++	  module first. If it does not work (for example,
++	  it does not work for compressed modules), module will be read
++	  (and unpacked if needed) into a memory block allocated by malloc.
++
++	  The only case when mmap works but malloc does not is when
++	  you are trying to load a big module on a very memory-constrained
++	  machine. Malloc will momentarily need 2x as much memory as mmap.
++
++	  Choosing N saves about 250 bytes of code (on 32-bit x86).
++
+ config FEATURE_INSMOD_VERSION_CHECKING
+ 	bool "Enable module version checking"
+ 	default n
+diff --git a/modutils/modutils-24.c b/modutils/modutils-24.c
+index e5ff54d..a878e74 100644
+--- a/modutils/modutils-24.c
++++ b/modutils/modutils-24.c
+@@ -3783,12 +3783,20 @@ int FAST_FUNC bb_init_module_24(const char *m_filename, const char *options)
+ 	int m_has_modinfo;
+ #endif
+ 	char *image;
+-	size_t image_size = 64 * 1024 * 1024;
+-
+-	/* Load module into memory and unzip if compressed */
+-	image = xmalloc_open_zipped_read_close(m_filename, &image_size);
+-	if (!image)
+-		return EXIT_FAILURE;
++	size_t image_size;
++	bool mmaped;
++
++	image_size = INT_MAX - 4095;
++	mmaped = 0;
++	image = try_to_mmap_module(m_filename, &image_size);
++	if (image) {
++		mmaped = 1;
++	} else {
++		/* Load module into memory and unzip if compressed */
++		image = xmalloc_open_zipped_read_close(m_filename, &image_size);
++		if (!image)
++			return EXIT_FAILURE;
++	}
+ 
+ 	m_name = xstrdup(bb_basename(m_filename));
+ 	/* "module.o[.gz]" -> "module" */
+@@ -3901,7 +3909,10 @@ int FAST_FUNC bb_init_module_24(const char *m_filename, const char *options)
+ 	exit_status = EXIT_SUCCESS;
+ 
+  out:
+-	free(image);
++	if (mmaped)
++		munmap(image, image_size);
++	else
++		free(image);
+ 	free(m_name);
+ 
+ 	return exit_status;
+diff --git a/modutils/modutils.c b/modutils/modutils.c
+index 969926d..850a868 100644
+--- a/modutils/modutils.c
++++ b/modutils/modutils.c
+@@ -62,7 +62,7 @@ char* FAST_FUNC filename2modname(const char *filename, char *modname)
+ 	return modname;
+ }
+ 
+-char * FAST_FUNC parse_cmdline_module_options(char **argv)
++char* FAST_FUNC parse_cmdline_module_options(char **argv)
+ {
+ 	char *options;
+ 	int optlen;
+@@ -77,6 +77,40 @@ char * FAST_FUNC parse_cmdline_module_options(char **argv)
+ 	return options;
+ }
+ 
++#if ENABLE_FEATURE_INSMOD_TRY_MMAP
++void* FAST_FUNC try_to_mmap_module(const char *filename, size_t *image_size_p)
++{
++	/* We have user reports of failure to load 3MB module
++	 * on a 16MB RAM machine. Apparently even a transient
++	 * memory spike to 6MB during module load
++	 * is too big for that system. */
++	void *image;
++	struct stat st;
++	int fd;
++
++	fd = xopen(filename, O_RDONLY);
++	fstat(fd, &st);
++	image = NULL;
++	/* st.st_size is off_t, we can't just pass it to mmap */
++	if (st.st_size <= *image_size_p) {
++		size_t image_size = st.st_size;
++		image = mmap(NULL, image_size, PROT_READ, MAP_PRIVATE, fd, 0);
++		if (image == MAP_FAILED) {
++			image = NULL;
++		} else if (*(uint32_t*)image != SWAP_BE32(0x7f454C46)) {
++			/* No ELF signature. Compressed module? */
++			munmap(image, image_size);
++			image = NULL;
++		} else {
++			/* Success. Report the size */
++			*image_size_p = image_size;
++		}
++	}
++	close(fd);
++	return image;
++}
++#endif
++
+ /* Return:
+  * 0 on success,
+  * -errno on open/read error,
+@@ -84,9 +118,10 @@ char * FAST_FUNC parse_cmdline_module_options(char **argv)
+  */
+ int FAST_FUNC bb_init_module(const char *filename, const char *options)
+ {
+-	size_t len;
++	size_t image_size;
+ 	char *image;
+ 	int rc;
++	bool mmaped;
+ 
+ 	if (!options)
+ 		options = "";
+@@ -97,17 +132,25 @@ int FAST_FUNC bb_init_module(const char *filename, const char *options)
+ 		return bb_init_module_24(filename, options);
+ #endif
+ 
+-	/* Use the 2.6 way */
+-	len = INT_MAX - 4095;
+-	errno = ENOMEM; /* may be changed by e.g. open errors below */
+-	image = xmalloc_open_zipped_read_close(filename, &len);
+-	if (!image)
+-		return -errno;
++	image_size = INT_MAX - 4095;
++	mmaped = 0;
++	image = try_to_mmap_module(filename, &image_size);
++	if (image) {
++		mmaped = 1;
++	} else {
++		errno = ENOMEM; /* may be changed by e.g. open errors below */
++		image = xmalloc_open_zipped_read_close(filename, &image_size);
++		if (!image)
++			return -errno;
++	}
+ 
+ 	errno = 0;
+-	init_module(image, len, options);
++	init_module(image, image_size, options);
+ 	rc = errno;
+-	free(image);
++	if (mmaped)
++		munmap(image, image_size);
++	else
++		free(image);
+ 	return rc;
+ }
+ 
+diff --git a/modutils/modutils.h b/modutils/modutils.h
+index 1cf4bba..131a508 100644
+--- a/modutils/modutils.h
++++ b/modutils/modutils.h
+@@ -51,6 +51,12 @@ enum {
+ #endif
+ };
+ 
++#if ENABLE_FEATURE_INSMOD_TRY_MMAP
++void* FAST_FUNC try_to_mmap_module(const char *filename, size_t *image_size_p);
++#else
++# define try_to_mmap_module(filename, image_size) NULL
++#endif
++
+ /* Return:
+  * 0 on success,
+  * -errno on open/read error,

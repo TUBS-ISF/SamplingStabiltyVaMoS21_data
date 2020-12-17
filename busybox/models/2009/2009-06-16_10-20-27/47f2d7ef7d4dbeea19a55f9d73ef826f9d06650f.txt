@@ -1,0 +1,247 @@
+2009-06-16 10:20:27 +0200
+diff --git a/networking/udhcp/arpping.c b/networking/udhcp/arpping.c
+index b10bff6..fa0989d 100644
+--- a/networking/udhcp/arpping.c
++++ b/networking/udhcp/arpping.c
+@@ -41,7 +41,11 @@ enum {
+ 
+ /* Returns 1 if no reply received */
+ 
+-int FAST_FUNC arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *interface)
++int FAST_FUNC arpping(uint32_t test_ip,
++		const uint8_t *safe_mac,
++		uint32_t from_ip,
++		uint8_t *from_mac,
++		const char *interface)
+ {
+ 	int timeout_ms;
+ 	struct pollfd pfd[1];
+@@ -73,7 +77,7 @@ int FAST_FUNC arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, con
+ 	arp.operation = htons(ARPOP_REQUEST);           /* ARP op code */
+ 	memcpy(arp.sHaddr, from_mac, 6);                /* source hardware address */
+ 	memcpy(arp.sInaddr, &from_ip, sizeof(from_ip)); /* source IP address */
+-	/* tHaddr is zero-fiiled */                     /* target hardware address */
++	/* tHaddr is zero-filled */                     /* target hardware address */
+ 	memcpy(arp.tInaddr, &test_ip, sizeof(test_ip)); /* target IP address */
+ 
+ 	memset(&addr, 0, sizeof(addr));
+@@ -98,13 +102,24 @@ int FAST_FUNC arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, con
+ 			r = read(s, &arp, sizeof(arp));
+ 			if (r < 0)
+ 				break;
++
++			//bb_error_msg("sHaddr %02x:%02x:%02x:%02x:%02x:%02x",
++			//	arp.sHaddr[0], arp.sHaddr[1], arp.sHaddr[2],
++			//	arp.sHaddr[3], arp.sHaddr[4], arp.sHaddr[5]);
++
+ 			if (r >= ARP_MSG_SIZE
+ 			 && arp.operation == htons(ARPOP_REPLY)
+ 			 /* don't check it: Linux doesn't return proper tHaddr (fixed in 2.6.24?) */
+ 			 /* && memcmp(arp.tHaddr, from_mac, 6) == 0 */
+ 			 && *((uint32_t *) arp.sInaddr) == test_ip
+ 			) {
+-				rv = 0;
++				 /* if ARP source MAC matches safe_mac
++				  * (which is client's MAC), then it's not a conflict
++				  * (client simply already has this IP and replies to ARPs!)
++				  */
++				if (!safe_mac || memcmp(safe_mac, arp.sHaddr, 6) != 0)
++					rv = 0;
++				//else bb_error_msg("sHaddr == safe_mac");
+ 				break;
+ 			}
+ 		}
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index 5a258c0..ca96847 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -92,7 +92,11 @@ int udhcp_read_interface(const char *interface, int *ifindex, uint32_t *addr, ui
+ int udhcp_raw_socket(int ifindex) FAST_FUNC;
+ int udhcp_listen_socket(/*uint32_t ip,*/ int port, const char *inf) FAST_FUNC;
+ /* Returns 1 if no reply received */
+-int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *interface) FAST_FUNC;
++int arpping(uint32_t test_ip,
++		const uint8_t *safe_mac,
++		uint32_t from_ip,
++		uint8_t *from_mac,
++		const char *interface) FAST_FUNC;
+ 
+ #if ENABLE_UDHCP_DEBUG
+ # define DEBUG(str, args...) bb_info_msg("### " str, ## args)
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 2dd3cd0..ab34b04 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -553,9 +553,10 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+  * the client MUST send a DHCPDECLINE message to the server and restarts
+  * the configuration process..." */
+ 						if (!arpping(packet.yiaddr,
+-							    (uint32_t) 0,
+-							    client_config.arp,
+-							    client_config.interface)
++								NULL,
++								(uint32_t) 0,
++								client_config.arp,
++								client_config.interface)
+ 						) {
+ 							bb_info_msg("offered address is in use "
+ 								"(got ARP reply), declining");
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 9667c61..4b5fcc0 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -99,7 +99,7 @@ struct dhcpOfferedAddr *add_lease(
+ int lease_expired(struct dhcpOfferedAddr *lease) FAST_FUNC;
+ struct dhcpOfferedAddr *find_lease_by_chaddr(const uint8_t *chaddr) FAST_FUNC;
+ struct dhcpOfferedAddr *find_lease_by_yiaddr(uint32_t yiaddr) FAST_FUNC;
+-uint32_t find_free_or_expired_address(void) FAST_FUNC;
++uint32_t find_free_or_expired_address(const uint8_t *chaddr) FAST_FUNC;
+ 
+ 
+ /*** static_leases.h ***/
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index e17fb9e..b2cdd19 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -118,7 +118,7 @@ struct dhcpOfferedAddr* FAST_FUNC find_lease_by_yiaddr(uint32_t yiaddr)
+ 
+ 
+ /* check is an IP is taken, if it is, add it to the lease table */
+-static int nobody_responds_to_arp(uint32_t addr)
++static int nobody_responds_to_arp(uint32_t addr, const uint8_t *safe_mac)
+ {
+ 	/* 16 zero bytes */
+ 	static const uint8_t blank_chaddr[16] = { 0 };
+@@ -127,7 +127,9 @@ static int nobody_responds_to_arp(uint32_t addr)
+ 	struct in_addr temp;
+ 	int r;
+ 
+-	r = arpping(addr, server_config.server, server_config.arp, server_config.interface);
++	r = arpping(addr, safe_mac,
++			server_config.server, server_config.arp,
++			server_config.interface);
+ 	if (r)
+ 		return r;
+ 
+@@ -140,7 +142,7 @@ static int nobody_responds_to_arp(uint32_t addr)
+ 
+ 
+ /* Find a new usable (we think) address. */
+-uint32_t FAST_FUNC find_free_or_expired_address(void)
++uint32_t FAST_FUNC find_free_or_expired_address(const uint8_t *chaddr)
+ {
+ 	uint32_t addr;
+ 	struct dhcpOfferedAddr *oldest_lease = NULL;
+@@ -163,7 +165,7 @@ uint32_t FAST_FUNC find_free_or_expired_address(void)
+ 
+ 		lease = find_lease_by_yiaddr(net_addr);
+ 		if (!lease) {
+-			if (nobody_responds_to_arp(net_addr))
++			if (nobody_responds_to_arp(net_addr, chaddr))
+ 				return net_addr;
+ 		} else {
+ 			if (!oldest_lease || lease->expires < oldest_lease->expires)
+@@ -172,7 +174,7 @@ uint32_t FAST_FUNC find_free_or_expired_address(void)
+ 	}
+ 
+ 	if (oldest_lease && lease_expired(oldest_lease)
+-	 && nobody_responds_to_arp(oldest_lease->yiaddr)
++	 && nobody_responds_to_arp(oldest_lease->yiaddr, chaddr)
+ 	) {
+ 		return oldest_lease->yiaddr;
+ 	}
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index 8b0f185..157d157 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -31,7 +31,8 @@ static int send_packet_to_relay(struct dhcpMessage *payload)
+ {
+ 	DEBUG("Forwarding packet to relay");
+ 
+-	return udhcp_send_kernel_packet(payload, server_config.server, SERVER_PORT,
++	return udhcp_send_kernel_packet(payload,
++			server_config.server, SERVER_PORT,
+ 			payload->giaddr, SERVER_PORT);
+ }
+ 
+@@ -42,23 +43,31 @@ static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcas
+ 	const uint8_t *chaddr;
+ 	uint32_t ciaddr;
+ 
+-	if (force_broadcast) {
+-		DEBUG("broadcasting packet to client (NAK)");
++	// Was:
++	//if (force_broadcast) { /* broadcast */ }
++	//else if (payload->ciaddr) { /* unicast to payload->ciaddr */ }
++	//else if (payload->flags & htons(BROADCAST_FLAG)) { /* broadcast */ }
++	//else { /* unicast to payload->yiaddr */ }
++	// But this is wrong: yiaddr is _our_ idea what client's IP is
++	// (for example, from lease file). Client may not know that,
++	// and may not have UDP socket listening on that IP!
++	// We should never unicast to payload->yiaddr!
++	// payload->ciaddr, OTOH, comes from client's request packet,
++	// and can be used.
++
++	if (force_broadcast
++	 || (payload->flags & htons(BROADCAST_FLAG))
++	 || !payload->ciaddr
++	) {
++		DEBUG("broadcasting packet to client");
+ 		ciaddr = INADDR_BROADCAST;
+ 		chaddr = MAC_BCAST_ADDR;
+-	} else if (payload->ciaddr) {
++	} else {
+ 		DEBUG("unicasting packet to client ciaddr");
+ 		ciaddr = payload->ciaddr;
+ 		chaddr = payload->chaddr;
+-	} else if (payload->flags & htons(BROADCAST_FLAG)) {
+-		DEBUG("broadcasting packet to client (requested)");
+-		ciaddr = INADDR_BROADCAST;
+-		chaddr = MAC_BCAST_ADDR;
+-	} else {
+-		DEBUG("unicasting packet to client yiaddr");
+-		ciaddr = payload->yiaddr;
+-		chaddr = payload->chaddr;
+ 	}
++
+ 	return udhcp_send_raw_packet(payload,
+ 		/*src*/ server_config.server, SERVER_PORT,
+ 		/*dst*/ ciaddr, CLIENT_PORT, chaddr,
+@@ -118,17 +127,18 @@ int FAST_FUNC send_offer(struct dhcpMessage *oldpacket)
+ 		struct dhcpOfferedAddr *lease;
+ 
+ 		lease = find_lease_by_chaddr(oldpacket->chaddr);
+-		/* the client is in our lease/offered table */
++		/* The client is in our lease/offered table */
+ 		if (lease) {
+ 			signed_leasetime_t tmp = lease->expires - time(NULL);
+ 			if (tmp >= 0)
+ 				lease_time_aligned = tmp;
+ 			packet.yiaddr = lease->yiaddr;
+-		/* Or the client has requested an ip */
+-		} else if ((req = get_option(oldpacket, DHCP_REQUESTED_IP)) != NULL
+-		 /* Don't look here (ugly hackish thing to do) */
++		}
++		/* Or the client has requested an IP */
++		else if ((req = get_option(oldpacket, DHCP_REQUESTED_IP)) != NULL
++		 /* (read IP) */
+ 		 && (move_from_unaligned32(req_align, req), 1)
+-		 /* and the ip is in the lease range */
++		 /* and the IP is in the lease range */
+ 		 && ntohl(req_align) >= server_config.start_ip
+ 		 && ntohl(req_align) <= server_config.end_ip
+ 		 /* and is not already taken/offered */
+@@ -137,9 +147,10 @@ int FAST_FUNC send_offer(struct dhcpMessage *oldpacket)
+ 			|| lease_expired(lease))
+ 		) {
+ 			packet.yiaddr = req_align;
+-		/* otherwise, find a free IP */
+-		} else {
+-			packet.yiaddr = find_free_or_expired_address();
++		}
++		/* Otherwise, find a free IP */
++		else {
++			packet.yiaddr = find_free_or_expired_address(oldpacket->chaddr);
+ 		}
+ 
+ 		if (!packet.yiaddr) {

@@ -1,0 +1,15 @@
+2009-04-15 21:49:48 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 683f9ba..b91e8c3 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -147,8 +147,7 @@
+ static const char hush_version_str[] ALIGN1 = "HUSH_VERSION="BB_VER;
+ 
+ /* This supports saving pointers malloced in vfork child,
+- * to be freed in the parent. One pointer is saved in
+- * G.argv_from_re_execing global var instead. TODO: unify.
++ * to be freed in the parent.
+  */
+ #if !BB_MMU
+ typedef struct nommu_save_t {

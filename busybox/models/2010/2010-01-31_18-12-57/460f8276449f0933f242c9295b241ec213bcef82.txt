@@ -1,0 +1,51 @@
+2010-01-31 18:12:57 +0100
+diff --git a/Config.in b/Config.in
+index b4ea702..e7bb05d 100644
+--- a/Config.in
++++ b/Config.in
+@@ -161,9 +161,11 @@ config LAST_SUPPORTED_WCHAR
+ 
+ 	  The idea is that many valid printable Unicode chars are
+ 	  nevertheless are not displayed correctly. Think about
+-	  combining charachers, double-wide hieroglyphs and such.
+-	  Many terminals, xterms and such will fail to handle them
+-	  correctly.
++	  combining charachers, double-wide hieroglyphs, obscure
++	  characters in dozens of ancient scripts...
++	  Many terminals, terminal emulators, xterms etc will fail
++	  to handle them correctly. Choose the smallest value
++	  which suits your needs.
+ 
+ 	  Typical values are:
+ 	  126 - ASCII only
+@@ -172,6 +174,10 @@ config LAST_SUPPORTED_WCHAR
+ 			code is ~700 bytes smaller for this case.
+ 	  4351 (0x10ff) - there are no double-wide chars in [0..4351] range,
+ 			code is ~300 bytes smaller for this case.
++	  12799 (0x31ff) - nearly all non-ideographic characters are
++			available in [0..12799] range, including
++			East Asian scripts like katakana, hiragana, hangul,
++			bopomofo...
+ 	  0 - off, any valid printable Unicode character will be printed.
+ 
+ config UNICODE_COMBINING_WCHARS
+diff --git a/libbb/unicode_wcwidth.c b/libbb/unicode_wcwidth.c
+index c7cc524..a81a980 100644
+--- a/libbb/unicode_wcwidth.c
++++ b/libbb/unicode_wcwidth.c
+@@ -534,6 +534,7 @@ static int wcwidth(unsigned ucs)
+ 		|| ucs == 0x2329 /* left-pointing angle bracket; also CJK punct. char */
+ 		|| ucs == 0x232a /* right-pointing angle bracket; also CJK punct. char */
+ 		|| (ucs >= 0x2e80 && ucs <= 0xa4cf && ucs != 0x303f) /* CJK ... Yi */
++#  if LAST_SUPPORTED_WCHAR >= 0xac00
+ 		|| (ucs >= 0xac00 && ucs <= 0xd7a3) /* Hangul Syllables */
+ 		|| (ucs >= 0xf900 && ucs <= 0xfaff) /* CJK Compatibility Ideographs */
+ 		|| (ucs >= 0xfe10 && ucs <= 0xfe19) /* Vertical forms */
+@@ -541,6 +542,7 @@ static int wcwidth(unsigned ucs)
+ 		|| (ucs >= 0xff00 && ucs <= 0xff60) /* Fullwidth Forms */
+ 		|| (ucs >= 0xffe0 && ucs <= 0xffe6)
+ 		|| ((ucs >> 17) == (2 >> 1)) /* 20000..3ffff: Supplementary and Tertiary Ideographic Planes */
++#  endif
+ 		);
+ # endif
+ #endif

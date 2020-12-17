@@ -1,0 +1,166 @@
+2008-07-28 00:01:16 +0000
+diff --git a/shell/Config.in b/shell/Config.in
+index f4a9e7b..ee2f832 100644
+--- a/shell/Config.in
++++ b/shell/Config.in
+@@ -178,9 +178,11 @@ config HUSH
+ 	  hush is a very small shell (just 18k) and it has fairly complete
+ 	  Bourne shell grammar. It even handles all the normal flow control
+ 	  options such as if/then/elif/else/fi, for/in/do/done, while loops,
+-	  etc.
++	  case/esac.
+ 
+-	  It does not handle case/esac, select, function, here documents ( <<
++	  It uses only vfork, so it can be used on uClinux systems.
++
++	  It does not handle select, functions, here documents ( <<
+ 	  word ), arithmetic expansion, aliases, brace expansion, tilde
+ 	  expansion, &> and >& redirection of stdout+stderr, etc.
+ 
+@@ -232,6 +234,14 @@ config HUSH_LOOPS
+ 	depends on HUSH
+ 	help
+ 	  Enable for, while and until loops in hush.
++	  As of 2008-07, break and continue statements are not supported.
++
++config HUSH_CASE
++	bool "Support case ... esac statement"
++	default n
++	depends on HUSH
++	help
++	  Enable case ... esac statement in hush. +400 bytes.
+ 
+ config LASH
+ 	bool "lash"
+@@ -249,7 +259,7 @@ config MSH
+ 	  shell to do. It is not always pedantically correct about Bourne
+ 	  shell grammar (try running the shell testscript "tests/sh.testcases"
+ 	  on it and compare vs bash) but for most things it works quite well.
+-	  It also uses only vfork, so it can be used on uClinux systems.
++	  It uses only vfork, so it can be used on uClinux systems.
+ 
+ comment "Bourne Shell Options"
+ 	depends on MSH || LASH || HUSH || ASH
+diff --git a/shell/hush.c b/shell/hush.c
+index cf6a18f..5a565b3 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -67,14 +67,12 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
+-
+-#include <glob.h>      /* glob, of course */
+-/* #include <dmalloc.h> */
+-
+ #include "busybox.h" /* for APPLET_IS_NOFORK/NOEXEC */
+-
+-// TEMP
+-#define ENABLE_HUSH_CASE 0
++#include <glob.h>
++/* #include <dmalloc.h> */
++#if ENABLE_HUSH_CASE
++#include <fnmatch.h>
++#endif
+ 
+ 
+ #if !BB_MMU && ENABLE_HUSH_TICK
+@@ -2064,6 +2062,10 @@ static int run_list(struct pipe *pi)
+ 	rpipe = NULL;
+ #endif
+ 
++	/* Past this point, all code paths should jump to ret: label
++	 * in order to return, no direct "return" statements.
++	 * This helps to ensure that no memory is leaked */
++
+ #if ENABLE_HUSH_JOB
+ 	/* Example of nested list: "while true; do { sleep 1 | exit 2; } done".
+ 	 * We are saving state before entering outermost list ("while...done")
+@@ -2170,6 +2172,7 @@ static int run_list(struct pipe *pi)
+ 			if (!*for_lcur) {
+ 				/* for loop is over, clean up */
+ 				free(for_list);
++				for_list = NULL;
+ 				for_lcur = NULL;
+ 				flag_rep = 0;
+ 				pi->progs->argv[0] = for_varname;
+@@ -2195,14 +2198,21 @@ static int run_list(struct pipe *pi)
+ #endif
+ #if ENABLE_HUSH_CASE
+ 		if (rword == RES_CASE) {
+-			case_word = pi->progs->argv[0];
++			case_word = expand_strvec_to_string(pi->progs->argv);
++			//bb_error_msg("case: arg:'%s' case_word:'%s'", pi->progs->argv[0], case_word);
+ 			continue;
+ 		}
+ 		if (rword == RES_MATCH) {
+ 			if (case_word) {
+-				next_if_code = strcmp(case_word, pi->progs->argv[0]);
+-				if (next_if_code == 0)
++				char *pattern = expand_strvec_to_string(pi->progs->argv);
++				/* TODO: which FNM_xxx flags to use? */
++				next_if_code = fnmatch(pattern, case_word, /*flags:*/ 0);
++				//bb_error_msg("fnmatch('%s','%s'):%d", pattern, case_word, next_if_code);
++				free(pattern);
++				if (next_if_code == 0) {
++					free(case_word);
+ 					case_word = NULL;
++				}
+ 				continue;
+ 			}
+ 			break;
+@@ -2276,6 +2286,12 @@ static int run_list(struct pipe *pi)
+ 	}
+ #endif
+ 	debug_printf_exec("run_list lvl %d return %d\n", run_list_level + 1, rcode);
++#if ENABLE_HUSH_LOOPS
++	free(for_list);
++#endif
++#if ENABLE_HUSH_CASE
++	free(case_word);
++#endif
+ 	return rcode;
+ }
+ 
+diff --git a/shell/hush_test/hush-misc/case1.right b/shell/hush_test/hush-misc/case1.right
+new file mode 100644
+index 0000000..9b88658
+--- /dev/null
++++ b/shell/hush_test/hush-misc/case1.right
+@@ -0,0 +1,13 @@
++OK_1
++OK_21
++OK_22
++OK_23
++OK_31
++OK_32
++OK_41
++OK_42
++OK_43
++OK_44
++OK_51
++OK_52
++OK_53
+diff --git a/shell/hush_test/hush-misc/case1.tests b/shell/hush_test/hush-misc/case1.tests
+new file mode 100755
+index 0000000..15f60f3
+--- /dev/null
++++ b/shell/hush_test/hush-misc/case1.tests
+@@ -0,0 +1,17 @@
++case w in a) echo SKIP;; w) echo OK_1;; w) echo WRONG;; esac
++
++t=w
++case $t in a) echo SKIP;; w) echo OK_21;; w) echo WRONG;; esac;
++case "$t" in a) echo SKIP;; w) echo OK_22;; w) echo WRONG;; esac;
++case w in a) echo SKIP;; $t) echo OK_23;; "$t") echo WRONG;; esac;
++
++case '' in a) echo SKIP;; w) echo WRONG;; *) echo OK_31;; esac;
++case '' in a) echo SKIP;; '') echo OK_32;; *) echo WRONG;; esac;
++
++case `echo w` in a) echo SKIP;; w) echo OK_41;; w) echo WRONG;; esac;
++case "`echo w`" in a) echo SKIP;; w) echo OK_42;; w) echo WRONG;; esac;
++case `echo w w` in a) echo SKIP;; w) echo WRONG;; 'w w') echo OK_43;; esac;
++case `echo w w` in a) echo SKIP;; w) echo WRONG;; w*) echo OK_44;; esac;
++
++case w in `echo w`) echo OK_51;; `echo WRONG >&2`w) echo WRONG;; esac;
++case w in `echo OK_52 >&2`) echo SKIP;; `echo`w) echo OK_53;; esac;

@@ -1,0 +1,17 @@
+2009-10-27 10:01:01 +0100
+diff --git a/libbb/xrealloc_vector.c b/libbb/xrealloc_vector.c
+index bbd5ab8..98fa967 100644
+--- a/libbb/xrealloc_vector.c
++++ b/libbb/xrealloc_vector.c
+@@ -20,8 +20,9 @@
+  * idx step, plus one: if idx == 0x20, vector[] is resized to 0x31,
+  * thus last usable element is vector[0x30].
+  *
+- * In other words: after xrealloc_vector(v, 4, idx) it's ok to use
+- * at least v[idx] and v[idx+1], for all idx values.
++ * In other words: after xrealloc_vector(v, 4, idx), with any idx,
++ * it's ok to use at least v[idx] and v[idx+1].
++ * v[idx+2] etc generally are not ok.
+  *
+  * New elements are zeroed out, but only if realloc was done
+  * (not on every call). You can depend on v[idx] and v[idx+1] being

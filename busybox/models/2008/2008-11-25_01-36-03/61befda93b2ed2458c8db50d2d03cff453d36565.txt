@@ -1,0 +1,149 @@
+2008-11-25 01:36:03 +0000
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index 8a40aa7..38dacc7 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -8,7 +8,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <signal.h>  /* For FEATURE_DD_SIGNAL_HANDLING */
+ #include "libbb.h"
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+diff --git a/coreutils/tee.c b/coreutils/tee.c
+index dc947c9..0f24246 100644
+--- a/coreutils/tee.c
++++ b/coreutils/tee.c
+@@ -11,7 +11,6 @@
+ /* http://www.opengroup.org/onlinepubs/007904975/utilities/tee.html */
+ 
+ #include "libbb.h"
+-#include <signal.h>
+ 
+ int tee_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int tee_main(int argc, char **argv)
+diff --git a/libbb/bb_askpass.c b/libbb/bb_askpass.c
+index c60ef37..c976497 100644
+--- a/libbb/bb_askpass.c
++++ b/libbb/bb_askpass.c
+@@ -8,8 +8,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <termios.h>
+-
+ #include "libbb.h"
+ 
+ /* do nothing signal handler */
+diff --git a/libbb/speed_table.c b/libbb/speed_table.c
+index 646f914..05fe66c 100644
+--- a/libbb/speed_table.c
++++ b/libbb/speed_table.c
+@@ -7,7 +7,6 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <termios.h>
+ #include "libbb.h"
+ 
+ struct speed_map {
+diff --git a/networking/telnet.c b/networking/telnet.c
+index ba6f2fb..cc99425 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -21,7 +21,6 @@
+  *
+  */
+ 
+-#include <termios.h>
+ #include <arpa/telnet.h>
+ #include <netinet/in.h>
+ #include "libbb.h"
+diff --git a/procps/top.c b/procps/top.c
+index 1d22871..c8a9539 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -644,8 +644,6 @@ static void clearmems(void)
+ }
+ 
+ #if ENABLE_FEATURE_USE_TERMIOS
+-#include <termios.h>
+-#include <signal.h>
+ 
+ static void reset_term(void)
+ {
+diff --git a/shell/ash.c b/shell/ash.c
+index 55a79a7..66bfa67 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -53,11 +53,21 @@
+ #endif
+ 
+ #include "busybox.h" /* for applet_names */
++//TODO: pull in some .h and find out do we have SINGLE_APPLET_MAIN?
++//#include "applet_tables.h" doesn't work
+ #include <paths.h>
+ #include <setjmp.h>
+ #include <fnmatch.h>
+-#if JOBS || ENABLE_ASH_READ_NCHARS
+-#include <termios.h>
++
++#if defined SINGLE_APPLET_MAIN
++/* STANDALONE does not make sense, and won't compile */
++#undef CONFIG_FEATURE_SH_STANDALONE
++#undef ENABLE_FEATURE_SH_STANDALONE
++#undef USE_FEATURE_SH_STANDALONE
++#undef SKIP_FEATURE_SH_STANDALONE(...)
++#define ENABLE_FEATURE_SH_STANDALONE 0
++#define USE_FEATURE_SH_STANDALONE(...)
++#define SKIP_FEATURE_SH_STANDALONE(...) __VA_ARGS__
+ #endif
+ 
+ #ifndef PIPE_BUF
+diff --git a/shell/hush.c b/shell/hush.c
+index 4212729..eafcbb4 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -67,6 +67,8 @@
+  */
+ 
+ #include "busybox.h" /* for APPLET_IS_NOFORK/NOEXEC */
++//TODO: pull in some .h and find out do we have SINGLE_APPLET_MAIN?
++//#include "applet_tables.h" doesn't work
+ #include <glob.h>
+ /* #include <dmalloc.h> */
+ #if ENABLE_HUSH_CASE
+@@ -75,6 +77,17 @@
+ 
+ #define HUSH_VER_STR "0.91"
+ 
++#if defined SINGLE_APPLET_MAIN
++/* STANDALONE does not make sense, and won't compile */
++#undef CONFIG_FEATURE_SH_STANDALONE
++#undef ENABLE_FEATURE_SH_STANDALONE
++#undef USE_FEATURE_SH_STANDALONE
++#define SKIP_FEATURE_SH_STANDALONE(...) __VA_ARGS__
++#define ENABLE_FEATURE_SH_STANDALONE 0
++#define USE_FEATURE_SH_STANDALONE(...)
++#define SKIP_FEATURE_SH_STANDALONE(...) __VA_ARGS__
++#endif
++
+ #if !BB_MMU && ENABLE_HUSH_TICK
+ //#undef ENABLE_HUSH_TICK
+ //#define ENABLE_HUSH_TICK 0
+diff --git a/util-linux/more.c b/util-linux/more.c
+index cf8e137..b0f20c4 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -15,10 +15,6 @@
+  */
+ 
+ #include "libbb.h"
+-#if ENABLE_FEATURE_USE_TERMIOS
+-#include <termios.h>
+-#endif /* FEATURE_USE_TERMIOS */
+-
+ 
+ #if ENABLE_FEATURE_USE_TERMIOS
+ 

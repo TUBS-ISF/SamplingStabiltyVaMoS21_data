@@ -1,0 +1,493 @@
+2008-11-06 00:49:59 +0000
+diff --git a/Config.in b/Config.in
+index 85d576e..d2eab53 100644
+--- a/Config.in
++++ b/Config.in
+@@ -256,18 +256,18 @@ config BUSYBOX_EXEC_PATH
+ # These are auto-selected by other options
+ 
+ config FEATURE_SYSLOG
+-	bool "Support for logging to syslog"
++	bool #No description makes it a hidden option
+ 	default n
+-	help
+-	  This option is auto-selected when you select any applet which may
+-	  send its output to syslog. You do not need to select it manually.
++	#help
++	#  This option is auto-selected when you select any applet which may
++	#  send its output to syslog. You do not need to select it manually.
+ 
+ config FEATURE_HAVE_RPC
+-	bool "RPC support"
++	bool #No description makes it a hidden option
+ 	default n
+-	help
+-	  This is automatically selected if any of enabled applets need it.
+-	  You do not need to select it manually.
++	#help
++	#  This is automatically selected if any of enabled applets need it.
++	#  You do not need to select it manually.
+ 
+ endmenu
+ 
+diff --git a/TODO_config_nommu b/TODO_config_nommu
+index df51dc0..f42ccac 100644
+--- a/TODO_config_nommu
++++ b/TODO_config_nommu
+@@ -555,7 +555,7 @@ CONFIG_FEATURE_CHAT_VAR_ABORT_LEN=y
+ CONFIG_FEATURE_CHAT_CLR_ABORT=y
+ CONFIG_CHRT=y
+ CONFIG_CROND=y
+-CONFIG_DEBUG_CROND_OPTION=y
++CONFIG_FEATURE_CROND_D=y
+ CONFIG_FEATURE_CROND_CALL_SENDMAIL=y
+ CONFIG_CRONTAB=y
+ CONFIG_DC=y
+@@ -706,7 +706,7 @@ CONFIG_TFTPD=y
+ CONFIG_FEATURE_TFTP_GET=y
+ CONFIG_FEATURE_TFTP_PUT=y
+ CONFIG_FEATURE_TFTP_BLOCKSIZE=y
+-CONFIG_DEBUG_TFTP=y
++CONFIG_TFTP_DEBUG=y
+ CONFIG_TRACEROUTE=y
+ CONFIG_FEATURE_TRACEROUTE_VERBOSE=y
+ CONFIG_FEATURE_TRACEROUTE_SOURCE_ROUTE=y
+@@ -719,9 +719,9 @@ CONFIG_DHCPD_LEASES_FILE="/var/lib/misc/udhcpd.leases"
+ CONFIG_APP_UDHCPC=y
+ CONFIG_FEATURE_UDHCPC_ARPING=y
+ CONFIG_FEATURE_UDHCP_PORT=y
+-CONFIG_FEATURE_UDHCP_DEBUG=y
+-CONFIG_FEATURE_RFC3397=y
+-CONFIG_DHCPC_DEFAULT_SCRIPT="/usr/share/udhcpc/default.script"
++CONFIG_UDHCP_DEBUG=y
++CONFIG_FEATURE_UDHCP_RFC3397=y
++CONFIG_UDHCPC_DEFAULT_SCRIPT="/usr/share/udhcpc/default.script"
+ CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS=80
+ CONFIG_VCONFIG=y
+ CONFIG_WGET=y
+diff --git a/include/libbb.h b/include/libbb.h
+index 086a59f..a6229a5 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1037,7 +1037,7 @@ enum {
+ 	PARSE_GREEDY    = 0x00040000, // last token takes entire remainder of the line
+ 	PARSE_MIN_DIE   = 0x00100000, // die if < min tokens found
+ 	// keep a copy of current line
+-	PARSE_KEEP_COPY = 0x00200000 * ENABLE_DEBUG_CROND_OPTION,
++	PARSE_KEEP_COPY = 0x00200000 * ENABLE_FEATURE_CROND_D,
+ //	PARSE_ESCAPE    = 0x00400000, // process escape sequences in tokens
+ 	// NORMAL is:
+ 	// * remove leading and trailing delimiters and collapse
+diff --git a/include/usage.h b/include/usage.h
+index ac62fbf..4ee8205 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -535,13 +535,13 @@
+      "\n	F	Input from file" \
+ 
+ #define crond_trivial_usage \
+-       "-fbS -l N " USE_DEBUG_CROND_OPTION("-d N ") "-L LOGFILE -c DIR"
++       "-fbS -l N " USE_FEATURE_CROND_D("-d N ") "-L LOGFILE -c DIR"
+ #define crond_full_usage "\n\n" \
+        "	-f	Foreground" \
+      "\n	-b	Background (default)" \
+      "\n	-S	Log to syslog (default)" \
+      "\n	-l	Set log level. 0 is the most verbose, default 8" \
+-	USE_DEBUG_CROND_OPTION( \
++	USE_FEATURE_CROND_D( \
+      "\n	-d	Set log level, log to stderr" \
+ 	) \
+      "\n	-L	Log to file" \
+@@ -4349,7 +4349,7 @@
+      "\n	-C,--clientid-none	Suppress default client identifier" \
+      "\n	-p,--pidfile=file	Create pidfile" \
+      "\n	-r,--request=IP		IP address to request" \
+-     "\n	-s,--script=file	Run file at DHCP events (default "CONFIG_DHCPC_DEFAULT_SCRIPT")" \
++     "\n	-s,--script=file	Run file at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT")" \
+      "\n	-t,--retries=N		Send up to N request packets" \
+      "\n	-T,--timeout=N		Try to get a lease for N seconds (default 3)" \
+      "\n	-A,--tryagain=N		Wait N seconds (default 20) after failure" \
+@@ -4378,7 +4378,7 @@
+      "\n	-C		Suppress default client identifier" \
+      "\n	-p file		Create pidfile" \
+      "\n	-r IP		IP address to request" \
+-     "\n	-s file		Run file at DHCP events (default "CONFIG_DHCPC_DEFAULT_SCRIPT")" \
++     "\n	-s file		Run file at DHCP events (default "CONFIG_UDHCPC_DEFAULT_SCRIPT")" \
+      "\n	-t N		Send up to N request packets" \
+      "\n	-T N		Try to get a lease for N seconds (default 3)" \
+      "\n	-A N		Wait N seconds (default 20) after failure" \
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index f8b4575..60b87c1 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -107,7 +107,7 @@ config CROND
+ 	      # Run daily cron jobs at 4:40 every day:
+ 	      40 4 * * * /etc/cron/daily > /dev/null 2>&1
+ 
+-config DEBUG_CROND_OPTION
++config FEATURE_CROND_D
+ 	bool "Support option -d to redirect output to stderr"
+ 	depends on CROND
+ 	default n
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 7d1908c..bd7a177 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -80,9 +80,9 @@ enum {
+ 	OPT_b = (1 << 3),
+ 	OPT_S = (1 << 4),
+ 	OPT_c = (1 << 5),
+-	OPT_d = (1 << 6) * ENABLE_DEBUG_CROND_OPTION,
++	OPT_d = (1 << 6) * ENABLE_FEATURE_CROND_D,
+ };
+-#if ENABLE_DEBUG_CROND_OPTION
++#if ENABLE_FEATURE_CROND_D
+ #define DebugOpt (option_mask32 & OPT_d)
+ #else
+ #define DebugOpt 0
+@@ -166,11 +166,11 @@ int crond_main(int argc UNUSED_PARAM, char **argv)
+ 	INIT_G();
+ 
+ 	/* "-b after -f is ignored", and so on for every pair a-b */
+-	opt_complementary = "f-b:b-f:S-L:L-S" USE_DEBUG_CROND_OPTION(":d-l")
++	opt_complementary = "f-b:b-f:S-L:L-S" USE_FEATURE_CROND_D(":d-l")
+ 			":l+:d+"; /* -l and -d have numeric param */
+-	opt = getopt32(argv, "l:L:fbSc:" USE_DEBUG_CROND_OPTION("d:"),
++	opt = getopt32(argv, "l:L:fbSc:" USE_FEATURE_CROND_D("d:"),
+ 			&LogLevel, &LogFile, &CDir
+-			USE_DEBUG_CROND_OPTION(,&LogLevel));
++			USE_FEATURE_CROND_D(,&LogLevel));
+ 	/* both -d N and -l N set the same variable: LogLevel */
+ 
+ 	if (!(opt & OPT_f)) {
+diff --git a/networking/Config.in b/networking/Config.in
+index bceacdd..3ae77e1 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -859,7 +859,7 @@ config FEATURE_TFTP_BLOCKSIZE
+ 	  Allow tftp to specify block size, and tftpd to understand
+ 	  "blksize" option.
+ 
+-config DEBUG_TFTP
++config TFTP_DEBUG
+ 	bool "Enable debug"
+ 	default n
+ 	depends on TFTP
+diff --git a/networking/tftp.c b/networking/tftp.c
+index eb39e9c..1f70685 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -113,7 +113,7 @@ static int tftp_blksize_check(const char *blksize_str, int maxsize)
+ 		bb_error_msg("bad blocksize '%s'", blksize_str);
+ 		return -1;
+ 	}
+-#if ENABLE_DEBUG_TFTP
++#if ENABLE_TFTP_DEBUG
+ 	bb_error_msg("using blksize %u", blksize);
+ #endif
+ 	return blksize;
+@@ -369,7 +369,7 @@ static int tftp_protocol(
+ 		waittime_ms = TFTP_TIMEOUT_MS;
+ 
+  send_again:
+-#if ENABLE_DEBUG_TFTP
++#if ENABLE_TFTP_DEBUG
+ 		fprintf(stderr, "sending %u bytes\n", send_len);
+ 		for (cp = xbuf; cp < &xbuf[send_len]; cp++)
+ 			fprintf(stderr, "%02x ", (unsigned char) *cp);
+@@ -431,7 +431,7 @@ static int tftp_protocol(
+ 		/* Process recv'ed packet */
+ 		opcode = ntohs( ((uint16_t*)rbuf)[0] );
+ 		recv_blk = ntohs( ((uint16_t*)rbuf)[1] );
+-#if ENABLE_DEBUG_TFTP
++#if ENABLE_TFTP_DEBUG
+ 		fprintf(stderr, "received %d bytes: %04x %04x\n", len, opcode, recv_blk);
+ #endif
+ 		if (opcode == TFTP_ERROR) {
+@@ -602,7 +602,7 @@ int tftp_main(int argc UNUSED_PARAM, char **argv)
+ 	port = bb_lookup_port(argv[1], "udp", 69);
+ 	peer_lsa = xhost2sockaddr(argv[0], port);
+ 
+-#if ENABLE_DEBUG_TFTP
++#if ENABLE_TFTP_DEBUG
+ 	fprintf(stderr, "using server '%s', remote_file '%s', local_file '%s'\n",
+ 			xmalloc_sockaddr2dotted(&peer_lsa->u.sa),
+ 			remote_file, local_file);
+diff --git a/networking/udhcp/Config.in b/networking/udhcp/Config.in
+index 55cefb6..d4b76e1 100644
+--- a/networking/udhcp/Config.in
++++ b/networking/udhcp/Config.in
+@@ -74,14 +74,14 @@ config FEATURE_UDHCP_PORT
+ 	  At the cost of ~300 bytes, enables -P port option.
+ 	  This feature is typically not needed.
+ 
+-config FEATURE_UDHCP_DEBUG
++config UDHCP_DEBUG
+ 	bool "Compile udhcp with noisy debugging messages"
+ 	default n
+ 	depends on APP_UDHCPD || APP_UDHCPC
+ 	help
+ 	  If selected, udhcpd will output extra debugging output.
+ 
+-config FEATURE_RFC3397
++config FEATURE_UDHCP_RFC3397
+ 	bool "Support for RFC3397 domain search (experimental)"
+ 	default n
+ 	depends on APP_UDHCPD || APP_UDHCPC
+@@ -89,7 +89,7 @@ config FEATURE_RFC3397
+ 	  If selected, both client and server will support passing of domain
+ 	  search lists via option 119, specified in RFC3397.
+ 
+-config DHCPC_DEFAULT_SCRIPT
++config UDHCPC_DEFAULT_SCRIPT
+ 	string "Absolute path to config script"
+ 	default "/usr/share/udhcpc/default.script"
+ 	depends on APP_UDHCPC
+diff --git a/networking/udhcp/Kbuild b/networking/udhcp/Kbuild
+index f4be6df..e938076 100644
+--- a/networking/udhcp/Kbuild
++++ b/networking/udhcp/Kbuild
+@@ -22,4 +22,4 @@ lib-$(CONFIG_APP_UDHCPD)        += dhcpd.o arpping.o files.o leases.o \
+ 
+ lib-$(CONFIG_APP_DUMPLEASES)    += dumpleases.o
+ lib-$(CONFIG_APP_DHCPRELAY)     += dhcprelay.o
+-lib-$(CONFIG_FEATURE_RFC3397)   += domain_codec.o
++lib-$(CONFIG_FEATURE_UDHCP_RFC3397) += domain_codec.o
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index de4a8c7..15f0d9a 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -18,7 +18,7 @@
+ # pragma GCC visibility push(hidden)
+ #endif
+ 
+-#define DEFAULT_SCRIPT   CONFIG_DHCPC_DEFAULT_SCRIPT
++#define DEFAULT_SCRIPT   CONFIG_UDHCPC_DEFAULT_SCRIPT
+ 
+ extern const uint8_t MAC_BCAST_ADDR[6]; /* six all-ones */
+ 
+@@ -97,7 +97,7 @@ int udhcp_listen_socket(/*uint32_t ip,*/ int port, const char *inf) FAST_FUNC;
+ /* Returns 1 if no reply received */
+ int arpping(uint32_t test_ip, uint32_t from_ip, uint8_t *from_mac, const char *interface) FAST_FUNC;
+ 
+-#if ENABLE_FEATURE_UDHCP_DEBUG
++#if ENABLE_UDHCP_DEBUG
+ # define DEBUG(str, args...) bb_info_msg("### " str, ## args)
+ #else
+ # define DEBUG(str, args...) do {;} while (0)
+diff --git a/networking/udhcp/domain_codec.c b/networking/udhcp/domain_codec.c
+index 6da4e8d..6f051c4 100644
+--- a/networking/udhcp/domain_codec.c
++++ b/networking/udhcp/domain_codec.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 
+ #include "common.h"
+ #include "options.h"
+@@ -202,4 +202,4 @@ uint8_t* FAST_FUNC dname_enc(const uint8_t *cstr, int clen, const char *src, int
+ 	return dname;
+ }
+ 
+-#endif /* ENABLE_FEATURE_RFC3397 */
++#endif /* ENABLE_FEATURE_UDHCP_RFC3397 */
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index b7bad33..0b97d76 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -90,7 +90,7 @@ static void attach_option(struct option_set **opt_list,
+ 	if (!existing) {
+ 		DEBUG("Attaching option %02x to list", option->code);
+ 
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 		if ((option->flags & TYPE_MASK) == OPTION_STR1035)
+ 			/* reuse buffer and length for RFC1035-formatted string */
+ 			buffer = (char *)dname_enc(NULL, 0, buffer, &length);
+@@ -109,7 +109,7 @@ static void attach_option(struct option_set **opt_list,
+ 
+ 		new->next = *curr;
+ 		*curr = new;
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 		if ((option->flags & TYPE_MASK) == OPTION_STR1035 && buffer != NULL)
+ 			free(buffer);
+ #endif
+@@ -119,7 +119,7 @@ static void attach_option(struct option_set **opt_list,
+ 	/* add it to an existing option */
+ 	DEBUG("Attaching option %02x to existing member of list", option->code);
+ 	if (option->flags & OPTION_LIST) {
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 		if ((option->flags & TYPE_MASK) == OPTION_STR1035)
+ 			/* reuse buffer and length for RFC1035-formatted string */
+ 			buffer = (char *)dname_enc(existing->data + 2,
+@@ -139,7 +139,7 @@ static void attach_option(struct option_set **opt_list,
+ 			memcpy(existing->data + existing->data[OPT_LEN] + 2, buffer, length);
+ 			existing->data[OPT_LEN] += length;
+ 		} /* else, ignore the data, we could put this in a second option in the future */
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 		if ((option->flags & TYPE_MASK) == OPTION_STR1035 && buffer != NULL)
+ 			free(buffer);
+ #endif
+@@ -190,7 +190,7 @@ static int read_opt(const char *const_line, void *arg)
+ 				retval = read_ip(val, buffer + 4);
+ 			break;
+ 		case OPTION_STRING:
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 		case OPTION_STR1035:
+ #endif
+ 			length = strlen(val);
+@@ -266,7 +266,7 @@ static int read_staticlease(const char *const_line, void *arg)
+ 
+ 	addStaticLease(arg, mac_bytes, ip);
+ 
+-	if (ENABLE_FEATURE_UDHCP_DEBUG) printStaticLeases(arg);
++	if (ENABLE_UDHCP_DEBUG) printStaticLeases(arg);
+ 
+ 	return 1;
+ }
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index b6e77e3..6bf99e2 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -43,7 +43,7 @@ const struct dhcp_option dhcp_options[] = {
+ 	{ OPTION_STRING                           , 0x42 }, /* tftp               */
+ 	{ OPTION_STRING                           , 0x43 }, /* bootfile           */
+ 	{ OPTION_STRING                           , 0x4D }, /* userclass          */
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 	{ OPTION_STR1035 | OPTION_LIST            , 0x77 }, /* search             */
+ #endif
+ 	/* MSIE's "Web Proxy Autodiscovery Protocol" support */
+@@ -92,7 +92,7 @@ const char dhcp_option_strings[] ALIGN1 =
+ 	"tftp" "\0"
+ 	"bootfile" "\0"
+ 	"userclass" "\0"
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 	"search" "\0"
+ #endif
+ 	/* MSIE's "Web Proxy Autodiscovery Protocol" support */
+@@ -106,7 +106,7 @@ const uint8_t dhcp_option_lengths[] ALIGN1 = {
+ 	[OPTION_IP_PAIR] = 8,
+ 	[OPTION_BOOLEAN] = 1,
+ 	[OPTION_STRING] =  1,
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 	[OPTION_STR1035] = 1,
+ #endif
+ 	[OPTION_U8] =      1,
+diff --git a/networking/udhcp/options.h b/networking/udhcp/options.h
+index fcf1c9a..d18a353 100644
+--- a/networking/udhcp/options.h
++++ b/networking/udhcp/options.h
+@@ -13,7 +13,7 @@ enum {
+ 	OPTION_IP = 1,
+ 	OPTION_IP_PAIR,
+ 	OPTION_STRING,
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 	OPTION_STR1035,	/* RFC1035 compressed domain name list */
+ #endif
+ 	OPTION_BOOLEAN,
+@@ -109,7 +109,7 @@ uint8_t *get_option(struct dhcpMessage *packet, int code) FAST_FUNC;
+ int end_option(uint8_t *optionptr) FAST_FUNC;
+ int add_option_string(uint8_t *optionptr, uint8_t *string) FAST_FUNC;
+ int add_simple_option(uint8_t *optionptr, uint8_t code, uint32_t data) FAST_FUNC;
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ char *dname_dec(const uint8_t *cstr, int clen, const char *pre) FAST_FUNC;
+ uint8_t *dname_enc(const uint8_t *cstr, int clen, const char *src, int *retlen) FAST_FUNC;
+ #endif
+diff --git a/networking/udhcp/script.c b/networking/udhcp/script.c
+index 2324ea9..8dff9b7 100644
+--- a/networking/udhcp/script.c
++++ b/networking/udhcp/script.c
+@@ -18,7 +18,7 @@ static const uint8_t max_option_length[] = {
+ 	[OPTION_IP] =		sizeof("255.255.255.255 "),
+ 	[OPTION_IP_PAIR] =	sizeof("255.255.255.255 ") * 2,
+ 	[OPTION_STRING] =	1,
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 	[OPTION_STR1035] =	1,
+ #endif
+ 	[OPTION_BOOLEAN] =	sizeof("yes "),
+@@ -109,7 +109,7 @@ static char *alloc_fill_opts(uint8_t *option, const struct dhcp_option *type_p,
+ 			memcpy(dest, option, len);
+ 			dest[len] = '\0';
+ 			return ret;	 /* Short circuit this case */
+-#if ENABLE_FEATURE_RFC3397
++#if ENABLE_FEATURE_UDHCP_RFC3397
+ 		case OPTION_STR1035:
+ 			/* unpack option into dest; use ret for prefix (i.e., "optname=") */
+ 			dest = dname_dec(option, len, ret);
+diff --git a/networking/udhcp/static_leases.c b/networking/udhcp/static_leases.c
+index bd07c50..43f1c98 100644
+--- a/networking/udhcp/static_leases.c
++++ b/networking/udhcp/static_leases.c
+@@ -79,7 +79,7 @@ uint32_t FAST_FUNC reservedIp(struct static_lease *lease_struct, uint32_t ip)
+ 	return return_val;
+ }
+ 
+-#if ENABLE_FEATURE_UDHCP_DEBUG
++#if ENABLE_UDHCP_DEBUG
+ /* Print out static leases just to check what's going on */
+ /* Takes the address of the pointer to the static_leases linked list */
+ void FAST_FUNC printStaticLeases(struct static_lease **arg)
+diff --git a/scripts/defconfig b/scripts/defconfig
+index 19ea10a..9378dc6 100644
+--- a/scripts/defconfig
++++ b/scripts/defconfig
+@@ -556,7 +556,7 @@ CONFIG_FEATURE_CHAT_IMPLICIT_CR=y
+ # CONFIG_FEATURE_CHAT_CLR_ABORT is not set
+ CONFIG_CHRT=y
+ CONFIG_CROND=y
+-# CONFIG_DEBUG_CROND_OPTION is not set
++# CONFIG_FEATURE_CROND_D is not set
+ CONFIG_FEATURE_CROND_CALL_SENDMAIL=y
+ CONFIG_CRONTAB=y
+ CONFIG_DC=y
+@@ -711,7 +711,7 @@ CONFIG_TFTPD=y
+ CONFIG_FEATURE_TFTP_GET=y
+ CONFIG_FEATURE_TFTP_PUT=y
+ CONFIG_FEATURE_TFTP_BLOCKSIZE=y
+-# CONFIG_DEBUG_TFTP is not set
++# CONFIG_TFTP_DEBUG is not set
+ CONFIG_TRACEROUTE=y
+ # CONFIG_FEATURE_TRACEROUTE_VERBOSE is not set
+ # CONFIG_FEATURE_TRACEROUTE_SOURCE_ROUTE is not set
+@@ -724,9 +724,9 @@ CONFIG_DHCPD_LEASES_FILE="/var/lib/misc/udhcpd.leases"
+ CONFIG_APP_UDHCPC=y
+ CONFIG_FEATURE_UDHCPC_ARPING=y
+ # CONFIG_FEATURE_UDHCP_PORT is not set
+-# CONFIG_FEATURE_UDHCP_DEBUG is not set
+-CONFIG_FEATURE_RFC3397=y
+-CONFIG_DHCPC_DEFAULT_SCRIPT="/usr/share/udhcpc/default.script"
++# CONFIG_UDHCP_DEBUG is not set
++CONFIG_FEATURE_UDHCP_RFC3397=y
++CONFIG_UDHCPC_DEFAULT_SCRIPT="/usr/share/udhcpc/default.script"
+ CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS=80
+ CONFIG_VCONFIG=y
+ CONFIG_WGET=y
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 8cecc60..976507b 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -403,10 +403,8 @@ config FEATURE_USE_TERMIOS
+ 	  unable to move the cursor.
+ 
+ config VOLUMEID
+-	bool "Routines for detecting label and uuid on common filesystems"
++	bool #No description makes it a hidden option
+ 	default n
+-	help
+-	  TODO
+ 
+ config FEATURE_VOLUMEID_EXT
+ 	bool "Ext filesystem"

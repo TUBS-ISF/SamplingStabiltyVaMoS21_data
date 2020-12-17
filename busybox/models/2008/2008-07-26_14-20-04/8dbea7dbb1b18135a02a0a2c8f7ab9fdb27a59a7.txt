@@ -1,0 +1,56 @@
+2008-07-26 14:20:04 +0000
+diff --git a/shell/ash_test/ash-signals/signal2.right b/shell/ash_test/ash-signals/signal2.right
+index 96d2d6a..a2af919 100644
+--- a/shell/ash_test/ash-signals/signal2.right
++++ b/shell/ash_test/ash-signals/signal2.right
+@@ -1,3 +1,3 @@
+-sleeping
++child sleeps
+ child exits as expected
+ parent exits
+diff --git a/shell/ash_test/ash-signals/signal2.tests b/shell/ash_test/ash-signals/signal2.tests
+index 04f981c..df639ca 100755
+--- a/shell/ash_test/ash-signals/signal2.tests
++++ b/shell/ash_test/ash-signals/signal2.tests
+@@ -6,7 +6,7 @@ cleanup() {
+     exit
+ }
+ trap cleanup HUP
+-echo "sleeping"
++echo "child sleeps"
+ sleep 1
+ echo "BAD exit from child!"
+ ' &
+diff --git a/shell/ash_test/ash-signals/signal3.right b/shell/ash_test/ash-signals/signal3.right
+new file mode 100644
+index 0000000..3113ba5
+--- /dev/null
++++ b/shell/ash_test/ash-signals/signal3.right
+@@ -0,0 +1,4 @@
++child sleeps
++child got HUP
++child exits
++parent exits
+diff --git a/shell/ash_test/ash-signals/signal3.tests b/shell/ash_test/ash-signals/signal3.tests
+new file mode 100755
+index 0000000..b56c2d9
+--- /dev/null
++++ b/shell/ash_test/ash-signals/signal3.tests
+@@ -0,0 +1,17 @@
++#!/bin/sh
++
++$THIS_SH -c '
++hup() {
++    echo "child got HUP"
++}
++trap hup HUP
++echo "child sleeps"
++sleep 1
++echo "child exits"
++' &
++
++child=$!
++sleep 0.1 # let child install handler first
++kill -HUP $child
++wait
++echo "parent exits"

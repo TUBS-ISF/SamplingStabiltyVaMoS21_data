@@ -1,0 +1,209 @@
+2007-07-20 21:29:49 +0000
+diff --git a/libbb/update_passwd.c b/libbb/update_passwd.c
+new file mode 100644
+index 0000000..5572db5
+--- /dev/null
++++ b/libbb/update_passwd.c
+@@ -0,0 +1,119 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * update_passwd
++ *
++ * update_passwd is a common function for passwd and chpasswd applets;
++ * it is responsible for updating password file (i.e. /etc/passwd or
++ * /etc/shadow) for a given user and password.
++ *
++ * Moved from loginutils/passwd.c by Alexander Shishkin <virtuoso@slind.org>
++ */
++
++#include "libbb.h"
++
++int update_passwd(const char *filename, const char *username,
++			const char *new_pw)
++{
++	struct stat sb;
++	struct flock lock;
++	FILE *old_fp;
++	FILE *new_fp;
++	char *new_name;
++	char *last_char;
++	unsigned user_len;
++	int old_fd;
++	int new_fd;
++	int i;
++	int cnt = 0;
++	int ret = 1; /* failure */
++
++	/* New passwd file, "/etc/passwd+" for now */
++	new_name = xasprintf("%s+", filename);
++	last_char = &new_name[strlen(new_name)-1];
++	username = xasprintf("%s:", username);
++	user_len = strlen(username);
++
++	old_fp = fopen(filename, "r+");
++	if (!old_fp)
++		goto free_mem;
++	old_fd = fileno(old_fp);
++
++	/* Try to create "/etc/passwd+". Wait if it exists. */
++	i = 30;
++	do {
++		// FIXME: on last iteration try w/o O_EXCL but with O_TRUNC?
++		new_fd = open(new_name, O_WRONLY|O_CREAT|O_EXCL,0600);
++		if (new_fd >= 0) goto created;
++		if (errno != EEXIST) break;
++		usleep(100000); /* 0.1 sec */
++	} while (--i);
++	bb_perror_msg("cannot create '%s'", new_name);
++	goto close_old_fp;
++
++ created:
++	if (!fstat(old_fd, &sb)) {
++		fchmod(new_fd, sb.st_mode & 0777); /* ignore errors */
++		fchown(new_fd, sb.st_uid, sb.st_gid);
++	}
++	new_fp = fdopen(new_fd, "w");
++	if (!new_fp) {
++		close(new_fd);
++		goto unlink_new;
++	}
++
++	/* Backup file is "/etc/passwd-" */
++	last_char[0] = '-';
++	/* Delete old one, create new as a hardlink to current */
++	i = (unlink(new_name) && errno != ENOENT);
++	if (i || link(filename, new_name))
++		bb_perror_msg("warning: cannot create backup copy '%s'", new_name);
++	last_char[0] = '+';
++
++	/* Lock the password file before updating */
++	lock.l_type = F_WRLCK;
++	lock.l_whence = SEEK_SET;
++	lock.l_start = 0;
++	lock.l_len = 0;
++	if (fcntl(old_fd, F_SETLK, &lock) < 0)
++		bb_perror_msg("warning: cannot lock '%s'", filename);
++	lock.l_type = F_UNLCK;
++
++	/* Read current password file, write updated one */
++	while (1) {
++		char *line = xmalloc_fgets(old_fp);
++		if (!line) break; /* EOF/error */
++		if (strncmp(username, line, user_len) == 0) {
++			/* we have a match with "username:"... */
++			const char *cp = line + user_len;
++			/* now cp -> old passwd, skip it: */
++			cp = strchr(cp, ':');
++			if (!cp) cp = "";
++			/* now cp -> ':' after old passwd or -> "" */
++			fprintf(new_fp, "%s%s%s", username, new_pw, cp);
++			cnt++;
++		} else
++			fputs(line, new_fp);
++		free(line);
++	}
++	fcntl(old_fd, F_SETLK, &lock);
++
++	/* We do want all of them to execute, thus | instead of || */
++	if ((ferror(old_fp) | fflush(new_fp) | fsync(new_fd) | fclose(new_fp))
++	 || rename(new_name, filename)
++	) {
++		/* At least one of those failed */
++		goto unlink_new;
++	}
++	ret = cnt; /* whee, success! */
++
++ unlink_new:
++	if (ret) unlink(new_name);
++
++ close_old_fp:
++	fclose(old_fp);
++
++ free_mem:
++	if (ENABLE_FEATURE_CLEAN_UP) free(new_name);
++	if (ENABLE_FEATURE_CLEAN_UP) free((char*)username);
++	return ret;
++}
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+new file mode 100644
+index 0000000..124fc86
+--- /dev/null
++++ b/loginutils/chpasswd.c
+@@ -0,0 +1,77 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * chpasswd.c
++ *
++ * Written for SLIND (from passwd.c) by Alexander Shishkin <virtuoso@slind.org>
++ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
++ */
++
++#include "libbb.h"
++
++#if ENABLE_GETOPT_LONG
++#include <getopt.h>
++
++static const struct option chpasswd_opts[] = {
++	{ "encrypted", no_argument, NULL, 'e' },
++	{ "md5", no_argument, NULL, 'm' },
++	{ NULL, 0, NULL, 0 }
++};
++#endif
++
++#define OPT_ENC		1
++#define OPT_MD5		2
++
++int chpasswd_main(int argc, char **argv);
++int chpasswd_main(int argc, char **argv)
++{
++	char *name, *pass;
++	char salt[sizeof("$N$XXXXXXXX")];
++	int opt, rc;
++	int rnd = rnd; /* we *want* it to be non-initialized! */
++	const char *pwfile = bb_path_passwd_file;
++
++	if (getuid() != 0)
++		bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
++
++#if ENABLE_FEATURE_SHADOWPASSWDS
++	if (access(bb_path_shadow_file, F_OK) == 0)
++		pwfile = bb_path_shadow_file;
++#endif
++
++ 	opt_complementary = "m--e";
++	USE_GETOPT_LONG(applet_long_options = chpasswd_opts;)
++	opt = getopt32(argc, argv, "em");
++
++	while ((name = xmalloc_getline(stdin)) != NULL) {
++		pass = strchr(name, ':');
++		if (!pass)
++			bb_error_msg_and_die("missing new password");
++		*pass++ = '\0';
++
++		//if (!getpwnam(name))
++		//	bb_error_msg_and_die("unknown user %s", name);
++
++		if (!(opt & OPT_ENC)) {
++			rnd = crypt_make_salt(salt, 1, rnd);
++			if (opt & OPT_MD5) {
++				strcpy(salt, "$1$");
++				rnd = crypt_make_salt(salt + 3, 4, rnd);
++			}
++			pass = pw_encrypt(pass, salt);
++		}
++
++		rc = update_passwd(pwfile, name, pass);
++		/* LOGMODE_BOTH logs to syslog */
++		logmode = LOGMODE_BOTH;
++		if (rc < 0)
++			bb_error_msg_and_die("an error occurred updating %s", pwfile);
++		if (rc > 0)
++			bb_info_msg("Password for '%s' changed", name);
++		else
++			bb_info_msg("User '%s' not found", name);
++		logmode = LOGMODE_STDIO;
++		free(name);
++	}
++
++	return 0;
++}

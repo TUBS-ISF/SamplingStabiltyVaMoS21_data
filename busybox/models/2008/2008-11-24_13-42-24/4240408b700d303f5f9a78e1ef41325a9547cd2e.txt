@@ -1,0 +1,30 @@
+2008-11-24 13:42:24 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 3c657a1..d35f8ae 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -4325,7 +4325,7 @@
+ 	"[-t SECS] [-s SIG] PROG [ARGS]"
+ #define timeout_full_usage "\n\n" \
+        "Runs PROG. Sends SIG to it if it is not gone in SECS seconds.\n" \
+-       "Defaults: SECS: 10, SIG: TERM.\n" \
++       "Defaults: SECS: 10, SIG: TERM." \
+ 
+ #define top_trivial_usage \
+        "[-b] [-nCOUNT] [-dSECONDS]"
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 2bab0eb..13cdb81 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -111,9 +111,9 @@ void FAST_FUNC bb_show_usage(void)
+ 		const char *usage_string = p = unpack_usage_messages();
+ 
+ 		if (*p == '\b') {
+-			full_write2_str("\nNo help available.\n\n");
++			full_write2_str("No help available.\n\n");
+ 		} else {
+-			full_write2_str("\nUsage: "SINGLE_APPLET_STR" ");
++			full_write2_str("Usage: "SINGLE_APPLET_STR" ");
+ 			full_write2_str(p);
+ 			full_write2_str("\n\n");
+ 		}

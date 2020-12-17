@@ -1,0 +1,28 @@
+2009-08-20 23:34:01 +0200
+diff --git a/applets/usage_compressed b/applets/usage_compressed
+index c30bcfa..00c5735 100755
+--- a/applets/usage_compressed
++++ b/applets/usage_compressed
+@@ -24,7 +24,7 @@ echo 'static const char packed_usage[] ALIGN1 = {'
+ ## | grep -v '^$' \
+ ## | $SED -e 's/\(..\)\(..\)/0x\2,0x\1,/g'
+ 
+-"$loc/usage" | bzip2 -1 | od -v -t x1 \
++"$loc/usage" | bzip2 -1 | dd bs=2 skip=1 | od -v -t x1 \
+ | $SED -e 's/^[^ ]*//' \
+ | $SED -e 's/ //g' \
+ | grep -v '^$' \
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 0feaef3..d239d98 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -73,8 +73,7 @@ static const char *unpack_usage_messages(void)
+ 
+ 	i = start_bunzip(&bd,
+ 			/* src_fd: */ -1,
+-//FIXME: can avoid storing these 2 bytes!
+-			/* inbuf:  */ (void *)packed_usage + 2,
++			/* inbuf:  */ (void *)packed_usage,
+ 			/* len:    */ sizeof(packed_usage));
+ 	/* read_bunzip can longjmp to start_bunzip, and ultimately
+ 	 * end up here with i != 0 on read data errors! Not trivial */

@@ -1,0 +1,15 @@
+2008-11-22 01:32:40 +0000
+diff --git a/shell/ash.c b/shell/ash.c
+index f99c509..d44de33 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -7575,7 +7575,9 @@ static const short nodesize[N_NUMBER] = {
+ 	[NDEFUN   ] = SHELL_ALIGN(sizeof(struct narg)),
+ 	[NARG     ] = SHELL_ALIGN(sizeof(struct narg)),
+ 	[NTO      ] = SHELL_ALIGN(sizeof(struct nfile)),
++#if ENABLE_ASH_BASH_COMPAT
+ 	[NTO2     ] = SHELL_ALIGN(sizeof(struct nfile)),
++#endif
+ 	[NCLOBBER ] = SHELL_ALIGN(sizeof(struct nfile)),
+ 	[NFROM    ] = SHELL_ALIGN(sizeof(struct nfile)),
+ 	[NFROMTO  ] = SHELL_ALIGN(sizeof(struct nfile)),

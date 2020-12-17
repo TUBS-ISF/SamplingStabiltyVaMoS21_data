@@ -1,0 +1,126 @@
+2007-06-03 22:30:22 +0000
+diff --git a/console-tools/resize.c b/console-tools/resize.c
+index 52fdb26..32551b2 100644
+--- a/console-tools/resize.c
++++ b/console-tools/resize.c
+@@ -11,16 +11,15 @@
+ 
+ #define ESC "\033"
+ 
+-struct termios old;
++#define old_termios (*(struct termios*)&bb_common_bufsiz1)
+ 
+ static void
+ onintr(int sig ATTRIBUTE_UNUSED)
+ {
+-	tcsetattr(STDERR_FILENO, TCSANOW, &old);
++	tcsetattr(STDERR_FILENO, TCSANOW, &old_termios);
+ 	exit(1);
+ }
+ 
+-
+ int resize_main(int argc, char **argv);
+ int resize_main(int argc, char **argv)
+ {
+@@ -34,8 +33,8 @@ int resize_main(int argc, char **argv)
+ 	 * and operate on it - should we do the same?
+ 	 */
+ 
+-	tcgetattr(STDERR_FILENO, &old); /* fiddle echo */
+-	new = old;
++	tcgetattr(STDERR_FILENO, &old_termios); /* fiddle echo */
++	new = old_termios;
+ 	new.c_cflag |= (CLOCAL | CREAD);
+ 	new.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+ 	signal(SIGINT, onintr);
+@@ -60,7 +59,7 @@ int resize_main(int argc, char **argv)
+ 	 * (gotten via TIOCGWINSZ) and recomputing *pixel values */
+ 	ret = ioctl(STDERR_FILENO, TIOCSWINSZ, &w);
+ 
+-	tcsetattr(STDERR_FILENO, TCSANOW, &old);
++	tcsetattr(STDERR_FILENO, TCSANOW, &old_termios);
+ 
+ 	if (ENABLE_FEATURE_RESIZE_PRINT)
+ 		printf("COLUMNS=%d;LINES=%d;export COLUMNS LINES;\n",
+diff --git a/networking/telnet.c b/networking/telnet.c
+index a594505..caca89d 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -79,7 +79,7 @@ struct globals {
+ 	struct termios termios_raw;
+ };
+ 
+-#define G (*(struct globals*)bb_common_bufsiz1)
++#define G (*(struct globals*)&bb_common_bufsiz1)
+ 
+ 
+ /* Function prototypes */
+diff --git a/scripts/find_stray_communal_vars b/scripts/find_stray_communal_vars
+new file mode 100755
+index 0000000..9f999d7
+--- /dev/null
++++ b/scripts/find_stray_communal_vars
+@@ -0,0 +1,10 @@
++#!/bin/sh
++
++# Communal variables are elusize, then don't show in size output!
++# This script will show all communals in *.o, sorted by size
++
++find -name '*.o' \
++| while read name; do
++    b=`basename "$name"`
++    nm "$name" | sed "s/^/$b: /"
++done | grep -i ' c ' | sort -k2
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index a4716e2..cc729e7 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -12,14 +12,12 @@
+ #include "libbb.h"
+ #include "xregex.h"
+ 
+-#define DEV_PATH	"/dev"
+-
+-struct mdev_globals
+-{
++struct globals {
+ 	int root_major, root_minor;
+-} mdev_globals;
+-
+-#define bbg mdev_globals
++};
++#define G (*(struct globals*)&bb_common_bufsiz1)
++#define root_major (G.root_major)
++#define root_minor (G.root_minor)
+ 
+ /* mknod in /dev based on a path like "/sys/block/hda/hda1" */
+ static void make_device(char *path, int delete)
+@@ -174,7 +172,7 @@ static void make_device(char *path, int delete)
+ 		if (mknod(device_name, mode | type, makedev(major, minor)) && errno != EEXIST)
+ 			bb_perror_msg_and_die("mknod %s", device_name);
+ 
+-		if (major == bbg.root_major && minor == bbg.root_minor)
++		if (major == root_major && minor == root_minor)
+ 			symlink(device_name, "root");
+ 
+ 		if (ENABLE_FEATURE_MDEV_CONF) chown(device_name, uid, gid);
+@@ -237,7 +235,7 @@ int mdev_main(int argc, char **argv)
+ 	char *env_path;
+ 	RESERVE_CONFIG_BUFFER(temp,PATH_MAX);
+ 
+-	xchdir(DEV_PATH);
++	xchdir("/dev");
+ 
+ 	/* Scan */
+ 
+@@ -245,8 +243,8 @@ int mdev_main(int argc, char **argv)
+ 		struct stat st;
+ 
+ 		xstat("/", &st);
+-		bbg.root_major = major(st.st_dev);
+-		bbg.root_minor = minor(st.st_dev);
++		root_major = major(st.st_dev);
++		root_minor = minor(st.st_dev);
+ 		strcpy(temp,"/sys/block");
+ 		find_dev(temp);
+ 		strcpy(temp,"/sys/class");

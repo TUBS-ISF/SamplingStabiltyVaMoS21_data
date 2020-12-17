@@ -1,0 +1,145 @@
+2009-04-19 23:07:51 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index c542b7d..2c2750f 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -4459,10 +4459,6 @@ static int done_word(o_string *word, struct parse_context *ctx)
+ 			}
+ 		}
+ 		command->argv = add_string_to_strings(command->argv, xstrdup(word->data));
+-//SEGV, but good idea.
+-//		command->argv = add_string_to_strings(command->argv, word->data);
+-//		word->data = NULL;
+-//		word->length = 0;
+ 		debug_print_strings("word appended to argv", command->argv);
+ 	}
+ 
+@@ -5481,14 +5477,16 @@ static struct pipe *parse_stream(char **pstring,
+ 		 * } is an ordinary char in this case, even inside { cmd; }
+ 		 * Pathological example: { ""}; } should exec "}" cmd
+ 		 */
+-		if (ch == '}'
+-		 && !(IS_NULL_PIPE(ctx.pipe)
+-		     && IS_NULL_CMD(ctx.command)
+-		     && dest.length == 0
+-		     && !dest.o_quoted
+-		    )
+-		) {
+-			goto ordinary_char;
++		if (ch == '}') {
++			if (!IS_NULL_CMD(ctx.command) /* cmd } */
++			 || dest.length != 0 /* word} */
++			 || dest.o_quoted    /* ""} */
++			) {
++				goto ordinary_char;
++			}
++			if (!IS_NULL_PIPE(ctx.pipe)) /* cmd | } */
++				goto skip_end_trigger;
++			/* else: } does terminate a group */
+ 		}
+ 
+ 		if (end_trigger && end_trigger == ch
+@@ -5531,6 +5529,7 @@ static struct pipe *parse_stream(char **pstring,
+ 				return ctx.list_head;
+ 			}
+ 		}
++ skip_end_trigger:
+ 		if (is_ifs)
+ 			continue;
+ 
+@@ -6420,12 +6419,11 @@ static int builtin_export(char **argv)
+ 	}
+ 
+ 	do {
+-		const char *value;
+ 		char *name = *argv;
+ 
+-		value = strchr(name, '=');
+-		if (!value) {
+-			/* They are exporting something without a =VALUE */
++		/* So far we do not check that name is valid */
++		if (strchr(name, '=') == NULL) {
++			/* Exporting a name without a =VALUE */
+ 			struct variable *var;
+ 
+ 			var = get_local_var(name);
+@@ -6433,12 +6431,19 @@ static int builtin_export(char **argv)
+ 				var->flg_export = 1;
+ 				debug_printf_env("%s: putenv '%s'\n", __func__, var->varstr);
+ 				putenv(var->varstr);
++				continue;
+ 			}
+-			/* bash does not return an error when trying to export
+-			 * an undefined variable.  Do likewise. */
+-			continue;
++			/* Exporting non-existing variable.
++			 * bash does not put it in environment,
++			 * but remembers that it is exported,
++			 * and does put it in env when it is set later.
++			 * We just set it to "" and export. */
++			name = xasprintf("%s=", name);
++		} else {
++			/* Exporting VAR=VALUE */
++			name = xstrdup(name);
+ 		}
+-		set_local_var(xstrdup(name), 1, 0);
++		set_local_var(name, 1, 0);
+ 	} while (*++argv);
+ 
+ 	return EXIT_SUCCESS;
+diff --git a/shell/hush_leaktool.sh b/shell/hush_leaktool.sh
+index f8e47ae..ca35ec1 100755
+--- a/shell/hush_leaktool.sh
++++ b/shell/hush_leaktool.sh
+@@ -6,8 +6,20 @@ output=output
+ freelist=`grep 'free 0x' "$output" | cut -d' ' -f2 | sort | uniq | xargs`
+ 
+ grep -v free "$output" >"$output.leaked"
++
++i=8
++list=
+ for freed in $freelist; do
+-    echo Dropping $freed
+-    grep -v $freed <"$output.leaked" >"$output.temp"
++    list="$list -e $freed"
++    test $((--i)) != 0 && continue
++    echo Dropping $list
++    grep -F -v $list <"$output.leaked" >"$output.temp"
+     mv "$output.temp" "$output.leaked"
++    i=8
++    list=
+ done
++if test "$list"; then
++    echo Dropping $list
++    grep -F -v $list <"$output.leaked" >"$output.temp"
++    mv "$output.temp" "$output.leaked"
++fi
+diff --git a/shell/hush_test/hush-trap/catch.right b/shell/hush_test/hush-trap/catch.right
+index 9e34c4c..80a062c 100644
+--- a/shell/hush_test/hush-trap/catch.right
++++ b/shell/hush_test/hush-trap/catch.right
+@@ -2,3 +2,4 @@ sending USR2
+ caught
+ sending USR2
+ sending USR2
++USR2
+diff --git a/shell/hush_test/hush-z_slow/leak_all1.tests b/shell/hush_test/hush-z_slow/leak_all1.tests
+index 21fdb0d..17ce0c6 100755
+--- a/shell/hush_test/hush-z_slow/leak_all1.tests
++++ b/shell/hush_test/hush-z_slow/leak_all1.tests
+@@ -67,6 +67,7 @@ HERE
+     f >/dev/null
+     : $((i++))
+ done
++unset -f f
+ 
+ memleak
+ 
+@@ -133,6 +134,7 @@ HERE
+     f >/dev/null
+     : $((i++))
+ done
++unset -f f
+ 
+ 
+ memleak

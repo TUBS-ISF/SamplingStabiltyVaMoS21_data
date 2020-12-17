@@ -1,0 +1,240 @@
+2009-07-05 04:50:36 +0200
+diff --git a/archival/libunarchive/data_extract_all.c b/archival/libunarchive/data_extract_all.c
+index 444770d..123d1de 100644
+--- a/archival/libunarchive/data_extract_all.c
++++ b/archival/libunarchive/data_extract_all.c
+@@ -21,7 +21,7 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ 	/* Check if the file already exists */
+ 	if (archive_handle->ah_flags & ARCHIVE_EXTRACT_UNCONDITIONAL) {
+ 		/* Remove the entry if it exists */
+-		if (((file_header->mode & S_IFMT) != S_IFDIR)
++		if ((!S_ISDIR(file_header->mode))
+ 		 && (unlink(file_header->name) == -1)
+ 		 && (errno != ENOENT)
+ 		) {
+@@ -132,7 +132,7 @@ void FAST_FUNC data_extract_all(archive_handle_t *archive_handle)
+ #endif
+ 			lchown(file_header->name, file_header->uid, file_header->gid);
+ 	}
+-	if ((file_header->mode & S_IFMT) != S_IFLNK) {
++	if (S_ISLNK(file_header->mode)) {
+ 		/* uclibc has no lchmod, glibc is even stranger -
+ 		 * it has lchmod which seems to do nothing!
+ 		 * so we use chmod... */
+diff --git a/coreutils/df.c b/coreutils/df.c
+index 34b0150..d95aff3 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -44,7 +44,6 @@ int df_main(int argc, char **argv)
+ 	FILE *mount_table;
+ 	struct mntent *mount_entry;
+ 	struct statfs s;
+-	static const char ignored_mounts[] ALIGN1 = "rootfs\0";
+ 
+ 	enum {
+ 		OPT_KILO  = (1 << 0),
+@@ -120,7 +119,7 @@ int df_main(int argc, char **argv)
+ 			mount_point = *argv++;
+ 			if (!mount_point)
+ 				break;
+-			mount_entry = find_mount_point(mount_point, bb_path_mtab_file);
++			mount_entry = find_mount_point(mount_point);
+ 			if (!mount_entry) {
+ 				bb_error_msg("%s: can't find mount point", mount_point);
+  set_error:
+@@ -154,8 +153,8 @@ int df_main(int argc, char **argv)
+ 						) / (blocks_used + s.f_bavail);
+ 			}
+ 
+-			/* GNU coreutils 6.10 skip certain mounts, try to be compatible.  */
+-			if (index_in_strings(device, ignored_mounts) != -1)
++			/* GNU coreutils 6.10 skips certain mounts, try to be compatible.  */
++			if (strcmp(device, "rootfs") == 0)
+ 				continue;
+ 
+ #ifdef WHY_WE_DO_IT_FOR_DEV_ROOT_ONLY
+diff --git a/include/libbb.h b/include/libbb.h
+index 835beb2..6f4c547 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -986,7 +986,7 @@ extern void run_applet_no_and_exit(int a, char **argv) NORETURN FAST_FUNC;
+ 
+ #ifdef HAVE_MNTENT_H
+ extern int match_fstype(const struct mntent *mt, const char *fstypes) FAST_FUNC;
+-extern struct mntent *find_mount_point(const char *name, const char *table) FAST_FUNC;
++extern struct mntent *find_mount_point(const char *name) FAST_FUNC;
+ #endif
+ extern void erase_mtab(const char * name) FAST_FUNC;
+ extern unsigned int tty_baud_to_value(speed_t speed) FAST_FUNC;
+diff --git a/libbb/find_mount_point.c b/libbb/find_mount_point.c
+index 4cd6b16..12b2cfc 100644
+--- a/libbb/find_mount_point.c
++++ b/libbb/find_mount_point.c
+@@ -17,7 +17,7 @@
+  * Given any other file (or directory), find the mount table entry for its
+  * filesystem.
+  */
+-struct mntent* FAST_FUNC find_mount_point(const char *name, const char *table)
++struct mntent* FAST_FUNC find_mount_point(const char *name)
+ {
+ 	struct stat s;
+ 	dev_t mountDevice;
+@@ -25,27 +25,35 @@ struct mntent* FAST_FUNC find_mount_point(const char *name, const char *table)
+ 	struct mntent *mountEntry;
+ 
+ 	if (stat(name, &s) != 0)
+-		return 0;
++		return NULL;
+ 
+-	if ((s.st_mode & S_IFMT) == S_IFBLK)
++	if (S_ISBLK(s.st_mode))
+ 		mountDevice = s.st_rdev;
+ 	else
+ 		mountDevice = s.st_dev;
+ 
+ 
+-	mountTable = setmntent(table ? table : bb_path_mtab_file, "r");
++	mountTable = setmntent(bb_path_mtab_file, "r");
+ 	if (!mountTable)
+ 		return 0;
+ 
+-	while ((mountEntry = getmntent(mountTable)) != 0) {
++	while ((mountEntry = getmntent(mountTable)) != NULL) {
++		/* rootfs mount in Linux 2.6 exists always,
++		 * and it makes sense to always ignore it.
++		 * Otherwise people can't reference their "real" root! */
++		if (strcmp(mountEntry->mnt_fsname, "rootfs") == 0)
++			continue;
++
+ 		if (strcmp(name, mountEntry->mnt_dir) == 0
+ 		 || strcmp(name, mountEntry->mnt_fsname) == 0
+ 		) { /* String match. */
+ 			break;
+ 		}
+-		if (stat(mountEntry->mnt_fsname, &s) == 0 && s.st_rdev == mountDevice)	/* Match the device. */
++		/* Match the device. */
++		if (stat(mountEntry->mnt_fsname, &s) == 0 && s.st_rdev == mountDevice)
+ 			break;
+-		if (stat(mountEntry->mnt_dir, &s) == 0 && s.st_dev == mountDevice)	/* Match the directory's mount point. */
++		/* Match the directory's mount point. */
++		if (stat(mountEntry->mnt_dir, &s) == 0 && s.st_dev == mountDevice)
+ 			break;
+ 	}
+ 	endmntent(mountTable);
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 34b09ce..838adf2 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -239,7 +239,7 @@ static void open_tty(const char *tty)
+ //		cur_dir_fd = xopen(".", O_DIRECTORY | O_NONBLOCK);
+ //		xchdir("/dev");
+ //		xstat(tty, &st);
+-//		if ((st.st_mode & S_IFMT) != S_IFCHR)
++//		if (!S_ISCHR(st.st_mode))
+ //			bb_error_msg_and_die("%s: not a character device", tty);
+ 
+ 		if (tty[0] != '/')
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index 0c33c1b..ca0b17e 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -374,38 +374,28 @@ static int ask(const char *string, int def)
+  */
+ static void check_mount(void)
+ {
+-	FILE *f;
+-	struct mntent *mnt;
+-	int cont;
+-	int fd;
+-//XXX:FIXME use find_mount_point()
+-	f = setmntent(MOUNTED, "r");
+-	if (f == NULL)
+-		return;
+-	while ((mnt = getmntent(f)) != NULL)
+-		if (strcmp(device_name, mnt->mnt_fsname) == 0)
+-			break;
+-	endmntent(f);
+-	if (!mnt)
+-		return;
+-
+-	/*
+-	 * If the root is mounted read-only, then /etc/mtab is
+-	 * probably not correct; so we won't issue a warning based on
+-	 * it.
+-	 */
+-	fd = open(MOUNTED, O_RDWR);
+-	if (fd < 0 && errno == EROFS)
+-		return;
+-	close(fd);
+-
+-	printf("%s is mounted. ", device_name);
+-	cont = 0;
+-	if (isatty(0) && isatty(1))
+-		cont = ask("Do you really want to continue", 0);
+-	if (!cont) {
+-		printf("Check aborted\n");
+-		exit(EXIT_SUCCESS);
++	if (find_mount_point(device_name)) {
++		int cont;
++#if ENABLE_FEATURE_MTAB_SUPPORT
++		/*
++		 * If the root is mounted read-only, then /etc/mtab is
++		 * probably not correct; so we won't issue a warning based on
++		 * it.
++		 */
++		int fd = open(bb_path_mtab_file, O_RDWR);
++
++		if (fd < 0 && errno == EROFS)
++			return;
++		close(fd);
++#endif
++		printf("%s is mounted. ", device_name);
++		cont = 0;
++		if (isatty(0) && isatty(1))
++			cont = ask("Do you really want to continue", 0);
++		if (!cont) {
++			printf("Check aborted\n");
++			exit(EXIT_SUCCESS);
++		}
+ 	}
+ }
+ 
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 2666132..18512a3 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -624,7 +624,6 @@ static void setup_tables(void)
+ int mkfs_minix_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mkfs_minix_main(int argc UNUSED_PARAM, char **argv)
+ {
+-	struct mntent *mp;
+ 	unsigned opt;
+ 	char *tmp;
+ 	struct stat statbuf;
+@@ -683,11 +682,8 @@ int mkfs_minix_main(int argc UNUSED_PARAM, char **argv)
+ 		G.total_blocks = 65535;
+ 
+ 	/* Check if it is mounted */
+-	mp = find_mount_point(G.device_name, NULL);
+-	if (mp && strcmp(G.device_name, mp->mnt_fsname) == 0)
+-		bb_error_msg_and_die("%s is mounted on %s; "
+-				"refusing to make a filesystem",
+-				G.device_name, mp->mnt_dir);
++	if (find_mount_point(G.device_name))
++		bb_error_msg_and_die("can't format mounted filesystem");
+ 
+ 	xmove_fd(xopen(G.device_name, O_RDWR), dev_fd);
+ 	if (fstat(dev_fd, &statbuf) < 0)
+diff --git a/util-linux/mkfs_vfat.c b/util-linux/mkfs_vfat.c
+index 98a0895..8c6078d 100644
+--- a/util-linux/mkfs_vfat.c
++++ b/util-linux/mkfs_vfat.c
+@@ -275,7 +275,7 @@ int mkfs_vfat_main(int argc UNUSED_PARAM, char **argv)
+ 		)
+ 			bb_error_msg_and_die("will not try to make filesystem on full-disk device (use -I if wanted)");
+ 		// can't work on mounted filesystems
+-		if (find_mount_point(device_name, NULL))
++		if (find_mount_point(device_name))
+ 			bb_error_msg_and_die("can't format mounted filesystem");
+ #endif
+ 		// get true sector size

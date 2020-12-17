@@ -1,0 +1,119 @@
+2008-06-12 15:54:49 +0000
+diff --git a/networking/libiproute/ipaddress.c b/networking/libiproute/ipaddress.c
+index faa3f2d..7a948a1 100644
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -196,7 +196,7 @@ static int flush_update(void)
+ 	return 0;
+ }
+ 
+-static int print_addrinfo(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
++static int print_addrinfo(const struct sockaddr_nl *who ATTRIBUTE_UNUSED,
+ 		struct nlmsghdr *n, void *arg ATTRIBUTE_UNUSED)
+ {
+ 	struct ifaddrmsg *ifa = NLMSG_DATA(n);
+@@ -380,7 +380,7 @@ static int print_selected_addrinfo(int ifindex, struct nlmsg_list *ainfo)
+ }
+ 
+ 
+-static int store_nlmsg(struct sockaddr_nl *who, struct nlmsghdr *n, void *arg)
++static int store_nlmsg(const struct sockaddr_nl *who, struct nlmsghdr *n, void *arg)
+ {
+ 	struct nlmsg_list **linfo = (struct nlmsg_list**)arg;
+ 	struct nlmsg_list *h;
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index 59cbf80..6977a09 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -78,7 +78,7 @@ static unsigned get_hz(void)
+ 	return hz_internal;
+ }
+ 
+-static int print_route(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
++static int print_route(const struct sockaddr_nl *who ATTRIBUTE_UNUSED,
+ 		struct nlmsghdr *n, void *arg)
+ {
+ 	FILE *fp = (FILE*)arg;
+diff --git a/networking/libiproute/iprule.c b/networking/libiproute/iprule.c
+index f62429a..2ee7701 100644
+--- a/networking/libiproute/iprule.c
++++ b/networking/libiproute/iprule.c
+@@ -40,7 +40,7 @@ static void usage(void)
+ }
+ */
+ 
+-static int print_rule(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
++static int print_rule(const struct sockaddr_nl *who ATTRIBUTE_UNUSED,
+ 					struct nlmsghdr *n, void *arg ATTRIBUTE_UNUSED)
+ {
+ 	struct rtmsg *r = NLMSG_DATA(n);
+diff --git a/networking/libiproute/libnetlink.c b/networking/libiproute/libnetlink.c
+index 47a055a..4511d36 100644
+--- a/networking/libiproute/libnetlink.c
++++ b/networking/libiproute/libnetlink.c
+@@ -103,7 +103,7 @@ int rtnl_dump_request(struct rtnl_handle *rth, int type, void *req, int len)
+ }
+ 
+ static int rtnl_dump_filter(struct rtnl_handle *rth,
+-		int (*filter)(struct sockaddr_nl *, struct nlmsghdr *n, void *),
++		int (*filter)(const struct sockaddr_nl *, struct nlmsghdr *n, void *),
+ 		void *arg1/*,
+ 		int (*junk)(struct sockaddr_nl *, struct nlmsghdr *n, void *),
+ 		void *arg2*/)
+@@ -195,7 +195,7 @@ static int rtnl_dump_filter(struct rtnl_handle *rth,
+ }
+ 
+ int xrtnl_dump_filter(struct rtnl_handle *rth,
+-		int (*filter)(struct sockaddr_nl *, struct nlmsghdr *n, void *),
++		int (*filter)(const struct sockaddr_nl *, struct nlmsghdr *, void *),
+ 		void *arg1)
+ {
+ 	int ret = rtnl_dump_filter(rth, filter, arg1/*, NULL, NULL*/);
+@@ -207,7 +207,7 @@ int xrtnl_dump_filter(struct rtnl_handle *rth,
+ int rtnl_talk(struct rtnl_handle *rtnl, struct nlmsghdr *n,
+ 	      pid_t peer, unsigned groups,
+ 	      struct nlmsghdr *answer,
+-	      int (*junk)(struct sockaddr_nl *, struct nlmsghdr *n, void *),
++	      int (*junk)(struct sockaddr_nl *, struct nlmsghdr *, void *),
+ 	      void *jarg)
+ {
+ /* bbox doesn't use parameters no. 3, 4, 6, 7, they are stubbed out */
+diff --git a/networking/libiproute/libnetlink.h b/networking/libiproute/libnetlink.h
+index 7507c52..6c1a881 100644
+--- a/networking/libiproute/libnetlink.h
++++ b/networking/libiproute/libnetlink.h
+@@ -27,7 +27,7 @@ extern void rtnl_close(struct rtnl_handle *rth);
+ extern int xrtnl_wilddump_request(struct rtnl_handle *rth, int fam, int type);
+ extern int rtnl_dump_request(struct rtnl_handle *rth, int type, void *req, int len);
+ extern int xrtnl_dump_filter(struct rtnl_handle *rth,
+-			int (*filter)(struct sockaddr_nl*, struct nlmsghdr *n, void*),
++			int (*filter)(const struct sockaddr_nl*, struct nlmsghdr *n, void*),
+ 			void *arg1);
+ 
+ /* bbox doesn't use parameters no. 3, 4, 6, 7, stub them out */
+diff --git a/networking/libiproute/ll_map.c b/networking/libiproute/ll_map.c
+index 031b29a..f9b6970 100644
+--- a/networking/libiproute/ll_map.c
++++ b/networking/libiproute/ll_map.c
+@@ -39,7 +39,7 @@ static struct idxmap *find_by_index(int idx)
+ 	return NULL;
+ }
+ 
+-int ll_remember_index(struct sockaddr_nl *who ATTRIBUTE_UNUSED,
++int ll_remember_index(const struct sockaddr_nl *who ATTRIBUTE_UNUSED,
+ 		struct nlmsghdr *n,
+ 		void *arg ATTRIBUTE_UNUSED)
+ {
+diff --git a/networking/libiproute/ll_map.h b/networking/libiproute/ll_map.h
+index c425789..6d64ac1 100644
+--- a/networking/libiproute/ll_map.h
++++ b/networking/libiproute/ll_map.h
+@@ -6,7 +6,7 @@
+ # pragma GCC visibility push(hidden)
+ #endif
+ 
+-int ll_remember_index(struct sockaddr_nl *who, struct nlmsghdr *n, void *arg);
++int ll_remember_index(const struct sockaddr_nl *who, struct nlmsghdr *n, void *arg);
+ int ll_init_map(struct rtnl_handle *rth);
+ int xll_name_to_index(const char *const name);
+ const char *ll_index_to_name(int idx);

@@ -1,0 +1,14 @@
+2007-11-18 06:13:58 +0000
+diff --git a/examples/depmod.pl b/examples/depmod.pl
+index ca2e8f7..c356d27 100755
+--- a/examples/depmod.pl
++++ b/examples/depmod.pl
+@@ -177,7 +177,7 @@ sub build_ref_tables
+ 	} else {
+         # exporting all symbols
+         foreach ( @$sym_ar ) {
+-            / [ABCDGRST] (.*)$/ and do {
++            / [ABCDGRSTW] (.*)$/ and do {
+                 warn "syma = $1\n" if $verbose;
+                 $exp->{$1} = $name;
+             };

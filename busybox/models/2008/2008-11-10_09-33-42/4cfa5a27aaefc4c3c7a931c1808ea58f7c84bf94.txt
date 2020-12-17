@@ -1,0 +1,65 @@
+2008-11-10 09:33:42 +0000
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 60b87c1..fc7333b 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -160,7 +160,7 @@ config DEVFSD
+ 	  "PERMISSIONS", "EXECUTE", "COPY", "IGNORE",
+ 	  "MKOLDCOMPAT", "MKNEWCOMPAT","RMOLDCOMPAT", "RMNEWCOMPAT".
+ 
+-	   But only if they are written UPPERCASE!!!!!!!!
++	  But only if they are written UPPERCASE!!!!!!!!
+ 
+ config DEVFSD_MODLOAD
+ 	bool "Adds support for MODLOAD keyword in devsfd.conf"
+@@ -300,14 +300,6 @@ config FEATURE_LESS_FLAGS
+ 	  The -M flag enables a more sophisticated status line.
+ 	  The -m flag enables a simpler status line with a percentage.
+ 
+-config FEATURE_LESS_DASHCMD
+-	bool "Enable flag changes ('-' command)"
+-	default n
+-	depends on LESS
+-	help
+-	  This enables the ability to change command-line flags within
+-	  less itself ('-' keyboard command).
+-
+ config FEATURE_LESS_MARKS
+ 	bool "Enable marks"
+ 	default n
+@@ -322,13 +314,6 @@ config FEATURE_LESS_REGEXP
+ 	help
+ 	  Enable regular expressions, allowing complex file searches.
+ 
+-config FEATURE_LESS_LINENUMS
+-	bool "Enable dynamic switching of line numbers"
+-	default n
+-	depends on FEATURE_LESS_DASHCMD
+-	help
+-	  Enable "-N" command.
+-
+ config FEATURE_LESS_WINCH
+ 	bool "Enable automatic resizing on window size changes"
+ 	default n
+@@ -336,6 +321,21 @@ config FEATURE_LESS_WINCH
+ 	help
+ 	  Makes less track window size changes.
+ 
++config FEATURE_LESS_DASHCMD
++	bool "Enable flag changes ('-' command)"
++	default n
++	depends on LESS
++	help
++	  This enables the ability to change command-line flags within
++	  less itself ('-' keyboard command).
++
++config FEATURE_LESS_LINENUMS
++	bool "Enable dynamic switching of line numbers"
++	default n
++	depends on FEATURE_LESS_DASHCMD
++	help
++	  Enable "-N" command.
++
+ config HDPARM
+ 	bool "hdparm"
+ 	default n

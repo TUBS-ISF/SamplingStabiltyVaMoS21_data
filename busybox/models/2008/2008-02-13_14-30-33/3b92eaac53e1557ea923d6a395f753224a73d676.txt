@@ -1,0 +1,66 @@
+2008-02-13 14:30:33 +0000
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index 1d6c599..d8df4c5 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -32,7 +32,7 @@ enum {
+ 	FLAG_u  = 8,            /* Unique */
+ 	FLAG_c  = 0x10,         /* Check: no output, exit(!ordered) */
+ 	FLAG_s  = 0x20,         /* Stable sort, no ascii fallback at end */
+-	FLAG_z  = 0x40,         /* Input is null terminated, not \n */
++	FLAG_z  = 0x40,         /* Input and output is NUL terminated, not \n */
+ /* These can be applied to search keys, the previous four can't */
+ 	FLAG_b  = 0x80,         /* Ignore leading blanks */
+ 	FLAG_r  = 0x100,        /* Reverse */
+@@ -396,8 +396,9 @@ int sort_main(int argc, char **argv)
+ 		if (linecount) linecount = flag+1;
+ 	}
+ 	/* Print it */
++	flag = (option_mask32 & FLAG_z) ? '\0' : '\n';
+ 	for (i = 0; i < linecount; i++)
+-		fprintf(outfile, "%s\n", lines[i]);
++		fprintf(outfile, "%s%c", lines[i], flag);
+ 
+ 	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }
+diff --git a/testsuite/README b/testsuite/README
+index a44846d..b4719e6 100644
+--- a/testsuite/README
++++ b/testsuite/README
+@@ -1,6 +1,3 @@
+-Update: doesn't work as described. Try "make check" from parent dir...
+-* * *
+-
+ To run the test suite, change to this directory and run "./runtest".  It will
+ run all of the test cases, and list those with unexpected outcomes.  Adding the
+ -v option will cause it to show expected outcomes as well.  To only run the test
+diff --git a/testsuite/runtest b/testsuite/runtest
+index 93d5ed6..fc8392a 100755
+--- a/testsuite/runtest
++++ b/testsuite/runtest
+@@ -1,5 +1,8 @@
+ #!/bin/sh
+ 
++# Usage:
++# runtest [applet1] [applet2...]
++
+ # Run one old-style test.
+ # Tests are stored in applet/testcase shell scripts.
+ # They are run using "sh -x -e applet/testcase".
+diff --git a/testsuite/sort.tests b/testsuite/sort.tests
+index 1db7870..f700dc0 100755
+--- a/testsuite/sort.tests
++++ b/testsuite/sort.tests
+@@ -107,6 +107,12 @@ a c
+ b c
+ " ""
+ 
++testing "sort -z outputs NUL terminated lines" "sort -z input" "\
++one\0three\0two\0\
++" "\
++one\0two\0three\0\
++" ""
++
+ testing "sort key doesn't strip leading blanks, disables fallback global sort" \
+ "sort -n -k2 -t ' '" " a \n 1 \n 2 \n" "" " 2 \n 1 \n a \n"
+ 

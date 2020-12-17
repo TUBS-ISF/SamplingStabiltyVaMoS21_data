@@ -1,0 +1,74 @@
+2008-04-19 21:30:52 +0000
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index b6b30e7..c5c4059 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -65,7 +65,7 @@ static int pid_is_exec(pid_t pid)
+ 	return 0;
+ }
+ 
+-static int pid_is_user(int pid, int uid)
++static int pid_is_user(int pid)
+ {
+ 	struct stat sb;
+ 	char buf[sizeof("/proc/") + sizeof(int)*3];
+@@ -73,10 +73,10 @@ static int pid_is_user(int pid, int uid)
+ 	sprintf(buf, "/proc/%u", pid);
+ 	if (stat(buf, &sb) != 0)
+ 		return 0;
+-	return (sb.st_uid == uid);
++	return (sb.st_uid == user_id);
+ }
+ 
+-static int pid_is_cmd(pid_t pid, const char *name)
++static int pid_is_cmd(pid_t pid)
+ {
+ 	char fname[sizeof("/proc//stat") + sizeof(int)*3];
+ 	char *buf;
+@@ -90,7 +90,7 @@ static int pid_is_cmd(pid_t pid, const char *name)
+ 			char *pe = strrchr(++p, ')');
+ 			if (pe) {
+ 				*pe = '\0';
+-				r = !strcmp(p, name);
++				r = !strcmp(p, cmdname);
+ 			}
+ 		}
+ 		free(buf);
+@@ -105,10 +105,10 @@ static void check(int pid)
+ 	if (execname && !pid_is_exec(pid)) {
+ 		return;
+ 	}
+-	if (userspec && !pid_is_user(pid, user_id)) {
++	if (userspec && !pid_is_user(pid)) {
+ 		return;
+ 	}
+-	if (cmdname && !pid_is_cmd(pid, cmdname)) {
++	if (cmdname && !pid_is_cmd(pid)) {
+ 		return;
+ 	}
+ 	p = xmalloc(sizeof(*p));
+@@ -169,8 +169,6 @@ static int do_stop(void)
+ 	struct pid_list *p;
+ 	int killed = 0;
+ 
+-	do_procinit();
+-
+ 	if (cmdname) {
+ 		if (ENABLE_FEATURE_CLEAN_UP) what = xstrdup(cmdname);
+ 		if (!ENABLE_FEATURE_CLEAN_UP) what = cmdname;
+@@ -308,13 +306,13 @@ int start_stop_daemon_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	if (execname)
+ 		xstat(execname, &execstat);
+ 
++	do_procinit(); /* Both start and stop needs to know current processes */
++
+ 	if (opt & CTX_STOP) {
+ 		int i = do_stop();
+ 		return (opt & OPT_OKNODO) ? 0 : (i <= 0);
+ 	}
+ 
+-	do_procinit();
+-
+ 	if (found) {
+ 		if (!quiet)
+ 			printf("%s already running\n%d\n", execname, found->pid);

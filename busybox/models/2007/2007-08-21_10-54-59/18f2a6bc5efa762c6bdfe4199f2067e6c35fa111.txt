@@ -1,0 +1,33 @@
+2007-08-21 10:54:59 +0000
+diff --git a/scripts/find_stray_common_vars b/scripts/find_stray_common_vars
+new file mode 100755
+index 0000000..9f26bc7
+--- /dev/null
++++ b/scripts/find_stray_common_vars
+@@ -0,0 +1,10 @@
++#!/bin/sh
++
++# Common variables are elusive, they don't show up in size output!
++# This script will show all commons in *.o, sorted by size
++
++find -name '*.o' \
++| while read name; do
++    b=`basename "$name"`
++    nm "$name" | sed "s/^/$b: /"
++done | grep -i ' c ' | sort -k2
+diff --git a/scripts/find_stray_communal_vars b/scripts/find_stray_communal_vars
+deleted file mode 100755
+index 9f26bc7..0000000
+--- a/scripts/find_stray_communal_vars
++++ /dev/null
+@@ -1,10 +0,0 @@
+-#!/bin/sh
+-
+-# Common variables are elusive, they don't show up in size output!
+-# This script will show all commons in *.o, sorted by size
+-
+-find -name '*.o' \
+-| while read name; do
+-    b=`basename "$name"`
+-    nm "$name" | sed "s/^/$b: /"
+-done | grep -i ' c ' | sort -k2

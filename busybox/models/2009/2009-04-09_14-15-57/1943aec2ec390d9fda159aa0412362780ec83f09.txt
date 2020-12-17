@@ -1,0 +1,158 @@
+2009-04-09 14:15:57 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index d791b62..4c2716d 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -64,7 +64,6 @@
+  *
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+-
+ #include "busybox.h" /* for APPLET_IS_NOFORK/NOEXEC */
+ //TODO: pull in some .h and find out whether we have SINGLE_APPLET_MAIN?
+ //#include "applet_tables.h" doesn't work
+@@ -79,6 +78,12 @@
+ # define PIPE_BUF 4096           /* amount of buffering in a pipe */
+ #endif
+ 
++
++/* Debug build knobs */
++//#define LEAK_HUNTING 1
++//#define WANT_TO_TEST_NOMMU 1
++
++
+ #ifdef WANT_TO_TEST_NOMMU
+ # undef BB_MMU
+ # undef USE_FOR_NOMMU
+@@ -214,8 +219,7 @@ static void debug_print_strings(const char *prefix, char **vv)
+ /*
+  * Leak hunting. Use hush_leaktool.sh for post-processing.
+  */
+-//#define FOR_HUSH_LEAKTOOL
+-#ifdef FOR_HUSH_LEAKTOOL
++#ifdef LEAK_HUNTING
+ static void *xxmalloc(int lineno, size_t size)
+ {
+ 	void *ptr = xmalloc((size + 0xff) & ~0xff);
+@@ -743,7 +747,7 @@ static char **add_strings_to_strings(char **strings, char **add, int need_to_dup
+ 		v[count1 + i] = (need_to_dup ? xstrdup(add[i]) : add[i]);
+ 	return v;
+ }
+-#ifdef FOR_HUSH_LEAKTOOL
++#ifdef LEAK_HUNTING
+ static char **xx_add_strings_to_strings(int lineno, char **strings, char **add, int need_to_dup)
+ {
+ 	char **ptr = add_strings_to_strings(strings, add, need_to_dup);
+@@ -761,7 +765,7 @@ static char **add_string_to_strings(char **strings, char *add)
+ 	v[1] = NULL;
+ 	return add_strings_to_strings(strings, v, /*dup:*/ 0);
+ }
+-#ifdef FOR_HUSH_LEAKTOOL
++#ifdef LEAK_HUNTING
+ static char **xx_add_string_to_strings(int lineno, char **strings, char *add)
+ {
+ 	char **ptr = add_string_to_strings(strings, add);
+@@ -2310,6 +2314,7 @@ static void setup_heredoc(struct redir_struct *redir)
+ 		len -= written;
+ 		if (len == 0) {
+ 			close(pair.wr);
++			free(expanded);
+ 			return;
+ 		}
+ 		heredoc += written;
+diff --git a/shell/hush_test/hush-z_slow/leak_heredoc1.right b/shell/hush_test/hush-z_slow/leak_heredoc1.right
+new file mode 100644
+index 0000000..c6f0334
+--- /dev/null
++++ b/shell/hush_test/hush-z_slow/leak_heredoc1.right
+@@ -0,0 +1,3 @@
++Warm up
++Measuring memory leak...
++Ok
+diff --git a/shell/hush_test/hush-z_slow/leak_heredoc1.tests b/shell/hush_test/hush-z_slow/leak_heredoc1.tests
+new file mode 100755
+index 0000000..26cbb28
+--- /dev/null
++++ b/shell/hush_test/hush-z_slow/leak_heredoc1.tests
+@@ -0,0 +1,34 @@
++echo "Warm up"
++i=1
++while test $i != 99; do
++    : <<HERE
++Hello $i `echo builtin_$i`
++HERE
++    : $((i++))
++done
++
++memleak
++
++echo "Measuring memory leak..."
++i=1
++while test $i != 99; do
++    : <<HERE
++Hello $i `echo builtin_$i`
++HERE
++    : $((i++))
++done
++i=1
++while test $i != 99; do
++    : <<HERE
++Hello $i `echo builtin_$i`
++HERE
++    : $((i++))
++done
++
++memleak
++kb=$?
++if test $kb -le 4; then
++    echo Ok #$kb
++else
++    echo "Bad: $kb kb (or more) leaked"
++fi
+diff --git a/shell/match.c b/shell/match.c
+index 0810fd8..47038d6 100644
+--- a/shell/match.c
++++ b/shell/match.c
+@@ -14,7 +14,6 @@
+  *
+  * Original BSD copyright notice is retained at the end of this file.
+  */
+-
+ #ifdef STANDALONE
+ # include <stdbool.h>
+ # include <stdio.h>
+@@ -22,7 +21,7 @@
+ # include <string.h>
+ # include <unistd.h>
+ #else
+-# include "busybox.h"
++# include "libbb.h"
+ #endif
+ #include <fnmatch.h>
+ #include "match.h"
+diff --git a/shell/math.c b/shell/math.c
+index 8a44c8e..cc298bd 100644
+--- a/shell/math.c
++++ b/shell/math.c
+@@ -26,8 +26,7 @@
+  * rewrote arith (see notes to this), added locale support,
+  * rewrote dynamic variables.
+  */
+-
+-#include "busybox.h"
++#include "libbb.h"
+ #include "math.h"
+ 
+ #define a_e_h_t arith_eval_hooks_t
+diff --git a/shell/msh.c b/shell/msh.c
+index da1dc35..dffacf0 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -12,7 +12,6 @@
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+-
+ #include <sys/times.h>
+ #include <setjmp.h>
+ 

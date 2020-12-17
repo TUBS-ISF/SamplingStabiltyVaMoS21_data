@@ -1,0 +1,14 @@
+2008-03-05 22:01:45 +0000
+diff --git a/libbb/getpty.c b/libbb/getpty.c
+index 4b65188..c006e34 100644
+--- a/libbb/getpty.c
++++ b/libbb/getpty.c
+@@ -8,6 +8,8 @@
+ 
+ #include "libbb.h"
+ 
++#define DEBUG 0
++
+ int getpty(char *line, int size)
+ {
+ 	int p;

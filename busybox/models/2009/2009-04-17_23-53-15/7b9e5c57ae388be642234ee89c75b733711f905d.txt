@@ -1,0 +1,14 @@
+2009-04-17 23:53:15 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 82634ff..f9757a7 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -6904,7 +6904,7 @@ static int builtin_continue(char **argv)
+ #endif
+ 
+ #if ENABLE_HUSH_FUNCTIONS
+-static int builtin_return(char **argv UNUSED_PARAM)
++static int builtin_return(char **argv)
+ {
+ 	int rc;
+ 

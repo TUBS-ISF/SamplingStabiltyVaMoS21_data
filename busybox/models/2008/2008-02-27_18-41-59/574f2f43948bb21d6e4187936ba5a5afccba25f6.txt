@@ -1,0 +1,572 @@
+2008-02-27 18:41:59 +0000
+diff --git a/archival/gzip.c b/archival/gzip.c
+index 00299b1..36502fa 100644
+--- a/archival/gzip.c
++++ b/archival/gzip.c
+@@ -2042,8 +2042,8 @@ int gzip_main(int argc, char **argv)
+ 	//if (opt & 0x4) // -v
+ 	argv += optind;
+ 
+-	PTR_TO_GLOBALS = xzalloc(sizeof(struct globals) + sizeof(struct globals2))
+-			+ sizeof(struct globals);
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(struct globals) + sizeof(struct globals2))
++			+ sizeof(struct globals));
+ 	G2.l_desc.dyn_tree    = G2.dyn_ltree;
+ 	G2.l_desc.static_tree = G2.static_ltree;
+ 	G2.l_desc.extra_bits  = extra_lbits;
+diff --git a/coreutils/test.c b/coreutils/test.c
+index 22dadac..2f5b6b8 100644
+--- a/coreutils/test.c
++++ b/coreutils/test.c
+@@ -180,6 +180,7 @@ static struct statics *const ptr_to_statics __attribute__ ((section (".data")));
+ 
+ #define INIT_S() do { \
+ 	(*(struct statics**)&ptr_to_statics) = xzalloc(sizeof(S)); \
++	barrier(); \
+ } while (0)
+ #define DEINIT_S() do { \
+ 	free(ptr_to_statics); \
+diff --git a/docs/keep_data_small.txt b/docs/keep_data_small.txt
+index 3ddbd81..2ddbefa 100644
+--- a/docs/keep_data_small.txt
++++ b/docs/keep_data_small.txt
+@@ -99,9 +99,9 @@ and then declare that ptr_to_globals is a pointer to it:
+ 
+ ptr_to_globals is declared as constant pointer.
+ This helps gcc understand that it won't change, resulting in noticeably
+-smaller code. In order to assign it, use PTR_TO_GLOBALS macro:
++smaller code. In order to assign it, use SET_PTR_TO_GLOBALS macro:
+ 
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G));
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G)));
+ 
+ Typically it is done in <applet>_main().
+ 
+diff --git a/editors/awk.c b/editors/awk.c
+index 983b311..f04ea5c 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -394,7 +394,8 @@ static const uint16_t PRIMES[] ALIGN2 = { 251, 1021, 4093, 16381, 65521 };
+ /* Globals. Split in two parts so that first one is addressed
+  * with (mostly short) negative offsets */
+ struct globals {
+-	chain beginseq, mainseq, endseq, *seq;
++	chain beginseq, mainseq, endseq;
++	chain *seq;
+ 	node *break_ptr, *continue_ptr;
+ 	rstream *iF;
+ 	xhash *vhash, *ahash, *fdhash, *fnhash;
+@@ -445,7 +446,7 @@ struct globals2 {
+ 	tsplitter fsplitter, rsplitter;
+ };
+ #define G1 (ptr_to_globals[-1])
+-#define G (*(struct globals2 *const)ptr_to_globals)
++#define G (*(struct globals2 *)ptr_to_globals)
+ /* For debug. nm --size-sort awk.o | grep -vi ' [tr] ' */
+ /* char G1size[sizeof(G1)]; - 0x6c */
+ /* char Gsize[sizeof(G)]; - 0x1cc */
+@@ -485,7 +486,7 @@ struct globals2 {
+ #define fsplitter    (G.fsplitter   )
+ #define rsplitter    (G.rsplitter   )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G1) + sizeof(G)) + sizeof(G1); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G1) + sizeof(G)) + sizeof(G1)); \
+ 	G.next_token__ltclass = TC_OPTERM; \
+ 	G.evaluate__seed = 1; \
+ } while (0)
+diff --git a/editors/diff.c b/editors/diff.c
+index 64b7daa..8844ec1 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -151,7 +151,7 @@ struct globals {
+ #define stb1               (G.stb1              )
+ #define stb2               (G.stb2              )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ 	context = 3; \
+ 	max_context = 64; \
+ } while (0)
+diff --git a/editors/ed.c b/editors/ed.c
+index a569788..15f0147 100644
+--- a/editors/ed.c
++++ b/editors/ed.c
+@@ -51,7 +51,7 @@ struct globals {
+ #define lines              (G.lines             )
+ #define marks              (G.marks             )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ } while (0)
+ 
+ 
+diff --git a/editors/vi.c b/editors/vi.c
+index 6f4bd06..d2d2670 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -233,7 +233,7 @@ struct globals {
+ #define readbuffer     (G.readbuffer    )
+ #define scr_out_buf    (G.scr_out_buf   )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ } while (0)
+ 
+ static int init_text_buffer(char *); // init from file or create new
+diff --git a/include/libbb.h b/include/libbb.h
+index 707e8d6..8305e59 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1208,10 +1208,14 @@ extern char bb_common_bufsiz1[COMMON_BUFSIZE];
+ struct globals;
+ /* '*const' ptr makes gcc optimize code much better.
+  * Magic prevents ptr_to_globals from going into rodata.
+- * If you want to assign a value, use PTR_TO_GLOBALS = xxx */
++ * If you want to assign a value, use SET_PTR_TO_GLOBALS(x) */
+ extern struct globals *const ptr_to_globals;
+-#define PTR_TO_GLOBALS (*(struct globals**)&ptr_to_globals)
+-
++/* At least gcc 3.4.6 on mipsel system needs optimization barrier */
++#define barrier() asm volatile("":::"memory")
++#define SET_PTR_TO_GLOBALS(x) do { \
++	(*(struct globals**)&ptr_to_globals) = (x); \
++	barrier(); \
++} while (0)
+ 
+ /* You can change LIBBB_DEFAULT_LOGIN_SHELL, but don't use it,
+  * use bb_default_login_shell and following defines.
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index fc87f62..fd36655 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -69,6 +69,7 @@ lib-y += pidfile.o
+ lib-y += printable.o
+ lib-y += process_escape_sequence.o
+ lib-y += procps.o
++lib-y += ptr_to_globals.o
+ lib-y += read.o
+ lib-y += recursive_action.o
+ lib-y += remove_file.o
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 793e3dc..fec99c5 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -127,6 +127,7 @@ void lbb_prepare(const char *applet, char **argv)
+ {
+ #ifdef __GLIBC__
+ 	(*(int **)&bb_errno) = __errno_location();
++	barrier();
+ #endif
+ 	applet_name = applet;
+ 
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index c6aa45c..d716169 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -146,6 +146,7 @@ static struct statics *const ptr_to_statics __attribute__ ((section (".data")));
+ 
+ #define INIT_S() do { \
+ 	(*(struct statics**)&ptr_to_statics) = xzalloc(sizeof(S)); \
++	barrier(); \
+ 	cmdedit_termw = 80; \
+ 	USE_FEATURE_EDITING_FANCY_PROMPT(num_ok_lines = 1;) \
+ 	USE_FEATURE_GETUSERNAME_AND_HOMEDIR(home_pwd_buf = (char*)null_str;) \
+diff --git a/libbb/messages.c b/libbb/messages.c
+index 2a011f8..74a070c 100644
+--- a/libbb/messages.c
++++ b/libbb/messages.c
+@@ -71,7 +71,3 @@ const char bb_path_wtmp_file[] ALIGN1 =
+  * Since gcc insists on aligning struct global's members, it would be a pity
+  * (and an alignment fault on some CPUs) to mess it up. */
+ char bb_common_bufsiz1[COMMON_BUFSIZE] __attribute__(( aligned(sizeof(long long)) ));
+-
+-struct globals;
+-/* Make it reside in R/W memory: */
+-struct globals *const ptr_to_globals __attribute__ ((section (".data")));
+diff --git a/libbb/ptr_to_globals.c b/libbb/ptr_to_globals.c
+new file mode 100644
+index 0000000..f8ccbf1
+--- /dev/null
++++ b/libbb/ptr_to_globals.c
+@@ -0,0 +1,11 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Copyright (C) 2008 by Denys Vlasenko <vda.linux@googlemail.com>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
++
++/* We cheat here. It is declared as const ptr in libbb.h,
++ * but here we make it live in R/W memory */
++struct globals;
++struct globals *ptr_to_globals;
+diff --git a/miscutils/less.c b/miscutils/less.c
+index da595f4..8d4f7ec 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -153,14 +153,14 @@ struct globals {
+ #define term_orig           (G.term_orig         )
+ #define term_less           (G.term_less         )
+ #define INIT_G() do { \
+-		PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
+-		less_gets_pos = -1; \
+-		empty_line_marker = "~"; \
+-		num_files = 1; \
+-		current_file = 1; \
+-		eof_error = 1; \
+-		terminated = 1; \
+-	} while (0)
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
++	less_gets_pos = -1; \
++	empty_line_marker = "~"; \
++	num_files = 1; \
++	current_file = 1; \
++	eof_error = 1; \
++	terminated = 1; \
++} while (0)
+ 
+ /* Reset terminal input to normal */
+ static void set_tty_cooked(void)
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 5be5317..de84cca 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -322,7 +322,7 @@ struct globals {
+ #define http_error_page   (G.http_error_page  )
+ #define proxy             (G.proxy            )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ 	USE_FEATURE_HTTPD_BASIC_AUTH(g_realm = "Web Server Authentication";) \
+ 	bind_addr_or_port = "80"; \
+ 	file_size = -1; \
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index 774d7c2..76aaa76 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -129,7 +129,7 @@ struct globals {
+ #define master     (G.master    )
+ #define slave      (G.slave     )
+ #define INIT_G() do { \
+-        PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++        SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ } while (0)
+ 
+ 
+diff --git a/networking/nc_bloaty.c b/networking/nc_bloaty.c
+index dd62e5d..cd01478 100644
+--- a/networking/nc_bloaty.c
++++ b/networking/nc_bloaty.c
+@@ -97,7 +97,6 @@ struct globals {
+ };
+ 
+ #define G (*ptr_to_globals)
+-
+ #define wrote_out  (G.wrote_out )
+ #define wrote_net  (G.wrote_net )
+ #define ouraddr    (G.ouraddr   )
+@@ -115,6 +114,10 @@ struct globals {
+ #else
+ #define o_interval 0
+ #endif
++#define INIT_G() do { \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
++} while (0)
++
+ 
+ /* Must match getopt32 call! */
+ enum {
+@@ -678,9 +681,7 @@ int nc_main(int argc, char **argv)
+ 	int x;
+ 	unsigned o_lport = 0;
+ 
+-	/* I was in this barbershop quartet in Skokie IL ... */
+-	/* round up the usual suspects, i.e. malloc up all the stuff we need */
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G));
++	INIT_G();
+ 
+ 	/* catch a signal or two for cleanup */
+ 	bb_signals(0
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index 3a6078f..eb356dc 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -77,7 +77,7 @@ struct globals {
+ #define xargs           (G.xargs     )
+ #define fargs           (G.fargs     )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ 	xargs[0] = "openssl"; \
+ 	xargs[1] = "s_client"; \
+ 	xargs[2] = "-quiet"; \
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index 2ba558f..582840a 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -378,7 +378,7 @@ struct globals {
+ #define wherefrom (G.wherefrom)
+ #define gwlist    (G.gwlist   )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ 	maxpacket = 32 * 1024; \
+ 	port = 32768 + 666; \
+ 	waittime = 5; \
+diff --git a/procps/nmeter.c b/procps/nmeter.c
+index b8ba3fa..5730529 100644
+--- a/procps/nmeter.c
++++ b/procps/nmeter.c
+@@ -75,11 +75,11 @@ struct globals {
+ #define proc_diskstats     (G.proc_diskstats    )
+ #define proc_sys_fs_filenr (G.proc_sys_fs_filenr)
+ #define INIT_G() do { \
+-		PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
+-		cur_outbuf = outbuf; \
+-		final_str = "\n"; \
+-		deltanz = delta = 1000000; \
+-	} while (0)
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
++	cur_outbuf = outbuf; \
++	final_str = "\n"; \
++	deltanz = delta = 1000000; \
++} while (0)
+ 
+ // We depend on this being a char[], not char* - we take sizeof() of it
+ #define outbuf bb_common_bufsiz1
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 73570da..d7da180 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -106,7 +106,7 @@ struct globals {
+ #define fl_flag_0      (G.fl_flag_0     )
+ #define dirn           (G.dirn          )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ 	linemax = 1000; \
+ 	/*buflen = 1024;*/ \
+ 	linecomplete = 1; \
+diff --git a/shell/Kbuild b/shell/Kbuild
+index 36a8ffd..deedc24 100644
+--- a/shell/Kbuild
++++ b/shell/Kbuild
+@@ -5,8 +5,7 @@
+ # Licensed under the GPL v2, see the file LICENSE in this tarball.
+ 
+ lib-y:=
+-lib-$(CONFIG_ASH)  += ash.o
+-lib-$(CONFIG_HUSH) += hush.o
+-lib-$(CONFIG_MSH)  += msh.o
+-
++lib-$(CONFIG_ASH)      += ash.o ash_ptr_hack.o
++lib-$(CONFIG_HUSH)     += hush.o
++lib-$(CONFIG_MSH)      += msh.o
+ lib-$(CONFIG_CTTYHACK) += cttyhack.o
+diff --git a/shell/ash.c b/shell/ash.c
+index 9c762e2..9b1a730 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -202,9 +202,8 @@ struct globals_misc {
+ 	/* indicates specified signal received */
+ 	char gotsig[NSIG - 1];
+ };
+-/* Make it reside in writable memory, yet make compiler understand that it is not going to change. */
+-static struct globals_misc *const ptr_to_globals_misc __attribute__ ((section (".data")));
+-#define G_misc (*ptr_to_globals_misc)
++extern struct globals_misc *const ash_ptr_to_globals_misc;
++#define G_misc (*ash_ptr_to_globals_misc)
+ #define rootpid   (G_misc.rootpid  )
+ #define shlvl     (G_misc.shlvl    )
+ #define minusc    (G_misc.minusc   )
+@@ -223,7 +222,8 @@ static struct globals_misc *const ptr_to_globals_misc __attribute__ ((section ("
+ #define sigmode   (G_misc.sigmode  )
+ #define gotsig    (G_misc.gotsig   )
+ #define INIT_G_misc() do { \
+-	(*(struct globals_misc**)&ptr_to_globals_misc) = xzalloc(sizeof(G_misc)); \
++	(*(struct globals_misc**)&ash_ptr_to_globals_misc) = xzalloc(sizeof(G_misc)); \
++	barrier(); \
+ 	curdir = nullstr; \
+ 	physdir = nullstr; \
+ } while (0)
+@@ -1147,9 +1147,8 @@ struct globals_memstack {
+ 	int    herefd; // = -1;
+ 	struct stack_block stackbase;
+ };
+-/* Make it reside in writable memory, yet make compiler understand that it is not going to change. */
+-static struct globals_memstack *const ptr_to_globals_memstack __attribute__ ((section (".data")));
+-#define G_memstack (*ptr_to_globals_memstack)
++extern struct globals_memstack *const ash_ptr_to_globals_memstack;
++#define G_memstack (*ash_ptr_to_globals_memstack)
+ #define g_stackp     (G_memstack.g_stackp    )
+ #define markp        (G_memstack.markp       )
+ #define g_stacknxt   (G_memstack.g_stacknxt  )
+@@ -1158,7 +1157,8 @@ static struct globals_memstack *const ptr_to_globals_memstack __attribute__ ((se
+ #define herefd       (G_memstack.herefd      )
+ #define stackbase    (G_memstack.stackbase   )
+ #define INIT_G_memstack() do { \
+-	(*(struct globals_memstack**)&ptr_to_globals_memstack) = xzalloc(sizeof(G_memstack)); \
++	(*(struct globals_memstack**)&ash_ptr_to_globals_memstack) = xzalloc(sizeof(G_memstack)); \
++	barrier(); \
+ 	g_stackp = &stackbase; \
+ 	g_stacknxt = stackbase.space; \
+ 	g_stacknleft = MINSIZE; \
+@@ -1778,9 +1778,8 @@ struct globals_var {
+ 	struct var *vartab[VTABSIZE];
+ 	struct var varinit[ARRAY_SIZE(varinit_data)];
+ };
+-/* Make it reside in writable memory, yet make compiler understand that it is not going to change. */
+-static struct globals_var *const ptr_to_globals_var __attribute__ ((section (".data")));
+-#define G_var (*ptr_to_globals_var)
++extern struct globals_var *const ash_ptr_to_globals_var;
++#define G_var (*ash_ptr_to_globals_var)
+ #define shellparam    (G_var.shellparam   )
+ #define redirlist     (G_var.redirlist    )
+ #define g_nullredirs  (G_var.g_nullredirs )
+@@ -1789,7 +1788,8 @@ static struct globals_var *const ptr_to_globals_var __attribute__ ((section (".d
+ #define varinit       (G_var.varinit      )
+ #define INIT_G_var() do { \
+ 	int i; \
+-	(*(struct globals_var**)&ptr_to_globals_var) = xzalloc(sizeof(G_var)); \
++	(*(struct globals_var**)&ash_ptr_to_globals_var) = xzalloc(sizeof(G_var)); \
++	barrier(); \
+ 	for (i = 0; i < ARRAY_SIZE(varinit_data); i++) { \
+ 		varinit[i].flags = varinit_data[i].flags; \
+ 		varinit[i].text  = varinit_data[i].text; \
+diff --git a/shell/ash_ptr_hack.c b/shell/ash_ptr_hack.c
+new file mode 100644
+index 0000000..490b73b
+--- /dev/null
++++ b/shell/ash_ptr_hack.c
+@@ -0,0 +1,16 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Copyright (C) 2008 by Denys Vlasenko <vda.linux@googlemail.com>
++ *
++ * Licensed under GPLv2, see file LICENSE in this tarball for details.
++ */
++
++/* We cheat here. They are declared as const ptr in ash.c,
++ * but here we make them live in R/W memory */
++struct globals_misc;
++struct globals_memstack;
++struct globals_var;
++
++struct globals_misc     *ash_ptr_to_globals_misc;
++struct globals_memstack *ash_ptr_to_globals_memstack;
++struct globals_var      *ash_ptr_to_globals_var;
+diff --git a/shell/hush.c b/shell/hush.c
+index d9ef239..b44f35b 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -460,6 +460,9 @@ enum { run_list_level = 0 };
+ #endif
+ #define charmap          (G.charmap         )
+ #define user_input_buf   (G.user_input_buf  )
++#define INIT_G() do { \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
++} while (0)
+ 
+ 
+ #define B_CHUNK  100
+@@ -3778,7 +3781,7 @@ int hush_main(int argc, char **argv)
+ 	char **e;
+ 	struct variable *cur_var;
+ 
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G));
++	INIT_G();
+ 
+ 	/* Deal with HUSH_VERSION */
+ 	shell_ver = const_shell_ver; /* copying struct here */
+diff --git a/shell/msh.c b/shell/msh.c
+index 917b08a..569011b 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -705,7 +705,7 @@ struct globals {
+ #define child_cmd       (G.child_cmd      )
+ #define iostack         (G.iostack        )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ 	global_env.linep = line; \
+ 	global_env.iobase = iostack; \
+ 	global_env.iop = iostack - 1; \
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index e54ade7..596984e 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -136,7 +136,7 @@ static const struct init_globals init_data = {
+ 
+ #define G (*ptr_to_globals)
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = memcpy(xzalloc(sizeof(G)), &init_data, sizeof(init_data)); \
++	SET_PTR_TO_GLOBALS(memcpy(xzalloc(sizeof(G)), &init_data, sizeof(init_data))); \
+ } while (0)
+ 
+ 
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index c98a74f..827ea21 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -309,7 +309,7 @@ struct globals {
+ #define MBRbuffer       (G.MBRbuffer)
+ #define ptes            (G.ptes)
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ 	sector_size = DEFAULT_SECTOR_SIZE; \
+ 	sector_offset = 1; \
+ 	g_partitions = 4; \
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index deb82f7..62e4f08 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -190,7 +190,7 @@ struct globals {
+ #define check_file_blk     (G.check_file_blk     )
+ #define current_name       (G.current_name       )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ 	dirsize = 16; \
+ 	namelen = 14; \
+ 	current_name[0] = '/'; \
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 118b95e..a784b72 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -122,7 +122,7 @@ struct globals {
+ };
+ #define G (*ptr_to_globals)
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ } while (0)
+ 
+ static ALWAYS_INLINE unsigned div_roundup(unsigned size, unsigned n)
+diff --git a/util-linux/more.c b/util-linux/more.c
+index eeeea50..2d55359 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -28,9 +28,7 @@ struct globals {
+ 	struct termios new_settings;
+ };
+ #define G (*(struct globals*)bb_common_bufsiz1)
+-//#define G (*ptr_to_globals)
+ #define INIT_G() ((void)0)
+-//#define INIT_G() PTR_TO_GLOBALS = xzalloc(sizeof(G))
+ #define initial_settings (G.initial_settings)
+ #define new_settings     (G.new_settings    )
+ #define cin_fileno       (G.cin_fileno      )
+diff --git a/util-linux/script.c b/util-linux/script.c
+index fda726e..e6dbb1a 100644
+--- a/util-linux/script.c
++++ b/util-linux/script.c
+@@ -25,7 +25,7 @@ struct globals {
+ #define tt        (G.tt       )
+ #define fname     (G.fname    )
+ #define INIT_G() do { \
+-	PTR_TO_GLOBALS = xzalloc(sizeof(G)); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ 	fname = "typescript"; \
+ } while (0)
+ 

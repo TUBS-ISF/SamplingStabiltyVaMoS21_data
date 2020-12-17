@@ -1,0 +1,16 @@
+2007-09-08 17:42:00 +0000
+diff --git a/procps/top.c b/procps/top.c
+index 529db5f..ac3b7e5 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -474,8 +474,8 @@ static NOINLINE void display_process_list(int count, int scr_width)
+ 				, SHOW_STAT(pcpu)
+ #endif
+ 		);
+-		if (col < scr_width)
+-			read_cmdline(line_buf + col, scr_width - col, s->pid, s->comm);
++		if (col + 1 < scr_width)
++			read_cmdline(line_buf + col, scr_width - col - 1, s->pid, s->comm);
+ 		fputs(line_buf, stdout);
+ 		/* printf(" %d/%d %lld/%lld", s->pcpu, total_pcpu,
+ 			jif.busy - prev_jif.busy, jif.total - prev_jif.total); */

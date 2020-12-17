@@ -1,0 +1,171 @@
+2009-10-18 11:46:35 +0200
+diff --git a/shell/hush.c b/shell/hush.c
+index 1d2826d..46bb7e9 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -2185,7 +2185,7 @@ static NOINLINE int expand_vars_to_list(o_string *output, int n, char *arg, char
+ 
+ 	ored_ch = 0;
+ 
+-	debug_printf_expand("expand_vars_to_list: arg '%s'\n", arg);
++	debug_printf_expand("expand_vars_to_list: arg:'%s' or_mask:%x\n", arg, or_mask);
+ 	debug_print_list("expand_vars_to_list", output, n);
+ 	n = o_save_ptr(output, n);
+ 	debug_print_list("expand_vars_to_list[0]", output, n);
+@@ -3425,7 +3425,7 @@ static void pseudo_exec_argv(nommu_save_t *nommu_save,
+ 	sigprocmask(SIG_SETMASK, &G.inherited_set, NULL);
+ 	execvp(argv[0], argv);
+ 	bb_perror_msg("can't execute '%s'", argv[0]);
+-	_exit(EXIT_FAILURE);
++	_exit(127); /* bash compat */
+ }
+ 
+ /* Called after [v]fork() in run_pipe
+@@ -3895,7 +3895,7 @@ static NOINLINE int run_pipe(struct pipe *pi)
+ 			argv_expanded = expand_strvec_to_strvec(argv + command->assignment_cnt);
+ 		}
+ 
+-		/* if someone gives us an empty string: ``, $(), ... */
++		/* if someone gives us an empty string: `cmd with empty output` */
+ 		if (!argv_expanded[0]) {
+ 			debug_leave();
+ 			return 0;
+@@ -5802,7 +5802,7 @@ static int parse_stream_dquoted(o_string *as_string,
+ 	if (ch != '\n') {
+ 		next = i_peek(input);
+ 	}
+-	debug_printf_parse(": ch=%c (%d) escape=%d\n",
++	debug_printf_parse("\" ch=%c (%d) escape=%d\n",
+ 					ch, ch, dest->o_escape);
+ 	if (ch == '\\') {
+ 		if (next == EOF) {
+@@ -5882,6 +5882,11 @@ static struct pipe *parse_stream(char **pstring,
+ 			end_trigger ? end_trigger : 'X');
+ 	debug_enter();
+ 
++	/* If very first arg is "" or '', dest.data may end up NULL.
++	 * Preventing this: */
++	o_addchr(&dest, '\0');
++	dest.length = 0;
++
+ 	G.ifs = get_local_var_value("IFS");
+ 	if (G.ifs == NULL)
+ 		G.ifs = " \t\n";
+@@ -6979,16 +6984,32 @@ static int FAST_FUNC builtin_cd(char **argv)
+ 
+ static int FAST_FUNC builtin_exec(char **argv)
+ {
+-	if (*++argv == NULL)
+-		return EXIT_SUCCESS; /* bash does this */
+-	{
++	static const char pseudo_null_str[] = { SPECIAL_VAR_SYMBOL, SPECIAL_VAR_SYMBOL, '\0' };
++	char **pp = argv;
+ #if !BB_MMU
+-		nommu_save_t dummy;
++	nommu_save_t dummy;
+ #endif
+-		/* TODO: if exec fails, bash does NOT exit! We do... */
+-		pseudo_exec_argv(&dummy, argv, 0, NULL);
+-		/* never returns */
++
++	if (*++argv == NULL)
++		return EXIT_SUCCESS; /* bash does this */
++
++	/* Make sure empty arguments aren't ignored */
++	/* Example: exec ls '' */
++	pp = argv;
++	while (*pp) {
++		if ((*pp)[0] == '\0')
++			*pp = (char*)pseudo_null_str;
++		pp++;
+ 	}
++
++	/* Careful: we can end up here after [v]fork. Do not restore
++	 * tty pgrp then, only top-level shell process does that */
++	if (G_saved_tty_pgrp && getpid() == G.root_pid)
++		tcsetpgrp(G_interactive_fd, G_saved_tty_pgrp);
++
++	/* TODO: if exec fails, bash does NOT exit! We do... */
++	pseudo_exec_argv(&dummy, argv, 0, NULL);
++	/* never returns */
+ }
+ 
+ static int FAST_FUNC builtin_exit(char **argv)
+diff --git a/shell/hush_test/hush-misc/empty_args.right b/shell/hush_test/hush-misc/empty_args.right
+new file mode 100644
+index 0000000..38ed8b8
+--- /dev/null
++++ b/shell/hush_test/hush-misc/empty_args.right
+@@ -0,0 +1,6 @@
++Null 0th arg:
++hush: can't execute '': No such file or directory
++127
++Null 1st arg:
++0
++Null arg in exec:
+diff --git a/shell/hush_test/hush-misc/empty_args.tests b/shell/hush_test/hush-misc/empty_args.tests
+new file mode 100755
+index 0000000..efce549
+--- /dev/null
++++ b/shell/hush_test/hush-misc/empty_args.tests
+@@ -0,0 +1,9 @@
++echo Null 0th arg:
++""
++echo $?
++echo Null 1st arg:
++# printf without args would print usage info
++printf ""
++echo $?
++echo Null arg in exec:
++exec printf ""
+diff --git a/shell/hush_test/hush-psubst/emptytick.right b/shell/hush_test/hush-psubst/emptytick.right
+index d4b70c5..1f60ecf 100644
+--- a/shell/hush_test/hush-psubst/emptytick.right
++++ b/shell/hush_test/hush-psubst/emptytick.right
+@@ -1,14 +1,17 @@
+ 0
+ 0
++hush: can't execute '': No such file or directory
+ 0
++hush: can't execute '': No such file or directory
+ 0
+ 0
+ 0
+ 0
+ 0
++hush: can't execute '': No such file or directory
+ 0
++hush: can't execute '': No such file or directory
+ 0
+ 0
+ 0
+-0
+-0
++hush: can't execute '': No such file or directory
+diff --git a/shell/hush_test/hush-psubst/emptytick.tests b/shell/hush_test/hush-psubst/emptytick.tests
+index af3a183..a269f02 100755
+--- a/shell/hush_test/hush-psubst/emptytick.tests
++++ b/shell/hush_test/hush-psubst/emptytick.tests
+@@ -1,16 +1,20 @@
+ true;  ``; echo $?
+ false; ``; echo $?
++# UNFIXED BUG. bash sets $? to 127:
+ true;  `""`; echo $?
++# bash sets $? to 127:
+ false; `""`; echo $?
+ true;  `     `; echo $?
+ false; `     `; echo $?
+ 
+ true;  $(); echo $?
+ false; $(); echo $?
++# bash sets $? to 127:
+ true;  $(""); echo $?
++# bash sets $? to 127:
+ false; $(""); echo $?
+ true;  $(     ); echo $?
+ false; $(     ); echo $?
+ 
+-true;  exec ''; echo $?
+-false; exec ''; echo $?
++exec ''; echo $?
++echo Not reached

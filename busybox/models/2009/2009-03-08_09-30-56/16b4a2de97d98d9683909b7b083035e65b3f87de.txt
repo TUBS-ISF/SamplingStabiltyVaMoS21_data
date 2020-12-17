@@ -1,0 +1,74 @@
+2009-03-08 09:30:56 +0000
+diff --git a/include/applets.h b/include/applets.h
+index 15dcbdf..becb140 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -164,6 +164,7 @@ USE_FSCK(APPLET(fsck, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ //USE_E2FSCK(APPLET_ODDNAME(fsck.ext2, e2fsck, _BB_DIR_SBIN, _BB_SUID_NEVER, fsck_ext2))
+ //USE_E2FSCK(APPLET_ODDNAME(fsck.ext3, e2fsck, _BB_DIR_SBIN, _BB_SUID_NEVER, fsck_ext3))
+ USE_FSCK_MINIX(APPLET_ODDNAME(fsck.minix, fsck_minix, _BB_DIR_SBIN, _BB_SUID_NEVER, fsck_minix))
++USE_FTPD(APPLET(ftpd, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_FTPGET(APPLET_ODDNAME(ftpget, ftpgetput, _BB_DIR_USR_BIN, _BB_SUID_NEVER, ftpget))
+ USE_FTPPUT(APPLET_ODDNAME(ftpput, ftpgetput, _BB_DIR_USR_BIN, _BB_SUID_NEVER, ftpput))
+ USE_FUSER(APPLET(fuser, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index de6f037..fb43fa3 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1280,6 +1280,20 @@
+      "\n	-m	Show \"mode not cleared\" warnings" \
+      "\n	-f	Force file system check" \
+ 
++#define ftpd_trivial_usage \
++       "[-w] [DIR]"
++#define ftpd_full_usage "\n\n" \
++       "FTP server\n" \
++       "\n" \
++       "ftpd should be used as an inetd service.\n" \
++       "ftpd's line for inetd.conf:\n" \
++       "	21 stream tcp nowait root ftpd ftpd /files/to/serve\n" \
++       "It also can be ran from tcpsvd:\n" \
++       "	tcpsvd -vE 0.0.0.0 21 ftpd /files/to/serve\n" \
++     "\nOptions:" \
++     "\n	-w	Allow upload" \
++     "\n	DIR	Change root to ths directory" \
++
+ #define ftpget_trivial_usage \
+        "[options] remote-host local-file remote-file"
+ #define ftpget_full_usage "\n\n" \
+diff --git a/networking/Config.in b/networking/Config.in
+index c455ff4..f3ba856 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -93,6 +93,19 @@ config FAKEIDENTD
+ 	  fakeidentd listens on the ident port and returns a predefined
+ 	  fake value on any query.
+ 
++config FTPD
++	bool "ftpd"
++	default n
++	help
++	  simple FTP daemon. You have to run it via inetd.
++
++config FEATURE_FTP_WRITE
++	bool "enable write"
++	default y
++	depends on FTPD
++	help
++	  Enable all kinds of FTP write commands (you have to add -w parameter)
++
+ config FTPGET
+ 	bool "ftpget"
+ 	default n
+diff --git a/networking/Kbuild b/networking/Kbuild
+index 7707126..d632774 100644
+--- a/networking/Kbuild
++++ b/networking/Kbuild
+@@ -11,6 +11,7 @@ lib-$(CONFIG_BRCTL)        += brctl.o
+ lib-$(CONFIG_DNSD)         += dnsd.o
+ lib-$(CONFIG_ETHER_WAKE)   += ether-wake.o
+ lib-$(CONFIG_FAKEIDENTD)   += isrv_identd.o isrv.o
++lib-$(CONFIG_FTPD)         += ftpd.o
+ lib-$(CONFIG_FTPGET)       += ftpgetput.o
+ lib-$(CONFIG_FTPPUT)       += ftpgetput.o
+ lib-$(CONFIG_HOSTNAME)     += hostname.o

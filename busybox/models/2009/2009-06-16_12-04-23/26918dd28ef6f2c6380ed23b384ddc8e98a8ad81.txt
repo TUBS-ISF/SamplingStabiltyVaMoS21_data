@@ -1,0 +1,243 @@
+2009-06-16 12:04:23 +0200
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 3f9522f..068f947 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -37,11 +37,11 @@ uint32_t FAST_FUNC random_xid(void)
+ }
+ 
+ 
+-/* initialize a packet with the proper defaults */
++/* Initialize the packet with the proper defaults */
+ static void init_packet(struct dhcpMessage *packet, char type)
+ {
+ 	udhcp_init_header(packet, type);
+-	memcpy(packet->chaddr, client_config.arp, 6);
++	memcpy(packet->chaddr, client_config.client_mac, 6);
+ 	if (client_config.clientid)
+ 		add_option_string(packet->options, client_config.clientid);
+ 	if (client_config.hostname)
+@@ -122,6 +122,7 @@ int FAST_FUNC send_decline(uint32_t xid, uint32_t server, uint32_t requested)
+ }
+ #endif
+ 
++
+ /* Broadcast a DHCP discover packet to the network, with an optionally requested IP */
+ int FAST_FUNC send_discover(uint32_t xid, uint32_t requested)
+ {
+@@ -143,7 +144,7 @@ int FAST_FUNC send_discover(uint32_t xid, uint32_t requested)
+ }
+ 
+ 
+-/* Broadcasts a DHCP request message */
++/* Broadcast a DHCP request message */
+ /* RFC 2131 3.1 paragraph 3:
+  * "The client _broadcasts_ a DHCPREQUEST message..."
+  */
+diff --git a/networking/udhcp/common.h b/networking/udhcp/common.h
+index de784ad..91e8ccc 100644
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -88,7 +88,7 @@ void udhcp_run_script(struct dhcpMessage *packet, const char *name) FAST_FUNC;
+ void udhcp_sp_setup(void) FAST_FUNC;
+ int udhcp_sp_fd_set(fd_set *rfds, int extra_fd) FAST_FUNC;
+ int udhcp_sp_read(const fd_set *rfds) FAST_FUNC;
+-int udhcp_read_interface(const char *interface, int *ifindex, uint32_t *nip, uint8_t *arp) FAST_FUNC;
++int udhcp_read_interface(const char *interface, int *ifindex, uint32_t *nip, uint8_t *mac) FAST_FUNC;
+ int udhcp_raw_socket(int ifindex) FAST_FUNC;
+ int udhcp_listen_socket(/*uint32_t ip,*/ int port, const char *inf) FAST_FUNC;
+ /* Returns 1 if no reply received */
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index ab34b04..44ff197 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -273,9 +273,14 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 		client_config.opt_mask[n >> 3] |= 1 << (n & 7);
+ 	}
+ 
+-	if (udhcp_read_interface(client_config.interface, &client_config.ifindex,
+-			   NULL, client_config.arp))
++	if (udhcp_read_interface(client_config.interface,
++			&client_config.ifindex,
++			NULL,
++			client_config.client_mac)
++	) {
+ 		return 1;
++	}
++
+ #if !BB_MMU
+ 	/* on NOMMU reexec (i.e., background) early */
+ 	if (!(opt & OPT_f)) {
+@@ -303,7 +308,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 	if (!client_config.clientid && !(opt & OPT_C)) {
+ 		client_config.clientid = alloc_dhcp_option(DHCP_CLIENT_ID, "", 7);
+ 		client_config.clientid[OPT_DATA] = 1;
+-		memcpy(client_config.clientid + OPT_DATA+1, client_config.arp, 6);
++		memcpy(client_config.clientid + OPT_DATA+1, client_config.client_mac, 6);
+ 	}
+ 
+ 	if (!client_config.vendorclass)
+@@ -490,7 +495,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 			}
+ 
+ 			/* Ignore packets that aren't for us */
+-			if (memcmp(packet.chaddr, client_config.arp, 6)) {
++			if (memcmp(packet.chaddr, client_config.client_mac, 6)) {
+ 				DEBUG("Packet does not have our chaddr - ignoring");
+ 				continue;
+ 			}
+@@ -555,7 +560,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 						if (!arpping(packet.yiaddr,
+ 								NULL,
+ 								(uint32_t) 0,
+-								client_config.arp,
++								client_config.client_mac,
+ 								client_config.interface)
+ 						) {
+ 							bb_info_msg("offered address is in use "
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index 361624f..861e134 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -6,7 +6,7 @@
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ struct client_config_t {
+-	uint8_t arp[6];                 /* Our arp address */
++	uint8_t client_mac[6];          /* Our arp address */
+ 	/* TODO: combine flag fields into single "unsigned opt" */
+ 	/* (can be set directly to the result of getopt32) */
+ 	char no_default_options;        /* Do not include default optins in request */
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 5993042..c74a11b 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -93,8 +93,11 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 	leases = xzalloc(server_config.max_leases * sizeof(*leases));
+ 	read_leases(server_config.lease_file);
+ 
+-	if (udhcp_read_interface(server_config.interface, &server_config.ifindex,
+-			   &server_config.server_nip, server_config.arp)) {
++	if (udhcp_read_interface(server_config.interface,
++			&server_config.ifindex,
++			&server_config.server_nip,
++			server_config.server_mac)
++	) {
+ 		retval = 1;
+ 		goto ret;
+ 	}
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 4774fd1..b233962 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -28,17 +28,23 @@ struct static_lease {
+ };
+ 
+ struct server_config_t {
+-	uint32_t server_nip;            /* Our IP, in network order */
++	char *interface;                /* interface to use */
++//TODO: ifindex, server_nip, server_mac
++// are obtained from interface name.
++// Instead of querying them *once*, create update_server_network_data_cache()
++// and call it before any usage of these fields.
++// update_server_network_data_cache() must re-query data
++// if more than N seconds have passed after last use.
++	int ifindex;
++	uint32_t server_nip;
+ #if ENABLE_FEATURE_UDHCP_PORT
+ 	uint16_t port;
+ #endif
++	uint8_t server_mac[6];          /* our MAC address (used only for ARP probing) */
++	struct option_set *options;     /* list of DHCP options loaded from the config file */
+ 	/* start,end are in host order: we need to compare start <= ip <= end */
+-	uint32_t start_ip;              /* Start address of leases, in host order */
+-	uint32_t end_ip;                /* End of leases, in host order */
+-	struct option_set *options;     /* List of DHCP options loaded from the config file */
+-	char *interface;                /* The name of the interface to use */
+-	int ifindex;                    /* Index number of the interface to use */
+-	uint8_t arp[6];                 /* Our arp address */
++	uint32_t start_ip;              /* start address of leases, in host order */
++	uint32_t end_ip;                /* end of leases, in host order */
+ 	uint32_t lease;	                /* lease time in seconds (host order) */
+ 	uint32_t max_leases;            /* maximum number of leases (including reserved address) */
+ 	uint32_t auto_time;             /* how long should udhcpd wait before writing a config file.
+@@ -48,10 +54,10 @@ struct server_config_t {
+ 	uint32_t conflict_time;         /* how long an arp conflict offender is leased for */
+ 	uint32_t offer_time;            /* how long an offered address is reserved */
+ 	uint32_t min_lease;             /* minimum lease time a client can request */
+-	uint32_t siaddr_nip;                /* next server bootp option */
++	uint32_t siaddr_nip;            /* "next server" bootp option */
+ 	char *lease_file;
+ 	char *pidfile;
+-	char *notify_file;              /* What to run whenever leases are written */
++	char *notify_file;              /* what to run whenever leases are written */
+ 	char *sname;                    /* bootp server name */
+ 	char *boot_file;                /* bootp boot file option */
+ 	struct static_lease *static_leases; /* List of ip/mac pairs to assign static leases */
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index c318856..291ae80 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -117,7 +117,7 @@ struct dhcpOfferedAddr* FAST_FUNC find_lease_by_yiaddr(uint32_t yiaddr)
+ }
+ 
+ 
+-/* check is an IP is taken, if it is, add it to the lease table */
++/* Check if the IP is taken; if it is, add it to the lease table */
+ static int nobody_responds_to_arp(uint32_t addr, const uint8_t *safe_mac)
+ {
+ 	/* 16 zero bytes */
+@@ -128,7 +128,8 @@ static int nobody_responds_to_arp(uint32_t addr, const uint8_t *safe_mac)
+ 	int r;
+ 
+ 	r = arpping(addr, safe_mac,
+-			server_config.server_nip, server_config.arp,
++			server_config.server_nip,
++			server_config.server_mac,
+ 			server_config.interface);
+ 	if (r)
+ 		return r;
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index 5aa494b..d9c5ce3 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -37,7 +37,7 @@ static int send_packet_to_relay(struct dhcpMessage *payload)
+ }
+ 
+ 
+-/* send a packet to a specific arp address and ip address by creating our own ip packet */
++/* send a packet to a specific mac address and ip address by creating our own ip packet */
+ static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcast)
+ {
+ 	const uint8_t *chaddr;
+diff --git a/networking/udhcp/socket.c b/networking/udhcp/socket.c
+index 449fcb7..de494ca 100644
+--- a/networking/udhcp/socket.c
++++ b/networking/udhcp/socket.c
+@@ -37,7 +37,7 @@
+ #include "common.h"
+ 
+ 
+-int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t *nip, uint8_t *arp)
++int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t *nip, uint8_t *mac)
+ {
+ 	int fd;
+ 	struct ifreq ifr;
+@@ -69,14 +69,14 @@ int FAST_FUNC udhcp_read_interface(const char *interface, int *ifindex, uint32_t
+ 		*ifindex = ifr.ifr_ifindex;
+ 	}
+ 
+-	if (arp) {
++	if (mac) {
+ 		if (ioctl_or_warn(fd, SIOCGIFHWADDR, &ifr) != 0) {
+ 			close(fd);
+ 			return -1;
+ 		}
+-		memcpy(arp, ifr.ifr_hwaddr.sa_data, 6);
++		memcpy(mac, ifr.ifr_hwaddr.sa_data, 6);
+ 		DEBUG("adapter hardware address %02x:%02x:%02x:%02x:%02x:%02x",
+-			arp[0], arp[1], arp[2], arp[3], arp[4], arp[5]);
++			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+ 	}
+ 
+ 	close(fd);

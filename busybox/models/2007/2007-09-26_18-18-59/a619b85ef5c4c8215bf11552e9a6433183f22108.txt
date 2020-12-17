@@ -1,0 +1,16 @@
+2007-09-26 18:18:59 +0000
+diff --git a/scripts/kconfig/lxdialog/check-lxdialog.sh b/scripts/kconfig/lxdialog/check-lxdialog.sh
+index 120d624..9e277b1 100644
+--- a/scripts/kconfig/lxdialog/check-lxdialog.sh
++++ b/scripts/kconfig/lxdialog/check-lxdialog.sh
+@@ -19,7 +19,9 @@ ldflags()
+ 		echo '-lcurses'
+ 		exit
+ 	fi
+-	exit 1
++	#bbox# exit 1
++	echo '-lcurses'
++	exit
+ }
+ 
+ # Where is ncurses.h?

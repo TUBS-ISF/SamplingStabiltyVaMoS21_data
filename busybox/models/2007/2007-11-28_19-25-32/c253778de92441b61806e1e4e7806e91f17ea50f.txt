@@ -1,0 +1,16 @@
+2007-11-28 19:25:32 +0000
+diff --git a/coreutils/touch.c b/coreutils/touch.c
+index 1b83dc4..3fe8b64 100644
+--- a/coreutils/touch.c
++++ b/coreutils/touch.c
+@@ -26,8 +26,9 @@ int touch_main(int argc, char **argv)
+ {
+ 	int fd;
+ 	int status = EXIT_SUCCESS;
+-	int flags = getopt32(argv, "c");
++	int flags = getopt32(argv, "cf");
+ 
++	flags &= 1; /* ignoring -f (BSD compat thingy) */
+ 	argv += optind;
+ 
+ 	if (!*argv) {

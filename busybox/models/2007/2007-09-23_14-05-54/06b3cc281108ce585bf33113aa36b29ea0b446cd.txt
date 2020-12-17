@@ -1,0 +1,22 @@
+2007-09-23 14:05:54 +0000
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 2a91a8f..7981abc 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -638,8 +638,16 @@ static void
+ seek_sector(ullong secno)
+ {
+ 	secno *= sector_size;
++#if ENABLE_FDISK_SUPPORT_LARGE_DISKS
+ 	if (lseek64(fd, (off64_t)secno, SEEK_SET) == (off64_t) -1)
+ 		fdisk_fatal(unable_to_seek);
++#else
++	if (secno > MAXINT(off_t)
++	 || lseek(fd, (off_t)secno, SEEK_SET) == (off_t) -1
++	) {
++		fdisk_fatal(unable_to_seek);
++	}
++#endif
+ }
+ 
+ #if ENABLE_FEATURE_FDISK_WRITABLE

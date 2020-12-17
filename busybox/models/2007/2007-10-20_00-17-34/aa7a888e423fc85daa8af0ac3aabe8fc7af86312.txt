@@ -1,0 +1,152 @@
+2007-10-20 00:17:34 +0000
+diff --git a/console-tools/Config.in b/console-tools/Config.in
+index f82d4ce..bd9dfb3 100644
+--- a/console-tools/Config.in
++++ b/console-tools/Config.in
+@@ -31,6 +31,12 @@ config DUMPKMAP
+ 	  This program dumps the kernel's keyboard translation table to
+ 	  stdout, in binary format. You can then use loadkmap to load it.
+ 
++config KBD_MODE
++	bool "kbd_mode"
++	default n
++	help
++	  This program reports and sets keyboard mode.
++
+ config LOADFONT
+ 	bool "loadfont"
+ 	default n
+diff --git a/console-tools/Kbuild b/console-tools/Kbuild
+index a55bc08..cf3825e 100644
+--- a/console-tools/Kbuild
++++ b/console-tools/Kbuild
+@@ -10,6 +10,7 @@ lib-$(CONFIG_CLEAR)		+= clear.o
+ lib-$(CONFIG_DEALLOCVT)		+= deallocvt.o
+ lib-$(CONFIG_DUMPKMAP)		+= dumpkmap.o
+ lib-$(CONFIG_SETCONSOLE)	+= setconsole.o
++lib-$(CONFIG_KBD_MODE)		+= kbd_mode.o
+ lib-$(CONFIG_LOADFONT)		+= loadfont.o
+ lib-$(CONFIG_LOADKMAP)		+= loadkmap.o
+ lib-$(CONFIG_OPENVT)		+= openvt.o
+diff --git a/console-tools/kbd_mode.c b/console-tools/kbd_mode.c
+new file mode 100644
+index 0000000..0000ea1
+--- /dev/null
++++ b/console-tools/kbd_mode.c
+@@ -0,0 +1,71 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Mini loadkmap implementation for busybox
++ *
++ * Copyright (C) 2007 Loïc Grenié <loic.grenie@gmail.com>
++ *   written using Andries Brouwer <aeb@cwi.nl>'s kbd_mode from
++ *   console-utils v0.2.3, licensed under GNU GPLv2
++ *
++ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
++ *
++ */
++
++#include <getopt.h>
++#include "libbb.h"
++#include <linux/kd.h>
++
++int kbd_mode_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int kbd_mode_main(int argc, char **argv)
++{
++	static const char opts[] = "saku";
++
++	const char *opt = argv[1];
++	const char *p;
++	int fd;
++
++	fd = get_console_fd();
++	if (fd < 0) /* get_console_fd() already complained */
++		return EXIT_FAILURE;
++
++	if (opt == NULL) {
++		/* No arg */
++		const char *msg = "unknown";
++		int mode;
++
++		ioctl(fd, KDGKBMODE, &mode);
++		switch(mode) {
++		case K_RAW:
++			msg = "raw (scancode)";
++			break;
++		case K_XLATE:
++			msg = "default (ASCII)";
++			break;
++		case K_MEDIUMRAW:
++			msg = "mediumraw (keycode)";
++			break;
++		case K_UNICODE:
++			msg = "Unicode (UTF-8)";
++			break;
++		}
++		printf("The keyboard is in %s mode\n", msg);
++	}
++	else if (argc > 2 /* more than 1 arg */
++	 || *opt != '-' /* not an option */
++	 || (p = strchr(opts, opt[1])) == NULL /* not an option we expect */
++	 || opt[2] != '\0' /* more than one option char */
++	) {
++		bb_show_usage();
++		/* return EXIT_FAILURE; - not reached */
++	}
++	else {
++#if K_RAW != 0 || K_XLATE != 1 || K_MEDIUMRAW != 2 || K_UNICODE != 3
++#error kbd_mode must be changed
++#endif
++		/* The options are in the order of the various K_xxx */
++		ioctl(fd, KDSKBMODE, p - opts);
++	}
++
++	if (ENABLE_FEATURE_CLEAN_UP)
++		close(fd);
++	return EXIT_SUCCESS;
++}
+diff --git a/include/applets.h b/include/applets.h
+index 5b64e3a..587ccbf 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -202,6 +202,7 @@ USE_IPLINK(APPLET(iplink, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_IPROUTE(APPLET(iproute, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_IPRULE(APPLET(iprule, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_IPTUNNEL(APPLET(iptunnel, _BB_DIR_BIN, _BB_SUID_NEVER))
++USE_KBD_MODE(APPLET(kbd_mode, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_KILL(APPLET(kill, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_KILLALL(APPLET_ODDNAME(killall, kill, _BB_DIR_USR_BIN, _BB_SUID_NEVER, killall))
+ USE_KILLALL5(APPLET_ODDNAME(killall5, kill, _BB_DIR_USR_BIN, _BB_SUID_NEVER, killall5))
+diff --git a/include/usage.h b/include/usage.h
+index d9a6ae7..8f0a13c 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1805,6 +1805,16 @@
+        "	[[i|o]seq] [[i|o]key KEY] [[i|o]csum]\n" \
+        "	[ttl TTL] [tos TOS] [[no]pmtudisc] [dev PHYS_DEV]"
+ 
++#define kbd_mode_trivial_usage \
++       "[-a|k|s|u]"
++#define kbd_mode_full_usage \
++       "Report or set the keyboard mode" \
++       "\n\nOptions set mode:\n" \
++       "	-a	Default (ASCII)\n" \
++       "	-k	Medium-raw (keyboard)\n" \
++       "	-s	Raw (scancode)\n" \
++       "	-u	Unicode (utf-8)"
++
+ #define kill_trivial_usage \
+        "[-l] [-signal] process-id [process-id ...]"
+ #define kill_full_usage \
+diff --git a/libbb/get_console.c b/libbb/get_console.c
+index b129518..0da27b1 100644
+--- a/libbb/get_console.c
++++ b/libbb/get_console.c
+@@ -67,6 +67,6 @@ int get_console_fd(void)
+ 		}
+ 	}
+ 
+-	bb_error_msg("cannot get file descriptor referring to console");
++	bb_error_msg("can't open console");
+ 	return fd;                      /* total failure */
+ }

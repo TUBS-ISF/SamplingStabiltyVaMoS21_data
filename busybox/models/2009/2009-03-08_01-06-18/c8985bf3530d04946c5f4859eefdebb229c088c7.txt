@@ -1,0 +1,14 @@
+2009-03-08 01:06:18 +0000
+diff --git a/docs/busybox.net/news.html b/docs/busybox.net/news.html
+index 59af56f..8c33438 100644
+--- a/docs/busybox.net/news.html
++++ b/docs/busybox.net/news.html
+@@ -29,7 +29,7 @@
+     <a href="http://busybox.net/fix.html">how to add a patch</a>)</p>
+ 
+     <p>1.13.3 is a bug fix release. It has fixes for awk, depmod, init, killall, mdev,
+-    modprobe, printf, tar, top, unzip, wget.
++    modprobe, printf, syslogd, tar, top, unzip, wget.
+     </p>
+   </li>
+ 

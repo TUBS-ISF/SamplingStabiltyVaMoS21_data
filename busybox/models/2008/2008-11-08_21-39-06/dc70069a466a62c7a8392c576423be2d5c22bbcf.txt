@@ -1,0 +1,158 @@
+2008-11-08 21:39:06 +0000
+diff --git a/console-tools/kbd_mode.c b/console-tools/kbd_mode.c
+index 13a82d7..c8451e7 100644
+--- a/console-tools/kbd_mode.c
++++ b/console-tools/kbd_mode.c
+@@ -7,26 +7,26 @@
+  *   console-utils v0.2.3, licensed under GNU GPLv2
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+- *
+  */
+-
+ #include "libbb.h"
+ #include <linux/kd.h>
+ 
+ int kbd_mode_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int kbd_mode_main(int argc UNUSED_PARAM, char **argv)
+ {
+-	int fd;
+-	unsigned opt;
+ 	enum {
+ 		SCANCODE  = (1 << 0),
+ 		ASCII	  = (1 << 1),
+ 		MEDIUMRAW = (1 << 2),
+-		UNICODE	  = (1 << 3)
++		UNICODE	  = (1 << 3),
+ 	};
+-	static const char KD_xxx[] ALIGN1 = "saku";
+-	opt = getopt32(argv, KD_xxx);
+-	fd = get_console_fd_or_die();
++	int fd;
++	unsigned opt;
++	const char *tty_name = CURRENT_TTY;
++
++	opt = getopt32(argv, "sakuC:", &tty_name);
++	fd = xopen(tty_name, O_NONBLOCK);
++	opt &= 0xf; /* clear -C bit, see (*) */
+ 
+ 	if (!opt) { /* print current setting */
+ 		const char *mode = "unknown";
+@@ -43,6 +43,7 @@ int kbd_mode_main(int argc UNUSED_PARAM, char **argv)
+ 			mode = "Unicode (UTF-8)";
+ 		printf("The keyboard is in %s mode\n", mode);
+ 	} else {
++		/* here we depend on specific bits assigned to options (*) */
+ 		opt = opt & UNICODE ? 3 : opt >> 1;
+ 		/* double cast prevents warnings about widening conversion */
+ 		xioctl(fd, KDSKBMODE, (void*)(ptrdiff_t)opt);
+diff --git a/console-tools/loadfont.c b/console-tools/loadfont.c
+index c6a3a4c..863c6ef 100644
+--- a/console-tools/loadfont.c
++++ b/console-tools/loadfont.c
+@@ -80,7 +80,10 @@ static void do_loadfont(int fd, unsigned char *inbuf, int unit, int fontsize)
+ 	}
+ 
+ #if 0
+-/* These ones do not honour -C tty (they set font on current tty regardless) */
++/* These ones do not honour -C tty (they set font on current tty regardless)
++ * On x86, this distinction is visible on framebuffer consoles
++ * (regular character consoles may have only one shared font anyway)
++ */
+ #if defined(PIO_FONTX) && !defined(__sparc__)
+ 	{
+ 		struct consolefontdesc cfd;
+diff --git a/console-tools/loadkmap.c b/console-tools/loadkmap.c
+index 56948e0..ac2c0a6 100644
+--- a/console-tools/loadkmap.c
++++ b/console-tools/loadkmap.c
+@@ -5,9 +5,7 @@
+  * Copyright (C) 1998 Enrique Zanardi <ezanardi@ull.es>
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+- *
+  */
+-
+ #include "libbb.h"
+ 
+ #define BINARY_KEYMAP_MAGIC "bkeymap"
+@@ -31,11 +29,15 @@ int loadkmap_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 	struct kbentry ke;
+ 	int i, j, fd;
+ 	uint16_t ibuff[NR_KEYS];
++/*	const char *tty_name = CURRENT_TTY; */
+ 	RESERVE_CONFIG_BUFFER(flags,MAX_NR_KEYMAPS);
+ 
+-/*  bb_warn_ignoring_args(argc>=2);*/
+-
++/* bb_warn_ignoring_args(argc >= 2); */
+ 	fd = get_console_fd_or_die();
++/* or maybe:
++	opt = getopt32(argv, "C:", &tty_name);
++	fd = xopen(tty_name, O_NONBLOCK);
++*/
+ 
+ 	xread(STDIN_FILENO, flags, 7);
+ 	if (strncmp(flags, BINARY_KEYMAP_MAGIC, 7))
+diff --git a/include/usage.h b/include/usage.h
+index 19af348..63aff31 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2019,7 +2019,7 @@
+        "	[ttl TTL] [tos TOS] [[no]pmtudisc] [dev PHYS_DEV]" \
+ 
+ #define kbd_mode_trivial_usage \
+-       "[-a|k|s|u]"
++       "[-a|k|s|u] [-C TTY]"
+ #define kbd_mode_full_usage "\n\n" \
+        "Report or set the keyboard mode\n" \
+      "\nOptions set mode:" \
+@@ -2027,6 +2027,7 @@
+      "\n	-k	Medium-raw (keyboard)" \
+      "\n	-s	Raw (scancode)" \
+      "\n	-u	Unicode (utf-8)" \
++     "\n	-C TTY	Affect TTY instead of /dev/tty" \
+ 
+ #define kill_trivial_usage \
+        "[-l] [-SIG] PID..."
+@@ -2129,20 +2130,23 @@
+        "lrwxrwxrwx    1 root     root            7 Apr 12 18:39 ls -> BusyBox*\n"
+ 
+ #define load_policy_trivial_usage NOUSAGE_STR
+-
+ #define load_policy_full_usage ""
+ 
+ #define loadfont_trivial_usage \
+        "< font"
+ #define loadfont_full_usage "\n\n" \
+-       "Load a console font from standard input"
++       "Load a console font from standard input" \
++/*   "\n	-C TTY	Affect TTY instead of /dev/tty" */ \
++
+ #define loadfont_example_usage \
+        "$ loadfont < /etc/i18n/fontname\n"
+ 
+ #define loadkmap_trivial_usage \
+        "< keymap"
+ #define loadkmap_full_usage "\n\n" \
+-       "Load a binary keyboard translation table from standard input"
++       "Load a binary keyboard translation table from standard input\n" \
++/*   "\n	-C TTY	Affect TTY instead of /dev/tty" */ \
++
+ #define loadkmap_example_usage \
+        "$ loadkmap < /etc/i18n/lang-keymap\n"
+ 
+@@ -3476,9 +3480,11 @@
+        "Start and monitor a service and optionally an appendant log service"
+ 
+ #define runsvdir_trivial_usage \
+-       "[-P] dir"
++       "[-P] [-s SCRIPT] dir"
+ #define runsvdir_full_usage "\n\n" \
+-       "Start a runsv process for each subdirectory"
++       "Start a runsv process for each subdirectory. If it exits, restart it.\n" \
++     "\n	-P		Put each runsv in a new session" \
++     "\n	-s SCRIPT	Run SCRIPT <signo> after signal is processed" \
+ 
+ #define rx_trivial_usage \
+        "FILE"

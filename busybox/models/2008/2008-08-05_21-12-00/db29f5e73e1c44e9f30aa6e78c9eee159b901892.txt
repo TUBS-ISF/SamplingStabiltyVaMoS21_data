@@ -1,0 +1,14 @@
+2008-08-05 21:12:00 +0000
+diff --git a/libbb/xrealloc_vector.c b/libbb/xrealloc_vector.c
+index 342ae53..43c34b7 100644
+--- a/libbb/xrealloc_vector.c
++++ b/libbb/xrealloc_vector.c
+@@ -39,7 +39,7 @@ void* FAST_FUNC xrealloc_vector_helper(void *vector, unsigned sizeof_and_shift,
+ 	if (!(idx & (mask - 1))) {
+ 		sizeof_and_shift >>= 8; /* sizeof(vector[0]) */
+ 		vector = xrealloc(vector, sizeof_and_shift * (idx + mask + 1));
+-		vector += idx;
++		vector = (char*)vector + (sizeof_and_shift * idx);
+ 		memset(vector, 0, sizeof_and_shift * (mask + 1));
+ 	}
+ 	return vector;

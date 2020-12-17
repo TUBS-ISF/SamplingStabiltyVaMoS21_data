@@ -1,0 +1,198 @@
+2008-03-28 01:00:09 +0000
+diff --git a/archival/rpm2cpio.c b/archival/rpm2cpio.c
+index 329f8f7..ee93871 100644
+--- a/archival/rpm2cpio.c
++++ b/archival/rpm2cpio.c
+@@ -13,14 +13,14 @@
+ #define RPM_HEADER_MAGIC "\216\255\350"
+ 
+ struct rpm_lead {
+-    unsigned char magic[4];
+-    uint8_t major, minor;
+-    uint16_t type;
+-    uint16_t archnum;
+-    char name[66];
+-    uint16_t osnum;
+-    uint16_t signature_type;
+-    char reserved[16];
++	unsigned char magic[4];
++	uint8_t major, minor;
++	uint16_t type;
++	uint16_t archnum;
++	char name[66];
++	uint16_t osnum;
++	uint16_t signature_type;
++	char reserved[16];
+ };
+ 
+ struct rpm_header {
+diff --git a/libbb/md5.c b/libbb/md5.c
+index 9de37b9..56f9727 100644
+--- a/libbb/md5.c
++++ b/libbb/md5.c
+@@ -206,15 +206,13 @@ static void md5_hash_block(const void *buffer, md5_ctx_t *ctx)
+ 		   before the computation.  To reduce the work for the next steps
+ 		   we store the swapped words in the array CORRECT_WORDS.  */
+ 
+-#  define OP(a, b, c, d, s, T)	\
+-      do	\
+-	{	\
+-	  a += FF (b, c, d) + (*cwp++ = SWAP_LE32(*words)) + T; \
+-	  ++words;	\
+-	  CYCLIC (a, s);	\
+-	  a += b;	\
+-	}	\
+-      while (0)
++#  define OP(a, b, c, d, s, T) \
++	do { \
++		a += FF (b, c, d) + (*cwp++ = SWAP_LE32(*words)) + T; \
++		++words; \
++		CYCLIC (a, s); \
++		a += b; \
++	} while (0)
+ 
+ 		/* It is unfortunate that C does not provide an operator for
+ 		   cyclic rotation.  Hope the C compiler is smart enough.  */
+@@ -265,14 +263,12 @@ static void md5_hash_block(const void *buffer, md5_ctx_t *ctx)
+ 		   in CORRECT_WORDS.  Redefine the macro to take an additional first
+ 		   argument specifying the function to use.  */
+ #  undef OP
+-#  define OP(f, a, b, c, d, k, s, T)	\
+-      do	\
+-	{	\
+-	  a += f (b, c, d) + correct_words[k] + T;	\
+-	  CYCLIC (a, s);	\
+-	  a += b;	\
+-	}	\
+-      while (0)
++#  define OP(f, a, b, c, d, k, s, T) \
++	do { \
++		a += f (b, c, d) + correct_words[k] + T; \
++		CYCLIC (a, s); \
++		a += b; \
++	} while (0)
+ 
+ 		/* Round 2.  */
+ #  if MD5_SIZE_VS_SPEED == 1
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 1b88f05..bb6b679 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -93,17 +93,17 @@
+ /*  Never change this otherwise the binary interface will change   */
+ 
+ struct devfsd_notify_struct
+-{   /*  Use native C types to ensure same types in kernel and user space     */
+-    unsigned int type;           /*  DEVFSD_NOTIFY_* value                   */
+-    unsigned int mode;           /*  Mode of the inode or device entry       */
+-    unsigned int major;          /*  Major number of device entry            */
+-    unsigned int minor;          /*  Minor number of device entry            */
+-    unsigned int uid;            /*  Uid of process, inode or device entry   */
+-    unsigned int gid;            /*  Gid of process, inode or device entry   */
+-    unsigned int overrun_count;  /*  Number of lost events                   */
+-    unsigned int namelen;        /*  Number of characters not including '\0' */
+-    /*  The device name MUST come last                                       */
+-    char devname[DEVFS_PATHLEN]; /*  This will be '\0' terminated            */
++{	/*  Use native C types to ensure same types in kernel and user space     */
++	unsigned int type;           /*  DEVFSD_NOTIFY_* value                   */
++	unsigned int mode;           /*  Mode of the inode or device entry       */
++	unsigned int major;          /*  Major number of device entry            */
++	unsigned int minor;          /*  Minor number of device entry            */
++	unsigned int uid;            /*  Uid of process, inode or device entry   */
++	unsigned int gid;            /*  Gid of process, inode or device entry   */
++	unsigned int overrun_count;  /*  Number of lost events                   */
++	unsigned int namelen;        /*  Number of characters not including '\0' */
++	/*  The device name MUST come last                                       */
++	char devname[DEVFS_PATHLEN]; /*  This will be '\0' terminated            */
+ };
+ 
+ #define BUFFER_SIZE 16384
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index 875e835..b119517 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -129,7 +129,7 @@ struct globals {
+ #define master     (G.master    )
+ #define slave      (G.slave     )
+ #define INIT_G() do { \
+-        SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+ } while (0)
+ 
+ 
+diff --git a/networking/ip.c b/networking/ip.c
+index bb409c5..5249217 100644
+--- a/networking/ip.c
++++ b/networking/ip.c
+@@ -39,35 +39,35 @@ static int ip_do(int (*ip_func)(char **argv), char **argv)
+ int ipaddr_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int ipaddr_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-    return ip_do(do_ipaddr, argv);
++	return ip_do(do_ipaddr, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_LINK
+ int iplink_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iplink_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-    return ip_do(do_iplink, argv);
++	return ip_do(do_iplink, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_ROUTE
+ int iproute_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iproute_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-    return ip_do(do_iproute, argv);
++	return ip_do(do_iproute, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_RULE
+ int iprule_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iprule_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-    return ip_do(do_iprule, argv);
++	return ip_do(do_iprule, argv);
+ }
+ #endif
+ #if ENABLE_FEATURE_IP_TUNNEL
+ int iptunnel_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int iptunnel_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-    return ip_do(do_iptunnel, argv);
++	return ip_do(do_iptunnel, argv);
+ }
+ #endif
+ 
+diff --git a/util-linux/getopt.c b/util-linux/getopt.c
+index 6ec5cb0..2da3481 100644
+--- a/util-linux/getopt.c
++++ b/util-linux/getopt.c
+@@ -158,10 +158,10 @@ static int generate_output(char **argv, int argc, const char *optstr, const stru
+ 
+ 	/* Reset getopt(3) (see libbb/getopt32.c for long rant) */
+ #ifdef __GLIBC__
+-        optind = 0;
++	optind = 0;
+ #else /* BSD style */
+-        optind = 1;
+-        /* optreset = 1; */
++	optind = 1;
++	/* optreset = 1; */
+ #endif
+ 
+ 	while (1) {
+diff --git a/util-linux/volume_id/hfs.c b/util-linux/volume_id/hfs.c
+index a7667f7..79658e4 100644
+--- a/util-linux/volume_id/hfs.c
++++ b/util-linux/volume_id/hfs.c
+@@ -160,7 +160,7 @@ int volume_id_probe_hfs_hfsplus(struct volume_id *id, uint64_t off)
+ 
+ 	buf = volume_id_get_buffer(id, off + HFS_SUPERBLOCK_OFFSET, 0x200);
+ 	if (buf == NULL)
+-                return -1;
++		return -1;
+ 
+ 	hfs = (struct hfs_mdb *) buf;
+ 	if (hfs->signature[0] != 'B' || hfs->signature[1] != 'D')

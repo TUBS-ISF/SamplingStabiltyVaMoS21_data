@@ -1,0 +1,14 @@
+2009-02-04 00:01:07 +0000
+diff --git a/include/usage.h b/include/usage.h
+index cfe12c6..367da1d 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3632,8 +3632,6 @@
+        "Send an email\n" \
+      "\nOptions:" \
+      "\n	-w timeout	Network timeout" \
+-     "\n	-H [user:pass@]server[:port] Server" \
+-     "\n	-S		Use openssl connection helper for secure servers" \
+      "\n	-N type		Request delivery notification. Type is ignored" \
+      "\n	-f sender	Sender" \
+      "\n	-F fullname	Sender full name. Overrides $NAME" \

@@ -1,0 +1,156 @@
+2008-01-13 15:23:27 +0000
+diff --git a/include/applets.h b/include/applets.h
+index 4934d18..830ff28 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -86,6 +86,7 @@ USE_AWK(APPLET_NOEXEC(awk, awk, _BB_DIR_USR_BIN, _BB_SUID_NEVER, awk))
+ USE_BASENAME(APPLET_NOFORK(basename, basename, _BB_DIR_USR_BIN, _BB_SUID_NEVER, basename))
+ USE_BBCONFIG(APPLET(bbconfig, _BB_DIR_BIN, _BB_SUID_NEVER))
+ //USE_BBSH(APPLET(bbsh, _BB_DIR_BIN, _BB_SUID_NEVER))
++USE_BRCTL(APPLET(brctl, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_BUNZIP2(APPLET(bunzip2, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_BUNZIP2(APPLET_ODDNAME(bzcat, bunzip2, _BB_DIR_USR_BIN, _BB_SUID_NEVER, bzcat))
+ USE_BZIP2(APPLET(bzip2, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index 464fb61..cb8bd2a 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -119,6 +119,16 @@
+        "$ basename /foo/bar.txt .txt\n" \
+        "bar"
+ 
++#define brctl_trivial_usage \
++       "COMMAND [BRIDGE [INTERFACE]]"
++#define brctl_full_usage \
++       "Manage ethernet bridges." \
++       "\n\nCommands:\n" \
++       "	addbr <bridge>		Create <bridge>\n" \
++       "	delbr <bridge>		Delete <bridge>\n" \
++       "	addif <bridge> <iface>	Add <iface> to <bridge>\n" \
++       "	delif <bridge> <iface>	Delete <iface> from <bridge>"
++
+ #define bunzip2_trivial_usage \
+        "[OPTION]... [FILE]"
+ #define bunzip2_full_usage \
+diff --git a/networking/Config.in b/networking/Config.in
+index 5a76604..83579bc 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -47,6 +47,12 @@ config ARPING
+ 	help
+ 	  Ping hosts by ARP packets.
+ 
++config BRCTL
++	bool "brctl"
++	default n
++	help
++	  Manage ethernet bridges.
++
+ config DNSD
+ 	bool "dnsd"
+ 	default n
+diff --git a/networking/Kbuild b/networking/Kbuild
+index 23968a8..3bcbe02 100644
+--- a/networking/Kbuild
++++ b/networking/Kbuild
+@@ -7,6 +7,7 @@
+ lib-y:=
+ lib-$(CONFIG_ARP)          += arp.o interface.o
+ lib-$(CONFIG_ARPING)       += arping.o
++lib-$(CONFIG_BRCTL)        += brctl.o
+ lib-$(CONFIG_DNSD)         += dnsd.o
+ lib-$(CONFIG_ETHER_WAKE)   += ether-wake.o
+ lib-$(CONFIG_FAKEIDENTD)   += isrv_identd.o isrv.o
+diff --git a/networking/brctl.c b/networking/brctl.c
+new file mode 100644
+index 0000000..21d528f
+--- /dev/null
++++ b/networking/brctl.c
+@@ -0,0 +1,87 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Small implementation of brctl for busybox.
++ *
++ * Copyright (C) 2008 by Bernhard Fischer
++ *
++ * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
++ */
++#include "libbb.h"
++#include <linux/sockios.h>
++#include <net/if.h>
++
++#ifdef ENABLE_FEATURE_BRCTL_SHOW
++#error Remove these
++#endif
++#define ENABLE_FEATURE_BRCTL_SHOW 0
++#define USE_FEATURE_BRCTL_SHOW(...)
++
++
++/* Fancy diagnostics -- printing add/del -- costs 49 bytes. */
++#if 0
++#define BRCTL_VERBOSE(...) __VA_ARGS__
++#else
++#define BRCTL_VERBOSE(...)
++#endif
++
++int brctl_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int brctl_main(int argc, char **argv)
++{
++	int fd;
++	static const char keywords[] ALIGN1 =
++		"addbr\0" "delbr\0" "addif\0" "delif\0"
++		USE_FEATURE_BRCTL_SHOW("show\0");
++	enum { ARG_addbr = 1, ARG_delbr, ARG_addif, ARG_delif
++		  USE_FEATURE_BRCTL_SHOW(, ARG_show) };
++	smalluint key;
++	static char info[] = BRCTL_VERBOSE("%s ")"bridge %s\0 iface %s";
++
++	argv++;
++	while (*argv) {
++		BRCTL_VERBOSE(char *op;)
++
++		key = index_in_strings(keywords, *argv) + 1;
++		if (key == 0) /* no match found in keywords array, bail out. */
++			bb_error_msg_and_die(bb_msg_invalid_arg, *argv, applet_name);
++		argv++;
++#if ENABLE_FEATURE_BRCTL_SHOW
++		if (key == ARG_show) { /* show */
++			;
++		}
++#endif
++		BRCTL_VERBOSE(op = (char*)((key % 2) ? "add" : "del");)
++		fd = xsocket(AF_INET, SOCK_STREAM, 0);
++		if (key < 3) {/* addbr or delbr */
++			char *br;
++
++			br = *(argv++);
++			if (ioctl(fd, key == ARG_addbr ? SIOCBRADDBR : SIOCBRDELBR, br) < 0)
++			{
++				info[9 BRCTL_VERBOSE(+3)] = '\0';
++				bb_perror_msg_and_die(info, BRCTL_VERBOSE(op,) br);
++			}
++		}
++		if (key > 2) { /* addif or delif */
++			struct ifreq ifr;
++			char *br, *brif;
++
++			br = *(argv++);
++			if (!*argv)
++				bb_show_usage();
++			brif = *(argv++);
++
++			if (!(ifr.ifr_ifindex = if_nametoindex(brif))) {
++				bb_perror_msg_and_die(info+11 BRCTL_VERBOSE(+3), brif);
++			}
++			safe_strncpy(ifr.ifr_name, br, IFNAMSIZ);
++			if (ioctl(fd,
++					  key == ARG_addif ? SIOCBRADDIF : SIOCBRDELIF, &ifr) < 0) {
++				info[9 BRCTL_VERBOSE(+3)] = ',';
++				bb_perror_msg_and_die (info, BRCTL_VERBOSE(op,) br, brif);
++			}
++		}
++		if (ENABLE_FEATURE_CLEAN_UP)
++			close(fd);
++	}
++	return EXIT_SUCCESS;
++}

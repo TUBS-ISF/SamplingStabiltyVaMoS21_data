@@ -1,0 +1,378 @@
+2008-07-21 13:46:54 +0000
+diff --git a/init/init.c b/init/init.c
+index e88b882..9923558 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -276,7 +276,7 @@ static void open_stdio_to_tty(const char* tty_name, int exit_on_failure)
+ 		/* fd can be only < 0 or 0: */
+ 		fd = device_open(tty_name, O_RDWR);
+ 		if (fd) {
+-			message(L_LOG | L_CONSOLE, "Can't open %s: %s",
++			message(L_LOG | L_CONSOLE, "can't open %s: %s",
+ 				tty_name, strerror(errno));
+ 			if (exit_on_failure)
+ 				_exit(EXIT_FAILURE);
+@@ -336,7 +336,7 @@ static void init_exec(const char *command)
+ 			ioctl(STDIN_FILENO, TIOCSCTTY, 0 /*only try, don't steal*/);
+ 	}
+ 	BB_EXECVP(cmd[0] + dash, cmd);
+-	message(L_LOG | L_CONSOLE, "Cannot run '%s': %s", cmd[0], strerror(errno));
++	message(L_LOG | L_CONSOLE, "cannot run '%s': %s", cmd[0], strerror(errno));
+ 	/* returns if execvp fails */
+ }
+ 
+@@ -357,7 +357,7 @@ static pid_t run(const struct init_action *a)
+ 	sigprocmask(SIG_SETMASK, &omask, NULL);
+ 
+ 	if (pid < 0)
+-		message(L_LOG | L_CONSOLE, "Can't fork");
++		message(L_LOG | L_CONSOLE, "can't fork");
+ 	if (pid)
+ 		return pid;
+ 
+@@ -391,7 +391,7 @@ static pid_t run(const struct init_action *a)
+ 		/* Now fork off another process to just hang around */
+ 		pid = fork();
+ 		if (pid < 0) {
+-			message(L_LOG | L_CONSOLE, "Can't fork");
++			message(L_LOG | L_CONSOLE, "can't fork");
+ 			_exit(EXIT_FAILURE);
+ 		}
+ 
+@@ -412,7 +412,7 @@ static pid_t run(const struct init_action *a)
+ 			/* Use a temporary process to steal the controlling tty. */
+ 			pid = fork();
+ 			if (pid < 0) {
+-				message(L_LOG | L_CONSOLE, "Can't fork");
++				message(L_LOG | L_CONSOLE, "can't fork");
+ 				_exit(EXIT_FAILURE);
+ 			}
+ 			if (pid == 0) {
+@@ -879,7 +879,7 @@ int init_main(int argc UNUSED_PARAM, char **argv)
+ 			BB_EXECVP(argv[0], argv);
+ 		} else if (enforce > 0) {
+ 			/* SELinux in enforcing mode but load_policy failed */
+-			message(L_CONSOLE, "Cannot load SELinux Policy. "
++			message(L_CONSOLE, "cannot load SELinux Policy. "
+ 				"Machine is in enforcing mode. Halting now.");
+ 			exit(EXIT_FAILURE);
+ 		}
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 66c6982..f7e044d 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1568,7 +1568,7 @@ static void send_file_and_exit(const char *url, int what)
+ 	f = open(url, O_RDONLY);
+ 	if (f < 0) {
+ 		if (DEBUG)
+-			bb_perror_msg("cannot open '%s'", url);
++			bb_perror_msg("can't open '%s'", url);
+ 		/* Error pages are sent by using send_file_and_exit(SEND_BODY).
+ 		 * IOW: it is unsafe to call send_headers_and_exit
+ 		 * if what is SEND_BODY! Can recurse! */
+diff --git a/runit/sv.c b/runit/sv.c
+index 1b92b9a..532bdb8 100644
+--- a/runit/sv.c
++++ b/runit/sv.c
+@@ -179,7 +179,7 @@ struct globals {
+ static void fatal_cannot(const char *m1) NORETURN;
+ static void fatal_cannot(const char *m1)
+ {
+-	bb_perror_msg("fatal: cannot %s", m1);
++	bb_perror_msg("fatal: can't %s", m1);
+ 	_exit(151);
+ }
+ 
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 66b96b8..9608795 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -145,12 +145,12 @@ static void pause_nomem(void)
+ }
+ static void pause1cannot(const char *m0)
+ {
+-	bb_perror_msg(PAUSE"cannot %s", m0);
++	bb_perror_msg(PAUSE"can't %s", m0);
+ 	sleep(3);
+ }
+ static void pause2cannot(const char *m0, const char *m1)
+ {
+-	bb_perror_msg(PAUSE"cannot %s %s", m0, m1);
++	bb_perror_msg(PAUSE"can't %s %s", m0, m1);
+ 	sleep(3);
+ }
+ 
+@@ -246,7 +246,7 @@ static void processorstart(struct logdir *ld)
+ 		fd = open_read("state");
+ 		if (fd == -1) {
+ 			if (errno != ENOENT)
+-				bb_perror_msg_and_die(FATAL"cannot %s processor %s", "open state for", ld->name);
++				bb_perror_msg_and_die(FATAL"can't %s processor %s", "open state for", ld->name);
+ 			close(xopen("state", O_WRONLY|O_NDELAY|O_TRUNC|O_CREAT));
+ 			fd = xopen("state", O_RDONLY|O_NDELAY);
+ 		}
+@@ -260,7 +260,7 @@ static void processorstart(struct logdir *ld)
+ 		prog[2] = ld->processor;
+ 		prog[3] = NULL;
+ 		execv("/bin/sh", prog);
+-		bb_perror_msg_and_die(FATAL"cannot %s processor %s", "run", ld->name);
++		bb_perror_msg_and_die(FATAL"can't %s processor %s", "run", ld->name);
+ 	}
+ 	ld->fnsave[26] = sv_ch; /* ...restore */
+ 	ld->ppid = pid;
+@@ -300,7 +300,7 @@ static unsigned processorstop(struct logdir *ld)
+ 		pause2cannot("set mode of processed", ld->name);
+ 	ld->fnsave[26] = 'u';
+ 	if (unlink(ld->fnsave) == -1)
+-		bb_error_msg(WARNING"cannot unlink: %s/%s", ld->name, ld->fnsave);
++		bb_error_msg(WARNING"can't unlink: %s/%s", ld->name, ld->fnsave);
+ 	while (rename("newstate", "state") == -1)
+ 		pause2cannot("rename state", ld->name);
+ 	if (verbose)
+@@ -325,7 +325,7 @@ static void rmoldest(struct logdir *ld)
+ 		if ((f->d_name[0] == '@') && (strlen(f->d_name) == 27)) {
+ 			if (f->d_name[26] == 't') {
+ 				if (unlink(f->d_name) == -1)
+-					warn2("cannot unlink processor leftover", f->d_name);
++					warn2("can't unlink processor leftover", f->d_name);
+ 			} else {
+ 				++n;
+ 				if (strcmp(f->d_name, oldest) < 0)
+@@ -335,14 +335,14 @@ static void rmoldest(struct logdir *ld)
+ 		}
+ 	}
+ 	if (errno)
+-		warn2("cannot read directory", ld->name);
++		warn2("can't read directory", ld->name);
+ 	closedir(d);
+ 
+ 	if (ld->nmax && (n > ld->nmax)) {
+ 		if (verbose)
+ 			bb_error_msg(INFO"delete: %s/%s", ld->name, oldest);
+ 		if ((*oldest == '@') && (unlink(oldest) == -1))
+-			warn2("cannot unlink oldest logfile", ld->name);
++			warn2("can't unlink oldest logfile", ld->name);
+ 	}
+ }
+ 
+@@ -451,7 +451,7 @@ static int buffer_pwrite(int n, char *s, unsigned len)
+ 					if (strcmp(f->d_name, oldest) < 0)
+ 						memcpy(oldest, f->d_name, 27);
+ 				}
+-			if (errno) warn2("cannot read directory, want remove old logfile",
++			if (errno) warn2("can't read directory, want remove old logfile",
+ 					ld->name);
+ 			closedir(d);
+ 			errno = ENOSPC;
+@@ -461,7 +461,7 @@ static int buffer_pwrite(int n, char *s, unsigned len)
+ 							ld->name, oldest);
+ 					errno = 0;
+ 					if (unlink(oldest) == -1) {
+-						warn2("cannot unlink oldest logfile", ld->name);
++						warn2("can't unlink oldest logfile", ld->name);
+ 						errno = ENOSPC;
+ 					}
+ 					while (fchdir(fdwdir) == -1)
+@@ -518,13 +518,13 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 
+ 	ld->fddir = open(fn, O_RDONLY|O_NDELAY);
+ 	if (ld->fddir == -1) {
+-		warn2("cannot open log directory", (char*)fn);
++		warn2("can't open log directory", (char*)fn);
+ 		return 0;
+ 	}
+ 	close_on_exec_on(ld->fddir);
+ 	if (fchdir(ld->fddir) == -1) {
+ 		logdir_close(ld);
+-		warn2("cannot change directory", (char*)fn);
++		warn2("can't change directory", (char*)fn);
+ 		return 0;
+ 	}
+ 	ld->fdlock = open("lock", O_WRONLY|O_NDELAY|O_APPEND|O_CREAT, 0600);
+@@ -532,7 +532,7 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 	 || (lock_exnb(ld->fdlock) == -1)
+ 	) {
+ 		logdir_close(ld);
+-		warn2("cannot lock directory", (char*)fn);
++		warn2("can't lock directory", (char*)fn);
+ 		while (fchdir(fdwdir) == -1)
+ 			pause1cannot("change to initial working directory");
+ 		return 0;
+@@ -651,7 +651,7 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 	} else {
+ 		if (errno != ENOENT) {
+ 			logdir_close(ld);
+-			warn2("cannot stat current", ld->name);
++			warn2("can't stat current", ld->name);
+ 			while (fchdir(fdwdir) == -1)
+ 				pause1cannot("change to initial working directory");
+ 			return 0;
+@@ -754,7 +754,7 @@ static int buffer_pread(/*int fd, */char *s, unsigned len)
+ 		if (errno == EINTR)
+ 			continue;
+ 		if (errno != EAGAIN) {
+-			warn("cannot read standard input");
++			warn("can't read standard input");
+ 			break;
+ 		}
+ 		/* else: EAGAIN - normal, repeat silently */
+diff --git a/shell/ash.c b/shell/ash.c
+index 7a63fce..637ba01 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -3534,7 +3534,7 @@ static void
+ xtcsetpgrp(int fd, pid_t pgrp)
+ {
+ 	if (tcsetpgrp(fd, pgrp))
+-		ash_msg_and_raise_error("cannot set tty process group (%m)");
++		ash_msg_and_raise_error("can't set tty process group (%m)");
+ }
+ 
+ /*
+@@ -4844,9 +4844,9 @@ openredirect(union node *redir)
+ 
+ 	return f;
+  ecreate:
+-	ash_msg_and_raise_error("cannot create %s: %s", fname, errmsg(errno, "nonexistent directory"));
++	ash_msg_and_raise_error("can't create %s: %s", fname, errmsg(errno, "nonexistent directory"));
+  eopen:
+-	ash_msg_and_raise_error("cannot open %s: %s", fname, errmsg(errno, "no such file"));
++	ash_msg_and_raise_error("can't open %s: %s", fname, errmsg(errno, "no such file"));
+ }
+ 
+ /*
+diff --git a/shell/hush.c b/shell/hush.c
+index 47cdf6f..3dc27d9 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1466,7 +1466,7 @@ static void pseudo_exec_argv(char **ptrs2free, char **argv)
+ 
+ 	debug_printf_exec("execing '%s'\n", argv[0]);
+ 	execvp(argv[0], argv);
+-	bb_perror_msg("cannot exec '%s'", argv[0]);
++	bb_perror_msg("can't exec '%s'", argv[0]);
+ 	_exit(EXIT_FAILURE);
+ }
+ 
+@@ -4425,7 +4425,7 @@ static int builtin_source(char **argv)
+ 	/* XXX search through $PATH is missing */
+ 	input = fopen(argv[1], "r");
+ 	if (!input) {
+-		bb_error_msg("cannot open '%s'", argv[1]);
++		bb_error_msg("can't open '%s'", argv[1]);
+ 		return EXIT_FAILURE;
+ 	}
+ 	close_on_exec_on(fileno(input));
+diff --git a/shell/msh.c b/shell/msh.c
+index eb17eb6..0cb81fe 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -1268,7 +1268,7 @@ static int newfile(char *s)
+ 		f = open(s, O_RDONLY);
+ 		if (f < 0) {
+ 			prs(s);
+-			err(": cannot open");
++			err(": can't open");
+ 			return 1;
+ 		}
+ 	}
+@@ -2770,7 +2770,7 @@ static int forkexec(struct op *t, int *pin, int *pout, int no_fork, char **wp)
+ 		DBGPRINTF3(("FORKEXEC: calling vfork()...\n"));
+ 		newpid = vfork();
+ 		if (newpid == -1) {
+-			DBGPRINTF(("FORKEXEC: ERROR, cannot vfork()!\n"));
++			DBGPRINTF(("FORKEXEC: ERROR, can't vfork()!\n"));
+ 			return -1;
+ 		}
+ 
+@@ -2820,7 +2820,7 @@ static int forkexec(struct op *t, int *pin, int *pout, int no_fork, char **wp)
+ 	if (iopp) {
+ 		if (bltin && bltin != doexec) {
+ 			prs(bltin_name);
+-			err(": cannot redirect shell command");
++			err(": can't redirect shell command");
+ 			if (forked)
+ 				_exit(-1);
+ 			return -1;
+@@ -2840,7 +2840,7 @@ static int forkexec(struct op *t, int *pin, int *pout, int no_fork, char **wp)
+ 			/* Builtin in pipe: disallowed */
+ 			/* TODO: allow "exec"? */
+ 			prs(bltin_name);
+-			err(": cannot run builtin as part of pipe");
++			err(": can't run builtin as part of pipe");
+ 			if (forked)
+ 				_exit(-1);
+ 			return -1;
+@@ -2955,7 +2955,7 @@ static int iosetup(struct ioword *iop, int pipein, int pipeout)
+ 
+ 	if (u < 0) {
+ 		prs(cp);
+-		prs(": cannot ");
++		prs(": can't ");
+ 		warn(msg);
+ 		return 1;
+ 	}
+@@ -3110,7 +3110,7 @@ static const char *rexecve(char *c, char **v, char **envp)
+ 		return "not found";
+ 	}
+ 	exstat = 126; /* mimic bash */
+-	return "cannot execute";
++	return "can't execute";
+ }
+ 
+ /*
+@@ -3996,7 +3996,7 @@ static int dollar(int quoted)
+ 		switch (c) {
+ 		case '=':
+ 			if (isdigit(*s)) {
+-				err("cannot use ${...=...} with $n");
++				err("can't use ${...=...} with $n");
+ 				gflg = 1;
+ 				break;
+ 			}
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index eeef18e..702567a 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -83,9 +83,9 @@ struct partition {
+ 	unsigned char size4[4];         /* nr of sectors in partition */
+ } PACKED;
+ 
+-static const char unable_to_open[] ALIGN1 = "cannot open %s";
+-static const char unable_to_read[] ALIGN1 = "cannot read from %s";
+-static const char unable_to_seek[] ALIGN1 = "cannot seek on %s";
++static const char unable_to_open[] ALIGN1 = "can't open %s";
++static const char unable_to_read[] ALIGN1 = "can't read from %s";
++static const char unable_to_seek[] ALIGN1 = "can't seek on %s";
+ 
+ enum label_type {
+ 	LABEL_DOS, LABEL_SUN, LABEL_SGI, LABEL_AIX, LABEL_OSF
+diff --git a/util-linux/umount.c b/util-linux/umount.c
+index 00f1253..0662cea 100644
+--- a/util-linux/umount.c
++++ b/util-linux/umount.c
+@@ -69,7 +69,7 @@ int umount_main(int argc UNUSED_PARAM, char **argv)
+ 	fp = setmntent(bb_path_mtab_file, "r");
+ 	if (!fp) {
+ 		if (opt & OPT_ALL)
+-			bb_error_msg_and_die("cannot open %s", bb_path_mtab_file);
++			bb_error_msg_and_die("can't open %s", bb_path_mtab_file);
+ 	} else {
+ 		while (getmntent_r(fp, &me, path, PATH_MAX)) {
+ 			/* Match fstype if passed */
+@@ -132,13 +132,13 @@ int umount_main(int argc UNUSED_PARAM, char **argv)
+ 				const char *msg = "%s busy - remounted read-only";
+ 				curstat = mount(m->device, zapit, NULL, MS_REMOUNT|MS_RDONLY, NULL);
+ 				if (curstat) {
+-					msg = "cannot remount %s read-only";
++					msg = "can't remount %s read-only";
+ 					status = EXIT_FAILURE;
+ 				}
+ 				bb_error_msg(msg, m->device);
+ 			} else {
+ 				status = EXIT_FAILURE;
+-				bb_perror_msg("cannot %sumount %s", (doForce ? "forcibly " : ""), zapit);
++				bb_perror_msg("can't %sumount %s", (doForce ? "forcibly " : ""), zapit);
+ 			}
+ 		} else {
+ 			// De-allocate the loop device.  This ioctl should be ignored on

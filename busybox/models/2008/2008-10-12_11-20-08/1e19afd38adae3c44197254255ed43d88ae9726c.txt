@@ -1,0 +1,140 @@
+2008-10-12 11:20:08 +0000
+diff --git a/include/applets.h b/include/applets.h
+index 35649d3..828900e 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -80,6 +80,7 @@ USE_AWK(APPLET_NOEXEC(awk, awk, _BB_DIR_USR_BIN, _BB_SUID_NEVER, awk))
+ USE_BASENAME(APPLET_NOFORK(basename, basename, _BB_DIR_USR_BIN, _BB_SUID_NEVER, basename))
+ USE_BBCONFIG(APPLET(bbconfig, _BB_DIR_BIN, _BB_SUID_NEVER))
+ //USE_BBSH(APPLET(bbsh, _BB_DIR_BIN, _BB_SUID_NEVER))
++USE_BLKID(APPLET(blkid, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_BRCTL(APPLET(brctl, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_BUNZIP2(APPLET(bunzip2, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_BUNZIP2(APPLET_ODDNAME(bzcat, bunzip2, _BB_DIR_USR_BIN, _BB_SUID_NEVER, bzcat))
+diff --git a/include/usage.h b/include/usage.h
+index d247864..3c11013 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1098,6 +1098,11 @@
+      "\n	-z		Delete messages on server" \
+      "\n	prog		Run 'prog <message_file>' on message delivery" \
+ 
++#define blkid_trivial_usage \
++       ""
++#define blkid_full_usage "\n\n" \
++       "Print UUIDs of all filesystems."
++
+ #define findfs_trivial_usage \
+        "LABEL=label or UUID=uuid"
+ #define findfs_full_usage "\n\n" \
+diff --git a/include/volume_id.h b/include/volume_id.h
+index 99cb11f..bba32c0 100644
+--- a/include/volume_id.h
++++ b/include/volume_id.h
+@@ -20,3 +20,4 @@
+ 
+ char *get_devname_from_label(const char *spec);
+ char *get_devname_from_uuid(const char *spec);
++void display_uuid_cache(void);
+diff --git a/util-linux/Config.in b/util-linux/Config.in
+index 2ba9f01..ba0916a 100644
+--- a/util-linux/Config.in
++++ b/util-linux/Config.in
+@@ -5,6 +5,15 @@
+ 
+ menu "Linux System Utilities"
+ 
++config BLKID
++	bool "blkid"
++	default n
++	select VOLUMEID
++	help
++	  Lists labels and UUIDs of all filesystems.
++	  WARNING:
++	  With all submodules selected, it will add ~8k to busybox.
++
+ config DMESG
+ 	bool "dmesg"
+ 	default n
+@@ -156,9 +165,7 @@ config FINDFS
+ 	default n
+ 	select VOLUMEID
+ 	help
+-	  This is similar to the findfs program that is part of the e2fsprogs
+-	  package. However, the e2fsprogs version only support ext2/3. This
+-	  version supports those in addition to FAT, swap, and ReiserFS.
++	  Prints the name of a filesystem with given laver or UUID.
+ 	  WARNING:
+ 	  With all submodules selected, it will add ~8k to busybox.
+ 
+@@ -651,7 +658,7 @@ config FEATURE_MOUNT_LABEL
+ 	select VOLUMEID
+ 	help
+ 	  This allows for specifying a device by label or uuid, rather than by
+-	  name. This feature utilizes the same functionality as findfs.
++	  name. This feature utilizes the same functionality as blkid/findfs.
+ 
+ config FEATURE_MOUNT_NFS
+ 	bool "Support mounting NFS file systems"
+diff --git a/util-linux/Kbuild b/util-linux/Kbuild
+index 38569c6..2d0fc49 100644
+--- a/util-linux/Kbuild
++++ b/util-linux/Kbuild
+@@ -5,6 +5,7 @@
+ # Licensed under the GPL v2, see the file LICENSE in this tarball.
+ 
+ lib-y:=
++lib-$(CONFIG_BLKID)             += blkid.o
+ lib-$(CONFIG_DMESG)             += dmesg.o
+ lib-$(CONFIG_FBSET)             += fbset.o
+ lib-$(CONFIG_FDFLUSH)           += freeramdisk.o
+diff --git a/util-linux/volume_id/Kbuild b/util-linux/volume_id/Kbuild
+index 54b95f0..d78e4ad 100644
+--- a/util-linux/volume_id/Kbuild
++++ b/util-linux/volume_id/Kbuild
+@@ -6,6 +6,7 @@
+ 
+ lib-y:=
+ 
++lib-$(CONFIG_BLKID)                             += get_devname.o
+ lib-$(CONFIG_FINDFS)                            += get_devname.o
+ lib-$(CONFIG_FEATURE_MOUNT_LABEL)               += get_devname.o
+ 
+diff --git a/util-linux/volume_id/get_devname.c b/util-linux/volume_id/get_devname.c
+index f9a2c90..83c0856 100644
+--- a/util-linux/volume_id/get_devname.c
++++ b/util-linux/volume_id/get_devname.c
+@@ -374,24 +374,25 @@ get_spec_by_volume_label(const char *s, int *major, int *minor)
+ {
+ 	return get_spec_by_x(VOL, s, major, minor);
+ }
++#endif // UNUSED
+ 
+-static int display_uuid_cache(void)
++/* Used by blkid */
++void display_uuid_cache(void)
+ {
+ 	struct uuidCache_s *u;
+-	size_t i;
+ 
+ 	uuidcache_init();
+-
+ 	u = uuidCache;
+ 	while (u) {
+-		printf("%s %s %s\n", u->device, u->label, u->uc_uuid);
++		printf("%s:", u->device);
++		if (u->label[0])
++			printf(" LABEL=\"%s\"", u->label);
++		if (u->uc_uuid[0])
++			printf(" UUID=\"%s\"", u->uc_uuid);
++		bb_putchar('\n');
+ 		u = u->next;
+ 	}
+-
+-	return 0;
+ }
+-#endif // UNUSED
+-
+ 
+ /* Used by mount and findfs */
+ 

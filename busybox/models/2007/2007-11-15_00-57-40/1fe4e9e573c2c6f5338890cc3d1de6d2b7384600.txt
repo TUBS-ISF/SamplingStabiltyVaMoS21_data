@@ -1,0 +1,14 @@
+2007-11-15 00:57:40 +0000
+diff --git a/procps/kill.c b/procps/kill.c
+index 65c2837..a77d66e 100644
+--- a/procps/kill.c
++++ b/procps/kill.c
+@@ -129,7 +129,7 @@ do_it_now:
+ 
+ 	/* Pid or name is required for kill/killall */
+ 	if (argc < 1) {
+-		bb_error_msg("You need to specify whom to kill");
++		bb_error_msg("you need to specify whom to kill");
+ 		return EXIT_FAILURE;
+ 	}
+ 

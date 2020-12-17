@@ -1,0 +1,14 @@
+2008-08-15 21:20:23 +0000
+diff --git a/coreutils/cut.c b/coreutils/cut.c
+index 0d95ff8..3c9fdbd 100644
+--- a/coreutils/cut.c
++++ b/coreutils/cut.c
+@@ -50,7 +50,7 @@ static void cut_file(FILE *file, char delim, const struct cut_list *cut_lists, u
+ 
+ 		/* set up a list so we can keep track of what's been printed */
+ 		int linelen = strlen(line);
+-		char *printed = xzalloc(linelen * sizeof(char));
++		char *printed = xzalloc(linelen + 1);
+ 		char *orig_line = line;
+ 		unsigned cl_pos = 0;
+ 		int spos;

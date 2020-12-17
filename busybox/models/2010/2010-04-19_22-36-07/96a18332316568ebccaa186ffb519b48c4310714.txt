@@ -1,0 +1,28 @@
+2010-04-19 22:36:07 -0400
+diff --git a/editors/sed.c b/editors/sed.c
+index e5e1877..302a156 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1031,7 +1031,7 @@ static void process_files(void)
+ 		case 'c':
+ 			/* Only triggers on last line of a matching range. */
+ 			if (!sed_cmd->in_match)
+-				sed_puts(sed_cmd->string, NO_EOL_CHAR);
++				sed_puts(sed_cmd->string, '\n');
+ 			goto discard_line;
+ 
+ 		/* Read file, append contents to output */
+diff --git a/testsuite/sed.tests b/testsuite/sed.tests
+index 875c946..f88524d 100755
+--- a/testsuite/sed.tests
++++ b/testsuite/sed.tests
+@@ -248,4 +248,9 @@ testing "sed beginning (^) matches only once" \
+ 	">/usr</>lib<\n" "" \
+ 	"/usr/lib\n"
+ 
++testing "sed c" \
++	"sed 'crepl'" \
++	"repl\nrepl\n" "" \
++	"first\nsecond\n"
++
+ exit $FAILCOUNT

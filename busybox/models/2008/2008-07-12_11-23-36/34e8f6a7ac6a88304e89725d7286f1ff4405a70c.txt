@@ -1,0 +1,54 @@
+2008-07-12 11:23:36 +0000
+diff --git a/coreutils/libcoreutils/coreutils.h b/coreutils/libcoreutils/coreutils.h
+index be9af12..89cd953 100644
+--- a/coreutils/libcoreutils/coreutils.h
++++ b/coreutils/libcoreutils/coreutils.h
+@@ -12,10 +12,10 @@
+ 
+ typedef int (*stat_func)(const char *fn, struct stat *ps);
+ 
+-int cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf);
+-int cp_mv_stat(const char *fn, struct stat *fn_stat);
++int cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf) FAST_FUNC;
++int cp_mv_stat(const char *fn, struct stat *fn_stat) FAST_FUNC;
+ 
+-mode_t getopt_mk_fifo_nod(char **argv);
++mode_t getopt_mk_fifo_nod(char **argv) FAST_FUNC;
+ 
+ #if __GNUC_PREREQ(4,1)
+ # pragma GCC visibility pop
+diff --git a/coreutils/libcoreutils/cp_mv_stat.c b/coreutils/libcoreutils/cp_mv_stat.c
+index ff7c273..0fd467c 100644
+--- a/coreutils/libcoreutils/cp_mv_stat.c
++++ b/coreutils/libcoreutils/cp_mv_stat.c
+@@ -23,7 +23,7 @@
+ #include "libbb.h"
+ #include "coreutils.h"
+ 
+-int cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf)
++int FAST_FUNC cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf)
+ {
+ 	if (sf(fn, fn_stat) < 0) {
+ 		if (errno != ENOENT) {
+@@ -44,7 +44,7 @@ int cp_mv_stat2(const char *fn, struct stat *fn_stat, stat_func sf)
+ 	return 1;
+ }
+ 
+-int cp_mv_stat(const char *fn, struct stat *fn_stat)
++int FAST_FUNC cp_mv_stat(const char *fn, struct stat *fn_stat)
+ {
+ 	return cp_mv_stat2(fn, fn_stat, stat);
+ }
+diff --git a/coreutils/libcoreutils/getopt_mk_fifo_nod.c b/coreutils/libcoreutils/getopt_mk_fifo_nod.c
+index 32e55a5..ba3222e 100644
+--- a/coreutils/libcoreutils/getopt_mk_fifo_nod.c
++++ b/coreutils/libcoreutils/getopt_mk_fifo_nod.c
+@@ -23,7 +23,7 @@
+ #include "libbb.h"
+ #include "coreutils.h"
+ 
+-mode_t getopt_mk_fifo_nod(char **argv)
++mode_t FAST_FUNC getopt_mk_fifo_nod(char **argv)
+ {
+ 	mode_t mode = 0666;
+ 	char *smode = NULL;

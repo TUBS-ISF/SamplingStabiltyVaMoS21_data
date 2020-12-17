@@ -1,0 +1,56 @@
+2009-10-04 01:34:54 +0200
+diff --git a/include/usage.h b/include/usage.h
+index 42d8b9b..9b9a56f 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3814,6 +3814,7 @@
+      "\n	-t		Read additional recipients from message body" \
+      "\n	-f sender	Sender (required)" \
+      "\n	-o options	Various options. -oi implied, others are ignored" \
++     "\n	-i		-oi synonym. implied and ignored" \
+      "\n" \
+      "\nBusybox specific options:" \
+      "\n	-w seconds	Network timeout" \
+diff --git a/mailutils/sendmail.c b/mailutils/sendmail.c
+index 7e57a94..014b20d 100644
+--- a/mailutils/sendmail.c
++++ b/mailutils/sendmail.c
+@@ -73,11 +73,12 @@ int sendmail_main(int argc UNUSED_PARAM, char **argv)
+ 		OPT_t = 1 << 0,         // read message for recipients, append them to those on cmdline
+ 		OPT_f = 1 << 1,         // sender address
+ 		OPT_o = 1 << 2,         // various options. -oi IMPLIED! others are IGNORED!
++		OPT_i = 1 << 3,         // IMPLIED!
+ 	//--- BB specific options
+-		OPT_w = 1 << 3,         // network timeout
+-		OPT_H = 1 << 4,         // use external connection helper
+-		OPT_S = 1 << 5,         // specify connection string
+-		OPT_a = 1 << 6,         // authentication tokens
++		OPT_w = 1 << 4,         // network timeout
++		OPT_H = 1 << 5,         // use external connection helper
++		OPT_S = 1 << 6,         // specify connection string
++		OPT_a = 1 << 7,         // authentication tokens
+ 	};
+ 
+ 	// init global variables
+@@ -93,7 +94,7 @@ int sendmail_main(int argc UNUSED_PARAM, char **argv)
+ 	// N.B. since -H and -S are mutually exclusive they do not interfere in opt_connect
+ 	// -a is for ssmtp (http://downloads.openwrt.org/people/nico/man/man8/ssmtp.8.html) compatibility,
+ 	// it is still under development.
+-	opts = getopt32(argv, "tf:o:w:H:S:a::", &opt_from, NULL, &timeout, &opt_connect, &opt_connect, &list);
++	opts = getopt32(argv, "tf:o:iw:H:S:a::", &opt_from, NULL, &timeout, &opt_connect, &opt_connect, &list);
+ 	//argc -= optind;
+ 	argv += optind;
+ 
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index d2104c3..74bf916 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -29,7 +29,7 @@
+ #define SENDMAIL        "sendmail"
+ #endif
+ #ifndef SENDMAIL_ARGS
+-#define SENDMAIL_ARGS   "-ti", "oem"
++#define SENDMAIL_ARGS   "-ti", NULL
+ #endif
+ #ifndef CRONUPDATE
+ #define CRONUPDATE      "cron.update"

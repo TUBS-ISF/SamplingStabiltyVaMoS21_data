@@ -1,0 +1,14 @@
+2009-02-14 12:13:13 +0000
+diff --git a/coreutils/Config.in b/coreutils/Config.in
+index b734f8e..03e6b6a 100644
+--- a/coreutils/Config.in
++++ b/coreutils/Config.in
+@@ -766,7 +766,7 @@ config FEATURE_WC_LARGE
+ 	default n
+ 	depends on WC
+ 	help
+-	  Use "unsigned long long" in wc for count variables.
++	  Use "unsigned long long" in wc for counter variables.
+ 
+ config WHO
+ 	bool "who"

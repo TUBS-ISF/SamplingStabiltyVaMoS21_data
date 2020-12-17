@@ -1,0 +1,14 @@
+2008-02-12 18:53:16 +0000
+diff --git a/docs/busybox.net/news.html b/docs/busybox.net/news.html
+index d1cf7c2..bc6bb9f 100644
+--- a/docs/busybox.net/news.html
++++ b/docs/busybox.net/news.html
+@@ -11,7 +11,7 @@
+     iproute, mdev, mkswap, msh, nameif, stty, test, zcip.</p>
+     <p>hush has `command` expansion re-enabled for NOMMU, although it is
+     inherently unsafe (by virtue of NOMMU's use of vfork instead of fork).
+-    Plan to make this less likely to bite people in future versions.</p>
++    The plan is to make this less likely to bite people in future versions.</p>
+   </li>
+ 
+   <li><b>24 December 2007 -- BusyBox 1.9.0 (unstable)</b>

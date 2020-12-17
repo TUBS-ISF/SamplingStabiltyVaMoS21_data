@@ -1,0 +1,162 @@
+2008-07-20 17:48:59 +0000
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index 8512f0c..0047a84 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -102,74 +102,46 @@ static void undot(uint8_t * rip)
+ }
+ 
+ /*
+- * Read one line of hostname/IP from file
+- * Returns 0 for each valid entry read, -1 at EOF
+- * Assumes all host names are lower case only
+- * Hostnames with more than one label are not handled correctly.
+- * Presently the dot is copied into name without
+- * converting to a length/string substring for that label.
+- */
+-static int getfileentry(FILE *fp, struct dns_entry *s)
+-{
+-	unsigned int a,b,c,d;
+-	char *line, *r, *name;
+-
+- restart:
+-	line = r = xmalloc_fgets(fp);
+-	if (!r)
+-		return -1;
+-	while (*r == ' ' || *r == '\t') {
+-		r++;
+-		if (!*r || *r == '#' || *r == '\n') {
+-			free(line);
+-			goto restart; /* skipping empty/blank and commented lines  */
+-		}
+-	}
+-	name = r;
+-	while (*r != ' ' && *r != '\t')
+-		r++;
+-	*r++ = '\0';
+-	if (sscanf(r, ".%u.%u.%u.%u"+1, &a, &b, &c, &d) != 4) {
+-		free(line);
+-		goto restart; /* skipping wrong lines */
+-	}
+-
+-	sprintf(s->ip, ".%u.%u.%u.%u"+1, a, b, c, d);
+-	sprintf(s->rip, ".%u.%u.%u.%u", d, c, b, a);
+-	undot((uint8_t*)s->rip);
+-	convname(s->name, (uint8_t*)name);
+-
+-	if (OPT_verbose)
+-		fprintf(stderr, "\tname:%s, ip:%s\n", &(s->name[1]),s->ip);
+-
+-	free(line);
+-	return 0;
+-}
+-
+-/*
+  * Read hostname/IP records from file
+  */
+ static void dnsentryinit(void)
+ {
+-	FILE *fp;
++	parser_t *parser;
+ 	struct dns_entry *m, *prev;
+ 
+ 	prev = dnsentry = NULL;
+-	fp = xfopen(fileconf, "r");
+-
+-	while (1) {
+-		m = xzalloc(sizeof(*m));
+-		/*m->next = NULL;*/
+-		if (getfileentry(fp, m))
+-			break;
+-
+-		if (prev == NULL)
+-			dnsentry = m;
+-		else
+-			prev->next = m;
+-		prev = m;
++	parser = config_open(fileconf);
++	if (parser) {
++		char *token[2];
++		while (config_read(parser, token, 2, 0, "# \t", 0)) {
++			unsigned int a,b,c,d;
++			/*
++			 * Assumes all host names are lower case only
++			 * Hostnames with more than one label are not handled correctly.
++			 * Presently the dot is copied into name without
++			 * converting to a length/string substring for that label.
++			 */
++			if (!token[1] || sscanf(token[1], ".%u.%u.%u.%u"+1, &a, &b, &c, &d) != 4)
++				continue;
++
++			m = xzalloc(sizeof(*m));
++			/*m->next = NULL;*/
++			sprintf(m->ip, ".%u.%u.%u.%u"+1, a, b, c, d);
++			sprintf(m->rip, ".%u.%u.%u.%u", d, c, b, a);
++			undot((uint8_t*)m->rip);
++			convname(m->name, (uint8_t*)token[0]);
++
++			if (OPT_verbose)
++				fprintf(stderr, "\tname:%s, ip:%s\n", &(m->name[1]), m->ip);
++
++			if (prev == NULL)
++				dnsentry = m;
++			else
++				prev->next = m;
++			prev = m;
++		}
++		config_close(parser);
+ 	}
+-	fclose(fp);
+ }
+ 
+ /*
+diff --git a/selinux/sestatus.c b/selinux/sestatus.c
+index 3b027ee..1351600 100644
+--- a/selinux/sestatus.c
++++ b/selinux/sestatus.c
+@@ -47,31 +47,17 @@ static void display_boolean(void)
+ 
+ static void read_config(char **pc, int npc, char **fc, int nfc)
+ {
+-	char buf[256];
+-	FILE *fp;
++	char *buf;
++	parser_t *parser;
+ 	int pc_ofs = 0, fc_ofs = 0, section = -1;
+ 
+ 	pc[0] = fc[0] = NULL;
+ 
+-	fp = fopen("/etc/sestatus.conf", "rb");
+-	if (fp == NULL)
++	parser = config_open("/etc/sestatus.conf");
++	if (!parser)
+ 		return;
+ 
+-	while (fgets(buf, sizeof(buf), fp) != NULL) {
+-		int i, c;
+-
+-		/* kills comments */
+-		for (i = 0; (c = buf[i]) != '\0'; i++) {
+-			if (c == '#') {
+-				buf[i] = '\0';
+-				break;
+-			}
+-		}
+-		trim(buf);
+-
+-		if (buf[0] == '\0')
+-			continue;
+-
++	while (config_read(parser, &buf, 1, 1, "# \t", PARSE_LAST_IS_GREEDY)) {
+ 		if (strcmp(buf, "[process]") == 0) {
+ 			section = 1;
+ 		} else if (strcmp(buf, "[files]") == 0) {
+@@ -86,7 +72,7 @@ static void read_config(char **pc, int npc, char **fc, int nfc)
+ 			}
+ 		}
+ 	}
+-	fclose(fp);
++	config_close(parser);
+ }
+ 
+ static void display_verbose(void)

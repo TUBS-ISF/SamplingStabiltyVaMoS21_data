@@ -1,0 +1,526 @@
+2007-08-13 10:36:25 +0000
+diff --git a/archival/bbunzip.c b/archival/bbunzip.c
+index bd1526b..f842d45 100644
+--- a/archival/bbunzip.c
++++ b/archival/bbunzip.c
+@@ -212,7 +212,7 @@ char* make_new_name_gunzip(char *filename)
+ 
+ 	extension++;
+ 	if (strcmp(extension, "tgz" + 1) == 0
+-#ifdef CONFIG_FEATURE_GUNZIP_UNCOMPRESS
++#if  ENABLE_FEATURE_GUNZIP_UNCOMPRESS
+ 	 || strcmp(extension, "Z") == 0
+ #endif
+ 	) {
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 0c1f96f..caa50f9 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -1412,10 +1412,10 @@ static void init_archive_deb_control(archive_handle_t *ar_handle)
+ 	tar_handle->src_fd = ar_handle->src_fd;
+ 
+ 	/* We don't care about data.tar.* or debian-binary, just control.tar.* */
+-#ifdef CONFIG_FEATURE_DEB_TAR_GZ
++#if  ENABLE_FEATURE_DEB_TAR_GZ
+ 	llist_add_to(&(ar_handle->accept), (char*)"control.tar.gz");
+ #endif
+-#ifdef CONFIG_FEATURE_DEB_TAR_BZ2
++#if  ENABLE_FEATURE_DEB_TAR_BZ2
+ 	llist_add_to(&(ar_handle->accept), (char*)"control.tar.bz2");
+ #endif
+ 
+@@ -1432,10 +1432,10 @@ static void init_archive_deb_data(archive_handle_t *ar_handle)
+ 	tar_handle->src_fd = ar_handle->src_fd;
+ 
+ 	/* We don't care about control.tar.* or debian-binary, just data.tar.* */
+-#ifdef CONFIG_FEATURE_DEB_TAR_GZ
++#if  ENABLE_FEATURE_DEB_TAR_GZ
+ 	llist_add_to(&(ar_handle->accept), (char*)"data.tar.gz");
+ #endif
+-#ifdef CONFIG_FEATURE_DEB_TAR_BZ2
++#if  ENABLE_FEATURE_DEB_TAR_BZ2
+ 	llist_add_to(&(ar_handle->accept), (char*)"data.tar.bz2");
+ #endif
+ 
+diff --git a/archival/dpkg_deb.c b/archival/dpkg_deb.c
+index 138caff..6dd8171 100644
+--- a/archival/dpkg_deb.c
++++ b/archival/dpkg_deb.c
+@@ -31,12 +31,12 @@ int dpkg_deb_main(int argc, char **argv)
+ 	ar_archive->sub_archive = tar_archive;
+ 	ar_archive->filter = filter_accept_list_reassign;
+ 
+-#ifdef CONFIG_FEATURE_DEB_TAR_GZ
++#if ENABLE_FEATURE_DEB_TAR_GZ
+ 	llist_add_to(&(ar_archive->accept), (char*)"data.tar.gz");
+ 	llist_add_to(&control_tar_llist, (char*)"control.tar.gz");
+ #endif
+ 
+-#ifdef CONFIG_FEATURE_DEB_TAR_BZ2
++#if ENABLE_FEATURE_DEB_TAR_BZ2
+ 	llist_add_to(&(ar_archive->accept), (char*)"data.tar.bz2");
+ 	llist_add_to(&control_tar_llist, (char*)"control.tar.bz2");
+ #endif
+diff --git a/archival/libunarchive/decompress_unlzma.c b/archival/libunarchive/decompress_unlzma.c
+index 2800a7e..4f36c06 100644
+--- a/archival/libunarchive/decompress_unlzma.c
++++ b/archival/libunarchive/decompress_unlzma.c
+@@ -12,7 +12,7 @@
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
+-#ifdef CONFIG_FEATURE_LZMA_FAST
++#if ENABLE_FEATURE_LZMA_FAST
+ #  define speed_inline ALWAYS_INLINE
+ #else
+ #  define speed_inline
+@@ -99,9 +99,11 @@ static ALWAYS_INLINE void rc_normalize(rc_t * rc)
+ 	}
+ }
+ 
+-/* Called 9 times */
++/* rc_is_bit_0 is called 9 times */
+ /* Why rc_is_bit_0_helper exists?
+- * Because we want to always expose (rc->code < rc->bound) to optimizer
++ * Because we want to always expose (rc->code < rc->bound) to optimizer.
++ * Thus rc_is_bit_0 is always inlined, and rc_is_bit_0_helper is inlined
++ * only if we compile for speed.
+  */
+ static speed_inline uint32_t rc_is_bit_0_helper(rc_t * rc, uint16_t * p)
+ {
+diff --git a/archival/libunarchive/filter_accept_list_reassign.c b/archival/libunarchive/filter_accept_list_reassign.c
+index 0fb536f..969dd1e 100644
+--- a/archival/libunarchive/filter_accept_list_reassign.c
++++ b/archival/libunarchive/filter_accept_list_reassign.c
+@@ -23,13 +23,13 @@ char filter_accept_list_reassign(archive_handle_t *archive_handle)
+ 		name_ptr = strrchr(archive_handle->file_header->name, '.');
+ 
+ 		/* Modify the subarchive handler based on the extension */
+-#ifdef CONFIG_FEATURE_DEB_TAR_GZ
++#if ENABLE_FEATURE_DEB_TAR_GZ
+ 		if (strcmp(name_ptr, ".gz") == 0) {
+ 			archive_handle->action_data_subarchive = get_header_tar_gz;
+ 			return EXIT_SUCCESS;
+ 		}
+ #endif
+-#ifdef CONFIG_FEATURE_DEB_TAR_BZ2
++#if ENABLE_FEATURE_DEB_TAR_BZ2
+ 		if (strcmp(name_ptr, ".bz2") == 0) {
+ 			archive_handle->action_data_subarchive = get_header_tar_bz2;
+ 			return EXIT_SUCCESS;
+diff --git a/archival/libunarchive/seek_by_jump.c b/archival/libunarchive/seek_by_jump.c
+index 6cd2564..edbf46b 100644
+--- a/archival/libunarchive/seek_by_jump.c
++++ b/archival/libunarchive/seek_by_jump.c
+@@ -9,7 +9,7 @@
+ void seek_by_jump(const archive_handle_t *archive_handle, const unsigned int amount)
+ {
+ 	if (lseek(archive_handle->src_fd, (off_t) amount, SEEK_CUR) == (off_t) -1) {
+-#ifdef CONFIG_FEATURE_UNARCHIVE_TAPE
++#if ENABLE_FEATURE_UNARCHIVE_TAPE
+ 		if (errno == ESPIPE) {
+ 			seek_by_read(archive_handle, amount);
+ 		} else
+diff --git a/coreutils/df.c b/coreutils/df.c
+index 5154eeb..f616398 100644
+--- a/coreutils/df.c
++++ b/coreutils/df.c
+@@ -22,7 +22,7 @@
+ #include <sys/vfs.h>
+ #include "libbb.h"
+ 
+-#ifndef CONFIG_FEATURE_HUMAN_READABLE
++#if !ENABLE_FEATURE_HUMAN_READABLE
+ static long kscale(long b, long bs)
+ {
+ 	return ( b * (long long) bs + 1024/2 ) / 1024;
+@@ -34,7 +34,7 @@ int df_main(int argc, char **argv)
+ {
+ 	long blocks_used;
+ 	long blocks_percent_used;
+-#ifdef CONFIG_FEATURE_HUMAN_READABLE
++#if  ENABLE_FEATURE_HUMAN_READABLE
+ 	unsigned long df_disp_hr = 1024;
+ #endif
+ 	int status = EXIT_SUCCESS;
+@@ -46,7 +46,7 @@ int df_main(int argc, char **argv)
+ 	static const char hdr_1k[] ALIGN1 = "1k-blocks";
+ 	const char *disp_units_hdr = hdr_1k;
+ 
+-#ifdef CONFIG_FEATURE_HUMAN_READABLE
++#if  ENABLE_FEATURE_HUMAN_READABLE
+ 	opt_complementary = "h-km:k-hm:m-hk";
+ 	opt = getopt32(argc, argv, "hmk");
+ 	if (opt & 1) {
+@@ -125,7 +125,7 @@ int df_main(int argc, char **argv)
+ 				}
+ 			}
+ 
+-#ifdef CONFIG_FEATURE_HUMAN_READABLE
++#if ENABLE_FEATURE_HUMAN_READABLE
+ 			printf("%-20s %9s ", device,
+ 				make_human_readable_str(s.f_blocks, s.f_bsize, df_disp_hr));
+ 
+diff --git a/coreutils/wc.c b/coreutils/wc.c
+index e5353b4..e746365 100644
+--- a/coreutils/wc.c
++++ b/coreutils/wc.c
+@@ -43,7 +43,7 @@
+ 
+ #include "libbb.h"
+ 
+-#ifdef CONFIG_LOCALE_SUPPORT
++#if  ENABLE_LOCALE_SUPPORT
+ #define isspace_given_isprint(c) isspace(c)
+ #else
+ #undef isspace
+diff --git a/docs/style-guide.txt b/docs/style-guide.txt
+index 381275a..7560d69 100644
+--- a/docs/style-guide.txt
++++ b/docs/style-guide.txt
+@@ -377,13 +377,13 @@ used in the code.
+ 
+ 	(in .h header file)
+ 
+-		#ifdef CONFIG_FEATURE_FUNKY
+-		static inline void maybe_do_funky_stuff (int bar, int baz)
++		#if ENABLE_FEATURE_FUNKY
++		static inline void maybe_do_funky_stuff(int bar, int baz)
+ 		{
+ 			/* lotsa code in here */
+ 		}
+ 		#else
+-		static inline void maybe_do_funky_stuff (int bar, int baz) {}
++		static inline void maybe_do_funky_stuff(int bar, int baz) {}
+ 		#endif
+ 
+ 	(in the .c source file)
+diff --git a/include/libbb.h b/include/libbb.h
+index a14d6be..0ea88a6 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1026,7 +1026,7 @@ extern char bb_common_bufsiz1[COMMON_BUFSIZE];
+ /* See docs/keep_data_small.txt */
+ struct globals;
+ /* '*const' ptr makes gcc optimize code much better.
+- * Magic prevents ptr_to_globals from going into rodata
++ * Magic prevents ptr_to_globals from going into rodata.
+  * If you want to assign a value, use PTR_TO_GLOBALS = xxx */
+ extern struct globals *const ptr_to_globals;
+ #define PTR_TO_GLOBALS (*(struct globals**)&ptr_to_globals)
+diff --git a/include/usage.h b/include/usage.h
+index 3f29160..a1b3936 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1946,7 +1946,7 @@
+ #define lsmod_full_usage \
+        "List the currently loaded kernel modules"
+ 
+-#ifdef CONFIG_FEATURE_MAKEDEVS_LEAF
++#if ENABLE_FEATURE_MAKEDEVS_LEAF
+ #define makedevs_trivial_usage \
+        "NAME TYPE MAJOR MINOR FIRST LAST [s]"
+ #define makedevs_full_usage \
+@@ -1969,7 +1969,7 @@
+        "[creates hda,hda1-hda8]\n"
+ #endif
+ 
+-#ifdef CONFIG_FEATURE_MAKEDEVS_TABLE
++#if ENABLE_FEATURE_MAKEDEVS_TABLE
+ #define makedevs_trivial_usage \
+        "[-d device_table] rootdir"
+ #define makedevs_full_usage \
+@@ -2565,7 +2565,7 @@
+ 	USE_FEATURE_PIDOF_OMIT( \
+        "$ pidof /bin/sh -o %PPID\n20351 5950")
+ 
+-#ifndef CONFIG_FEATURE_FANCY_PING
++#if !ENABLE_FEATURE_FANCY_PING
+ #define ping_trivial_usage \
+        "host"
+ #define ping_full_usage \
+@@ -3430,7 +3430,7 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "$ cat /tmp/foo\n" \
+        "Hello\n"
+ 
+-#ifdef CONFIG_FEATURE_TELNET_AUTOLOGIN
++#if ENABLE_FEATURE_TELNET_AUTOLOGIN
+ #define telnet_trivial_usage \
+        "[-a] [-l USER] HOST [PORT]"
+ #define telnet_full_usage \
+diff --git a/libbb/create_icmp6_socket.c b/libbb/create_icmp6_socket.c
+index b90f3e9..51899cd 100644
+--- a/libbb/create_icmp6_socket.c
++++ b/libbb/create_icmp6_socket.c
+@@ -7,12 +7,12 @@
+  *
+  */
+ 
+-#include <sys/types.h>
+-#include <netdb.h>
+-#include <sys/socket.h>
++//#include <sys/types.h>
++//#include <netdb.h>
++//#include <sys/socket.h>
+ #include "libbb.h"
+ 
+-#ifdef CONFIG_FEATURE_IPV6
++#if ENABLE_FEATURE_IPV6
+ int create_icmp6_socket(void)
+ {
+ 	struct protoent *proto;
+diff --git a/libbb/create_icmp_socket.c b/libbb/create_icmp_socket.c
+index dbd4769..3a46558 100644
+--- a/libbb/create_icmp_socket.c
++++ b/libbb/create_icmp_socket.c
+@@ -7,9 +7,9 @@
+  *
+  */
+ 
+-#include <sys/types.h>
+-#include <netdb.h>
+-#include <sys/socket.h>
++//#include <sys/types.h>
++//#include <netdb.h>
++//#include <sys/socket.h>
+ #include "libbb.h"
+ 
+ int create_icmp_socket(void)
+diff --git a/libbb/inet_common.c b/libbb/inet_common.c
+index ec3c3f9..7e799b5 100644
+--- a/libbb/inet_common.c
++++ b/libbb/inet_common.c
+@@ -164,7 +164,7 @@ char *INET_rresolve(struct sockaddr_in *s_in, int numeric, uint32_t netmask)
+ 	return name;
+ }
+ 
+-#ifdef CONFIG_FEATURE_IPV6
++#if ENABLE_FEATURE_IPV6
+ 
+ int INET6_resolve(const char *name, struct sockaddr_in6 *sin6)
+ {
+diff --git a/libbb/xgethostbyname.c b/libbb/xgethostbyname.c
+index c3158c3..3bb522d 100644
+--- a/libbb/xgethostbyname.c
++++ b/libbb/xgethostbyname.c
+@@ -7,7 +7,7 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-#include <netdb.h>
++//#include <netdb.h>
+ #include "libbb.h"
+ 
+ struct hostent *xgethostbyname(const char *name)
+diff --git a/miscutils/makedevs.c b/miscutils/makedevs.c
+index 0ad12d7..6a3e808 100644
+--- a/miscutils/makedevs.c
++++ b/miscutils/makedevs.c
+@@ -9,7 +9,7 @@
+ 
+ #include "libbb.h"
+ 
+-#ifdef CONFIG_FEATURE_MAKEDEVS_LEAF
++#if ENABLE_FEATURE_MAKEDEVS_LEAF
+ int makedevs_main(int argc, char **argv);
+ int makedevs_main(int argc, char **argv)
+ {
+@@ -65,7 +65,7 @@ int makedevs_main(int argc, char **argv)
+ 	return 0;
+ }
+ 
+-#elif defined CONFIG_FEATURE_MAKEDEVS_TABLE
++#elif ENABLE_FEATURE_MAKEDEVS_TABLE
+ 
+ /* Licensed under the GPL v2 or later, see the file LICENSE in this tarball. */
+ 
+@@ -162,8 +162,7 @@ int makedevs_main(int argc, char **argv)
+ 				ret = EXIT_FAILURE;
+ 				goto loop;
+ 			}
+-		} else
+-		{
++		} else {
+ 			dev_t rdev;
+ 
+ 			if (type == 'p') {
+diff --git a/modutils/lsmod.c b/modutils/lsmod.c
+index acca230..01e1c55 100644
+--- a/modutils/lsmod.c
++++ b/modutils/lsmod.c
+@@ -14,7 +14,7 @@
+ #include "libbb.h"
+ 
+ 
+-#ifndef CONFIG_FEATURE_CHECK_TAINTED_MODULE
++#if !ENABLE_FEATURE_CHECK_TAINTED_MODULE
+ static void check_tainted(void) { puts(""); }
+ #else
+ #define TAINT_FILENAME                  "/proc/sys/kernel/tainted"
+@@ -44,7 +44,7 @@ static void check_tainted(void)
+ }
+ #endif
+ 
+-#ifdef CONFIG_FEATURE_QUERY_MODULE_INTERFACE
++#if ENABLE_FEATURE_QUERY_MODULE_INTERFACE
+ 
+ struct module_info
+ {
+@@ -131,7 +131,7 @@ int lsmod_main(int argc, char **argv)
+ 		puts("");
+ 	}
+ 
+-#ifdef CONFIG_FEATURE_CLEAN_UP
++#if ENABLE_FEATURE_CLEAN_UP
+ 	free(module_names);
+ #endif
+ 
+diff --git a/modutils/rmmod.c b/modutils/rmmod.c
+index 13f5ec2..26bad7d 100644
+--- a/modutils/rmmod.c
++++ b/modutils/rmmod.c
+@@ -10,7 +10,7 @@
+ #include "libbb.h"
+ #include <sys/syscall.h>
+ 
+-#ifdef CONFIG_FEATURE_2_6_MODULES
++#if ENABLE_FEATURE_2_6_MODULES
+ static inline void filename2modname(char *modname, const char *afterslash)
+ {
+ 	unsigned int i;
+diff --git a/networking/ipcalc.c b/networking/ipcalc.c
+index 2a099ef..3f99b75 100644
+--- a/networking/ipcalc.c
++++ b/networking/ipcalc.c
+@@ -36,7 +36,7 @@ static unsigned long get_netmask(unsigned long ipaddr)
+ 		return 0;
+ }
+ 
+-#ifdef CONFIG_FEATURE_IPCALC_FANCY
++#if ENABLE_FEATURE_IPCALC_FANCY
+ static int get_prefix(unsigned long netmask)
+ {
+ 	unsigned long msk = 0x80000000;
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index 69986df..a2b8b38 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -37,7 +37,7 @@ enum {
+ 	CMD_INFO = 12,
+ 	CMD_CHANGE = 13,
+ 
+-#ifdef CONFIG_FEATURE_FBSET_FANCY
++#if ENABLE_FEATURE_FBSET_FANCY
+ 	CMD_XRES = 100,
+ 	CMD_YRES = 101,
+ 	CMD_VXRES = 102,
+@@ -130,7 +130,7 @@ static const struct cmdoptions_t {
+ 	{ "-laced", 1, CMD_LACED },
+ 	{ "-double", 1, CMD_DOUBLE },
+ 	{ "-n", 0, CMD_CHANGE },
+-#ifdef CONFIG_FEATURE_FBSET_FANCY
++#if ENABLE_FEATURE_FBSET_FANCY
+ 	{ "-all", 0, CMD_ALL },
+ 	{ "-xres", 1, CMD_XRES },
+ 	{ "-yres", 1, CMD_YRES },
+@@ -158,7 +158,7 @@ static const struct cmdoptions_t {
+ 	{ "", 0, 0 }
+ };
+ 
+-#ifdef CONFIG_FEATURE_FBSET_READMODE
++#if ENABLE_FEATURE_FBSET_READMODE
+ /* taken from linux/fb.h */
+ enum {
+ 	FB_VMODE_INTERLACED = 1,	/* interlaced	*/
+@@ -173,7 +173,7 @@ enum {
+ static int readmode(struct fb_var_screeninfo *base, const char *fn,
+ 					const char *mode)
+ {
+-#ifdef CONFIG_FEATURE_FBSET_READMODE
++#if ENABLE_FEATURE_FBSET_READMODE
+ 	FILE *f;
+ 	char buf[256];
+ 	char *p = buf;
+@@ -286,7 +286,7 @@ static inline void showmode(struct fb_var_screeninfo *v)
+ 		vrate = hrate / (v->upper_margin + v->yres + v->lower_margin + v->vsync_len);
+ 	}
+ 	printf("\nmode \"%ux%u-%u\"\n"
+-#ifdef CONFIG_FEATURE_FBSET_FANCY
++#if ENABLE_FEATURE_FBSET_FANCY
+ 	"\t# D: %.3f MHz, H: %.3f kHz, V: %.3f Hz\n"
+ #endif
+ 	"\tgeometry %u %u %u %u %u\n"
+@@ -295,7 +295,7 @@ static inline void showmode(struct fb_var_screeninfo *v)
+ 	"\trgba %u/%u,%u/%u,%u/%u,%u/%u\n"
+ 	"endmode\n\n",
+ 		v->xres, v->yres, (int) (vrate + 0.5),
+-#ifdef CONFIG_FEATURE_FBSET_FANCY
++#if ENABLE_FEATURE_FBSET_FANCY
+ 		drate / 1e6, hrate / 1e3, vrate,
+ #endif
+ 		v->xres, v->yres, v->xres_virtual, v->yres_virtual, v->bits_per_pixel,
+@@ -360,7 +360,7 @@ int fbset_main(int argc, char **argv)
+ 			case CMD_CHANGE:
+ 				g_options |= OPT_CHANGE;
+ 				break;
+-#ifdef CONFIG_FEATURE_FBSET_FANCY
++#if ENABLE_FEATURE_FBSET_FANCY
+ 			case CMD_XRES:
+ 				varset.xres = xatou32(argv[1]);
+ 				break;
+diff --git a/util-linux/hwclock.c b/util-linux/hwclock.c
+index 8677214..fcb7308 100644
+--- a/util-linux/hwclock.c
++++ b/util-linux/hwclock.c
+@@ -132,7 +132,7 @@ static void from_sys_clock(int utc)
+ 	write_rtc(tv.tv_sec, utc);
+ }
+ 
+-#ifdef CONFIG_FEATURE_HWCLOCK_ADJTIME_FHS
++#if ENABLE_FEATURE_HWCLOCK_ADJTIME_FHS
+ # define ADJTIME_PATH "/var/lib/hwclock/adjtime"
+ #else
+ # define ADJTIME_PATH "/etc/adjtime"
+diff --git a/util-linux/ipcrm.c b/util-linux/ipcrm.c
+index 1e62062..f49d28e 100644
+--- a/util-linux/ipcrm.c
++++ b/util-linux/ipcrm.c
+@@ -29,7 +29,10 @@ union semun {
+ };
+ #endif
+ 
+-#ifndef CONFIG_IPCRM_DROP_LEGACY
++#define IPCRM_LEGACY 1
++
++
++#if IPCRM_LEGACY
+ 
+ typedef enum type_id {
+ 	SHM,
+@@ -70,7 +73,7 @@ static int remove_ids(type_id type, int argc, char **argv)
+ 
+ 	return nb_errors;
+ }
+-#endif /* #ifndef CONFIG_IPCRM_DROP_LEGACY */
++#endif /* IPCRM_LEGACY */
+ 
+ 
+ int ipcrm_main(int argc, char **argv);
+@@ -82,7 +85,7 @@ int ipcrm_main(int argc, char **argv)
+ 	/* if the command is executed without parameters, do nothing */
+ 	if (argc == 1)
+ 		return 0;
+-#ifndef CONFIG_IPCRM_DROP_LEGACY
++#if IPCRM_LEGACY
+ 	/* check to see if the command is being invoked in the old way if so
+ 	   then run the old code. Valid commands are msg, shm, sem. */
+ 	{
+@@ -113,7 +116,7 @@ int ipcrm_main(int argc, char **argv)
+ 			return 0;
+ 		}
+ 	}
+-#endif /* #ifndef CONFIG_IPCRM_DROP_LEGACY */
++#endif /* IPCRM_LEGACY */
+ 
+ 	/* process new syntax to conform with SYSV ipcrm */
+ 	while ((c = getopt(argc, argv, "q:m:s:Q:M:S:h?")) != -1) {

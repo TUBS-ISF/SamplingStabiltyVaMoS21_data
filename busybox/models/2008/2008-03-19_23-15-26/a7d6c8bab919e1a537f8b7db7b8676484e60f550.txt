@@ -1,0 +1,81 @@
+2008-03-19 23:15:26 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index d059ac9..19b3bba 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -637,7 +637,11 @@ const char* get_cached_groupname(gid_t gid);
+ void clear_username_cache(void);
+ /* internally usernames are saved in fixed-sized char[] buffers */
+ enum { USERNAME_MAX_SIZE = 16 - sizeof(int) };
+-
++#if ENABLE_FEATURE_CHECK_NAMES
++void die_if_bad_username(const char* name);
++#else
++#define die_if_bad_username(name) ((void)(name))
++#endif
+ 
+ int execable_file(const char *name);
+ char *find_execable(const char *filename);
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 654722c..5740d92 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -122,6 +122,7 @@ lib-$(CONFIG_MKFS_MINIX) += find_mount_point.o
+ lib-$(CONFIG_SELINUX) += selinux_common.o
+ lib-$(CONFIG_HWCLOCK) += rtc.o
+ lib-$(CONFIG_RTCWAKE) += rtc.o
++lib-$(CONFIG_FEATURE_CHECK_NAMES) += die_if_bad_username.o
+ 
+ # We shouldn't build xregcomp.c if we don't need it - this ensures we don't
+ # require regex.h to be in the include dir even if we don't need it thereby
+diff --git a/loginutils/Config.in b/loginutils/Config.in
+index 81d05ef..c57d997 100644
+--- a/loginutils/Config.in
++++ b/loginutils/Config.in
+@@ -82,6 +82,18 @@ config FEATURE_DEL_USER_FROM_GROUP
+ 	  If called with two non-option arguments, deluser
+ 	  or delgroup will remove an user from a specified group.
+ 
++config FEATURE_CHECK_NAMES
++	bool "Enable sanity check on user/group names in adduser and addgroup"
++	default n
++	depends on ADDUSER || ADDGROUP
++	help
++	  Enable sanity check on user and group names in adduser and addgroup.
++	  To avoid problems, the user or group name should consist only of
++	  letters, digits, underscores, periods, at signs and dashes,
++	  and not start with a dash (as defined by IEEE Std 1003.1-2001).
++	  For compatibility with Samba machine accounts "$" is also supported
++	  at the end of the user or group name.
++
+ config ADDUSER
+ 	bool "adduser"
+ 	default n
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index b25f817..367c6b9 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -173,8 +173,11 @@ int addgroup_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ #endif
+ 	} else
+ #endif /* ENABLE_FEATURE_ADDUSER_TO_GROUP */
++	{
++		die_if_bad_username(argv[0]);
+ 		new_group(argv[0], gid);
+ 
++	}
+ 	/* Reached only on success */
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/loginutils/adduser.c b/loginutils/adduser.c
+index d409eab..cd68015 100644
+--- a/loginutils/adduser.c
++++ b/loginutils/adduser.c
+@@ -111,6 +111,7 @@ int adduser_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 
+ 	/* fill in the passwd struct */
+ 	pw.pw_name = argv[0];
++	die_if_bad_username(pw.pw_name);
+ 	if (!pw.pw_dir) {
+ 		/* create string for $HOME if not specified already */
+ 		pw.pw_dir = xasprintf("/home/%s", argv[0]);

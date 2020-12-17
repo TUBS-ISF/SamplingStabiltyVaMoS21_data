@@ -1,0 +1,14 @@
+2010-01-03 21:52:46 +0100
+diff --git a/networking/ntpd.c b/networking/ntpd.c
+index f147d8c..771a75a 100644
+--- a/networking/ntpd.c
++++ b/networking/ntpd.c
+@@ -335,7 +335,7 @@ static ALWAYS_INLINE double SQRT(double X)
+ 	if (sizeof(float) != 4)
+ 		return sqrt(X);
+ 
+-	/* This avoids needing libm, saves about 1.2k on x86-32 */
++	/* This avoids needing libm, saves about 0.5k on x86-32 */
+ 	return my_SQRT(X);
+ }
+ 

@@ -1,0 +1,188 @@
+2007-07-27 15:06:25 +0000
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index 75cf373..7247f55 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -25,7 +25,7 @@ static const struct suffix_mult dd_suffixes[] = {
+ 	{ "M", 1048576 },
+ 	{ "GD", 1000000000 },
+ 	{ "G", 1073741824 },
+-	{ NULL, 0 }
++	{ }
+ };
+ 
+ struct globals {
+diff --git a/coreutils/head.c b/coreutils/head.c
+index 1700af2..bffba40 100644
+--- a/coreutils/head.c
++++ b/coreutils/head.c
+@@ -25,7 +25,7 @@ static const struct suffix_mult head_suffixes[] = {
+ 	{ "b", 512 },
+ 	{ "k", 1024 },
+ 	{ "m", 1024*1024 },
+-	{ NULL, 0 }
++	{ }
+ };
+ #endif
+ 
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 8034072..e308605 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -981,7 +981,7 @@ parse_old_offset(const char *s, off_t *offset)
+ 	static const struct suffix_mult Bb[] = {
+ 		{ "B", 1024 },
+ 		{ "b", 512 },
+-		{ NULL, 0 }
++		{ }
+ 	};
+ 	char *p;
+ 	int radix;
+@@ -1204,7 +1204,7 @@ int od_main(int argc, char **argv)
+ 		{ "b", 512 },
+ 		{ "k", 1024 },
+ 		{ "m", 1024*1024 },
+-		{ NULL, 0 }
++		{ }
+ 	};
+ 	unsigned opt;
+ 	int l_c_m;
+diff --git a/coreutils/sleep.c b/coreutils/sleep.c
+index e9a30da..26cdbc4 100644
+--- a/coreutils/sleep.c
++++ b/coreutils/sleep.c
+@@ -29,7 +29,7 @@ static const struct suffix_mult sfx[] = {
+ 	{ "m", 60 },
+ 	{ "h", 60*60 },
+ 	{ "d", 24*60*60 },
+-	{ NULL, 0 }
++	{ }
+ };
+ #endif
+ 
+diff --git a/coreutils/split.c b/coreutils/split.c
+index 7b4f8c2..d1eb829 100644
+--- a/coreutils/split.c
++++ b/coreutils/split.c
+@@ -20,7 +20,7 @@ static const struct suffix_mult split_suffices[] = {
+ #if ENABLE_FEATURE_SPLIT_FANCY
+ 	{ "g", 1024*1024*1024 },
+ #endif
+-	{ NULL, 0 }
++	{ }
+ };
+ 
+ /* Increment the suffix part of the filename.
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index b73e2ea..fbb72ba 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -524,10 +524,10 @@ static void display_window_size(const int fancy)
+ }
+ 
+ static const struct suffix_mult stty_suffixes[] = {
+-	{"b",  512 },
+-	{"k",  1024},
+-	{"B",  1024},
+-	{NULL, 0   }
++	{ "b",  512 },
++	{ "k", 1024 },
++	{ "B", 1024 },
++	{ }
+ };
+ 
+ static const struct mode_info *find_mode(const char *name)
+diff --git a/coreutils/tail.c b/coreutils/tail.c
+index e0d21ed..0146916 100644
+--- a/coreutils/tail.c
++++ b/coreutils/tail.c
+@@ -30,7 +30,7 @@ static const struct suffix_mult tail_suffixes[] = {
+ 	{ "b", 512 },
+ 	{ "k", 1024 },
+ 	{ "m", 1024*1024 },
+-	{ NULL, 0 }
++	{ }
+ };
+ 
+ struct globals {
+diff --git a/findutils/find.c b/findutils/find.c
+index eaf1d59..47cba7c 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -760,10 +760,10 @@ static action*** parse_params(char **argv)
+ 			static const struct suffix_mult find_suffixes[] = {
+ 				{ "c", 1 },
+ 				{ "w", 2 },
+-				{ "b"+1, 512 },
++				{ "", 512 },
+ 				{ "b", 512 },
+ 				{ "k", 1024 },
+-				{ NULL, 0 }
++				{ }
+ 			};
+ 			action_size *ap;
+ 			ap = ALLOC_ACTION(size);
+diff --git a/include/libbb.h b/include/libbb.h
+index b438ec2..780bd45 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -451,7 +451,7 @@ const char *make_human_readable_str(unsigned long long size,
+ char *bin2hex(char *buf, const char *cp, int count);
+ 
+ struct suffix_mult {
+-	const char *suffix;
++	char suffix[4];
+ 	unsigned mult;
+ };
+ #include "xatonum.h"
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 08e0b64..b271b74 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -488,9 +488,9 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 				break;
+ 			case 's': {
+ 				static const struct suffix_mult km_suffixes[] = {
+-						{ "k", 1024 },
+-						{ "m", 1024*1024 },
+-						{ NULL, 0 }
++					{ "k", 1024 },
++					{ "m", 1024*1024 },
++					{ }
+ 				};
+ 				ld->sizemax = xatou_sfx(&s[1], km_suffixes);
+ 				break;
+@@ -503,10 +503,10 @@ static unsigned logdir_open(struct logdir *ld, const char *fn)
+ 				break;
+ 			case 't': {
+ 				static const struct suffix_mult mh_suffixes[] = {
+-						{ "m", 60 },
+-						{ "h", 60*60 },
+-						/*{ "d", 24*60*60 },*/
+-						{ NULL, 0 }
++					{ "m", 60 },
++					{ "h", 60*60 },
++					/*{ "d", 24*60*60 },*/
++					{ }
+ 				};
+ 				ld->tmax = xatou_sfx(&s[1], mh_suffixes);
+ 				if (ld->tmax) {
+diff --git a/util-linux/hexdump.c b/util-linux/hexdump.c
+index 36ed1e9..213f607 100644
+--- a/util-linux/hexdump.c
++++ b/util-linux/hexdump.c
+@@ -48,10 +48,10 @@ static const char add_first[] = "\"%07.7_Ax\n\"";
+ static const char hexdump_opts[] = "bcdoxCe:f:n:s:v";
+ 
+ static const struct suffix_mult suffixes[] = {
+-	{ "b",  512 },
+-	{ "k",  1024 },
+-	{ "m",  1024*1024 },
+-	{ NULL, 0 }
++	{ "b", 512 },
++	{ "k", 1024 },
++	{ "m", 1024*1024 },
++	{ }
+ };
+ 
+ int hexdump_main(int argc, char **argv);

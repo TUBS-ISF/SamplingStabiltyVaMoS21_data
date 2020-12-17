@@ -1,0 +1,372 @@
+2008-03-17 09:33:45 +0000
+diff --git a/coreutils/od_bloaty.c b/coreutils/od_bloaty.c
+index 4526f0e..dce2349 100644
+--- a/coreutils/od_bloaty.c
++++ b/coreutils/od_bloaty.c
+@@ -1177,7 +1177,6 @@ dump_strings(off_t address, off_t end_offset)
+ int od_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int od_main(int argc, char **argv)
+ {
+-	static char const *const default_file_list[] = { "-", NULL };
+ 	static const struct suffix_mult bkm[] = {
+ 		{ "b", 512 },
+ 		{ "k", 1024 },
+@@ -1383,7 +1382,7 @@ int od_main(int argc, char **argv)
+ 	/* If no files were listed on the command line,
+ 	   set the global pointer FILE_LIST so that it
+ 	   references the null-terminated list of one name: "-".  */
+-	file_list = default_file_list;
++	file_list = bb_argv_dash;
+ 	if (argc > 0) {
+ 		/* Set the global pointer FILE_LIST so that it
+ 		   references the first file-argument on the command-line.  */
+diff --git a/miscutils/dc.c b/miscutils/dc.c
+index 68ecd8a..6129375 100644
+--- a/miscutils/dc.c
++++ b/miscutils/dc.c
+@@ -19,6 +19,8 @@ enum { STACK_SIZE = (COMMON_BUFSIZE - offsetof(struct globals, stack)) / sizeof(
+ #define pointer   (G.pointer   )
+ #define base      (G.base      )
+ #define stack     (G.stack     )
++#define INIT_G() do { \
++} while (0)
+ 
+ 
+ static void push(double a)
+@@ -194,6 +196,8 @@ static char *get_token(char **buffer)
+ int dc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int dc_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
++	INIT_G();
++
+ 	argv++;
+ 	if (!argv[0]) {
+ 		/* take stuff from stdin if no args are given */
+diff --git a/miscutils/last.c b/miscutils/last.c
+index f46d4ca..f823a13 100644
+--- a/miscutils/last.c
++++ b/miscutils/last.c
+@@ -39,9 +39,8 @@ int last_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ 	file = xopen(bb_path_wtmp_file, O_RDONLY);
+ 
+ 	printf("%-10s %-14s %-18s %-12.12s %s\n", "USER", "TTY", "HOST", "LOGIN", "TIME");
+-	while ((n = safe_read(file, (void*)&ut, sizeof(struct utmp))) != 0) {
+-
+-		if (n != sizeof(struct utmp)) {
++	while ((n = full_read(file, &ut, sizeof(ut))) > 0) {
++		if (n != sizeof(ut)) {
+ 			bb_perror_msg_and_die("short read");
+ 		}
+ 
+@@ -53,16 +52,14 @@ int last_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ 			else if (strncmp(ut.ut_user, "runlevel", 7) == 0)
+ 				ut.ut_type = RUN_LVL;
+ 		} else {
+-			if (!ut.ut_name[0] || strcmp(ut.ut_name, "LOGIN") == 0 ||
+-					ut.ut_name[0] == 0)
+-			{
++			if (ut.ut_name[0] == '\0' || strcmp(ut.ut_name, "LOGIN") == 0) {
+ 				/* Don't bother.  This means we can't find how long
+ 				 * someone was logged in for.  Oh well. */
+ 				continue;
+ 			}
+-			if (ut.ut_type != DEAD_PROCESS &&
+-					ut.ut_name[0] && ut.ut_line[0])
+-			{
++			if (ut.ut_type != DEAD_PROCESS
++			 && ut.ut_name[0] && ut.ut_line[0]
++			) {
+ 				ut.ut_type = USER_PROCESS;
+ 			}
+ 			if (strcmp(ut.ut_name, "date") == 0) {
+@@ -71,7 +68,7 @@ int last_main(int argc, char **argv ATTRIBUTE_UNUSED)
+ 			}
+ 		}
+ 
+-		if (ut.ut_type!=USER_PROCESS) {
++		if (ut.ut_type != USER_PROCESS) {
+ 			switch (ut.ut_type) {
+ 				case OLD_TIME:
+ 				case NEW_TIME:
+diff --git a/networking/brctl.c b/networking/brctl.c
+index bbd14c4..2bb03dd 100644
+--- a/networking/brctl.c
++++ b/networking/brctl.c
+@@ -33,13 +33,15 @@
+ 
+ #if ENABLE_FEATURE_BRCTL_FANCY
+ #include <linux/if_bridge.h>
++
+ /* FIXME: These 4 funcs are not really clean and could be improved */
+-static inline ALWAYS_INLINE void strtotimeval(struct timeval *tv,
+-											  const char *time_str)
++static ALWAYS_INLINE void strtotimeval(struct timeval *tv,
++		const char *time_str)
+ {
+ 	double secs;
+ #if BRCTL_USE_INTERNAL
+-	if (!(secs = /*bb_*/strtod(time_str, NULL)))
++	secs = /*bb_*/strtod(time_str, NULL);
++	if (!secs)
+ #else
+ 	if (sscanf(time_str, "%lf", &secs) != 1)
+ #endif
+@@ -48,7 +50,7 @@ static inline ALWAYS_INLINE void strtotimeval(struct timeval *tv,
+ 	tv->tv_usec = 1000000 * (secs - tv->tv_sec);
+ }
+ 
+-static inline ALWAYS_INLINE unsigned long __tv_to_jiffies(const struct timeval *tv)
++static ALWAYS_INLINE unsigned long __tv_to_jiffies(const struct timeval *tv)
+ {
+ 	unsigned long long jif;
+ 
+@@ -56,7 +58,7 @@ static inline ALWAYS_INLINE unsigned long __tv_to_jiffies(const struct timeval *
+ 
+ 	return jif/10000;
+ }
+-# if 00
++# if 0
+ static void __jiffies_to_tv(struct timeval *tv, unsigned long jiffies)
+ {
+ 	unsigned long long tvusec;
+@@ -74,7 +76,7 @@ static unsigned long str_to_jiffies(const char *time_str)
+ }
+ 
+ static void arm_ioctl(unsigned long *args,
+-				 unsigned long arg0, unsigned long arg1, unsigned long arg2)
++		unsigned long arg0, unsigned long arg1, unsigned long arg2)
+ {
+ 	args[0] = arg0;
+ 	args[1] = arg1;
+@@ -84,10 +86,9 @@ static void arm_ioctl(unsigned long *args,
+ #endif
+ 
+ 
+-int brctl_main(int argc ATTRIBUTE_UNUSED, char **argv) MAIN_EXTERNALLY_VISIBLE;
++int brctl_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int brctl_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	int fd;
+ 	static const char keywords[] ALIGN1 =
+ 		"addbr\0" "delbr\0" "addif\0" "delif\0"
+ 	USE_FEATURE_BRCTL_FANCY(
+@@ -96,16 +97,19 @@ int brctl_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		"setpathcost\0" "setportprio\0" "setbridgeprio\0"
+ 	)
+ 		USE_FEATURE_BRCTL_SHOW("showmacs\0" "show\0");
++
+ 	enum { ARG_addbr = 0, ARG_delbr, ARG_addif, ARG_delif
+ 		USE_FEATURE_BRCTL_FANCY(,
+ 		   ARG_stp,
+ 		   ARG_setageing, ARG_setfd, ARG_sethello, ARG_setmaxage,
+ 		   ARG_setpathcost, ARG_setportprio, ARG_setbridgeprio
+ 		)
+-		  USE_FEATURE_BRCTL_SHOW(, ARG_showmacs, ARG_show) };
++		  USE_FEATURE_BRCTL_SHOW(, ARG_showmacs, ARG_show)
++	};
++
++	int fd;
+ 	smallint key;
+ 	struct ifreq ifr;
+-	static char info[] = "bridge %s\0 iface %s";
+ 	char *br, *brif;
+ #if ENABLE_FEATURE_BRCTL_FANCY
+ 	unsigned long args[4] = {0, 0, 0, 0};
+@@ -125,25 +129,26 @@ int brctl_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		}
+ #endif
+ 		fd = xsocket(AF_INET, SOCK_STREAM, 0);
+-		br = *(argv++);
++		br = *argv++;
+ 
+ 		if (key == ARG_addbr || key == ARG_delbr) { /* addbr or delbr */
+ 			ioctl_or_perror_and_die(fd,
+-								key == ARG_addbr ? SIOCBRADDBR : SIOCBRDELBR,
+-								br, info, br);
++					key == ARG_addbr ? SIOCBRADDBR : SIOCBRDELBR,
++					br, "bridge %s", br);
+ 			goto done;
+ 		}
+ 		if (!*argv) /* all but 'show' need at least one argument */
+ 			bb_show_usage();
+ 		safe_strncpy(ifr.ifr_name, br, IFNAMSIZ);
+ 		if (key == ARG_addif || key == ARG_delif) { /* addif or delif */
+-			brif = *(argv++);
+-			if (!(ifr.ifr_ifindex = if_nametoindex(brif))) {
+-				bb_perror_msg_and_die(info+11, brif);
++			brif = *argv++;
++			ifr.ifr_ifindex = if_nametoindex(brif);
++			if (!ifr.ifr_ifindex) {
++				bb_perror_msg_and_die("iface %s", brif);
+ 			}
+ 			ioctl_or_perror_and_die(fd,
+-								  key == ARG_addif ? SIOCBRADDIF : SIOCBRDELIF,
+-								  &ifr, info, br);
++					key == ARG_addif ? SIOCBRADDIF : SIOCBRDELIF,
++					&ifr, "bridge %s", br);
+ 			goto done;
+ 		}
+ #if ENABLE_FEATURE_BRCTL_FANCY
+@@ -156,11 +161,10 @@ int brctl_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		}
+ 		if ((unsigned)(key - ARG_stp) < 5) { /* time related ops */
+ 			unsigned long op = (key == ARG_setageing) ? BRCTL_SET_AGEING_TIME :
+-							(key == ARG_setfd) ? BRCTL_SET_BRIDGE_FORWARD_DELAY:
+-							(key == ARG_sethello) ? BRCTL_SET_BRIDGE_HELLO_TIME:
+-							(key == ARG_setmaxage) ? BRCTL_SET_BRIDGE_MAX_AGE :
+-							-1/* will never be used */;
+-			arm_ioctl(args, op, str_to_jiffies (*argv), 0);
++			                   (key == ARG_setfd) ? BRCTL_SET_BRIDGE_FORWARD_DELAY :
++			                   (key == ARG_sethello) ? BRCTL_SET_BRIDGE_HELLO_TIME :
++			                   /*key == ARG_setmaxage*/ BRCTL_SET_BRIDGE_MAX_AGE;
++			arm_ioctl(args, op, str_to_jiffies(*argv), 0);
+ 			goto fire;
+ 		}
+ 		port = -1;
+@@ -168,25 +172,28 @@ int brctl_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 			int ifidx[MAX_PORTS];
+ 			unsigned i;
+ 
+-			if (!(port = if_nametoindex(*argv)))
++			port = if_nametoindex(*argv);
++			if (!port)
+ 				bb_error_msg_and_die(bb_msg_invalid_arg, *argv, "port");
+ 			argv++;
+ 			memset(ifidx, 0, sizeof ifidx);
+ 			arm_ioctl(args, BRCTL_GET_PORT_LIST, (unsigned long)ifidx,
+ 					  MAX_PORTS);
+ 			xioctl(fd, SIOCDEVPRIVATE, &ifr);
+-			for (i = 0; i < MAX_PORTS; i++)
++			for (i = 0; i < MAX_PORTS; i++) {
+ 				if (ifidx[i] == port) {
+ 					port = i;
+ 					break;
+ 				}
++			}
+ 		}
+ 		if (key == ARG_setpathcost
+-			|| key == ARG_setportprio || key == ARG_setbridgeprio) {
++		 || key == ARG_setportprio
++		 || key == ARG_setbridgeprio
++		) {
+ 			unsigned long op = (key == ARG_setpathcost) ? BRCTL_SET_PATH_COST :
+-						(key == ARG_setportprio) ? BRCTL_SET_PORT_PRIORITY :
+-						(key == ARG_setbridgeprio) ? BRCTL_SET_BRIDGE_PRIORITY :
+-						-1/* will never be used */;
++			                   (key == ARG_setportprio) ? BRCTL_SET_PORT_PRIORITY :
++			                   /*key == ARG_setbridgeprio*/ BRCTL_SET_BRIDGE_PRIORITY;
+ 			unsigned long arg1 = port;
+ 			unsigned long arg2;
+ # if BRCTL_USE_INTERNAL
+@@ -194,7 +201,7 @@ int brctl_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ # else
+ 			if (sscanf(*argv, "%i", &tmp) != 1)
+ 				bb_error_msg_and_die(bb_msg_invalid_arg, *argv,
+-									 key == ARG_setpathcost ? "cost" : "prio");
++						key == ARG_setpathcost ? "cost" : "prio");
+ # endif
+ 			if (key == ARG_setbridgeprio) {
+ 				arg1 = tmp;
+@@ -212,6 +219,6 @@ int brctl_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			close(fd);
+ 	}
+-USE_FEATURE_BRCTL_SHOW(out:)
++ USE_FEATURE_BRCTL_SHOW(out:)
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index bca5c90..32e4764 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -42,17 +42,34 @@ struct service {
+ 	smallint isgone;
+ };
+ 
+-static struct service *sv;
+-static char *svdir;
+-static int svnum;
+-static char *rplog;
+-static int rploglen;
+-static struct fd_pair logpipe;
+-static struct pollfd pfd[1];
+-static unsigned stamplog;
+-static smallint check = 1;
+-static smallint exitsoon;
+-static smallint set_pgrp;
++struct globals {
++	struct service *sv;
++	char *svdir;
++	char *rplog;
++	int svnum;
++	int rploglen;
++	struct fd_pair logpipe;
++	struct pollfd pfd[1];
++	unsigned stamplog;
++	smallint check; /* = 1; */
++	smallint exitsoon;
++	smallint set_pgrp;
++};
++#define G (*(struct globals*)&bb_common_bufsiz1)
++#define sv        (G.sv        )
++#define svdir     (G.svdir     )
++#define rplog     (G.rplog     )
++#define svnum     (G.svnum     )
++#define rploglen  (G.rploglen  )
++#define logpipe   (G.logpipe   )
++#define pfd       (G.pfd       )
++#define stamplog  (G.stamplog  )
++#define check     (G.check     )
++#define exitsoon  (G.exitsoon  )
++#define set_pgrp  (G.set_pgrp  )
++#define INIT_G() do { \
++	check = 1; \
++} while (0)
+ 
+ static void fatal2_cannot(const char *m1, const char *m2)
+ {
+@@ -222,6 +239,8 @@ int runsvdir_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ 	char ch;
+ 	int i;
+ 
++	INIT_G();
++
+ 	argv++;
+ 	if (!*argv)
+ 		bb_show_usage();
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index a0e6cda..d4a3207 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -214,9 +214,10 @@ struct globals {
+ 	unsigned verbose;
+ #endif
+ 	llist_t *fslist;
+-	char getmntent_buf[sizeof(bb_common_bufsiz1) - 8*3];
++	char getmntent_buf[1];
+ 
+ };
++enum { GETMNTENT_BUFSIZE = COMMON_BUFSIZE - offsetof(struct globals, getmntent_buf) };
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #define nfs_mount_version (G.nfs_mount_version)
+ #if ENABLE_FEATURE_MOUNT_VERBOSE
+@@ -1775,7 +1776,7 @@ int mount_main(int argc, char **argv)
+ 			if (!mountTable) bb_error_msg_and_die("no %s", bb_path_mtab_file);
+ 
+ 			while (getmntent_r(mountTable, &mtpair[0], getmntent_buf,
+-								sizeof(getmntent_buf)))
++								GETMNTENT_BUFSIZE))
+ 			{
+ 				// Don't show rootfs. FIXME: why??
+ 				// util-linux 2.12a happily shows rootfs...
+@@ -1842,8 +1843,8 @@ int mount_main(int argc, char **argv)
+ 		// Get next fstab entry
+ 
+ 		if (!getmntent_r(fstab, mtcur, getmntent_buf
+-					+ (mtcur==mtpair ? sizeof(getmntent_buf)/2 : 0),
+-				sizeof(getmntent_buf)/2))
++					+ (mtcur==mtpair ? GETMNTENT_BUFSIZE/2 : 0),
++				GETMNTENT_BUFSIZE/2))
+ 		{
+ 			// Were we looking for something specific?
+ 

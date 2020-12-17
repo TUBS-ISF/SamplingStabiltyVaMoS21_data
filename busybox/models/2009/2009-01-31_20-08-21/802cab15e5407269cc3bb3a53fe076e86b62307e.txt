@@ -1,0 +1,26 @@
+2009-01-31 20:08:21 +0000
+diff --git a/networking/brctl.c b/networking/brctl.c
+index 69e3c86..1b52689 100644
+--- a/networking/brctl.c
++++ b/networking/brctl.c
+@@ -16,6 +16,20 @@
+ #include <linux/sockios.h>
+ #include <net/if.h>
+ 
++#ifndef SIOCBRADDBR
++# define SIOCBRADDBR BRCTL_ADD_BRIDGE
++#endif
++#ifndef SIOCBRDELBR
++# define SIOCBRDELBR BRCTL_DEL_BRIDGE
++#endif
++#ifndef SIOCBRADDIF
++# define SIOCBRADDIF BRCTL_ADD_IF
++#endif
++#ifndef SIOCBRDELIF
++# define SIOCBRDELIF BRCTL_DEL_IF
++#endif
++
++
+ /* Maximum number of ports supported per bridge interface.  */
+ #ifndef MAX_PORTS
+ #define MAX_PORTS 32

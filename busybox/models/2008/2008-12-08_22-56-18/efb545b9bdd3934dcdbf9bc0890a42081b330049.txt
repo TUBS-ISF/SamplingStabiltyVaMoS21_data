@@ -1,0 +1,469 @@
+2008-12-08 22:56:18 +0000
+diff --git a/archival/libunarchive/decompress_unzip.c b/archival/libunarchive/decompress_unzip.c
+index e83cd4f..8696925 100644
+--- a/archival/libunarchive/decompress_unzip.c
++++ b/archival/libunarchive/decompress_unzip.c
+@@ -1083,8 +1083,7 @@ static uint16_t buffer_read_le_u16(STATE_PARAM_ONLY)
+ {
+ 	uint16_t res;
+ #if BB_LITTLE_ENDIAN
+-	/* gcc 4.2.1 is very clever */
+-	memcpy(&res, &bytebuffer[bytebuffer_offset], 2);
++	move_from_unaligned16(res, &bytebuffer[bytebuffer_offset]);
+ #else
+ 	res = bytebuffer[bytebuffer_offset];
+ 	res |= bytebuffer[bytebuffer_offset + 1] << 8;
+@@ -1097,7 +1096,7 @@ static uint32_t buffer_read_le_u32(STATE_PARAM_ONLY)
+ {
+ 	uint32_t res;
+ #if BB_LITTLE_ENDIAN
+-	memcpy(&res, &bytebuffer[bytebuffer_offset], 4);
++	move_from_unaligned32(res, &bytebuffer[bytebuffer_offset]);
+ #else
+ 	res = bytebuffer[bytebuffer_offset];
+ 	res |= bytebuffer[bytebuffer_offset + 1] << 8;
+diff --git a/include/platform.h b/include/platform.h
+index b8c85db..5d6a181 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -151,13 +151,19 @@
+ 
+ /* ---- Unaligned access ------------------------------------ */
+ 
+-/* parameter is supposed to be an uint32_t* ptr */
++/* NB: unaligned parameter should be a pointer, aligned one -
++ * a lvalue. This makes it more likely to not swap them by mistake
++ */
+ #if defined(i386) || defined(__x86_64__)
+-#define get_unaligned_u32p(u32p) (*(u32p))
++#define move_from_unaligned16(v, u16p) ((v) = *(uint16_t*)(u16p))
++#define move_from_unaligned32(v, u32p) ((v) = *(uint32_t*)(u32p))
++#define move_to_unaligned32(u32p, v)   (*(uint32_t*)(u32p) = (v))
+ /* #elif ... - add your favorite arch today! */
+ #else
+ /* performs reasonably well (gcc usually inlines memcpy here) */
+-#define get_unaligned_u32p(u32p) ({ uint32_t __t; memcpy(&__t, (u32p), 4); __t; })
++#define move_from_unaligned16(v, u16p) (memcpy(&(v), (u16p), 2))
++#define move_from_unaligned32(v, u32p) (memcpy(&(v), (u32p), 4))
++#define move_to_unaligned32(u32p, v)   (memcpy((u32p), &(v), 4))
+ #endif
+ 
+ /* ---- Networking ------------------------------------------ */
+diff --git a/networking/arping.c b/networking/arping.c
+index e442997..e7b842f 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -153,6 +153,15 @@ static bool recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 	struct arphdr *ah = (struct arphdr *) buf;
+ 	unsigned char *p = (unsigned char *) (ah + 1);
+ 	struct in_addr src_ip, dst_ip;
++	/* moves below assume in_addr is 4 bytes big, ensure that */
++	struct BUG_in_addr_must_be_4 {
++		char BUG_in_addr_must_be_4[
++			sizeof(struct in_addr) == 4 ? 1 : -1
++		];
++		char BUG_s_addr_must_be_4[
++			sizeof(src_ip.s_addr) == 4 ? 1 : -1
++		];
++	};
+ 
+ 	/* Filter out wild packets */
+ 	if (FROM->sll_pkttype != PACKET_HOST
+@@ -171,13 +180,13 @@ static bool recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 
+ 	/* Protocol must be IP. */
+ 	if (ah->ar_pro != htons(ETH_P_IP)
+-		|| (ah->ar_pln != 4)
+-		|| (ah->ar_hln != me.sll_halen)
+-		|| (len < (int)(sizeof(*ah) + 2 * (4 + ah->ar_hln))))
++	 || (ah->ar_pln != 4)
++	 || (ah->ar_hln != me.sll_halen)
++	 || (len < (int)(sizeof(*ah) + 2 * (4 + ah->ar_hln))))
+ 		return false;
+ 
+-	memcpy(&src_ip, p + ah->ar_hln, 4);
+-	memcpy(&dst_ip, p + ah->ar_hln + 4 + ah->ar_hln, 4);
++	move_from_unaligned32(src_ip.s_addr, p + ah->ar_hln);
++	move_from_unaligned32(dst_ip.s_addr, p + ah->ar_hln + 4 + ah->ar_hln);
+ 
+ 	if (dst.s_addr != src_ip.s_addr)
+ 		return false;
+@@ -200,7 +209,7 @@ static bool recv_pack(unsigned char *buf, int len, struct sockaddr_ll *FROM)
+ 		   dst_ip/dst_hw do not matter.
+ 		 */
+ 		if ((memcmp(p, &me.sll_addr, me.sll_halen) == 0)
+-			|| (src.s_addr && src.s_addr != dst_ip.s_addr))
++		 || (src.s_addr && src.s_addr != dst_ip.s_addr))
+ 			return false;
+ 	}
+ 	if (!(option_mask32 & QUIET)) {
+@@ -306,7 +315,7 @@ int arping_main(int argc UNUSED_PARAM, char **argv)
+ 	/* if (!inet_aton(target, &dst)) - not needed */ {
+ 		len_and_sockaddr *lsa;
+ 		lsa = xhost_and_af2sockaddr(target, 0, AF_INET);
+-		memcpy(&dst, &lsa->u.sin.sin_addr.s_addr, 4);
++		dst = lsa->u.sin.sin_addr;
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			free(lsa);
+ 	}
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index e8dcb40..434903f 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -253,7 +253,7 @@ static int process_packet(uint8_t *buf)
+ 			goto empty_packet;
+ 		}
+ 		v32 = a.s_addr; /* in case long != int */
+-		memcpy(answstr, &v32, 4);
++		move_to_unaligned32(answstr, v32);
+ 		outr_rlen = 4;			// uint32_t IP
+ 	} else
+ 		outr_rlen = strlen((char *)answstr) + 1;	// a host name
+diff --git a/networking/libiproute/libnetlink.c b/networking/libiproute/libnetlink.c
+index 01454fb..6d51d8d 100644
+--- a/networking/libiproute/libnetlink.c
++++ b/networking/libiproute/libnetlink.c
+@@ -341,7 +341,7 @@ int FAST_FUNC addattr32(struct nlmsghdr *n, int maxlen, int type, uint32_t data)
+ 	rta = (struct rtattr*)(((char*)n) + NLMSG_ALIGN(n->nlmsg_len));
+ 	rta->rta_type = type;
+ 	rta->rta_len = len;
+-	memcpy(RTA_DATA(rta), &data, 4);
++	move_to_unaligned32(RTA_DATA(rta), data);
+ 	n->nlmsg_len = NLMSG_ALIGN(n->nlmsg_len) + len;
+ 	return 0;
+ }
+@@ -372,7 +372,7 @@ int FAST_FUNC rta_addattr32(struct rtattr *rta, int maxlen, int type, uint32_t d
+ 	subrta = (struct rtattr*)(((char*)rta) + RTA_ALIGN(rta->rta_len));
+ 	subrta->rta_type = type;
+ 	subrta->rta_len = len;
+-	memcpy(RTA_DATA(subrta), &data, 4);
++	move_to_unaligned32(RTA_DATA(subrta), data);
+ 	rta->rta_len = NLMSG_ALIGN(rta->rta_len) + len;
+ 	return 0;
+ }
+diff --git a/networking/libiproute/ll_addr.c b/networking/libiproute/ll_addr.c
+index e732efd..f50e371 100644
+--- a/networking/libiproute/ll_addr.c
++++ b/networking/libiproute/ll_addr.c
+@@ -43,6 +43,8 @@ const char *ll_addr_n2a(unsigned char *addr, int alen, int type, char *buf, int
+ 
+ int ll_addr_a2n(unsigned char *lladdr, int len, char *arg)
+ {
++	int i;
++
+ 	if (strchr(arg, '.')) {
+ 		inet_prefix pfx;
+ 		if (get_addr_1(&pfx, arg, AF_INET)) {
+@@ -54,26 +56,24 @@ int ll_addr_a2n(unsigned char *lladdr, int len, char *arg)
+ 		}
+ 		memcpy(lladdr, pfx.data, 4);
+ 		return 4;
+-	} else {
+-		int i;
++	}
+ 
+-		for (i=0; i<len; i++) {
+-			int temp;
+-			char *cp = strchr(arg, ':');
+-			if (cp) {
+-				*cp = 0;
+-				cp++;
+-			}
+-			if (sscanf(arg, "%x", &temp) != 1 || (temp < 0 || temp > 255)) {
+-				bb_error_msg("\"%s\" is invalid lladdr", arg);
+-				return -1;
+-			}
+-			lladdr[i] = temp;
+-			if (!cp) {
+-				break;
+-			}
+-			arg = cp;
++	for (i = 0; i < len; i++) {
++		int temp;
++		char *cp = strchr(arg, ':');
++		if (cp) {
++			*cp = 0;
++			cp++;
++		}
++		if (sscanf(arg, "%x", &temp) != 1 || (temp < 0 || temp > 255)) {
++			bb_error_msg("\"%s\" is invalid lladdr", arg);
++			return -1;
++		}
++		lladdr[i] = temp;
++		if (!cp) {
++			break;
+ 		}
+-		return i+1;
++		arg = cp;
+ 	}
++	return i+1;
+ }
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 2d48980..e2e5b0a 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -503,7 +503,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 						/* still selecting - this server looks bad */
+ 					}
+ 					/* it IS unaligned sometimes, don't "optimize" */
+-					server_addr = get_unaligned_u32p((uint32_t*)temp);
++					move_from_unaligned32(server_addr, temp);
+ 					xid = packet.xid;
+ 					requested_ip = packet.yiaddr;
+ 
+@@ -525,7 +525,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ 						lease_seconds = 60 * 60;
+ 					} else {
+ 						/* it IS unaligned sometimes, don't "optimize" */
+-						lease_seconds = get_unaligned_u32p((uint32_t*)temp);
++						move_from_unaligned32(lease_seconds, temp);
+ 						lease_seconds = ntohl(lease_seconds);
+ 						lease_seconds &= 0x0fffffff; /* paranoia: must not be prone to overflows */
+ 						if (lease_seconds < 10) /* and not too small */
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index b512c45..7b45968 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -30,7 +30,9 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 	int server_socket = -1, bytes, retval, max_sock;
+ 	struct dhcpMessage packet;
+ 	uint8_t *state, *server_id, *requested;
+-	uint32_t server_id_align, requested_align, static_lease_ip;
++	uint32_t server_id_aligned = server_id_aligned; /* for compiler */
++	uint32_t requested_aligned = requested_aligned;
++	uint32_t static_lease_ip;
+ 	unsigned timeout_end;
+ 	unsigned num_ips;
+ 	unsigned opt;
+@@ -79,7 +81,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 	option = find_option(server_config.options, DHCP_LEASE_TIME);
+ 	server_config.lease = LEASE_TIME;
+ 	if (option) {
+-		memcpy(&server_config.lease, option->data + 2, 4);
++		move_from_unaligned32(server_config.lease, option->data + 2);
+ 		server_config.lease = ntohl(server_config.lease);
+ 	}
+ 
+@@ -190,21 +192,24 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 			requested = get_option(&packet, DHCP_REQUESTED_IP);
+ 			server_id = get_option(&packet, DHCP_SERVER_ID);
+ 
+-			if (requested) memcpy(&requested_align, requested, 4);
+-			if (server_id) memcpy(&server_id_align, server_id, 4);
++			if (requested)
++				move_from_unaligned32(requested_aligned, requested);
++			if (server_id)
++				move_from_unaligned32(server_id_aligned, server_id);
+ 
+ 			if (lease) {
+ 				if (server_id) {
+ 					/* SELECTING State */
+-					DEBUG("server_id = %08x", ntohl(server_id_align));
+-					if (server_id_align == server_config.server && requested
+-					 && requested_align == lease->yiaddr
++					DEBUG("server_id = %08x", ntohl(server_id_aligned));
++					if (server_id_aligned == server_config.server
++					 && requested
++					 && requested_aligned == lease->yiaddr
+ 					) {
+ 						send_ACK(&packet, lease->yiaddr);
+ 					}
+ 				} else if (requested) {
+ 					/* INIT-REBOOT State */
+-					if (lease->yiaddr == requested_align)
++					if (lease->yiaddr == requested_aligned)
+ 						send_ACK(&packet, lease->yiaddr);
+ 					else
+ 						send_NAK(&packet);
+@@ -221,7 +226,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 			} else if (requested) {
+ 				/* INIT-REBOOT State */
+-				lease = find_lease_by_yiaddr(requested_align);
++				lease = find_lease_by_yiaddr(requested_aligned);
+ 				if (lease) {
+ 					if (lease_expired(lease)) {
+ 						/* probably best if we drop this lease */
+@@ -230,7 +235,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
+ 					} else
+ 						send_NAK(&packet);
+ 				} else {
+-					uint32_t r = ntohl(requested_align);
++					uint32_t r = ntohl(requested_aligned);
+ 					if (r < server_config.start_ip
+ 				         || r > server_config.end_ip
+ 					) {
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index 2c27e70..581a7b6 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -224,9 +224,8 @@ int FAST_FUNC add_simple_option(uint8_t *optionptr, uint8_t code, uint32_t data)
+ 			option[OPT_LEN] = len;
+ 			if (BB_BIG_ENDIAN)
+ 				data <<= 8 * (4 - len);
+-			/* This memcpy is for processors which can't
+-			 * handle a simple unaligned 32-bit assignment */
+-			memcpy(&option[OPT_DATA], &data, 4);
++			/* Assignment is unaligned! */
++			move_to_unaligned32(&option[OPT_DATA], data);
+ 			return add_option_string(optionptr, option);
+ 		}
+ 	}
+diff --git a/networking/udhcp/script.c b/networking/udhcp/script.c
+index 8dff9b7..4ae17fb 100644
+--- a/networking/udhcp/script.c
++++ b/networking/udhcp/script.c
+@@ -90,19 +90,19 @@ static char *alloc_fill_opts(uint8_t *option, const struct dhcp_option *type_p,
+ 			dest += sprintf(dest, "%u", *option);
+ 			break;
+ 		case OPTION_U16:
+-			memcpy(&val_u16, option, 2);
++			move_from_unaligned16(val_u16, option);
+ 			dest += sprintf(dest, "%u", ntohs(val_u16));
+ 			break;
+ 		case OPTION_S16:
+-			memcpy(&val_s16, option, 2);
++			move_from_unaligned16(val_s16, option);
+ 			dest += sprintf(dest, "%d", ntohs(val_s16));
+ 			break;
+ 		case OPTION_U32:
+-			memcpy(&val_u32, option, 4);
++			move_from_unaligned32(val_u32, option);
+ 			dest += sprintf(dest, "%lu", (unsigned long) ntohl(val_u32));
+ 			break;
+ 		case OPTION_S32:
+-			memcpy(&val_s32, option, 4);
++			move_from_unaligned32(val_s32, option);
+ 			dest += sprintf(dest, "%ld", (long) ntohl(val_s32));
+ 			break;
+ 		case OPTION_STRING:
+@@ -183,7 +183,7 @@ static char **fill_envp(struct dhcpMessage *packet)
+ 		/* Fill in a subnet bits option for things like /24 */
+ 		if (dhcp_options[i].code == DHCP_SUBNET) {
+ 			uint32_t subnet;
+-			memcpy(&subnet, temp, 4);
++			move_from_unaligned32(subnet, temp);
+ 			envp[j++] = xasprintf("mask=%d", mton(subnet));
+ 		}
+  next:
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index dcc234c..fca685d 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -103,7 +103,8 @@ int FAST_FUNC send_offer(struct dhcpMessage *oldpacket)
+ {
+ 	struct dhcpMessage packet;
+ 	struct dhcpOfferedAddr *lease = NULL;
+-	uint32_t req_align, lease_time_align = server_config.lease;
++	uint32_t req_align;
++	uint32_t lease_time_aligned = server_config.lease;
+ 	uint8_t *req, *lease_time;
+ 	struct option_set *curr;
+ 	struct in_addr addr;
+@@ -120,7 +121,7 @@ int FAST_FUNC send_offer(struct dhcpMessage *oldpacket)
+ 		lease = find_lease_by_chaddr(oldpacket->chaddr);
+ 		if (lease) {
+ 			if (!lease_expired(lease))
+-				lease_time_align = lease->expires - time(0);
++				lease_time_aligned = lease->expires - time(0);
+ 			packet.yiaddr = lease->yiaddr;
+ 		/* Or the client has a requested ip */
+ 		} else if ((req = get_option(oldpacket, DHCP_REQUESTED_IP))
+@@ -155,22 +156,22 @@ int FAST_FUNC send_offer(struct dhcpMessage *oldpacket)
+ 		}
+ 		lease_time = get_option(oldpacket, DHCP_LEASE_TIME);
+ 		if (lease_time) {
+-			memcpy(&lease_time_align, lease_time, 4);
+-			lease_time_align = ntohl(lease_time_align);
+-			if (lease_time_align > server_config.lease)
+-				lease_time_align = server_config.lease;
++			move_from_unaligned32(lease_time_aligned, lease_time);
++			lease_time_aligned = ntohl(lease_time_aligned);
++			if (lease_time_aligned > server_config.lease)
++				lease_time_aligned = server_config.lease;
+ 		}
+ 
+ 		/* Make sure we aren't just using the lease time from the previous offer */
+-		if (lease_time_align < server_config.min_lease)
+-			lease_time_align = server_config.lease;
++		if (lease_time_aligned < server_config.min_lease)
++			lease_time_aligned = server_config.lease;
+ 		/* ADDME: end of short circuit */
+ 	} else {
+ 		/* It is a static lease... use it */
+ 		packet.yiaddr = static_lease_ip;
+ 	}
+ 
+-	add_simple_option(packet.options, DHCP_LEASE_TIME, htonl(lease_time_align));
++	add_simple_option(packet.options, DHCP_LEASE_TIME, htonl(lease_time_aligned));
+ 
+ 	curr = server_config.options;
+ 	while (curr) {
+@@ -203,7 +204,7 @@ int FAST_FUNC send_ACK(struct dhcpMessage *oldpacket, uint32_t yiaddr)
+ 	struct dhcpMessage packet;
+ 	struct option_set *curr;
+ 	uint8_t *lease_time;
+-	uint32_t lease_time_align = server_config.lease;
++	uint32_t lease_time_aligned = server_config.lease;
+ 	struct in_addr addr;
+ 
+ 	init_packet(&packet, oldpacket, DHCPACK);
+@@ -211,15 +212,15 @@ int FAST_FUNC send_ACK(struct dhcpMessage *oldpacket, uint32_t yiaddr)
+ 
+ 	lease_time = get_option(oldpacket, DHCP_LEASE_TIME);
+ 	if (lease_time) {
+-		memcpy(&lease_time_align, lease_time, 4);
+-		lease_time_align = ntohl(lease_time_align);
+-		if (lease_time_align > server_config.lease)
+-			lease_time_align = server_config.lease;
+-		else if (lease_time_align < server_config.min_lease)
+-			lease_time_align = server_config.lease;
++		move_from_unaligned32(lease_time_aligned, lease_time);
++		lease_time_aligned = ntohl(lease_time_aligned);
++		if (lease_time_aligned > server_config.lease)
++			lease_time_aligned = server_config.lease;
++		else if (lease_time_aligned < server_config.min_lease)
++			lease_time_aligned = server_config.lease;
+ 	}
+ 
+-	add_simple_option(packet.options, DHCP_LEASE_TIME, htonl(lease_time_align));
++	add_simple_option(packet.options, DHCP_LEASE_TIME, htonl(lease_time_aligned));
+ 
+ 	curr = server_config.options;
+ 	while (curr) {
+@@ -236,7 +237,7 @@ int FAST_FUNC send_ACK(struct dhcpMessage *oldpacket, uint32_t yiaddr)
+ 	if (send_packet(&packet, 0) < 0)
+ 		return -1;
+ 
+-	add_lease(packet.chaddr, packet.yiaddr, lease_time_align);
++	add_lease(packet.chaddr, packet.yiaddr, lease_time_aligned);
+ 	if (ENABLE_FEATURE_UDHCPD_WRITE_LEASES_EARLY) {
+ 		/* rewrite the file with leases at every new acceptance */
+ 		write_leases();
+diff --git a/networking/zcip.c b/networking/zcip.c
+index 3a349a5..df4c0ec 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -279,7 +279,8 @@ int zcip_main(int argc, char **argv)
+ 	// NOTE: the sequence of addresses we try changes only
+ 	// depending on when we detect conflicts.
+ 	{
+-		uint32_t t = get_unaligned_u32p((uint32_t *) ((char *)&eth_addr + 2));
++		uint32_t t;
++		move_from_unaligned32(t, ((char *)&eth_addr + 2));
+ 		srand(t);
+ 	}
+ 	if (ip.s_addr == 0)
+diff --git a/util-linux/volume_id/linux_raid.c b/util-linux/volume_id/linux_raid.c
+index a113060..0877b8a 100644
+--- a/util-linux/volume_id/linux_raid.c
++++ b/util-linux/volume_id/linux_raid.c
+@@ -62,7 +62,7 @@ int volume_id_probe_linux_raid(struct volume_id *id, uint64_t off, uint64_t size
+ 	if (mdp->md_magic != cpu_to_le32(MD_MAGIC))
+ 		return -1;
+ 
+-	memcpy(uuid, &mdp->set_uuid0, 4);
++	*(uint32_t*)uuid = mdp->set_uuid0;
+ 	memcpy(&uuid[4], &mdp->set_uuid1, 12);
+ 	volume_id_set_uuid(id, uuid, UUID_DCE);
+ 

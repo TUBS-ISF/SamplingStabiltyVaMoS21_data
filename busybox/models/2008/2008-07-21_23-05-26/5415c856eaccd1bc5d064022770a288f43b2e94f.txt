@@ -1,0 +1,1416 @@
+2008-07-21 23:05:26 +0000
+diff --git a/archival/cpio.c b/archival/cpio.c
+index ebe911a..37b6b5c 100644
+--- a/archival/cpio.c
++++ b/archival/cpio.c
+@@ -287,7 +287,7 @@ int cpio_main(int argc UNUSED_PARAM, char **argv)
+ 			bb_show_usage();
+ 		if (opt & CPIO_OPT_FILE) {
+ 			fclose(stdout);
+-			stdout = fopen(cpio_filename, "w");
++			stdout = fopen_for_write(cpio_filename);
+ 			/* Paranoia: I don't trust libc that much */
+ 			xdup2(fileno(stdout), STDOUT_FILENO);
+ 		}
+diff --git a/archival/dpkg.c b/archival/dpkg.c
+index 671aae7..9ea3087 100644
+--- a/archival/dpkg.c
++++ b/archival/dpkg.c
+@@ -748,7 +748,7 @@ static void index_status_file(const char *filename)
+ 	status_node_t *status_node = NULL;
+ 	unsigned status_num;
+ 
+-	status_file = xfopen(filename, "r");
++	status_file = xfopen_for_read(filename);
+ 	while ((control_buffer = xmalloc_fgetline_str(status_file, "\n\n")) != NULL) {
+ 		const unsigned package_num = fill_package_struct(control_buffer);
+ 		if (package_num != -1) {
+@@ -790,8 +790,8 @@ static void write_buffer_no_status(FILE *new_status_file, const char *control_bu
+ /* This could do with a cleanup */
+ static void write_status_file(deb_file_t **deb_file)
+ {
+-	FILE *old_status_file = xfopen("/var/lib/dpkg/status", "r");
+-	FILE *new_status_file = xfopen("/var/lib/dpkg/status.udeb", "w");
++	FILE *old_status_file = xfopen_for_read("/var/lib/dpkg/status");
++	FILE *new_status_file = xfopen_for_write("/var/lib/dpkg/status.udeb");
+ 	char *package_name;
+ 	char *status_from_file;
+ 	char *control_buffer = NULL;
+@@ -1161,7 +1161,7 @@ static char **create_list(const char *filename)
+ 	int count;
+ 
+ 	/* don't use [xw]fopen here, handle error ourself */
+-	list_stream = fopen(filename, "r");
++	list_stream = fopen_for_read(filename);
+ 	if (list_stream == NULL) {
+ 		return NULL;
+ 	}
+@@ -1548,7 +1548,7 @@ static void unpack_package(deb_file_t *deb_file)
+ 
+ 	/* Create the list file */
+ 	list_filename = xasprintf("/var/lib/dpkg/info/%s.%s", package_name, "list");
+-	out_stream = xfopen(list_filename, "w");
++	out_stream = xfopen_for_write(list_filename);
+ 	while (archive_handle->sub_archive->passed) {
+ 		/* the leading . has been stripped by data_extract_all_prefix already */
+ 		fputs(archive_handle->sub_archive->passed->data, out_stream);
+diff --git a/archival/tar.c b/archival/tar.c
+index a46442f..b2481b8 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -663,7 +663,7 @@ static llist_t *append_file_list_to_list(llist_t *list)
+ 	llist_t *newlist = NULL;
+ 
+ 	while (list) {
+-		src_stream = xfopen(llist_pop(&list), "r");
++		src_stream = xfopen_for_read(llist_pop(&list));
+ 		while ((line = xmalloc_fgetline(src_stream)) != NULL) {
+ 			/* kill trailing '/' unless the string is just "/" */
+ 			char *cp = last_char_is(line, '/');
+diff --git a/coreutils/dos2unix.c b/coreutils/dos2unix.c
+index 311dc13..309cbc3 100644
+--- a/coreutils/dos2unix.c
++++ b/coreutils/dos2unix.c
+@@ -35,7 +35,7 @@ static void convert(char *fn, int conv_type)
+ 		resolved_fn = xmalloc_follow_symlinks(fn);
+ 		if (resolved_fn == NULL)
+ 			bb_simple_perror_msg_and_die(fn);
+-		in = xfopen(resolved_fn, "r");
++		in = xfopen_for_read(resolved_fn);
+ 		fstat(fileno(in), &st);
+ 
+ 		temp_fn = xasprintf("%sXXXXXX", resolved_fn);
+diff --git a/coreutils/sort.c b/coreutils/sort.c
+index ac8fc9b..fad6d12 100644
+--- a/coreutils/sort.c
++++ b/coreutils/sort.c
+@@ -293,7 +293,7 @@ int sort_main(int argc UNUSED_PARAM, char **argv)
+ 			"k::"; /* -k takes list */
+ 	getopt32(argv, OPT_STR, &str_ignored, &str_ignored, &str_o, &lst_k, &str_t);
+ #if ENABLE_FEATURE_SORT_BIG
+-	if (option_mask32 & FLAG_o) outfile = xfopen(str_o, "w");
++	if (option_mask32 & FLAG_o) outfile = xfopen_for_write(str_o);
+ 	if (option_mask32 & FLAG_t) {
+ 		if (!str_t[0] || str_t[1])
+ 			bb_error_msg_and_die("bad -t parameter");
+diff --git a/coreutils/uudecode.c b/coreutils/uudecode.c
+index 81a86cb..0298a4b 100644
+--- a/coreutils/uudecode.c
++++ b/coreutils/uudecode.c
+@@ -179,7 +179,7 @@ int uudecode_main(int argc UNUSED_PARAM, char **argv)
+ 		}
+ 		dst_stream = stdout;
+ 		if (NOT_LONE_DASH(outname)) {
+-			dst_stream = xfopen(outname, "w");
++			dst_stream = xfopen_for_write(outname);
+ 			fchmod(fileno(dst_stream), mode & (S_IRWXU | S_IRWXG | S_IRWXO));
+ 		}
+ 		free(line);
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 91f51a3..875eca5 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -204,7 +204,7 @@ static void do_pidfile(void)
+ 	FILE *f;
+ 	unsigned pid;
+ 
+-	f = fopen(pidfile, "r");
++	f = fopen_for_read(pidfile);
+ 	if (f) {
+ 		if (fscanf(f, "%u", &pid) == 1)
+ 			check(pid);
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/devname.c b/e2fsprogs/old_e2fsprogs/blkid/devname.c
+index 97d1c35..5b9e48f 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/devname.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/devname.c
+@@ -152,7 +152,7 @@ static dev_t lvm_get_devno(const char *lvm_device)
+ 	dev_t ret = 0;
+ 
+ 	DBG(DEBUG_DEVNAME, printf("opening %s\n", lvm_device));
+-	if ((lvf = fopen(lvm_device, "r")) == NULL) {
++	if ((lvf = fopen_for_read(lvm_device)) == NULL) {
+ 		DBG(DEBUG_DEVNAME, printf("%s: (%d) %s\n", lvm_device, errno,
+ 					  strerror(errno)));
+ 		return 0;
+@@ -233,7 +233,7 @@ evms_probe_all(blkid_cache cache)
+ 	FILE *procpt;
+ 	char device[110];
+ 
+-	procpt = fopen(PROC_EVMS_VOLUMES, "r");
++	procpt = fopen_for_read(PROC_EVMS_VOLUMES);
+ 	if (!procpt)
+ 		return 0;
+ 	while (fgets(line, sizeof(line), procpt)) {
+@@ -282,7 +282,7 @@ int blkid_probe_all(blkid_cache cache)
+ 	lvm_probe_all(cache);
+ #endif
+ 
+-	proc = fopen(PROC_PARTITIONS, "r");
++	proc = fopen_for_read(PROC_PARTITIONS);
+ 	if (!proc)
+ 		return -BLKID_ERR_PROC;
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/blkid/save.c b/e2fsprogs/old_e2fsprogs/blkid/save.c
+index cdbaabc..3600260 100644
+--- a/e2fsprogs/old_e2fsprogs/blkid/save.c
++++ b/e2fsprogs/old_e2fsprogs/blkid/save.c
+@@ -102,7 +102,7 @@ int blkid_flush_cache(blkid_cache cache)
+ 	}
+ 
+ 	if (!file) {
+-		file = fopen(filename, "w");
++		file = fopen_for_write(filename);
+ 		opened = filename;
+ 	}
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/e2fsck.c b/e2fsprogs/old_e2fsprogs/e2fsck.c
+index 4887a57..7cb1227 100644
+--- a/e2fsprogs/old_e2fsprogs/e2fsck.c
++++ b/e2fsprogs/old_e2fsprogs/e2fsck.c
+@@ -12672,7 +12672,7 @@ static int is_on_batt(void)
+ 	unsigned int    acflag;
+ 	struct dirent*  de;
+ 
+-	f = fopen("/proc/apm", "r");
++	f = fopen_for_read("/proc/apm");
+ 	if (f) {
+ 		if (fscanf(f, "%s %s %s %x", tmp, tmp, tmp, &acflag) != 4)
+ 			acflag = 1;
+@@ -12686,7 +12686,7 @@ static int is_on_batt(void)
+ 				continue;
+ 			snprintf(fname, 80, "/proc/acpi/ac_adapter/%s/state",
+ 				 de->d_name);
+-			f = fopen(fname, "r");
++			f = fopen_for_read(fname);
+ 			if (!f)
+ 				continue;
+ 			if (fscanf(f, "%s %s", tmp2, tmp) != 2)
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/ismounted.c b/e2fsprogs/old_e2fsprogs/ext2fs/ismounted.c
+index d943f11..7f24f9b 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/ismounted.c
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/ismounted.c
+@@ -249,7 +249,7 @@ static int is_swap_device(const char *file)
+ 		file_dev = st_buf.st_rdev;
+ #endif	/* __GNU__ */
+ 
+-	if (!(f = fopen("/proc/swaps", "r")))
++	if (!(f = fopen_for_read("/proc/swaps")))
+ 		return 0;
+ 	/* Skip the first line */
+ 	fgets(buf, sizeof(buf), f);
+diff --git a/e2fsprogs/old_e2fsprogs/ext2fs/test_io.c b/e2fsprogs/old_e2fsprogs/ext2fs/test_io.c
+index bd74225..3d40d9a 100644
+--- a/e2fsprogs/old_e2fsprogs/ext2fs/test_io.c
++++ b/e2fsprogs/old_e2fsprogs/ext2fs/test_io.c
+@@ -180,7 +180,7 @@ static errcode_t test_open(const char *name, int flags, io_channel *channel)
+ 
+ 	data->outfile = NULL;
+ 	if ((value = getenv("TEST_IO_LOGFILE")) != NULL)
+-		data->outfile = fopen(value, "w");
++		data->outfile = fopen_for_write(value);
+ 	if (!data->outfile)
+ 		data->outfile = stderr;
+ 
+diff --git a/e2fsprogs/old_e2fsprogs/mke2fs.c b/e2fsprogs/old_e2fsprogs/mke2fs.c
+index e16fe93..852c249 100644
+--- a/e2fsprogs/old_e2fsprogs/mke2fs.c
++++ b/e2fsprogs/old_e2fsprogs/mke2fs.c
+@@ -225,7 +225,7 @@ static void read_bb_file(ext2_filsys fs, badblocks_list *bb_list,
+ 	FILE		*f;
+ 	errcode_t	retval;
+ 
+-	f = xfopen(bad_blocks_file, "r");
++	f = xfopen_for_read(bad_blocks_file);
+ 	retval = ext2fs_read_bb_FILE(fs, f, bb_list, invalid_block);
+ 	fclose (f);
+ 	mke2fs_error_msg_and_die(retval, "read bad blocks from list");
+diff --git a/editors/awk.c b/editors/awk.c
+index 7af9e1e..571d681 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -2400,7 +2400,7 @@ static var *evaluate(node *op, var *res)
+ 						X.rsm->F = popen(L.s, "r");
+ 						X.rsm->is_pipe = TRUE;
+ 					} else {
+-						X.rsm->F = fopen(L.s, "r");		/* not xfopen! */
++						X.rsm->F = fopen_for_read(L.s);		/* not xfopen! */
+ 					}
+ 				}
+ 			} else {
+diff --git a/editors/patch.c b/editors/patch.c
+index d5f6df2..e8482a7 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -131,9 +131,9 @@ int patch_main(int argc UNUSED_PARAM, char **argv)
+ 		} else {
+ 			backup_filename = xasprintf("%s.orig", new_filename);
+ 			xrename(new_filename, backup_filename);
+-			src_stream = xfopen(backup_filename, "r");
++			src_stream = xfopen_for_read(backup_filename);
+ 		}
+-		dst_stream = xfopen(new_filename, "w");
++		dst_stream = xfopen_for_write(new_filename);
+ 		fchmod(fileno(dst_stream), saved_stat.st_mode);
+ 
+ 		printf("patching file %s\n", new_filename);
+diff --git a/editors/sed.c b/editors/sed.c
+index 67e8841..496d3d2 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -438,7 +438,7 @@ static const char *parse_cmd_args(sed_cmd_t *sed_cmd, const char *cmdstr)
+ 			bb_error_msg_and_die("command only uses one address");
+ 		cmdstr += parse_file_cmd(/*sed_cmd,*/ cmdstr, &sed_cmd->string);
+ 		if (sed_cmd->cmd == 'w') {
+-			sed_cmd->sw_file = xfopen(sed_cmd->string, "w");
++			sed_cmd->sw_file = xfopen_for_write(sed_cmd->string);
+ 			sed_cmd->sw_last_char = '\n';
+ 		}
+ 	/* handle branch commands */
+@@ -1025,7 +1025,7 @@ static void process_files(void)
+ 			{
+ 				FILE *rfile;
+ 
+-				rfile = fopen(sed_cmd->string, "r");
++				rfile = fopen_for_read(sed_cmd->string);
+ 				if (rfile) {
+ 					char *line;
+ 
+@@ -1271,7 +1271,7 @@ int sed_main(int argc UNUSED_PARAM, char **argv)
+ 	while (opt_f) { // -f
+ 		char *line;
+ 		FILE *cmdfile;
+-		cmdfile = xfopen(llist_pop(&opt_f), "r");
++		cmdfile = xfopen_for_read(llist_pop(&opt_f));
+ 		while ((line = xmalloc_fgetline(cmdfile)) != NULL) {
+ 			add_cmd(line);
+ 			free(line);
+diff --git a/findutils/grep.c b/findutils/grep.c
+index 5cfd772..030e624 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -375,7 +375,7 @@ static int FAST_FUNC file_action_grep(const char *filename,
+ 			void* matched,
+ 			int depth UNUSED_PARAM)
+ {
+-	FILE *file = fopen(filename, "r");
++	FILE *file = fopen_for_read(filename);
+ 	if (file == NULL) {
+ 		if (!SUPPRESS_ERR_MSGS)
+ 			bb_simple_perror_msg(filename);
+@@ -514,7 +514,7 @@ int grep_main(int argc, char **argv)
+ 				}
+ 			}
+ 			/* else: fopen(dir) will succeed, but reading won't */
+-			file = fopen(cur_file, "r");
++			file = fopen_for_read(cur_file);
+ 			if (file == NULL) {
+ 				if (!SUPPRESS_ERR_MSGS)
+ 					bb_simple_perror_msg(cur_file);
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index 7a9865b..8f0a3d4 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -277,7 +277,7 @@ static int xargs_ask_confirmation(void)
+ 	FILE *tty_stream;
+ 	int c, savec;
+ 
+-	tty_stream = xfopen(CURRENT_TTY, "r");
++	tty_stream = xfopen_for_read(CURRENT_TTY);
+ 	fputs(" ?...", stderr);
+ 	fflush(stderr);
+ 	c = savec = getc(tty_stream);
+diff --git a/include/libbb.h b/include/libbb.h
+index 4b2a839..684e130 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -631,6 +631,10 @@ extern FILE *fopen_or_warn(const char *filename, const char *mode) FAST_FUNC;
+ /* "Opens" stdin if filename is special, else just opens file: */
+ extern FILE *xfopen_stdin(const char *filename) FAST_FUNC;
+ extern FILE *fopen_or_warn_stdin(const char *filename) FAST_FUNC;
++extern FILE* fopen_for_read(const char *path) FAST_FUNC;
++extern FILE* xfopen_for_read(const char *path) FAST_FUNC;
++extern FILE* fopen_for_write(const char *path) FAST_FUNC;
++extern FILE* xfopen_for_write(const char *path) FAST_FUNC;
+ 
+ int bb_pstrcmp(const void *a, const void *b) /* not FAST_FUNC! */;
+ void qsort_string_vector(char **sv, unsigned count) FAST_FUNC;
+@@ -993,10 +997,12 @@ int bb_parse_mode(const char* s, mode_t* theMode) FAST_FUNC;
+  * Config file parser
+  */
+ enum {
++	PARSE_VANILLA        = 0x00000000, // trim line, collapse delimiters, warn and continue if less than mintokens
+ 	PARSE_DONT_REDUCE    = 0x00010000, // do not treat consecutive delimiters as one
+ 	PARSE_DONT_TRIM      = 0x00020000, // do not trim line of leading and trailing delimiters
+ 	PARSE_LAST_IS_GREEDY = 0x00040000, // last token takes whole remainder of the line
+ //	PARSE_DONT_NULL      = 0x00080000, // do not set tokens[] to NULL
++	PARSE_MIN_DIE        = 0x00100000, // die if less tokens found
+ 	// keep a copy of current line
+ 	PARSE_KEEP_COPY      = 0x00200000 * ENABLE_DEBUG_CROND_OPTION,
+ };
+@@ -1007,6 +1013,7 @@ typedef struct parser_t {
+ 	int lineno;
+ } parser_t;
+ parser_t* config_open(const char *filename) FAST_FUNC;
++parser_t* config_open2(const char *filename, FILE* FAST_FUNC (*fopen_func)(const char *path)) FAST_FUNC;
+ int config_read(parser_t *parser, char **tokens, unsigned flags, const char *delims) FAST_FUNC;
+ #define config_read(parser, tokens, max, min, str, flags) \
+ 	config_read(parser, tokens, ((flags) | (((min) & 0xFF) << 8) | ((max) & 0xFF)), str)
+diff --git a/init/init.c b/init/init.c
+index d11d425..884603a 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -681,7 +681,7 @@ static void parse_inittab(void)
+ 		"sysinit\0""respawn\0""askfirst\0""wait\0""once\0"
+ 		"ctrlaltdel\0""shutdown\0""restart\0";
+ 
+-	parser_t *parser = config_open(INITTAB);
++	parser_t *parser = config_open2(INITTAB, fopen_for_read);
+ 	/* No inittab file -- set up some default behavior */
+ 	if (parser == NULL) {
+ 		/* Reboot on Ctrl-Alt-Del */
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 8c35450..beb1d6f 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -316,7 +316,7 @@ static void parse_config_file(void)
+ 	 || !S_ISREG(st.st_mode)                /* Not a regular file? */
+ 	 || (st.st_uid != 0)                    /* Not owned by root? */
+ 	 || (st.st_mode & (S_IWGRP | S_IWOTH))  /* Writable by non-root? */
+-	 || !(f = fopen(config_file, "r"))      /* Cannot open? */
++	 || !(f = fopen_for_read(config_file))      /* Cannot open? */
+ 	) {
+ 		return;
+ 	}
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index a46b5d2..2e16e6a 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -989,7 +989,7 @@ static void load_history(const char *fromfile)
+ 
+ 	/* NB: do not trash old history if file can't be opened */
+ 
+-	fp = fopen(fromfile, "r");
++	fp = fopen_for_read(fromfile);
+ 	if (fp) {
+ 		/* clean up old history */
+ 		for (hi = state->cnt_history; hi > 0;) {
+@@ -1022,7 +1022,7 @@ static void save_history(const char *tofile)
+ {
+ 	FILE *fp;
+ 
+-	fp = fopen(tofile, "w");
++	fp = fopen_for_write(tofile);
+ 	if (fp) {
+ 		int i;
+ 
+diff --git a/libbb/login.c b/libbb/login.c
+index 1703a2e..b3e199c 100644
+--- a/libbb/login.c
++++ b/libbb/login.c
+@@ -32,7 +32,7 @@ void FAST_FUNC print_login_issue(const char *issue_file, const char *tty)
+ 
+ 	puts("\r");	/* start a new line */
+ 
+-	fp = fopen(issue_file, "r");
++	fp = fopen_for_read(issue_file);
+ 	if (!fp)
+ 		return;
+ 	while ((c = fgetc(fp)) != EOF) {
+diff --git a/libbb/parse_config.c b/libbb/parse_config.c
+index 3174a64..5109066 100644
+--- a/libbb/parse_config.c
++++ b/libbb/parse_config.c
+@@ -59,11 +59,11 @@ Typical usage:
+ 
+ */
+ 
+-parser_t* FAST_FUNC config_open(const char *filename)
++parser_t* FAST_FUNC config_open2(const char *filename, FILE* FAST_FUNC (*fopen_func)(const char *path))
+ {
+ 	parser_t *parser = xzalloc(sizeof(parser_t));
+ 	/* empty file configures nothing */
+-	parser->fp = fopen_or_warn_stdin(filename);
++	parser->fp = fopen_func(filename);
+ 	if (parser->fp)
+ 		return parser;
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+@@ -71,6 +71,11 @@ parser_t* FAST_FUNC config_open(const char *filename)
+ 	return NULL;
+ }
+ 
++parser_t* FAST_FUNC config_open(const char *filename)
++{
++	return config_open2(filename, fopen_or_warn_stdin);
++}
++
+ static void config_free_data(parser_t *const parser)
+ {
+ 	free(parser->line);
+@@ -114,6 +119,7 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 	int ntokens = flags & 0xFF;
+ 	int mintokens = (flags & 0xFF00) >> 8;
+ 
++ again:
+ 	// N.B. this could only be used in read-in-one-go version, or when tokens use xstrdup(). TODO
+ 	//if (!parser->lineno || !(flags & PARSE_DONT_NULL))
+ 		memset(tokens, 0, sizeof(tokens[0]) * ntokens);
+@@ -211,9 +217,13 @@ int FAST_FUNC config_read(parser_t *parser, char **tokens, unsigned flags, const
+ 		//bb_info_msg("A[%s]", line);
+ 	}
+ 
+-	if (ii < mintokens)
+-		bb_error_msg_and_die("bad line %u: %d tokens found, %d needed",
+-				parser->lineno, ii, mintokens);
++	if (ii < mintokens) {
++		bb_error_msg("bad line %u: %d tokens found, %d needed",
++ 				parser->lineno, ii, mintokens);
++		if (flags & PARSE_MIN_DIE)
++			xfunc_die();
++		goto again;
++	}
+ 
+ 	return ii;
+ }
+diff --git a/libbb/procps.c b/libbb/procps.c
+index f799099..ba3d250 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -308,7 +308,7 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 			FILE *file;
+ 
+ 			strcpy(filename_tail, "/smaps");
+-			file = fopen(filename, "r");
++			file = fopen_for_read(filename);
+ 			if (!file)
+ 				break;
+ 			while (fgets(buf, sizeof(buf), file)) {
+diff --git a/libbb/rtc.c b/libbb/rtc.c
+index 1fdeee8..222d977 100644
+--- a/libbb/rtc.c
++++ b/libbb/rtc.c
+@@ -14,7 +14,7 @@
+ int FAST_FUNC rtc_adjtime_is_utc(void)
+ {
+ 	int utc = 0;
+-	FILE *f = fopen(ADJTIME_PATH, "r");
++	FILE *f = fopen_for_read(ADJTIME_PATH);
+ 
+ 	if (f) {
+ 		RESERVE_CONFIG_BUFFER(buffer, 128);
+diff --git a/libbb/wfopen.c b/libbb/wfopen.c
+index ac365c2..4c84b3b 100644
+--- a/libbb/wfopen.c
++++ b/libbb/wfopen.c
+@@ -18,3 +18,23 @@ FILE* FAST_FUNC fopen_or_warn(const char *path, const char *mode)
+ 	}
+ 	return fp;
+ }
++
++FILE* FAST_FUNC fopen_for_read(const char *path)
++{
++	return fopen(path, "r");
++}
++
++FILE* FAST_FUNC xfopen_for_read(const char *path)
++{
++	return xfopen(path, "r");
++}
++
++FILE* FAST_FUNC fopen_for_write(const char *path)
++{
++	return fopen(path, "w");
++}
++
++FILE* FAST_FUNC xfopen_for_write(const char *path)
++{
++	return xfopen(path, "w");
++}
+diff --git a/libpwdgrp/pwd_grp.c b/libpwdgrp/pwd_grp.c
+index 867caf0..2065190 100644
+--- a/libpwdgrp/pwd_grp.c
++++ b/libpwdgrp/pwd_grp.c
+@@ -464,7 +464,7 @@ int getpwent_r(struct passwd *__restrict resultbuf,
+ 	*result = NULL;				/* In case of error... */
+ 
+ 	if (!pwf) {
+-		pwf = fopen(_PATH_PASSWD, "r");
++		pwf = fopen_for_read(_PATH_PASSWD);
+ 		if (!pwf) {
+ 			rv = errno;
+ 			goto ERR;
+@@ -511,7 +511,7 @@ int getgrent_r(struct group *__restrict resultbuf,
+ 	*result = NULL;				/* In case of error... */
+ 
+ 	if (!grf) {
+-		grf = fopen(_PATH_GROUP, "r");
++		grf = fopen_for_read(_PATH_GROUP);
+ 		if (!grf) {
+ 			rv = errno;
+ 			goto ERR;
+@@ -558,7 +558,7 @@ int getspent_r(struct spwd *resultbuf, char *buffer,
+ 	*result = NULL;				/* In case of error... */
+ 
+ 	if (!spf) {
+-		spf = fopen(_PATH_SHADOW, "r");
++		spf = fopen_for_read(_PATH_SHADOW);
+ 		if (!spf) {
+ 			rv = errno;
+ 			goto ERR;
+@@ -630,7 +630,7 @@ int initgroups(const char *user, gid_t gid)
+ 	char buff[PWD_BUFFER_SIZE];
+ 
+ 	rv = -1;
+-	grfile = fopen(_PATH_GROUP, "r");
++	grfile = fopen_for_read(_PATH_GROUP);
+ 	if (grfile != NULL) {
+ 
+ 		/* We alloc space for 8 gids at a time. */
+diff --git a/libpwdgrp/pwd_grp_internal.c b/libpwdgrp/pwd_grp_internal.c
+index d55edc3..ffdc85e 100644
+--- a/libpwdgrp/pwd_grp_internal.c
++++ b/libpwdgrp/pwd_grp_internal.c
+@@ -32,7 +32,7 @@ int GETXXKEY_R_FUNC(GETXXKEY_R_KEYTYPE key,
+ 
+ 	*result = NULL;
+ 
+-	stream = fopen(GETXXKEY_R_PATHNAME, "r");
++	stream = fopen_for_read(GETXXKEY_R_PATHNAME);
+ 	if (!stream)
+ 		return errno;
+ 	while (1) {
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 7d4fe4d..358a45c 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -668,7 +668,7 @@ int getty_main(int argc UNUSED_PARAM, char **argv)
+ 	logmode = LOGMODE_BOTH;
+ 
+ #ifdef DEBUGGING
+-	dbf = xfopen(DEBUGTERM, "w");
++	dbf = xfopen_for_write(DEBUGTERM);
+ 	for (n = 1; argv[n]; n++) {
+ 		debug(argv[n]);
+ 		debug("\n");
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 9c7941e..5a75ed2 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -122,7 +122,7 @@ static void die_if_nologin(void)
+ 	if (access("/etc/nologin", F_OK))
+ 		return;
+ 
+-	fp = fopen("/etc/nologin", "r");
++	fp = fopen_for_read("/etc/nologin");
+ 	if (fp) {
+ 		while ((c = getc(fp)) != EOF)
+ 			bb_putchar((c=='\n') ? '\r' : c);
+@@ -139,30 +139,20 @@ static ALWAYS_INLINE void die_if_nologin(void) {}
+ #if ENABLE_FEATURE_SECURETTY && !ENABLE_PAM
+ static int check_securetty(void)
+ {
+-	FILE *fp;
+-	int i;
+-	char buf[256];
+-
+-	fp = fopen("/etc/securetty", "r");
+-	if (!fp) {
+-		/* A missing securetty file is not an error. */
+-		return 1;
+-	}
+-	while (fgets(buf, sizeof(buf)-1, fp)) {
+-		for (i = strlen(buf)-1; i >= 0; --i) {
+-			if (!isspace(buf[i]))
++	char *buf;
++	int ret = 1;
++	parser_t *parser = config_open2("/etc/securetty", fopen_for_read);
++	/* N.B. A missing securetty file is not an error. */
++	if (parser) {
++		while (config_read(parser, &buf, 1, 1, "# \t", 0)) {
++			if (strcmp(buf, short_tty) == 0)
+ 				break;
+ 		}
+-		buf[++i] = '\0';
+-		if (!buf[0] || (buf[0] == '#'))
+-			continue;
+-		if (strcmp(buf, short_tty) == 0) {
+-			fclose(fp);
+-			return 1;
+-		}
++		config_close(parser);
++		// buf != NULL here iff config file was empty (OK) or buf equals short_tty (OK)
++		ret = buf != NULL;
+ 	}
+-	fclose(fp);
+-	return 0;
++	return ret;
+ }
+ #else
+ static ALWAYS_INLINE int check_securetty(void) { return 1; }
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index c7ee793..b3a06a3 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -529,7 +529,7 @@ static void CheckUpdates(void)
+ 	FILE *fi;
+ 	char buf[256];
+ 
+-	fi = fopen(CRONUPDATE, "r");
++	fi = fopen_for_read(CRONUPDATE);
+ 	if (fi != NULL) {
+ 		unlink(CRONUPDATE);
+ 		while (fgets(buf, sizeof(buf), fi) != NULL) {
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index c85ff08..61b97dc 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -459,7 +459,7 @@ static void read_config_file(char *path, int optional, unsigned long *event_mask
+ 			free(p);
+ 			return;
+ 		}
+-		fp = fopen(path, "r");
++		fp = fopen_for_read(path);
+ 		if (fp != NULL) {
+ 			while (fgets(buf, STRING_LENGTH, fp) != NULL) {
+ 				/*  Skip whitespace  */
+diff --git a/miscutils/fbsplash.c b/miscutils/fbsplash.c
+index 67847c1..380f09b 100644
+--- a/miscutils/fbsplash.c
++++ b/miscutils/fbsplash.c
+@@ -341,7 +341,7 @@ static void init(const char *cfg_filename)
+ 		case 7:
+ 			G.bdebug_messages = val;
+ 			if (G.bdebug_messages)
+-				G.logfile_fd = xfopen("/tmp/fbsplash.log", "w");
++				G.logfile_fd = xfopen_for_write("/tmp/fbsplash.log");
+ 			break;
+ #endif
+  err:
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 1e22d33..530a40a 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -1129,7 +1129,7 @@ static void save_input_to_file(void)
+ 	print_statusline("Log file: ");
+ 	current_line = less_gets(sizeof("Log file: ")-1);
+ 	if (current_line[0]) {
+-		fp = fopen(current_line, "w");
++		fp = fopen_for_write(current_line);
+ 		if (!fp) {
+ 			msg = "Error opening log file";
+ 			goto ret;
+diff --git a/miscutils/makedevs.c b/miscutils/makedevs.c
+index 3b45d70..ed08f7e 100644
+--- a/miscutils/makedevs.c
++++ b/miscutils/makedevs.c
+@@ -80,7 +80,7 @@ int makedevs_main(int argc, char **argv)
+ 
+ 	getopt32(argv, "d:", &line);
+ 	if (line)
+-		table = xfopen(line, "r");
++		table = xfopen_for_read(line);
+ 
+ 	if (optind >= argc || (rootdir=argv[optind])==NULL) {
+ 		bb_error_msg_and_die("root directory not specified");
+diff --git a/miscutils/man.c b/miscutils/man.c
+index 7ef5941..df00c3e 100644
+--- a/miscutils/man.c
++++ b/miscutils/man.c
+@@ -106,9 +106,7 @@ int man_main(int argc UNUSED_PARAM, char **argv)
+ 	if (parser) {
+ 		/* go through man configuration file and search relevant paths, sections */
+ 		char *token[2];
+-		while (config_read(parser, token, 2, 0, "# \t", PARSE_LAST_IS_GREEDY)) {
+-			if (!token[1])
+-				continue;
++		while (config_read(parser, token, 2, 2, "# \t", PARSE_LAST_IS_GREEDY)) {
+ 			if (strcmp("MANPATH", token[0]) == 0) {
+ 				man_path_list[count_mp] = xstrdup(token[1]);
+ 				count_mp++;
+diff --git a/modutils/depmod.c b/modutils/depmod.c
+index d128ac0..b6a914e 100644
+--- a/modutils/depmod.c
++++ b/modutils/depmod.c
+@@ -150,7 +150,7 @@ int depmod_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	if (!(option_mask32 & ARG_n)) { /* --dry-run */
+ 		chp = concat_path_file(moddir, CONFIG_DEFAULT_DEPMOD_FILE);
+-		filedes = xfopen(chp, "w");
++		filedes = xfopen_for_write(chp);
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+ 			free(chp);
+ 	}
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 97f4a87..9dcc5b0 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -3992,7 +3992,7 @@ int insmod_main(int argc, char **argv)
+ 
+ 	/* Get a filedesc for the module.  Check that we have a complete path */
+ 	if (stat(arg1, &st) < 0 || !S_ISREG(st.st_mode)
+-	 || (fp = fopen(arg1, "r")) == NULL
++	 || (fp = fopen_for_read(arg1)) == NULL
+ 	) {
+ 		/* Hmm.  Could not open it.  First search under /lib/modules/`uname -r`,
+ 		 * but do not error out yet if we fail to find it... */
+@@ -4016,7 +4016,7 @@ int insmod_main(int argc, char **argv)
+ 		}
+ 
+ 		/* Check if we have found anything yet */
+-		if (!m_filename || ((fp = fopen(m_filename, "r")) == NULL)) {
++		if (!m_filename || ((fp = fopen_for_read(m_filename)) == NULL)) {
+ 			int r;
+ 			char *module_dir;
+ 
+@@ -4033,7 +4033,7 @@ int insmod_main(int argc, char **argv)
+ 				bb_error_msg_and_die("%s: module not found", m_fullName);
+ 			free(module_dir);
+ 			if (m_filename == NULL
+-			 || ((fp = fopen(m_filename, "r")) == NULL)
++			 || ((fp = fopen_for_read(m_filename)) == NULL)
+ 			) {
+ 				bb_error_msg_and_die("%s: module not found", m_fullName);
+ 			}
+diff --git a/modutils/lsmod.c b/modutils/lsmod.c
+index 5e37923..3f23703 100644
+--- a/modutils/lsmod.c
++++ b/modutils/lsmod.c
+@@ -28,7 +28,7 @@ static void check_tainted(void)
+ 	FILE *f;
+ 
+ 	tainted = 0;
+-	f = fopen(TAINT_FILENAME, "r");
++	f = fopen_for_read(TAINT_FILENAME);
+ 	if (f) {
+ 		fscanf(f, "%d", &tainted);
+ 		fclose(f);
+@@ -145,7 +145,7 @@ int lsmod_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ int lsmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int lsmod_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ {
+-	FILE *file = xfopen("/proc/modules", "r");
++	FILE *file = xfopen_for_read("/proc/modules");
+ 
+ 	printf("Module                  Size  Used by");
+ 	check_tainted();
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index ae7c29c..f75dae8 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -299,7 +299,7 @@ static FAST_FUNC int fileAction(const char *pathname,
+ static int load_dep_bb(void)
+ {
+ 	char *line;
+-	FILE *fp = fopen(DEPFILE_BB, "r");
++	FILE *fp = fopen_for_read(DEPFILE_BB);
+ 
+ 	if (!fp)
+ 		return 0;
+@@ -492,7 +492,7 @@ static int already_loaded(const char *name)
+ 	char *line;
+ 	FILE* modules;
+ 
+-	modules = xfopen("/proc/modules", "r");
++	modules = xfopen_for_read("/proc/modules");
+ 	while ((line = xmalloc_fgets(modules)) != NULL) {
+ 		if (strncmp(line, name, len) == 0 && line[len] == ' ') {
+ 			free(line);
+@@ -688,7 +688,7 @@ int modprobe_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	/* are we lsmod? -> just dump /proc/modules */
+ 	if ('l' == applet0) {
+-		xprint_and_close_file(xfopen("/proc/modules", "r"));
++		xprint_and_close_file(xfopen_for_read("/proc/modules"));
+ 		return EXIT_SUCCESS;
+ 	}
+ 
+diff --git a/networking/arp.c b/networking/arp.c
+index ac8c870..620f7c0 100644
+--- a/networking/arp.c
++++ b/networking/arp.c
+@@ -382,7 +382,7 @@ static int arp_show(char *name)
+ 		}
+ 		host = xstrdup(ap->sprint(&sa, 1));
+ 	}
+-	fp = xfopen("/proc/net/arp", "r");
++	fp = xfopen_for_read("/proc/net/arp");
+ 	/* Bypass header -- read one line */
+ 	fgets(line, sizeof(line), fp);
+ 
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index 0047a84..efb5cfb 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -113,7 +113,7 @@ static void dnsentryinit(void)
+ 	parser = config_open(fileconf);
+ 	if (parser) {
+ 		char *token[2];
+-		while (config_read(parser, token, 2, 0, "# \t", 0)) {
++		while (config_read(parser, token, 2, 2, "# \t", 0)) {
+ 			unsigned int a,b,c,d;
+ 			/*
+ 			 * Assumes all host names are lower case only
+@@ -121,7 +121,8 @@ static void dnsentryinit(void)
+ 			 * Presently the dot is copied into name without
+ 			 * converting to a length/string substring for that label.
+ 			 */
+-			if (!token[1] || sscanf(token[1], ".%u.%u.%u.%u"+1, &a, &b, &c, &d) != 4)
++//			if (!token[1] || sscanf(token[1], ".%u.%u.%u.%u"+1, &a, &b, &c, &d) != 4)
++			if (sscanf(token[1], ".%u.%u.%u.%u"+1, &a, &b, &c, &d) != 4)
+ 				continue;
+ 
+ 			m = xzalloc(sizeof(*m));
+diff --git a/networking/hostname.c b/networking/hostname.c
+index 93cbc96..dd2a206 100644
+--- a/networking/hostname.c
++++ b/networking/hostname.c
+@@ -16,28 +16,19 @@
+ 
+ static void do_sethostname(char *s, int isfile)
+ {
+-	FILE *f;
+-
+ 	if (!s)
+ 		return;
+-	if (!isfile) {
+-		if (sethostname(s, strlen(s)) < 0) {
+-			if (errno == EPERM)
+-				bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+-			bb_perror_msg_and_die("sethostname");
+-		}
+-	} else {
+-		f = xfopen(s, "r");
+-#define strbuf bb_common_bufsiz1
+-		while (fgets(strbuf, sizeof(strbuf), f) != NULL) {
+-			if (strbuf[0] == '#') {
+-				continue;
+-			}
+-			chomp(strbuf);
+-			do_sethostname(strbuf, 0);
++	if (isfile) {
++		parser_t *parser = config_open2(s, xfopen_for_read);
++		while (config_read(parser, &s, 1, 1, "# \t", 0)) {
++			do_sethostname(s, 0);
+ 		}
+ 		if (ENABLE_FEATURE_CLEAN_UP)
+-			fclose(f);
++			config_close(parser);
++	} else if (sethostname(s, strlen(s)) < 0) {
++		if (errno == EPERM)
++			bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
++		bb_perror_msg_and_die("sethostname");
+ 	}
+ }
+ 
+@@ -98,5 +89,5 @@ int hostname_main(int argc, char **argv)
+ 	}
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		free(buf);
+-	return 0;
++	return EXIT_SUCCESS;
+ }
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 8c4242e..82891f1 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -518,7 +518,7 @@ static void parse_conf(const char *path, int flag)
+ 		sprintf((char *)filename, "%s/%s", path, httpd_conf);
+ 	}
+ 
+-	while ((f = fopen(filename, "r")) == NULL) {
++	while ((f = fopen_for_read(filename)) == NULL) {
+ 		if (flag == SUBDIR_PARSE || flag == FIND_FROM_HTTPD_ROOT) {
+ 			/* config file not found, no changes to config */
+ 			return;
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index cb937ca..c0e9e81 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -692,7 +692,7 @@ static struct interfaces_file_t *read_interfaces(const char *filename)
+ 	enum { NONE, IFACE, MAPPING } currently_processing = NONE;
+ 
+ 	defn = xzalloc(sizeof(*defn));
+-	f = xfopen(filename, "r");
++	f = xfopen_for_read(filename);
+ 
+ 	while ((buf = xmalloc_fgetline(f)) != NULL) {
+ #if ENABLE_DESKTOP
+@@ -1090,7 +1090,7 @@ static llist_t *find_iface_state(llist_t *state_list, const char *iface)
+ static llist_t *read_iface_state(void)
+ {
+ 	llist_t *state_list = NULL;
+-	FILE *state_fp = fopen(CONFIG_IFUPDOWN_IFSTATE_PATH, "r");
++	FILE *state_fp = fopen_for_read(CONFIG_IFUPDOWN_IFSTATE_PATH);
+ 
+ 	if (state_fp) {
+ 		char *start, *end_ptr;
+@@ -1256,7 +1256,7 @@ int ifupdown_main(int argc, char **argv)
+ 			}
+ 
+ 			/* Actually write the new state */
+-			state_fp = xfopen(CONFIG_IFUPDOWN_IFSTATE_PATH, "w");
++			state_fp = xfopen_for_write(CONFIG_IFUPDOWN_IFSTATE_PATH);
+ 			state = state_list;
+ 			while (state) {
+ 				if (state->data) {
+diff --git a/networking/interface.c b/networking/interface.c
+index 83b24f1..065b4ba 100644
+--- a/networking/interface.c
++++ b/networking/interface.c
+@@ -990,7 +990,7 @@ static void ife_print(struct interface *ptr)
+ #define IPV6_ADDR_MAPPED        0x1000U
+ #define IPV6_ADDR_RESERVED      0x2000U	/* reserved address space */
+ 
+-	f = fopen(_PATH_PROCNET_IFINET6, "r");
++	f = fopen_for_read(_PATH_PROCNET_IFINET6);
+ 	if (f != NULL) {
+ 		while (fscanf
+ 			   (f, "%4s%4s%4s%4s%4s%4s%4s%4s %08x %02x %02x %02x %20s\n",
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index 17af41f..bdccad6 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -64,7 +64,7 @@ static unsigned get_hz(void)
+ 	if (hz_internal)
+ 		return hz_internal;
+ 
+-	fp = fopen("/proc/net/psched", "r");
++	fp = fopen_for_read("/proc/net/psched");
+ 	if (fp) {
+ 		unsigned nom, denom;
+ 
+diff --git a/networking/libiproute/rt_names.c b/networking/libiproute/rt_names.c
+index 797c83b..b22df9c 100644
+--- a/networking/libiproute/rt_names.c
++++ b/networking/libiproute/rt_names.c
+@@ -18,7 +18,7 @@ static void rtnl_tab_initialize(const char *file, const char **tab, int size)
+ 	char buf[512];
+ 	FILE *fp;
+ 
+-	fp = fopen(file, "r");
++	fp = fopen_for_read(file);
+ 	if (!fp)
+ 		return;
+ 	while (fgets(buf, sizeof(buf), fp)) {
+diff --git a/networking/nameif.c b/networking/nameif.c
+index 76a8cb7..5a3bd60 100644
+--- a/networking/nameif.c
++++ b/networking/nameif.c
+@@ -170,7 +170,7 @@ int nameif_main(int argc, char **argv)
+ 	}
+ 
+ 	ctl_sk = xsocket(PF_INET, SOCK_DGRAM, 0);
+-	ifh = xfopen("/proc/net/dev", "r");
++	ifh = xfopen_for_read("/proc/net/dev");
+ 
+ 	linenum = 0;
+ 	while (clist) {
+diff --git a/networking/netstat.c b/networking/netstat.c
+index 24b2654..46510ac 100644
+--- a/networking/netstat.c
++++ b/networking/netstat.c
+@@ -466,7 +466,7 @@ static void do_info(const char *file, const char *name, int (*proc)(int, char *)
+ 	FILE *procinfo;
+ 	char *buffer;
+ 
+-	procinfo = fopen(file, "r");
++	procinfo = fopen_for_read(file);
+ 	if (procinfo == NULL) {
+ 		if (errno != ENOENT) {
+ 			bb_simple_perror_msg(file);
+diff --git a/networking/route.c b/networking/route.c
+index 7b6d4f4..2bc2f92 100644
+--- a/networking/route.c
++++ b/networking/route.c
+@@ -484,7 +484,7 @@ void FAST_FUNC bb_displayroutes(int noresolve, int netstatfmt)
+ 	struct sockaddr_in s_addr;
+ 	struct in_addr mask;
+ 
+-	FILE *fp = xfopen("/proc/net/route", "r");
++	FILE *fp = xfopen_for_read("/proc/net/route");
+ 
+ 	printf("Kernel IP routing table\n"
+ 	       "Destination     Gateway         Genmask         Flags %s Iface\n",
+@@ -552,7 +552,7 @@ static void INET6_displayroutes(void)
+ 	int iflags, metric, refcnt, use, prefix_len, slen;
+ 	struct sockaddr_in6 snaddr6;
+ 
+-	FILE *fp = xfopen("/proc/net/ipv6_route", "r");
++	FILE *fp = xfopen_for_read("/proc/net/ipv6_route");
+ 
+ 	printf("Kernel IPv6 routing table\n%-44s%-40s"
+ 			  "Flags Metric Ref    Use Iface\n",
+diff --git a/networking/traceroute.c b/networking/traceroute.c
+index f16fc79..4e6ca2d 100644
+--- a/networking/traceroute.c
++++ b/networking/traceroute.c
+@@ -508,7 +508,7 @@ findsaddr(const struct sockaddr_in *to, struct sockaddr_in *from)
+ 	struct IFADDRLIST *al;
+ 	char buf[256], tdevice[256], device[256];
+ 
+-	f = xfopen("/proc/net/route", "r");
++	f = xfopen_for_read("/proc/net/route");
+ 
+ 	/* Find the appropriate interface */
+ 	n = 0;
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index fe6bff4..264a988 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -321,9 +321,7 @@ void read_config(const char *file)
+ 	if (!parser)
+ 		return;
+ 
+-	while (config_read(parser, token, 2, 0, "# \t", PARSE_LAST_IS_GREEDY)) {
+-		if (!token[1])
+-			continue;
++	while (config_read(parser, token, 2, 2, "# \t", PARSE_LAST_IS_GREEDY)) {
+ 		for (k = keywords, i = 0; i < ARRAY_SIZE(keywords); k++, i++) {
+ 			if (!strcasecmp(token[0], k->keyword)) {
+ 				if (!k->handler(token[1], k->var)) {
+diff --git a/procps/fuser.c b/procps/fuser.c
+index ca7c7e2..d2ac9eb 100644
+--- a/procps/fuser.c
++++ b/procps/fuser.c
+@@ -109,7 +109,7 @@ static inode_list *scan_proc_net(const char *proto,
+ 	tmp_dev = find_socket_dev();
+ 
+ 	sprintf(path, "/proc/net/%s", proto);
+-	f = fopen(path, "r");
++	f = fopen_for_read(path);
+ 	if (!f)
+ 		return ilist;
+ 
+@@ -158,7 +158,7 @@ static pid_list *scan_pid_maps(const char *fname, pid_t pid,
+ 	long long uint64_inode;
+ 	dev_t dev;
+ 
+-	file = fopen(fname, "r");
++	file = fopen_for_read(fname);
+ 	if (!file)
+ 		return plist;
+ 	while (fgets(line, MAX_LINE, file)) {
+diff --git a/procps/sysctl.c b/procps/sysctl.c
+index 6e582b0..3fe6f6f 100644
+--- a/procps/sysctl.c
++++ b/procps/sysctl.c
+@@ -98,10 +98,11 @@ static int sysctl_preload_file_and_exit(const char *filename)
+ 	if (!parser)
+ 		return 1;
+ 
+-	while (config_read(parser, token, 2, 0, "# \t=", PARSE_LAST_IS_GREEDY)) { // TODO: ';' is comment char too
+-		if (!token[1]) {
+-			bb_error_msg(WARN_BAD_LINE, filename, parser->lineno);
+-		} else {
++	while (config_read(parser, token, 2, 2, "# \t=", PARSE_LAST_IS_GREEDY)) { // TODO: ';' is comment char too
++//		if (!token[1]) {
++//			bb_error_msg(WARN_BAD_LINE, filename, parser->lineno);
++//		} else {
++		{
+ #if 0
+ 			char *s = xasprintf("%s=%s", token[0], token[1]);
+ 			sysctl_write_setting(s);
+@@ -205,7 +206,7 @@ static int sysctl_read_setting(const char *name)
+ 	while ((cptr = strchr(outname, '/')) != NULL)
+ 		*cptr = '.';
+ 
+-	fp = fopen(tmpname, "r");
++	fp = fopen_for_read(tmpname);
+ 	if (fp == NULL) {
+ 		switch (errno) {
+ 		case ENOENT:
+diff --git a/procps/top.c b/procps/top.c
+index 392a3c8..1a6b8ab 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -164,7 +164,7 @@ static int mult_lvl_cmp(void* a, void* b)
+ 
+ static void get_jiffy_counts(void)
+ {
+-	FILE* fp = xfopen("stat", "r");
++	FILE* fp = xfopen_for_read("stat");
+ 	prev_jif = jif;
+ 	if (fscanf(fp, "cpu  %lld %lld %lld %lld %lld %lld %lld %lld",
+ 			&jif.usr,&jif.nic,&jif.sys,&jif.idle,
+@@ -268,7 +268,7 @@ static unsigned long display_header(int scr_width)
+ #endif
+ 
+ 	/* read memory info */
+-	fp = xfopen("meminfo", "r");
++	fp = xfopen_for_read("meminfo");
+ 
+ 	/*
+ 	 * Old kernels (such as 2.4.x) had a nice summary of memory info that
+@@ -617,7 +617,7 @@ static void display_topmem_header(int scr_width)
+ 	memset(&Z, 0, sizeof(Z));
+ 
+ 	/* read memory info */
+-	fp = xfopen("meminfo", "r");
++	fp = xfopen_for_read("meminfo");
+ 	while (fgets(linebuf, sizeof(linebuf), fp)) {
+ 		char *p;
+ 
+diff --git a/scripts/basic/split-include.c b/scripts/basic/split-include.c
+index 459c452..60934b5 100644
+--- a/scripts/basic/split-include.c
++++ b/scripts/basic/split-include.c
+@@ -154,7 +154,7 @@ int main(int argc, const char * argv [])
+ 	    }
+ 
+ 	    /* Write the file. */
+-	    if ((fp_target = fopen(ptarget, "w" )) == NULL)
++	    if ((fp_target = fopen(ptarget,  "w")) == NULL)
+ 		ERROR_EXIT(ptarget);
+ 	    fputs(line, fp_target);
+ 	    if (ferror(fp_target) || fclose(fp_target) != 0)
+diff --git a/selinux/setfiles.c b/selinux/setfiles.c
+index d567f83..8eb04e6 100644
+--- a/selinux/setfiles.c
++++ b/selinux/setfiles.c
+@@ -554,7 +554,7 @@ int setfiles_main(int argc, char **argv)
+ 	if ((applet_name[0] == 's') && (flags & OPT_c)) {
+ 		FILE *policystream;
+ 
+-		policystream = xfopen(policyfile, "r");
++		policystream = xfopen_for_read(policyfile);
+ 		if (sepol_set_policydb_from_file(policystream) < 0) {
+ 			bb_error_msg_and_die("sepol_set_policydb_from_file on %s", policyfile);
+ 		}
+@@ -575,7 +575,7 @@ int setfiles_main(int argc, char **argv)
+ 	if (flags & OPT_o) {
+ 		outfile = stdout;
+ 		if (NOT_LONE_CHAR(out_filename, '-')) {
+-			outfile = xfopen(out_filename, "w");
++			outfile = xfopen_for_write(out_filename);
+ 		}
+ 	}
+ 	if (applet_name[0] == 'r') { /* restorecon */
+@@ -620,7 +620,7 @@ int setfiles_main(int argc, char **argv)
+ 		FILE *f = stdin;
+ 
+ 		if (NOT_LONE_CHAR(input_filename, '-'))
+-			f = xfopen(input_filename, "r");
++			f = xfopen_for_read(input_filename);
+ 		while ((len = getline(&buf, &buf_len, f)) > 0) {
+ 			buf[len - 1] = '\0';
+ 			errors |= process_one(buf);
+diff --git a/shell/bbsh.c b/shell/bbsh.c
+index 3be64ee..897c022 100644
+--- a/shell/bbsh.c
++++ b/shell/bbsh.c
+@@ -206,7 +206,7 @@ int bbsh_main(int argc, char **argv)
+ 
+ 	getopt32(argv, "c:", &command);
+ 
+-	f = argv[optind] ? xfopen(argv[optind],"r") : NULL;
++	f = argv[optind] ? xfopen_for_read(argv[optind]) : NULL;
+ 	if (command) handle(command);
+ 	else {
+ 		unsigned cmdlen=0;
+diff --git a/shell/hush.c b/shell/hush.c
+index 3dc27d9..cf6a18f 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -4012,7 +4012,7 @@ int hush_main(int argc, char **argv)
+ 
+ 	if (argv[0] && argv[0][0] == '-') {
+ 		debug_printf("sourcing /etc/profile\n");
+-		input = fopen("/etc/profile", "r");
++		input = fopen_for_read("/etc/profile");
+ 		if (input != NULL) {
+ 			close_on_exec_on(fileno(input));
+ 			parse_and_run_file(input);
+@@ -4116,7 +4116,7 @@ int hush_main(int argc, char **argv)
+ 		debug_printf("\nrunning script '%s'\n", argv[optind]);
+ 		global_argv = argv + optind;
+ 		global_argc = argc - optind;
+-		input = xfopen(argv[optind], "r");
++		input = xfopen_for_read(argv[optind]);
+ 		fcntl(fileno(input), F_SETFD, FD_CLOEXEC);
+ 		opt = parse_and_run_file(input);
+ 	}
+@@ -4423,7 +4423,7 @@ static int builtin_source(char **argv)
+ 		return EXIT_FAILURE;
+ 
+ 	/* XXX search through $PATH is missing */
+-	input = fopen(argv[1], "r");
++	input = fopen_for_read(argv[1]);
+ 	if (!input) {
+ 		bb_error_msg("can't open '%s'", argv[1]);
+ 		return EXIT_FAILURE;
+diff --git a/shell/lash_unused.c b/shell/lash_unused.c
+index 7084089..90b1f56 100644
+--- a/shell/lash_unused.c
++++ b/shell/lash_unused.c
+@@ -1513,7 +1513,7 @@ int lash_main(int argc, char **argv)
+ 
+ 	if (global_argv[0] && global_argv[0][0] == '-') {
+ 		FILE *prof_input;
+-		prof_input = fopen("/etc/profile", "r");
++		prof_input = fopen_for_read("/etc/profile");
+ 		if (prof_input) {
+ 			llist_add_to(&close_me_list, (void *)(long)fileno(prof_input));
+ 			/* Now run the file */
+@@ -1553,7 +1553,7 @@ int lash_main(int argc, char **argv)
+ 		}
+ 	} else if (!local_pending_command && global_argv[optind]) {
+ 		//printf( "optind=%d  argv[optind]='%s'\n", optind, argv[optind]);
+-		input = xfopen(global_argv[optind], "r");
++		input = xfopen_for_read(global_argv[optind]);
+ 		/* be lazy, never mark this closed */
+ 		llist_add_to(&close_me_list, (void *)(long)fileno(input));
+ 	}
+diff --git a/util-linux/fbset.c b/util-linux/fbset.c
+index ab7770d..ac45fe8 100644
+--- a/util-linux/fbset.c
++++ b/util-linux/fbset.c
+@@ -178,7 +178,7 @@ static int readmode(struct fb_var_screeninfo *base, const char *fn,
+ 	char buf[256];
+ 	char *p = buf;
+ 
+-	f = xfopen(fn, "r");
++	f = xfopen_for_read(fn);
+ 	while (!feof(f)) {
+ 		fgets(buf, sizeof(buf), f);
+ 		p = strstr(buf, "mode ");
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index 702567a..b1f0b65 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -2684,7 +2684,7 @@ is_ide_cdrom_or_tape(const char *device)
+ 		return 0;
+ 
+ 	snprintf(buf, sizeof(buf), "/proc/ide/%s/media", device+5);
+-	procf = fopen(buf, "r");
++	procf = fopen_for_read(buf);
+ 	if (procf != NULL && fgets(buf, sizeof(buf), procf))
+ 		is_ide = (!strncmp(buf, "cdrom", 5) ||
+ 			  !strncmp(buf, "tape", 4));
+diff --git a/util-linux/fdisk_sun.c b/util-linux/fdisk_sun.c
+index 427efbe..d1a436b 100644
+--- a/util-linux/fdisk_sun.c
++++ b/util-linux/fdisk_sun.c
+@@ -181,7 +181,7 @@ sun_autoconfigure_scsi(void)
+ 		id[0] & 0xff,
+ 		(id[0]>>8) & 0xff
+ 	);
+-	pfd = fopen("/proc/scsi/scsi", "r");
++	pfd = fopen_for_read("/proc/scsi/scsi");
+ 	if (!pfd) {
+ 		return NULL;
+ 	}
+diff --git a/util-linux/hexdump.c b/util-linux/hexdump.c
+index 4d2b059..8ac12f0 100644
+--- a/util-linux/hexdump.c
++++ b/util-linux/hexdump.c
+@@ -14,24 +14,13 @@
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+-
+ static void bb_dump_addfile(dumper_t *dumper, char *name)
+ {
+-	char *p;
+-	FILE *fp;
+-	char *buf;
+-
+-	fp = xfopen(name, "r");
+-
+-	while ((buf = xmalloc_fgetline(fp)) != NULL) {
+-		p = skip_whitespace(buf);
+-
+-		if (*p && (*p != '#')) {
+-			bb_dump_add(dumper, p);
+-		}
+-		free(buf);
++	parser_t *parser = config_open2(name, xfopen_for_read);
++	while (config_read(parser, &name, 1, 1, "# \t", 0)) {
++		bb_dump_add(dumper, name);
+ 	}
+-	fclose(fp);
++	config_close(parser);
+ }
+ 
+ static const char *const add_strings[] = {
+@@ -131,7 +120,7 @@ int hexdump_main(int argc, char **argv)
+ 
+ 	do {
+ 		char *buf;
+-		fp = xfopen(*argv, "r");
++		fp = xfopen_for_read(*argv);
+  jump_in:
+ 		while ((buf = xmalloc_fgetline(fp)) != NULL) {
+ 			p = buf;
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 8c3991a..b29bf5a 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -540,7 +540,7 @@ static void get_list_blocks(char *filename)
+ 	FILE *listfile;
+ 	unsigned long blockno;
+ 
+-	listfile = xfopen(filename, "r");
++	listfile = xfopen_for_read(filename);
+ 	while (!feof(listfile)) {
+ 		fscanf(listfile, "%ld\n", &blockno);
+ 		mark_zone(blockno);
+diff --git a/util-linux/more.c b/util-linux/more.c
+index 9395466..cf8e137 100644
+--- a/util-linux/more.c
++++ b/util-linux/more.c
+@@ -72,7 +72,7 @@ int more_main(int argc UNUSED_PARAM, char **argv)
+ 	 * is not a tty and turns into cat. This makes sense. */
+ 	if (!isatty(STDOUT_FILENO))
+ 		return bb_cat(argv);
+-	cin = fopen(CURRENT_TTY, "r");
++	cin = fopen_for_read(CURRENT_TTY);
+ 	if (!cin)
+ 		return bb_cat(argv);
+ 
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 31f433b..2288e2c 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -363,7 +363,7 @@ static llist_t *get_block_backed_filesystems(void)
+ 	FILE *f;
+ 
+ 	for (i = 0; i < 2; i++) {
+-		f = fopen(filesystems[i], "r");
++		f = fopen_for_read(filesystems[i]);
+ 		if (!f) continue;
+ 
+ 		while ((buf = xmalloc_fgetline(f)) != NULL) {
+diff --git a/util-linux/readprofile.c b/util-linux/readprofile.c
+index 1c15712..1f5ba2e 100644
+--- a/util-linux/readprofile.c
++++ b/util-linux/readprofile.c
+@@ -144,7 +144,7 @@ int readprofile_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	total = 0;
+ 
+-	map = xfopen(mapFile, "r");
++	map = xfopen_for_read(mapFile);
+ 
+ 	while (fgets(mapline, S_LEN, map)) {
+ 		if (sscanf(mapline, "%llx %s %s", &fn_add, mode, fn_name) != 3)
+diff --git a/util-linux/volume_id/get_devname.c b/util-linux/volume_id/get_devname.c
+index d1968b7..f9a2c90 100644
+--- a/util-linux/volume_id/get_devname.c
++++ b/util-linux/volume_id/get_devname.c
+@@ -165,7 +165,7 @@ uuidcache_init_partitions(void)
+ 	int handleOnFirst;
+ 	char *chptr;
+ 
+-	procpt = xfopen("/proc/partitions", "r");
++	procpt = xfopen_for_read("/proc/partitions");
+ /*
+ # cat /proc/partitions
+ major minor  #blocks  name
+@@ -259,7 +259,7 @@ uuidcache_init_cdroms(void)
+ 	int ma, mi;
+ 	FILE *proccd;
+ 
+-	proccd = fopen(PROC_CDROMS, "r");
++	proccd = fopen_for_read(PROC_CDROMS);
+ 	if (!proccd) {
+ //		static smallint warn = 0;
+ //		if (!warn) {

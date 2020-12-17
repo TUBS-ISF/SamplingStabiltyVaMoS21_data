@@ -1,0 +1,61 @@
+2008-04-23 07:02:02 +0000
+diff --git a/testsuite/du/du-h-works b/testsuite/du/du-h-works
+index 82041ab..3f8ff3d 100644
+--- a/testsuite/du/du-h-works
++++ b/testsuite/du/du-h-works
+@@ -1,4 +1,4 @@
+-[ -n "$d" ] || d=..
++d=/bin
+ du -h "$d" > logfile.gnu
+ busybox du -h "$d" > logfile.bb
+ cmp logfile.gnu logfile.bb
+diff --git a/testsuite/du/du-k-works b/testsuite/du/du-k-works
+index 177a1a2..6c2c5d0 100644
+--- a/testsuite/du/du-k-works
++++ b/testsuite/du/du-k-works
+@@ -1,4 +1,4 @@
+-[ -n "$d" ] || d=..
++d=/bin
+ du -k "$d" > logfile.gnu
+ busybox du -k "$d" > logfile.bb
+ cmp logfile.gnu logfile.bb
+diff --git a/testsuite/du/du-l-works b/testsuite/du/du-l-works
+index 61e9140..c3d2ec0 100644
+--- a/testsuite/du/du-l-works
++++ b/testsuite/du/du-l-works
+@@ -1,4 +1,4 @@
+-[ -n "$d" ] || d=..
++d=/bin
+ du -l "$d" > logfile.gnu
+ busybox du -l "$d" > logfile.bb
+ cmp logfile.gnu logfile.bb
+diff --git a/testsuite/du/du-m-works b/testsuite/du/du-m-works
+index bc97073..bf0a90e 100644
+--- a/testsuite/du/du-m-works
++++ b/testsuite/du/du-m-works
+@@ -1,4 +1,4 @@
+-[ -n "$d" ] || d=..
++d=/bin
+ du -m "$d" > logfile.gnu
+ busybox du -m "$d" > logfile.bb
+ cmp logfile.gnu logfile.bb
+diff --git a/testsuite/du/du-s-works b/testsuite/du/du-s-works
+index f0b3bf0..ae97077 100644
+--- a/testsuite/du/du-s-works
++++ b/testsuite/du/du-s-works
+@@ -1,4 +1,4 @@
+-[ -n "$d" ] || d=..
++d=/bin
+ du -s "$d" > logfile.gnu
+ busybox du -s "$d" > logfile.bb
+ cmp logfile.gnu logfile.bb
+diff --git a/testsuite/du/du-works b/testsuite/du/du-works
+index 47949c6..46a336d 100644
+--- a/testsuite/du/du-works
++++ b/testsuite/du/du-works
+@@ -1,4 +1,4 @@
+-[ -n "$d" ] || d=..
++d=/bin
+ du "$d" > logfile.gnu
+ busybox du "$d" > logfile.bb
+ cmp logfile.gnu logfile.bb

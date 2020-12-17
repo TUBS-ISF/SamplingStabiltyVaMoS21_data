@@ -1,0 +1,233 @@
+2007-06-13 12:27:17 +0000
+diff --git a/applets/applets.c b/applets/applets.c
+index f341242..cff792f 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -467,11 +467,11 @@ void bb_show_usage(void)
+ 			i--;
+ 		}
+ 
+-		format_string = "%s\n\nUsage: %s %s\n\n";
++		fprintf(stderr, "%s multi-call binary\n", bb_banner);
++		format_string = "\nUsage: %s %s\n\n";
+ 		if (*p == '\b')
+-			format_string = "%s\n\nNo help available.\n\n";
+-		fprintf(stderr, format_string, bb_msg_full_version,
+-					applet_name, p);
++			format_string = "\nNo help available.\n\n";
++		fprintf(stderr, format_string, applet_name, p);
+ 		dealloc_usage_messages((char*)usage_string);
+ 	}
+ 	xfunc_die();
+@@ -550,8 +550,8 @@ static int busybox_main(char **argv)
+ 		/* leading tab and room to wrap */
+ 		output_width -= sizeof("start-stop-daemon, ") + 8;
+ 
+-		printf("%s\n"
+-		       "Copyright (C) 1998-2006  Erik Andersen, Rob Landley, and others.\n"
++		printf("%s multi-call binary\n", bb_banner); /* reuse const string... */
++		printf("Copyright (C) 1998-2006  Erik Andersen, Rob Landley, and others.\n"
+ 		       "Licensed under GPLv2.  See source distribution for full notice.\n"
+ 		       "\n"
+ 		       "Usage: busybox [function] [arguments]...\n"
+@@ -561,7 +561,7 @@ static int busybox_main(char **argv)
+ 		       "\tutilities into a single executable.  Most people will create a\n"
+ 		       "\tlink to busybox for each function they wish to use and BusyBox\n"
+ 		       "\twill act like whatever it was invoked as!\n"
+-		       "\nCurrently defined functions:\n", bb_msg_full_version);
++		       "\nCurrently defined functions:\n");
+ 		col = 0;
+ 		a = applets;
+ 		while (a->name) {
+diff --git a/include/libbb.h b/include/libbb.h
+index 5aa95ea..c0c417c 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -927,9 +927,8 @@ enum {	/* DO NOT CHANGE THESE VALUES!  cp.c, mv.c, install.c depend on them. */
+ #define FILEUTILS_CP_OPTSTR "pdRfils" USE_SELINUX("c")
+ extern const struct bb_applet *current_applet;
+ extern const char *applet_name;
+-extern const char BB_BANNER[];
+-
+-extern const char bb_msg_full_version[];
++/* "BusyBox vN.N.N (timestamp or extra_vestion)" */
++extern const char bb_banner[];
+ extern const char bb_msg_memory_exhausted[];
+ extern const char bb_msg_invalid_date[];
+ extern const char bb_msg_read_error[];
+diff --git a/init/init.c b/init/init.c
+index 6fcdc03..da79d10 100644
+--- a/init/init.c
++++ b/init/init.c
+@@ -934,7 +934,7 @@ int init_main(int argc, char **argv)
+ 	if (argc > 1) setenv("RUNLEVEL", argv[1], 1);
+ 
+ 	/* Hello world */
+-	message(MAYBE_CONSOLE | L_LOG, "init started: %s", bb_msg_full_version);
++	message(MAYBE_CONSOLE | L_LOG, "init started: %s", bb_banner);
+ 
+ 	/* Make sure there is enough memory to do something useful. */
+ 	if (ENABLE_SWAPONOFF) {
+diff --git a/libbb/correct_password.c b/libbb/correct_password.c
+index 6255f7e..d0f68c0 100644
+--- a/libbb/correct_password.c
++++ b/libbb/correct_password.c
+@@ -47,9 +47,14 @@ int correct_password(const struct passwd *pw)
+ 	char buffer[256];
+ #endif
+ 
+-	correct = bb_msg_full_version; /* fake salt. crypt() can choke otherwise */
+-	if (!pw)
+-		goto fake_it; /* The content of 'correct' will never match */
++	/* fake salt. crypt() can choke otherwise.
++	 * (bb_banner's first two chars are letters and thus are valid salt) */
++	correct = bb_banner;
++	if (!pw) {
++		/* bb_banner will never match, it contains () which is never
++		 * generated in valid encrypted passwords. */
++		goto fake_it;
++	}
+ 	correct = pw->pw_passwd;
+ #if ENABLE_FEATURE_SHADOWPASSWDS
+ 	if (LONE_CHAR(pw->pw_passwd, 'x') || LONE_CHAR(pw->pw_passwd, '*')) {
+diff --git a/libbb/messages.c b/libbb/messages.c
+index 56cccaf..8cab2dc 100644
+--- a/libbb/messages.c
++++ b/libbb/messages.c
+@@ -12,8 +12,7 @@
+ #else
+ #define BANNER "BusyBox v" BB_VER " (" BB_EXTRA_VERSION ")"
+ #endif
+-const char BB_BANNER[] = BANNER;
+-const char bb_msg_full_version[] = BANNER " multi-call binary";
++const char bb_banner[] = BANNER;
+ 
+ const char bb_msg_memory_exhausted[] = "memory exhausted";
+ const char bb_msg_invalid_date[] = "invalid date '%s'";
+diff --git a/shell/ash.c b/shell/ash.c
+index 173beb1..35eec42 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -7737,16 +7737,16 @@ setinteractive(int on)
+ #if !ENABLE_FEATURE_SH_EXTRA_QUIET
+ 	if (is_interactive > 1) {
+ 		/* Looks like they want an interactive shell */
+-		static smallint do_banner;
++		static smallint did_banner;
+ 
+-		if (!do_banner) {
++		if (!did_banner) {
+ 			out1fmt(
+ 				"\n\n"
+-				"%s Built-in shell (ash)\n"
++				"%s built-in shell (ash)\n"
+ 				"Enter 'help' for a list of built-in commands."
+ 				"\n\n",
+-				BB_BANNER);
+-			do_banner = 1;
++				bb_banner);
++			did_banner = 1;
+ 		}
+ 	}
+ #endif
+diff --git a/shell/hush.c b/shell/hush.c
+index e6fa3d9..a446bbe 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3787,7 +3787,7 @@ int hush_main(int argc, char **argv)
+ 			hush_exit(xfunc_error_retval);
+ 		}
+ #if !ENABLE_FEATURE_SH_EXTRA_QUIET
+-		printf("\n\n%s hush - the humble shell v"HUSH_VER_STR"\n", BB_BANNER);
++		printf("\n\n%s hush - the humble shell v"HUSH_VER_STR"\n", bb_banner);
+ 		printf("Enter 'help' for a list of built-in commands.\n\n");
+ #endif
+ 	}
+diff --git a/shell/lash.c b/shell/lash.c
+index 21c95fb..4e8b237 100644
+--- a/shell/lash.c
++++ b/shell/lash.c
+@@ -1548,9 +1548,9 @@ int lash_main(int argc_l, char **argv_l)
+ 	if (opt & LASH_OPT_i) {
+ 		/* Looks like they want an interactive shell */
+ 		if (!ENABLE_FEATURE_SH_EXTRA_QUIET) {
+-			printf("\n\n%s Built-in shell (lash)\n"
++			printf("\n\n%s built-in shell (lash)\n"
+ 					"Enter 'help' for a list of built-in commands.\n\n",
+-					BB_BANNER);
++					bb_banner);
+ 		}
+ 	} else if (!local_pending_command && argv[optind]) {
+ 		//printf( "optind=%d  argv[optind]='%s'\n", optind, argv[optind]);
+diff --git a/shell/msh.c b/shell/msh.c
+index dc2fa9c..2328e07 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -36,7 +36,7 @@
+ # define bb_dev_null "/dev/null"
+ # define DEFAULT_SHELL "/proc/self/exe"
+ # define CONFIG_BUSYBOX_EXEC_PATH "/proc/self/exe"
+-# define BB_BANNER "busybox standalone"
++# define bb_banner "busybox standalone"
+ # define ENABLE_FEATURE_SH_STANDALONE 0
+ # define bb_msg_memory_exhausted "memory exhausted"
+ # define xmalloc(size) malloc(size)
+@@ -5315,9 +5315,9 @@ int msh_main(int argc, char **argv)
+ 			interactive++;
+ #if !ENABLE_FEATURE_SH_EXTRA_QUIET
+ #ifdef MSHDEBUG
+-			printf("\n\n%s Built-in shell (msh with debug)\n", BB_BANNER);
++			printf("\n\n%s built-in shell (msh with debug)\n", bb_banner);
+ #else
+-			printf("\n\n%s Built-in shell (msh)\n", BB_BANNER);
++			printf("\n\n%s built-in shell (msh)\n", bb_banner);
+ #endif
+ 			printf("Enter 'help' for a list of built-in commands.\n\n");
+ #endif
+diff --git a/sysklogd/klogd.c b/sysklogd/klogd.c
+index 5beec14..fcc5746 100644
+--- a/sysklogd/klogd.c
++++ b/sysklogd/klogd.c
+@@ -68,7 +68,7 @@ int klogd_main(int argc, char **argv)
+ 	if (option_mask32 & OPT_LEVEL)
+ 		klogctl(8, NULL, i);
+ 
+-	syslog(LOG_NOTICE, "klogd started: %s", BB_BANNER);
++	syslog(LOG_NOTICE, "klogd started: %s", bb_banner);
+ 
+ 	/* Note: this code does not detect incomplete messages
+ 	 * (messages not ending with '\n' or just when kernel
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index 955d66f..74cccf6 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -114,7 +114,6 @@ static smallint version2;
+ enum { version2 = 0 };
+ #endif
+ 
+-#define PROGRAM_VERSION "1.2 - 11/11/96"
+ static smallint repair, automatic, verbose, list, show, warn_mode, force;
+ static smallint changed;  /* is filesystem modified? */
+ static smallint errors_uncorrected;  /* flag if some error was not corrected */
+@@ -1315,7 +1314,7 @@ int fsck_minix_main(int argc, char **argv)
+ 	 * flags and whether or not the -f switch was specified on the
+ 	 * command line.
+ 	 */
+-	printf("%s, "PROGRAM_VERSION"\n", applet_name);
++	printf("%s: %s\n", applet_name, bb_banner);
+ 
+ 	if (!(Super.s_state & MINIX_ERROR_FS)
+ 	 && (Super.s_state & MINIX_VALID_FS) && !force
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index ffdb214..92d6404 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -94,7 +94,7 @@ struct globals {
+ 	int dev_fd;
+ 
+ #if ENABLE_FEATURE_MINIX2
+-	int version2;
++	smallint version2;
+ #define version2 G.version2
+ #endif
+ 	char *device_name;

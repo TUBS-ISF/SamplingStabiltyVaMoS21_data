@@ -1,0 +1,82 @@
+2008-06-07 05:19:31 +0000
+diff --git a/editors/diff.c b/editors/diff.c
+index eac4b08..4e51f6f 100644
+--- a/editors/diff.c
++++ b/editors/diff.c
+@@ -1021,11 +1021,12 @@ static unsigned diffreg(char *file1, char *file2, int flags)
+ 	rval = D_SAME;
+ 
+ 	if (flags & D_EMPTY1)
+-		f1 = xfopen(bb_dev_null, "r");
++		/* can't be stdin, but xfopen_stdin() is smaller code */
++		f1 = xfopen_stdin(bb_dev_null);
+ 	else
+ 		f1 = xfopen_stdin(file1);
+ 	if (flags & D_EMPTY2)
+-		f2 = xfopen(bb_dev_null, "r");
++		f2 = xfopen_stdin(bb_dev_null);
+ 	else
+ 		f2 = xfopen_stdin(file2);
+ 
+diff --git a/findutils/grep.c b/findutils/grep.c
+index 6af1b46..fc78938 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -126,7 +126,7 @@ struct globals {
+ typedef struct grep_list_data_t {
+ 	char *pattern;
+ 	regex_t preg;
+-#define PATTERN_MEM_A 1
++#define ALLOCATED 1
+ #define COMPILED 2
+ 	int flg_mem_alocated_compiled;
+ } grep_list_data_t;
+@@ -363,10 +363,10 @@ static void load_regexes_from_file(llist_t *fopt)
+ 
+ 		fopt = cur->link;
+ 		free(cur);
+-		f = xfopen(ffile, "r");
++		f = xfopen_stdin(ffile);
+ 		while ((line = xmalloc_fgetline(f)) != NULL) {
+ 			llist_add_to(&pattern_head,
+-				new_grep_list_data(line, PATTERN_MEM_A));
++				new_grep_list_data(line, ALLOCATED));
+ 		}
+ 	}
+ }
+@@ -486,7 +486,7 @@ int grep_main(int argc, char **argv)
+ 		argc--;
+ 	}
+ 
+-	/* argv[(optind)..(argc-1)] should be names of file to grep through. If
++	/* argv[0..(argc-1)] should be names of file to grep through. If
+ 	 * there is more than one file to grep, we will print the filenames. */
+ 	if (argc > 1)
+ 		print_filename = 1;
+@@ -535,9 +535,9 @@ int grep_main(int argc, char **argv)
+ 			grep_list_data_t *gl = (grep_list_data_t *)pattern_head_ptr->data;
+ 
+ 			pattern_head = pattern_head->link;
+-			if ((gl->flg_mem_alocated_compiled & PATTERN_MEM_A))
++			if (gl->flg_mem_alocated_compiled & ALLOCATED)
+ 				free(gl->pattern);
+-			if ((gl->flg_mem_alocated_compiled & COMPILED))
++			if (gl->flg_mem_alocated_compiled & COMPILED)
+ 				regfree(&(gl->preg));
+ 			free(gl);
+ 			free(pattern_head_ptr);
+diff --git a/testsuite/grep.tests b/testsuite/grep.tests
+index 34c0fe4..b2de2af 100755
+--- a/testsuite/grep.tests
++++ b/testsuite/grep.tests
+@@ -78,6 +78,10 @@ testing "grep handles multiple regexps" "grep -e one -e two input ; echo \$?" \
+ testing "grep -F handles multiple expessions" "grep -F -e one -e two input ; echo \$?" \
+ 	"one\ntwo\n0\n" "one\ntwo\n" ""
+ 
++# -f file/-
++testing "grep can read regexps from stdin" "grep -f - input ; echo \$?" \
++	"two\nthree\n0\n" "tw\ntwo\nthree\n" "tw.\nthr\n"
++
+ optional FEATURE_GREP_EGREP_ALIAS
+ testing "grep -E supports extended regexps" "grep -E fo+" "foo\n" "" \
+ 	"b\ar\nfoo\nbaz"

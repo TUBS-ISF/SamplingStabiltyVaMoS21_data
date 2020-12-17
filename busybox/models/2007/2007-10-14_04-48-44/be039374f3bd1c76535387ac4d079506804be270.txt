@@ -1,0 +1,57 @@
+2007-10-14 04:48:44 +0000
+diff --git a/include/applets.h b/include/applets.h
+index 29a5d09..5b64e3a 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -304,6 +304,7 @@ USE_SETENFORCE(APPLET(setenforce, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_SETFILES(APPLET(setfiles, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_SETKEYCODES(APPLET(setkeycodes, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_SETLOGCONS(APPLET(setlogcons, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
++USE_SETSEBOOL(APPLET(setsebool, _BB_DIR_USR_SBIN, _BB_SUID_NEVER))
+ USE_SETSID(APPLET(setsid, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_SETUIDGID(APPLET_ODDNAME(setuidgid, chpst, _BB_DIR_USR_BIN, _BB_SUID_NEVER, setuidgid))
+ USE_FEATURE_SH_IS_ASH(APPLET_NOUSAGE(sh, ash, _BB_DIR_BIN, _BB_SUID_NEVER))
+diff --git a/include/usage.h b/include/usage.h
+index 4c697d3..e88cf9e 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3056,6 +3056,12 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+ #define setlogcons_full_usage \
+        "Redirect the kernel output to console N (0 for current)"
+ 
++#define setsebool_trivial_usage \
++       "boolean value"
++
++#define setsebool_full_usage \
++       "Change boolean setting"
++
+ #define setsid_trivial_usage \
+        "program [arg ...]"
+ #define setsid_full_usage \
+diff --git a/selinux/Config.in b/selinux/Config.in
+index 77f89c7..c2fc08d 100644
+--- a/selinux/Config.in
++++ b/selinux/Config.in
+@@ -104,5 +104,13 @@ config FEATURE_SETFILES_CHECK_OPTION
+ 	  Support "-c" option (check the validity of the contexts against
+ 	  the specified binary policy) for setfiles. Requires libsepol.
+ 
++config SETSEBOOL
++	bool "setsebool"
++	default n
++	depends on SELINUX
++	help
++	  Enable support for change boolean. 
++	  semanage and -P option is not supported yet.
++
+ endmenu
+ 
+diff --git a/selinux/Kbuild b/selinux/Kbuild
+index 08f49c8..ce353e0 100644
+--- a/selinux/Kbuild
++++ b/selinux/Kbuild
+@@ -16,3 +16,4 @@ lib-$(CONFIG_SELINUXENABLED)	+= selinuxenabled.o
+ lib-$(CONFIG_SETENFORCE)	+= setenforce.o
+ lib-$(CONFIG_SETFILES)		+= setfiles.o
+ lib-$(CONFIG_RESTORECON)	+= setfiles.o
++lib-$(CONFIG_SETSEBOOL)		+= setsebool.o

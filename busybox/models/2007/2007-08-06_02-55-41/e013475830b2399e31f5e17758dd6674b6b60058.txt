@@ -1,0 +1,53 @@
+2007-08-06 02:55:41 +0000
+diff --git a/coreutils/env.c b/coreutils/env.c
+index 31167d0..3008358 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -63,7 +63,7 @@ int env_main(int argc, char** argv)
+ 	if (opt & 1) {
+ 		cleanenv[0] = NULL;
+ 		environ = cleanenv;
+-	} else if (opt & 2) {
++	} else {
+ 		while (unset_env) {
+ 			unsetenv(unset_env->data);
+ 			unset_env = unset_env->link;
+diff --git a/coreutils/printenv.c b/coreutils/printenv.c
+index 2531d5a..19fa832 100644
+--- a/coreutils/printenv.c
++++ b/coreutils/printenv.c
+@@ -14,25 +14,20 @@ extern char **environ;
+ int printenv_main(int argc, char **argv);
+ int printenv_main(int argc, char **argv)
+ {
+-	int e = 0;
+-
+ 	/* no variables specified, show whole env */
+-	if (argc == 1)
++	if (argc == 1) {
++		int e = 0;
+ 		while (environ[e])
+ 			puts(environ[e++]);
+-
+-	/* search for specified variables and print them out if found */
+-	else {
+-		int i;
+-		size_t l;
++	} else {
++		/* search for specified variables and print them out if found */
+ 		char *arg, *env;
+ 
+-		for (i=1; (arg = argv[i]); ++i)
+-			for (; (env = environ[e]); ++e) {
+-				l = strlen(arg);
+-				if (!strncmp(env, arg, l) && env[l] == '=')
+-					puts(env + l + 1);
+-			}
++		while ((arg = *++argv) != NULL) {
++			env = getenv(arg);
++			if (env)
++				puts(env);
++		}
+ 	}
+ 
+ 	fflush_stdout_and_exit(0);

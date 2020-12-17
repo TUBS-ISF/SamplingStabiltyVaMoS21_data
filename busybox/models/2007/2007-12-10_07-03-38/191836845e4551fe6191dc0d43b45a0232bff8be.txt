@@ -1,0 +1,305 @@
+2007-12-10 07:03:38 +0000
+diff --git a/include/usage.h b/include/usage.h
+index f6506b4..12d2cef 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3840,7 +3840,7 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+ 
+ #define udhcpc_trivial_usage \
+        "[-Cfbnqtv] [-c CID] [-V VCLS] [-H HOSTNAME] [-i INTERFACE]\n" \
+-       "	[-p pidfile] [-r IP] [-s script]"
++       "	[-p pidfile] [-r IP] [-s script] [-O dhcp-option]..."
+ #define udhcpc_full_usage \
+ 	USE_GETOPT_LONG( \
+        "	-V,--vendorclass=CLASSID	Vendor class identifier" \
+@@ -3860,6 +3860,7 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "\n	-n,--now	Exit with failure if lease is not immediately obtained" \
+        "\n	-q,--quit	Quit after obtaining lease" \
+        "\n	-R,--release	Release IP on quit" \
++       "\n	-O,--request-option=OPT	Request DHCP option OPT from server" \
+ 	USE_FEATURE_UDHCPC_ARPING( \
+        "\n	-a,--arping	Use arping to validate offered address" \
+ 	) \
+@@ -3882,6 +3883,7 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "\n	-n		Exit with failure if lease is not immediately obtained" \
+        "\n	-q		Quit after obtaining lease" \
+        "\n	-R		Release IP on quit" \
++       "\n	-O OPT		Request DHCP option OPT from server" \
+ 	USE_FEATURE_UDHCPC_ARPING( \
+        "\n	-a		Use arping to validate offered address" \
+ 	) \
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index 406fe34..54f3f0e 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -57,13 +57,18 @@ static void init_packet(struct dhcpMessage *packet, char type)
+  * goes towards the head of the packet. */
+ static void add_requests(struct dhcpMessage *packet)
+ {
++	uint8_t c;
+ 	int end = end_option(packet->options);
+ 	int i, len = 0;
+ 
+ 	packet->options[end + OPT_CODE] = DHCP_PARAM_REQ;
+-	for (i = 0; dhcp_options[i].code; i++)
+-		if (dhcp_options[i].flags & OPTION_REQ)
+-			packet->options[end + OPT_DATA + len++] = dhcp_options[i].code;
++	for (i = 0; (c = dhcp_options[i].code) != 0; i++) {
++		if (dhcp_options[i].flags & OPTION_REQ
++		 || (client_config.opt_mask[c >> 3] & (1 << (c & 7)))
++		) {
++			packet->options[end + OPT_DATA + len++] = c;
++		}
++	}
+ 	packet->options[end + OPT_LEN] = len;
+ 	packet->options[end + OPT_DATA + len] = DHCP_END;
+ 
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index d8077f7..69c35ca 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -133,6 +133,7 @@ int udhcpc_main(int argc, char **argv)
+ {
+ 	uint8_t *temp, *message;
+ 	char *str_c, *str_V, *str_h, *str_F, *str_r, *str_T, *str_A, *str_t;
++	llist_t *list_O = NULL;
+ #if ENABLE_FEATURE_UDHCPC_ARPING
+ 	char *str_W;
+ #endif
+@@ -183,28 +184,29 @@ int udhcpc_main(int argc, char **argv)
+ 	};
+ #if ENABLE_GETOPT_LONG
+ 	static const char udhcpc_longopts[] ALIGN1 =
+-		"clientid\0"      Required_argument "c"
+-		"clientid-none\0" No_argument       "C"
+-		"vendorclass\0"   Required_argument "V"
+-		"foreground\0"    No_argument       "f"
+-		"background\0"    No_argument       "b"
+-		"hostname\0"      Required_argument "H"
+-		"fqdn\0"          Required_argument "F"
+-		"interface\0"     Required_argument "i"
+-		"now\0"           No_argument       "n"
+-		"pidfile\0"       Required_argument "p"
+-		"quit\0"          No_argument       "q"
+-		"release\0"       No_argument       "R"
+-		"request\0"       Required_argument "r"
+-		"script\0"        Required_argument "s"
+-		"timeout\0"       Required_argument "T"
+-		"version\0"       No_argument       "v"
+-		"retries\0"       Required_argument "t"
+-		"tryagain\0"      Required_argument "A"
+-		"syslog\0"        No_argument       "S"
++		"clientid\0"       Required_argument "c"
++		"clientid-none\0"  No_argument       "C"
++		"vendorclass\0"    Required_argument "V"
++		"foreground\0"     No_argument       "f"
++		"background\0"     No_argument       "b"
++		"hostname\0"       Required_argument "H"
++		"fqdn\0"           Required_argument "F"
++		"interface\0"      Required_argument "i"
++		"now\0"            No_argument       "n"
++		"pidfile\0"        Required_argument "p"
++		"quit\0"           No_argument       "q"
++		"release\0"        No_argument       "R"
++		"request\0"        Required_argument "r"
++		"script\0"         Required_argument "s"
++		"timeout\0"        Required_argument "T"
++		"version\0"        No_argument       "v"
++		"retries\0"        Required_argument "t"
++		"tryagain\0"       Required_argument "A"
++		"syslog\0"         No_argument       "S"
+ #if ENABLE_FEATURE_UDHCPC_ARPING
+-		"arping\0"        No_argument       "a"
++		"arping\0"         No_argument       "a"
+ #endif
++		"request-option\0" Required_argument "O"
+ 		;
+ #endif
+ 	/* Default options. */
+@@ -212,16 +214,18 @@ int udhcpc_main(int argc, char **argv)
+ 	client_config.script = DEFAULT_SCRIPT;
+ 
+ 	/* Parse command line */
+-	opt_complementary = "c--C:C--c"; // mutually exclusive
++	opt_complementary = "c--C:C--c:O::"; // Cc: mutually exclusive; O: list
+ #if ENABLE_GETOPT_LONG
+ 	applet_long_options = udhcpc_longopts;
+ #endif
+ 	opt = getopt32(argv, "c:CV:fbH:h:F:i:np:qRr:s:T:t:vSA:"
+ 		USE_FEATURE_UDHCPC_ARPING("aW:")
+-		, &str_c, &str_V, &str_h, &str_h, &str_F,
+-		&client_config.interface, &client_config.pidfile, &str_r,
+-		&client_config.script, &str_T, &str_t, &str_A
++		"O:"
++		, &str_c, &str_V, &str_h, &str_h, &str_F
++		, &client_config.interface, &client_config.pidfile, &str_r
++		, &client_config.script, &str_T, &str_t, &str_A
+ 		USE_FEATURE_UDHCPC_ARPING(, &str_W)
++		, &list_O
+ 		);
+ 
+ 	if (opt & OPT_c)
+@@ -268,11 +272,18 @@ int udhcpc_main(int argc, char **argv)
+ 		puts("version "BB_VER);
+ 		return 0;
+ 	}
+-
+ 	if (opt & OPT_S) {
+ 		openlog(applet_name, LOG_PID, LOG_LOCAL0);
+ 		logmode |= LOGMODE_SYSLOG;
+ 	}
++	while (list_O) {
++		int n = index_in_strings(dhcp_option_strings, list_O->data);
++		if (n < 0)
++			bb_error_msg_and_die("unknown option '%s'", list_O->data);
++		n = dhcp_options[n].code;
++		client_config.opt_mask[n >> 3] |= 1 << (n & 7);
++		list_O = list_O->link;
++	}
+ 
+ 	if (read_interface(client_config.interface, &client_config.ifindex,
+ 			   NULL, client_config.arp))
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index c0172a8..e818896 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -30,6 +30,7 @@ struct client_config_t {
+ 	uint8_t *fqdn;                  /* Optional fully qualified domain name to use */
+ 	int ifindex;                    /* Index number of the interface to use */
+ 	uint8_t arp[6];                 /* Our arp address */
++	uint8_t opt_mask[256 / 8];      /* Bitmask of options to send (-O option) */
+ };
+ 
+ #define client_config (*(struct client_config_t*)&bb_common_bufsiz1)
+diff --git a/networking/udhcp/options.c b/networking/udhcp/options.c
+index c224f36..12e5662 100644
+--- a/networking/udhcp/options.c
++++ b/networking/udhcp/options.c
+@@ -11,49 +11,49 @@
+ 
+ /* Supported options are easily added here */
+ const struct dhcp_option dhcp_options[] = {
+-	/* flags                                     code */
+-	{ OPTION_IP | OPTION_REQ,                    0x01 }, /* DHCP_SUBNET        */
+-	{ OPTION_S32,                                0x02 }, /* DHCP_TIME_OFFSET   */
+-	{ OPTION_IP | OPTION_LIST | OPTION_REQ,      0x03 }, /* DHCP_ROUTER        */
+-	{ OPTION_IP | OPTION_LIST,                   0x04 }, /* DHCP_TIME_SERVER   */
+-	{ OPTION_IP | OPTION_LIST,                   0x05 }, /* DHCP_NAME_SERVER   */
+-	{ OPTION_IP | OPTION_LIST | OPTION_REQ,      0x06 }, /* DHCP_DNS_SERVER    */
+-	{ OPTION_IP | OPTION_LIST,                   0x07 }, /* DHCP_LOG_SERVER    */
+-	{ OPTION_IP | OPTION_LIST,                   0x08 }, /* DHCP_COOKIE_SERVER */
+-	{ OPTION_IP | OPTION_LIST,                   0x09 }, /* DHCP_LPR_SERVER    */
+-	{ OPTION_STRING | OPTION_REQ,                0x0c }, /* DHCP_HOST_NAME     */
+-	{ OPTION_U16,                                0x0d }, /* DHCP_BOOT_SIZE     */
+-	{ OPTION_STRING | OPTION_LIST | OPTION_REQ,  0x0f }, /* DHCP_DOMAIN_NAME   */
+-	{ OPTION_IP,                                 0x10 }, /* DHCP_SWAP_SERVER   */
+-	{ OPTION_STRING,                             0x11 }, /* DHCP_ROOT_PATH     */
+-	{ OPTION_U8,                                 0x17 }, /* DHCP_IP_TTL        */
+-	{ OPTION_U16,                                0x1a }, /* DHCP_MTU           */
+-	{ OPTION_IP | OPTION_REQ,                    0x1c }, /* DHCP_BROADCAST     */
+-	{ OPTION_STRING | OPTION_REQ,                0x28 }, /* DHCP_NTP_SERVER    */
+-	{ OPTION_IP | OPTION_LIST | OPTION_REQ,      0x29 }, /* DHCP_WINS_SERVER   */
+-	{ OPTION_IP | OPTION_LIST | OPTION_REQ,      0x2a }, /* DHCP_REQUESTED_IP  */
+-	{ OPTION_IP | OPTION_LIST,                   0x2c }, /* DHCP_LEASE_TIME    */
+-	{ OPTION_IP,                                 0x32 }, /* DHCP_OPTION_OVER   */
+-	{ OPTION_U32,                                0x33 }, /* DHCP_MESSAGE_TYPE  */
+-	{ OPTION_U8,                                 0x35 }, /* DHCP_SERVER_ID     */
+-	{ OPTION_IP,                                 0x36 }, /* DHCP_PARAM_REQ     */
+-	{ OPTION_STRING,                             0x38 }, /* DHCP_MESSAGE       */
+-	{ OPTION_STRING,                             0x3C }, /* DHCP_VENDOR        */
+-	{ OPTION_STRING,                             0x3D }, /* DHCP_CLIENT_ID     */
+-	{ OPTION_STRING,                             0x42 }, /* "tftp"             */
+-	{ OPTION_STRING,                             0x43 }, /* "bootfile"         */
+-	{ OPTION_STRING,                             0x4D }, /* "userclass"        */
++	/* flags                                    code */
++	{ OPTION_IP                   | OPTION_REQ, 0x01 }, /* DHCP_SUBNET        */
++	{ OPTION_S32                              , 0x02 }, /* DHCP_TIME_OFFSET   */
++	{ OPTION_IP | OPTION_LIST     | OPTION_REQ, 0x03 }, /* DHCP_ROUTER        */
++	{ OPTION_IP | OPTION_LIST                 , 0x04 }, /* DHCP_TIME_SERVER   */
++	{ OPTION_IP | OPTION_LIST                 , 0x05 }, /* DHCP_NAME_SERVER   */
++	{ OPTION_IP | OPTION_LIST     | OPTION_REQ, 0x06 }, /* DHCP_DNS_SERVER    */
++	{ OPTION_IP | OPTION_LIST                 , 0x07 }, /* DHCP_LOG_SERVER    */
++	{ OPTION_IP | OPTION_LIST                 , 0x08 }, /* DHCP_COOKIE_SERVER */
++	{ OPTION_IP | OPTION_LIST                 , 0x09 }, /* DHCP_LPR_SERVER    */
++	{ OPTION_STRING               | OPTION_REQ, 0x0c }, /* DHCP_HOST_NAME     */
++	{ OPTION_U16                              , 0x0d }, /* DHCP_BOOT_SIZE     */
++	{ OPTION_STRING | OPTION_LIST | OPTION_REQ, 0x0f }, /* DHCP_DOMAIN_NAME   */
++	{ OPTION_IP                               , 0x10 }, /* DHCP_SWAP_SERVER   */
++	{ OPTION_STRING                           , 0x11 }, /* DHCP_ROOT_PATH     */
++	{ OPTION_U8                               , 0x17 }, /* DHCP_IP_TTL        */
++	{ OPTION_U16                              , 0x1a }, /* DHCP_MTU           */
++	{ OPTION_IP                   | OPTION_REQ, 0x1c }, /* DHCP_BROADCAST     */
++	{ OPTION_STRING                           , 0x28 }, /* nisdomain          */
++	{ OPTION_IP | OPTION_LIST                 , 0x29 }, /* nissrv             */
++	{ OPTION_IP | OPTION_LIST     | OPTION_REQ, 0x2a }, /* DHCP_NTP_SERVER    */
++	{ OPTION_IP | OPTION_LIST                 , 0x2c }, /* DHCP_WINS_SERVER   */
++	{ OPTION_IP                               , 0x32 }, /* DHCP_REQUESTED_IP  */
++	{ OPTION_U32                              , 0x33 }, /* DHCP_LEASE_TIME    */
++	{ OPTION_U8                               , 0x35 }, /* dhcptype           */
++	{ OPTION_IP                               , 0x36 }, /* DHCP_SERVER_ID     */
++	{ OPTION_STRING                           , 0x38 }, /* DHCP_MESSAGE       */
++	{ OPTION_STRING                           , 0x3C }, /* DHCP_VENDOR        */
++	{ OPTION_STRING                           , 0x3D }, /* DHCP_CLIENT_ID     */
++	{ OPTION_STRING                           , 0x42 }, /* tftp               */
++	{ OPTION_STRING                           , 0x43 }, /* bootfile           */
++	{ OPTION_STRING                           , 0x4D }, /* userclass          */
+ #if ENABLE_FEATURE_RFC3397
+-	{ OPTION_STR1035 | OPTION_LIST | OPTION_REQ, 0x77 }, /* "search"           */
++	{ OPTION_STR1035 | OPTION_LIST            , 0x77 }, /* search             */
+ #endif
+ 	/* MSIE's "Web Proxy Autodiscovery Protocol" support */
+-	{ OPTION_STRING,                             0xfc }, /* "wpad"             */
++	{ OPTION_STRING                           , 0xfc }, /* wpad               */
+ 
+ 	/* Options below have no match in dhcp_option_strings[],
+ 	 * are not passed to dhcpc scripts, and cannot be specified
+ 	 * with "option XXX YYY" syntax in dhcpd config file. */
+ 
+-	{ OPTION_U16,                                0x39 }, /* DHCP_MAX_SIZE      */
++	{ OPTION_U16                              , 0x39 }, /* DHCP_MAX_SIZE      */
+ 	{ } /* zeroed terminating entry */
+ };
+ 
+@@ -64,28 +64,28 @@ const char dhcp_option_strings[] ALIGN1 =
+ 	"subnet" "\0"      /* DHCP_SUBNET         */
+ 	"timezone" "\0"    /* DHCP_TIME_OFFSET    */
+ 	"router" "\0"      /* DHCP_ROUTER         */
+-	"timesvr" "\0"     /* DHCP_TIME_SERVER    */
+-	"namesvr" "\0"     /* DHCP_NAME_SERVER    */
++	"timesrv" "\0"     /* DHCP_TIME_SERVER    */
++	"namesrv" "\0"     /* DHCP_NAME_SERVER    */
+ 	"dns" "\0"         /* DHCP_DNS_SERVER     */
+-	"logsvr" "\0"      /* DHCP_LOG_SERVER     */
+-	"cookiesvr" "\0"   /* DHCP_COOKIE_SERVER  */
+-	"lprsvr" "\0"      /* DHCP_LPR_SERVER     */
++	"logsrv" "\0"      /* DHCP_LOG_SERVER     */
++	"cookiesrv" "\0"   /* DHCP_COOKIE_SERVER  */
++	"lprsrv" "\0"      /* DHCP_LPR_SERVER     */
+ 	"hostname" "\0"    /* DHCP_HOST_NAME      */
+ 	"bootsize" "\0"    /* DHCP_BOOT_SIZE      */
+ 	"domain" "\0"      /* DHCP_DOMAIN_NAME    */
+-	"swapsvr" "\0"     /* DHCP_SWAP_SERVER    */
++	"swapsrv" "\0"     /* DHCP_SWAP_SERVER    */
+ 	"rootpath" "\0"    /* DHCP_ROOT_PATH      */
+ 	"ipttl" "\0"       /* DHCP_IP_TTL         */
+ 	"mtu" "\0"         /* DHCP_MTU            */
+ 	"broadcast" "\0"   /* DHCP_BROADCAST      */
+-	"nisdomain" "\0"   /* DHCP_NTP_SERVER     */
+-	"nissrv" "\0"      /* DHCP_WINS_SERVER    */
+-	"ntpsrv" "\0"      /* DHCP_REQUESTED_IP   */
+-	"wins" "\0"        /* DHCP_LEASE_TIME     */
+-	"requestip" "\0"   /* DHCP_OPTION_OVER    */
+-	"lease" "\0"       /* DHCP_MESSAGE_TYPE   */
+-	"dhcptype" "\0"    /* DHCP_SERVER_ID      */
+-	"serverid" "\0"    /* DHCP_PARAM_REQ      */
++	"nisdomain" "\0"   /*                     */
++	"nissrv" "\0"      /*                     */
++	"ntpsrv" "\0"      /* DHCP_NTP_SERVER     */
++	"wins" "\0"        /* DHCP_WINS_SERVER    */
++	"requestip" "\0"   /* DHCP_REQUESTED_IP   */
++	"lease" "\0"       /* DHCP_LEASE_TIME     */
++	"dhcptype" "\0"    /*                     */
++	"serverid" "\0"    /* DHCP_SERVER_ID      */
+ 	"message" "\0"     /* DHCP_MESSAGE        */
+ 	"vendorclass" "\0" /* DHCP_VENDOR         */
+ 	"clientid" "\0"    /* DHCP_CLIENT_ID      */

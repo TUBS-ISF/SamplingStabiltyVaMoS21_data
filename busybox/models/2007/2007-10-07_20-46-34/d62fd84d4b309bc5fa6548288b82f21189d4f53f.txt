@@ -1,0 +1,299 @@
+2007-10-07 20:46:34 +0000
+diff --git a/Config.in b/Config.in
+index b046812..74f8bea 100644
+--- a/Config.in
++++ b/Config.in
+@@ -283,14 +283,15 @@ config STATIC
+ config BUILD_LIBBUSYBOX
+ 	bool "Build shared libbusybox"
+ 	default n
++	depends on !FEATURE_PREFER_APPLETS
+ 	help
+-	  Build a shared library libbusybox.so which contains all
+-	  libraries used inside busybox.
++	  Build a shared library libbusybox.so.N.N.N which contains all
++	  busybox code.
+ 
+-	  This is an experimental feature intended to support the upcoming
+-	  "make standalone" mode.  Enabling it against the one big busybox
+-	  binary serves no purpose (and increases the size).  You should
+-	  almost certainly say "no" to this right now.
++	  This feature allows every applet to be built as a tiny
++	  separate executable.  Enabling it for "one big busybox binary"
++	  approach serves no purpose and increases code size.
++	  You should almost certainly say "no" to this.
+ 
+ ### config FEATURE_FULL_LIBBUSYBOX
+ ###	bool "Feature-complete libbusybox"
+diff --git a/applets/Kbuild b/applets/Kbuild
+index cf7d297..289c5de 100644
+--- a/applets/Kbuild
++++ b/applets/Kbuild
+@@ -4,13 +4,13 @@
+ #
+ # Licensed under the GPL v2, see the file LICENSE in this tarball.
+ 
+-obj-y:=
+-obj-y	    += applets.o
++obj-y :=
++obj-y += applets.o
+ 
+ hostprogs-y:=
+ hostprogs-y += usage
+ 
+-always:=    $(hostprogs-y)
++always:= $(hostprogs-y)
+ 
+ # Generated files need additional love
+ 
+diff --git a/applets/applets.c b/applets/applets.c
+index f91884b..49ad859 100644
+--- a/applets/applets.c
++++ b/applets/applets.c
+@@ -15,6 +15,7 @@
+ #include <assert.h>
+ #include "busybox.h"
+ 
++
+ /* Apparently uclibc defines __GLIBC__ (compat trick?). Oh well. */
+ #if ENABLE_STATIC && defined(__GLIBC__) && !defined(__UCLIBC__)
+ #warning Static linking against glibc produces buggy executables
+@@ -27,32 +28,8 @@
+ #endif
+ 
+ 
+-/* Declare <applet>_main() */
+-#define PROTOTYPES
+-#include "applets.h"
+-#undef PROTOTYPES
+-
+-#if ENABLE_SHOW_USAGE && !ENABLE_FEATURE_COMPRESS_USAGE
+-/* Define usage_messages[] */
+-static const char usage_messages[] ALIGN1 = ""
+-#define MAKE_USAGE
+-#include "usage.h"
+-#include "applets.h"
+-;
+-#undef MAKE_USAGE
+-#else
+-#define usage_messages 0
+-#endif /* SHOW_USAGE */
+-
+-/* Define struct bb_applet applets[] */
+-#include "applets.h"
+-/* The -1 arises because of the {0,NULL,0,-1} entry. */
+-
+-#if ENABLE_FEATURE_SH_STANDALONE
+-const unsigned short NUM_APPLETS = ARRAY_SIZE(applets);
+-#endif
+ const struct bb_applet *current_applet;
+-const char *applet_name ATTRIBUTE_EXTERNALLY_VISIBLE;
++const char *applet_name;
+ #if !BB_MMU
+ bool re_execed;
+ #endif
+@@ -419,82 +396,6 @@ static void check_suid(const struct bb_applet *applet)
+ #endif /* FEATURE_SUID */
+ 
+ 
+-#if ENABLE_FEATURE_COMPRESS_USAGE
+-
+-#include "usage_compressed.h"
+-#include "unarchive.h"
+-
+-static const char *unpack_usage_messages(void)
+-{
+-	char *outbuf = NULL;
+-	bunzip_data *bd;
+-	int i;
+-
+-	i = start_bunzip(&bd,
+-			/* src_fd: */ -1,
+-			/* inbuf:  */ packed_usage,
+-			/* len:    */ sizeof(packed_usage));
+-	/* read_bunzip can longjmp to start_bunzip, and ultimately
+-	 * end up here with i != 0 on read data errors! Not trivial */
+-	if (!i) {
+-		/* Cannot use xmalloc: will leak bd in NOFORK case! */
+-		outbuf = malloc_or_warn(SIZEOF_usage_messages);
+-		if (outbuf)
+-			read_bunzip(bd, outbuf, SIZEOF_usage_messages);
+-	}
+-	dealloc_bunzip(bd);
+-	return outbuf;
+-}
+-#define dealloc_usage_messages(s) free(s)
+-
+-#else
+-
+-#define unpack_usage_messages() usage_messages
+-#define dealloc_usage_messages(s) ((void)(s))
+-
+-#endif /* FEATURE_COMPRESS_USAGE */
+-
+-
+-void bb_show_usage(void)
+-{
+-	if (ENABLE_SHOW_USAGE) {
+-		const char *format_string;
+-		const char *p;
+-		const char *usage_string = p = unpack_usage_messages();
+-		int i;
+-
+-		i = current_applet - applets;
+-		while (i) {
+-			while (*p++) continue;
+-			i--;
+-		}
+-
+-		fprintf(stderr, "%s multi-call binary\n", bb_banner);
+-		format_string = "\nUsage: %s %s\n\n";
+-		if (*p == '\b')
+-			format_string = "\nNo help available.\n\n";
+-		fprintf(stderr, format_string, applet_name, p);
+-		dealloc_usage_messages((char*)usage_string);
+-	}
+-	xfunc_die();
+-}
+-
+-
+-static int applet_name_compare(const void *name, const void *vapplet)
+-{
+-	const struct bb_applet *applet = vapplet;
+-
+-	return strcmp(name, applet->name);
+-}
+-
+-const struct bb_applet *find_applet_by_name(const char *name)
+-{
+-	/* Do a binary search to find the applet entry given the name. */
+-	return bsearch(name, applets, ARRAY_SIZE(applets)-1, sizeof(applets[0]),
+-				applet_name_compare);
+-}
+-
+-
+ #if ENABLE_FEATURE_INSTALLER
+ /* create (sym)links for each applet */
+ static void install_links(const char *busybox, int use_symbolic_links)
+@@ -635,16 +536,9 @@ void run_applet_and_exit(const char *name, char **argv)
+ }
+ 
+ 
+-#ifdef __GLIBC__
+-/* Make it reside in R/W memory: */
+-int *const bb_errno __attribute__ ((section (".data")));
+-#endif
+-
+ int main(int argc, char **argv)
+ {
+-#ifdef __GLIBC__
+-	(*(int **)&bb_errno) = __errno_location();
+-#endif
++	bbox_prepare_main();
+ 
+ #if !BB_MMU
+ 	/* NOMMU re-exec trick sets high-order bit in first byte of name */
+@@ -660,10 +554,6 @@ int main(int argc, char **argv)
+ 
+ 	parse_config_file(); /* ...maybe, if FEATURE_SUID_CONFIG */
+ 
+-	/* Set locale for everybody except 'init' */
+-	if (ENABLE_LOCALE_SUPPORT && getpid() != 1)
+-		setlocale(LC_ALL, "");
+-
+ 	run_applet_and_exit(applet_name, argv);
+ 	bb_error_msg_and_die("applet not found");
+ }
+diff --git a/include/busybox.h b/include/busybox.h
+index 8b3647f..3ab90d5 100644
+--- a/include/busybox.h
++++ b/include/busybox.h
+@@ -48,8 +48,9 @@ struct bb_applet {
+ #endif
+ };
+ 
+-/* Defined in applet.c */
++/* Defined in appletlib.c */
+ extern const struct bb_applet applets[];
+ extern const unsigned short NUM_APPLETS;
++void bbox_prepare_main(void);
+ 
+ #endif	/* _BB_INTERNAL_H_ */
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 55b3658..c6c33bd 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -6,6 +6,7 @@
+ 
+ lib-y:=
+ 
++lib-y += appletlib.o
+ lib-y += ask_confirmation.o
+ lib-y += bb_askpass.o
+ lib-y += bb_basename.o
+diff --git a/scripts/trylink b/scripts/trylink
+index a87d672..e756461 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -128,6 +128,7 @@ if test "$CONFIG_BUILD_LIBBUSYBOX" = y; then
+ 	exit 1
+     }
+     strip -s --remove-section=.note --remove-section=.comment $EXE -o "$sharedlib_dir/libbusybox.so.$BB_VER"
++    chmod a+x "$sharedlib_dir/libbusybox.so.$BB_VER"
+     echo "libbusybox: $sharedlib_dir/libbusybox.so.$BB_VER"
+ fi
+ 
+@@ -160,41 +161,15 @@ if test "$CONFIG_FEATURE_INDIVIDUAL" = y; then
+ 	test x"$cname" = "x[[" && cname=test
+ 
+ 	echo "\
+-#include <errno.h>
+-#include <unistd.h>
+-#include <stdlib.h>
+-#include <stdio.h>
+-#include \"../include/autoconf.h\"
+-#include \"../include/usage.h\"
+-
+-#ifdef __GLIBC__
+-/* Make it reside in R/W memory: */
+-int *const bb_errno __attribute__ ((section (\".data\")));
+-#endif
++void bbox_prepare_main(void);
++int $main(int argc, char **argv);
+ 
+ const char *applet_name = \"$name\";
+ 
+-void bb_show_usage(void)
+-{
+-	fprintf(stderr, \"Usage: $name \"
+-#ifdef ${cname}_trivial_usage
+-		${cname}_trivial_usage
+-#endif
+-#ifdef ${cname}_full_usage
+-		\"\\n\\n\" ${cname}_full_usage
+-#endif
+-		\"\\n\\n\");
+-	exit(1);
+-}
+-
+-int $main(int argc, char **argv);
+-
+ int main(int argc, char **argv)
+ {
+-#ifdef __GLIBC__
+-        (*(int **)&bb_errno) = __errno_location();
+-#endif
+-        return $main(argc, argv);
++	bbox_prepare_main();
++	return $main(argc, argv);
+ }
+ " >"$sharedlib_dir/applet.c"
+ 
+@@ -215,3 +190,7 @@ int main(int argc, char **argv)
+ 
+     done <applet.lst
+ fi
++
++# libbusybox.so is needed only for -lbusybox at link time,
++# it is not needed at runtime. Deleting to reduce confusion.
++rm "$sharedlib_dir"/libbusybox.so >/dev/null

@@ -1,0 +1,15 @@
+2008-04-11 11:50:55 +0000
+diff --git a/scripts/Makefile.IMA b/scripts/Makefile.IMA
+index d246517..0ceea8d 100644
+--- a/scripts/Makefile.IMA
++++ b/scripts/Makefile.IMA
+@@ -132,6 +132,9 @@ lib-y:=
+ include editors/Kbuild
+ lib-all-y += $(patsubst %,editors/%,$(sort $(lib-y)))
+ lib-y:=
++include ipsvd/Kbuild
++lib-all-y += $(patsubst %,ipsvd/%,$(sort $(lib-y)))
++lib-y:=
+ include printutils/Kbuild
+ lib-all-y += $(patsubst %,printutils/%,$(sort $(lib-y)))
+ lib-y:=

@@ -1,0 +1,107 @@
+2009-09-30 02:39:57 +0200
+diff --git a/coreutils/dd.c b/coreutils/dd.c
+index 627e7e7..c5c9476 100644
+--- a/coreutils/dd.c
++++ b/coreutils/dd.c
+@@ -36,8 +36,10 @@ struct globals {
+ 	off_t out_full, out_part, in_full, in_part;
+ };
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+-/* We have to zero it out because of NOEXEC */
+-#define INIT_G() memset(&G, 0, sizeof(G))
++#define INIT_G() do { \
++	/* we have to zero it out because of NOEXEC */ \
++	memset(&G, 0, sizeof(G)); \
++} while (0)
+ 
+ 
+ static void dd_output_status(int UNUSED_PARAM cur_signal)
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 827b350..19d3804 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -264,15 +264,15 @@ struct globals {
+ };
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ #if ENABLE_FEATURE_LS_COLOR
+-#define show_color     (G.show_color    )
++# define show_color     (G.show_color    )
+ #else
+ enum { show_color = 0 };
+ #endif
+-#define exit_code      (G.exit_code     )
+-#define all_fmt        (G.all_fmt       )
++#define exit_code       (G.exit_code     )
++#define all_fmt         (G.all_fmt       )
+ #if ENABLE_FEATURE_AUTOWIDTH
+-#define tabstops       (G.tabstops      )
+-#define terminal_width (G.terminal_width)
++# define tabstops       (G.tabstops      )
++# define terminal_width (G.terminal_width)
+ #else
+ enum {
+ 	tabstops = COLUMN_GAP,
+@@ -280,8 +280,8 @@ enum {
+ };
+ #endif
+ #define current_time_t (G.current_time_t)
+-/* memset: we have to zero it out because of NOEXEC */
+ #define INIT_G() do { \
++	/* we have to zero it out because of NOEXEC */ \
+ 	memset(&G, 0, sizeof(G)); \
+ 	IF_FEATURE_AUTOWIDTH(tabstops = COLUMN_GAP;) \
+ 	IF_FEATURE_AUTOWIDTH(terminal_width = TERMINAL_WIDTH;) \
+diff --git a/findutils/find.c b/findutils/find.c
+index 6f7be4f..76cd18c 100644
+--- a/findutils/find.c
++++ b/findutils/find.c
+@@ -109,6 +109,8 @@ struct globals {
+ 	struct G_sizecheck { \
+ 		char G_sizecheck[sizeof(G) > COMMON_BUFSIZE ? -1 : 1]; \
+ 	}; \
++	/* we have to zero it out because of NOEXEC */ \
++	memset(&G, 0, offsetof(struct globals, need_print)); \
+ 	G.need_print = 1; \
+ 	G.recurse_flags = ACTION_RECURSE; \
+ } while (0)
+diff --git a/networking/ftpd.c b/networking/ftpd.c
+index a8687fb..70a3533 100644
+--- a/networking/ftpd.c
++++ b/networking/ftpd.c
+@@ -662,7 +662,7 @@ popen_ls(const char *opt)
+ 		execv(bb_busybox_exec_path + 1, (char**) argv);
+ 		_exit(127);
+ #else
+-		memset(&G, 0, sizeof(G));
++		/* memset(&G, 0, sizeof(G)); - ls_main does it */
+ 		exit(ls_main(ARRAY_SIZE(argv) - 1, (char**) argv));
+ #endif
+ 	}
+@@ -1114,7 +1114,7 @@ int ftpd_main(int argc UNUSED_PARAM, char **argv)
+ /* --group-directories-first would be nice, but ls don't do that yet */
+ 		xchdir(argv[2]);
+ 		argv[2] = (char*)"--";
+-		memset(&G, 0, sizeof(G));
++		/* memset(&G, 0, sizeof(G)); - ls_main does it */
+ 		return ls_main(argc, argv);
+ 	}
+ #endif
+diff --git a/networking/telnet.c b/networking/telnet.c
+index cc99425..77e1747 100644
+--- a/networking/telnet.c
++++ b/networking/telnet.c
+@@ -77,11 +77,10 @@ struct globals {
+ 	struct termios termios_raw;
+ };
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+-void BUG_telnet_globals_too_big(void);
+ #define INIT_G() do { \
+-	if (sizeof(G) > COMMON_BUFSIZE) \
+-		BUG_telnet_globals_too_big(); \
+-	/* memset(&G, 0, sizeof G); - already is */ \
++	struct G_sizecheck { \
++		char G_sizecheck[sizeof(G) > COMMON_BUFSIZE ? -1 : 1]; \
++	}; \
+ } while (0)
+ 
+ /* Function prototypes */

@@ -1,0 +1,14 @@
+2008-06-18 20:01:12 +0000
+diff --git a/libbb/strrstr.c b/libbb/strrstr.c
+index 088d9f4..f61dd51 100644
+--- a/libbb/strrstr.c
++++ b/libbb/strrstr.c
+@@ -24,7 +24,7 @@ char* strrstr(const char *haystack, const char *needle)
+ 	char *r = NULL;
+ 
+ 	if (!needle[0])
+-		return (char*)haystack;
++		return (char*)haystack + strlen(haystack);
+ 	while (1) {
+ 		char *p = strstr(haystack, needle);
+ 		if (!p)

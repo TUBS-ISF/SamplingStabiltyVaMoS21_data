@@ -1,0 +1,72 @@
+2008-06-09 16:02:39 +0000
+diff --git a/miscutils/less.c b/miscutils/less.c
+index 0529b20..ecdb9ae 100644
+--- a/miscutils/less.c
++++ b/miscutils/less.c
+@@ -172,16 +172,6 @@ static void set_tty_cooked(void)
+ 	tcsetattr(kbd_fd, TCSANOW, &term_orig);
+ }
+ 
+-/* Exit the program gracefully */
+-static void less_exit(int code)
+-{
+-	bb_putchar('\n');
+-	set_tty_cooked();
+-	if (code < 0)
+-		kill_myself_with_sig(- code); /* does not return */
+-	exit(code);
+-}
+-
+ /* Move the cursor to a position (x,y), where (0,0) is the
+    top-left corner of the console */
+ static void move_cursor(int line, int row)
+@@ -205,6 +195,16 @@ static void print_statusline(const char *str)
+ 	printf(HIGHLIGHT"%.*s"NORMAL, width - 1, str);
+ }
+ 
++/* Exit the program gracefully */
++static void less_exit(int code)
++{
++	set_tty_cooked();
++	clear_line();
++	if (code < 0)
++		kill_myself_with_sig(- code); /* does not return */
++	exit(code);
++}
++
+ #if ENABLE_FEATURE_LESS_REGEXP
+ static void fill_match_lines(unsigned pos);
+ #else
+@@ -538,6 +538,9 @@ static void print_found(const char *line)
+  start:
+ 		/* Most of the time doesn't find the regex, optimize for that */
+ 		match_status = regexec(&pattern, line, 1, &match_structs, eflags);
++		/* if even "" matches, treat it as "not a match" */
++		if (match_structs.rm_so >= match_structs.rm_eo)
++			match_status = 1;
+ 	}
+ 
+ 	if (!growline) {
+diff --git a/shell/hush.c b/shell/hush.c
+index 9e574c9..b80468f 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3218,7 +3218,6 @@ static int redirect_opt_num(o_string *o)
+ }
+ 
+ #if ENABLE_HUSH_TICK
+-/* NB: currently disabled on NOMMU */
+ static FILE *generate_stream_from_list(struct pipe *head)
+ {
+ 	FILE *pf;
+@@ -3229,6 +3228,10 @@ static FILE *generate_stream_from_list(struct pipe *head)
+ /* By using vfork here, we suspend parent till child exits or execs.
+  * If child will not do it before it fills the pipe, it can block forever
+  * in write(STDOUT_FILENO), and parent (shell) will be also stuck.
++ * Try this script:
++ * yes "0123456789012345678901234567890" | dd bs=32 count=64k >TESTFILE
++ * huge=`cat TESTFILE` # will block here forever
++ * echo OK
+  */
+ 	pid = BB_MMU ? fork() : vfork();
+ 	if (pid < 0)

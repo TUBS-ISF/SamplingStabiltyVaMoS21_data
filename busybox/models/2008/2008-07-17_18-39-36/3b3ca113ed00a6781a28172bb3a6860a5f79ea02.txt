@@ -1,0 +1,172 @@
+2008-07-17 18:39:36 +0000
+diff --git a/include/libbb.h b/include/libbb.h
+index aafdfa3..14af136 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1166,6 +1166,7 @@ typedef struct procps_status_t {
+ 	uint8_t shift_pages_to_bytes;
+ 	uint8_t shift_pages_to_kb;
+ /* Fields are set to 0/NULL if failed to determine (or not requested) */
++	uint16_t argv_len;
+ 	char *argv0;
+ 	USE_SELINUX(char *context;)
+ 	/* Everything below must contain no ptrs to malloc'ed data:
+@@ -1213,7 +1214,7 @@ enum {
+ 	PSSCAN_UTIME    = 1 << 13,
+ 	PSSCAN_TTY      = 1 << 14,
+ 	PSSCAN_SMAPS	= (1 << 15) * ENABLE_FEATURE_TOPMEM,
+-	PSSCAN_ARGVN    = (1 << 16) * (ENABLE_PGREP | ENABLE_PKILL),
++	PSSCAN_ARGVN    = (1 << 16) * (ENABLE_PGREP || ENABLE_PKILL || ENABLE_PIDOF),
+ 	USE_SELINUX(PSSCAN_CONTEXT = 1 << 17,)
+ 	PSSCAN_START_TIME = 1 << 18,
+ 	/* These are all retrieved from proc/NN/stat in one go: */
+diff --git a/libbb/find_pid_by_name.c b/libbb/find_pid_by_name.c
+index ae2f116..2ee423c 100644
+--- a/libbb/find_pid_by_name.c
++++ b/libbb/find_pid_by_name.c
+@@ -38,6 +38,35 @@ execXXX("/proc/self/exe", applet_name, params....)
+ and therefore comm field contains "exe".
+ */
+ 
++static int comm_match(procps_status_t *p, const char *procName)
++{
++	int argv1idx;
++
++	/* comm does not match */
++	if (strncmp(p->comm, procName, 15) != 0)
++		return 0;
++
++	/* in Linux, if comm is 15 chars, it may be a truncated */
++	if (p->comm[14] == '\0') /* comm is not truncated - match */
++		return 1;
++
++	/* comm is truncated, but first 15 chars match.
++	 * This can be crazily_long_script_name.sh!
++	 * The telltale sign is basename(argv[1]) == procName. */
++
++	if (!p->argv0)
++		return 0;
++
++	argv1idx = strlen(p->argv0) + 1;
++	if (argv1idx >= p->argv_len)
++		return 0;
++
++	if (strcmp(bb_basename(p->argv0 + argv1idx), procName) != 0)
++		return 0;
++
++	return 1;
++}
++
+ /* find_pid_by_name()
+  *
+  *  Modified by Vladimir Oleynik for use with libbb/procps.c
+@@ -48,24 +77,20 @@ and therefore comm field contains "exe".
+  *  Returns a list of all matching PIDs
+  *  It is the caller's duty to free the returned pidlist.
+  */
+-pid_t* FAST_FUNC find_pid_by_name(const char* procName)
++pid_t* FAST_FUNC find_pid_by_name(const char *procName)
+ {
+ 	pid_t* pidList;
+ 	int i = 0;
+ 	procps_status_t* p = NULL;
+ 
+-	pidList = xmalloc(sizeof(*pidList));
+-	while ((p = procps_scan(p, PSSCAN_PID|PSSCAN_COMM|PSSCAN_ARGV0))) {
+-		if (
+-		/* we require comm to match and to not be truncated */
+-		/* in Linux, if comm is 15 chars, it may be a truncated
+-		 * name, so we don't allow that to match */
+-		    (!p->comm[sizeof(p->comm)-2] && strcmp(p->comm, procName) == 0)
++	pidList = xzalloc(sizeof(*pidList));
++	while ((p = procps_scan(p, PSSCAN_PID|PSSCAN_COMM|PSSCAN_ARGVN))) {
++		if (comm_match(p, procName)
+ 		/* or we require argv0 to match (essential for matching reexeced /proc/self/exe)*/
+ 		 || (p->argv0 && strcmp(bb_basename(p->argv0), procName) == 0)
+ 		/* TOOD: we can also try /proc/NUM/exe link, do we want that? */
+ 		) {
+-			pidList = xrealloc(pidList, sizeof(*pidList) * (i+2));
++			pidList = xrealloc_vector(pidList, 2, i);
+ 			pidList[i++] = p->pid;
+ 		}
+ 	}
+diff --git a/libbb/procps.c b/libbb/procps.c
+index a5168a0..f799099 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -78,7 +78,7 @@ const char* FAST_FUNC get_cached_groupname(gid_t gid)
+ 
+ #define PROCPS_BUFSIZE 1024
+ 
+-static int FAST_FUNC read_to_buf(const char *filename, void *buf)
++static int read_to_buf(const char *filename, void *buf)
+ {
+ 	int fd;
+ 	/* open_read_close() would do two reads, checking for EOF.
+@@ -385,16 +385,15 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 			n = read_to_buf(filename, buf);
+ 			if (n <= 0)
+ 				break;
+-#if ENABLE_PGREP || ENABLE_PKILL
+ 			if (flags & PSSCAN_ARGVN) {
+-				do {
+-					n--;
+-					if (buf[n] == '\0')
+-						buf[n] = ' ';
+-				} while (n);
++				sp->argv_len = n;
++				sp->argv0 = xmalloc(n + 1);
++				memcpy(sp->argv0, buf, n + 1);
++				/* sp->argv0[n] = '\0'; - buf has it */
++			} else {
++				sp->argv_len = 0;
++				sp->argv0 = xstrdup(buf);
+ 			}
+-#endif
+-			sp->argv0 = xstrdup(buf);
+ 		}
+ #endif
+ 		break;
+diff --git a/procps/pgrep.c b/procps/pgrep.c
+index 7b3cd8e..0e8e529 100644
+--- a/procps/pgrep.c
++++ b/procps/pgrep.c
+@@ -111,8 +111,15 @@ int pgrep_main(int argc UNUSED_PARAM, char **argv)
+ 		if (proc->pid == pid)
+ 			continue;
+ 		cmd = proc->argv0;
+-		if (!cmd)
++		if (!cmd) {
+ 			cmd = proc->comm;
++		} else {
++			int i = proc->argv_len;
++			while (i) {
++				if (!cmd[i]) cmd[i] = ' ';
++				i--;
++			}
++		}
+ 		/* NB: OPT_INVERT is always 0 or 1 */
+ 		if ((regexec(&re_buffer, cmd, 1, re_match, 0) == 0 /* match found */
+ 		     && (!OPT_ANCHOR || (re_match[0].rm_so == 0 && re_match[0].rm_eo == (regoff_t)strlen(cmd)))) ^ OPT_INVERT
+diff --git a/procps/pidof.c b/procps/pidof.c
+index 2519473..7805044 100644
+--- a/procps/pidof.c
++++ b/procps/pidof.c
+@@ -22,7 +22,6 @@ int pidof_main(int argc UNUSED_PARAM, char **argv)
+ 	unsigned first = 1;
+ 	unsigned opt;
+ #if ENABLE_FEATURE_PIDOF_OMIT
+-	char ppid_str[sizeof(int)*3 + 1];
+ 	llist_t *omits = NULL; /* list of pids to omit */
+ 	opt_complementary = "o::";
+ #endif
+@@ -39,8 +38,7 @@ int pidof_main(int argc UNUSED_PARAM, char **argv)
+ 		while (omits_p) {
+ 			/* are we asked to exclude the parent's process ID?  */
+ 			if (strcmp(omits_p->data, "%PPID") == 0) {
+-				sprintf(ppid_str, "%u", (unsigned)getppid());
+-				omits_p->data = ppid_str;
++				omits_p->data = utoa((unsigned)getppid());
+ 			}
+ 			omits_p = omits_p->link;
+ 		}

@@ -1,0 +1,16 @@
+2009-07-16 14:33:16 +0200
+diff --git a/libbb/lineedit.c b/libbb/lineedit.c
+index a3d9395..9a773b4 100644
+--- a/libbb/lineedit.c
++++ b/libbb/lineedit.c
+@@ -429,7 +429,9 @@ static void input_delete(int save)
+ #endif
+ 
+ 	memmove(command_ps + j, command_ps + j + 1,
+-			(command_len - j + 1) * sizeof(command_ps[0]));
++			/* (command_len + 1 [because of NUL]) - (j + 1)
++			 * simplified into (command_len - j) */
++			(command_len - j) * sizeof(command_ps[0]));
+ 	command_len--;
+ 	input_end();                    /* rewrite new line */
+ 	cmdedit_set_out_char(' ');      /* erase char */

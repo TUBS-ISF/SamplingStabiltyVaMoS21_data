@@ -1,0 +1,14 @@
+2009-03-28 12:43:53 +0000
+diff --git a/shell/hush.c b/shell/hush.c
+index 275d618..67e689f 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1322,7 +1322,7 @@ static void debug_print_list(const char *prefix, o_string *o, int n)
+ 	}
+ 	if (n) {
+ 		const char *p = o->data + (int)list[n - 1] + string_start;
+-		fprintf(stderr, " total_sz:%d\n", (p + strlen(p) + 1) - o->data);
++		fprintf(stderr, " total_sz:%ld\n", (p + strlen(p) + 1) - o->data);
+ 	}
+ }
+ #else

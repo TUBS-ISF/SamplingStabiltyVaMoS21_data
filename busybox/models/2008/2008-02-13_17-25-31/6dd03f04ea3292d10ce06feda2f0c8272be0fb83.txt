@@ -1,0 +1,16 @@
+2008-02-13 17:25:31 +0000
+diff --git a/util-linux/switch_root.c b/util-linux/switch_root.c
+index 700f799..bd1e9d5 100644
+--- a/util-linux/switch_root.c
++++ b/util-linux/switch_root.c
+@@ -73,8 +73,8 @@ int switch_root_main(int argc, char **argv)
+ 
+ 	// Parse args (-c console)
+ 
+-	opt_complementary = "-2";
+-	getopt32(argv, "c:", &console);
++	opt_complementary = "-2"; // minimum 2 params
++	getopt32(argv, "+c:", &console); // '+': stop parsing at first non-option
+ 	argv += optind;
+ 
+ 	// Change to new root directory and verify it's a different fs.

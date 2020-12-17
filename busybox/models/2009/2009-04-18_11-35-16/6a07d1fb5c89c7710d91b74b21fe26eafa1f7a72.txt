@@ -1,0 +1,16 @@
+2009-04-18 11:35:16 +0000
+diff --git a/util-linux/acpid.c b/util-linux/acpid.c
+index ef4e54d..49ea52d 100644
+--- a/util-linux/acpid.c
++++ b/util-linux/acpid.c
+@@ -78,8 +78,8 @@ int acpid_main(int argc, char **argv)
+ 	// goto configuration directory
+ 	xchdir(opt_conf);
+ 
+-//	// setup signals
+-//	bb_signals(BB_FATAL_SIGS, record_signo);
++	// prevent zombies
++	signal(SIGCHLD, SIG_IGN);
+ 
+ 	// no explicit evdev files given? -> use proc event interface
+ 	if (!*argv) {

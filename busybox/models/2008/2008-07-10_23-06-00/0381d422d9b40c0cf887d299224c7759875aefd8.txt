@@ -1,0 +1,324 @@
+2008-07-10 23:06:00 +0000
+diff --git a/archival/Config.in b/archival/Config.in
+index 4599b68..02daae1 100644
+--- a/archival/Config.in
++++ b/archival/Config.in
+@@ -90,10 +90,11 @@ config DPKG
+ 	bool "dpkg"
+ 	default n
+ 	help
+-	  dpkg is a medium-level tool to install, build, remove and manage Debian packages.
++	  dpkg is a medium-level tool to install, build, remove and manage
++	  Debian packages.
+ 
+-	  This implementation of dpkg has a number of limitations, you should use the
+-	  official dpkg if possible.
++	  This implementation of dpkg has a number of limitations,
++	  you should use the official dpkg if possible.
+ 
+ config DPKG_DEB
+ 	bool "dpkg_deb"
+@@ -103,8 +104,8 @@ config DPKG_DEB
+ 
+ 	  This implementation of dpkg-deb cannot pack archives.
+ 
+-	  Unless you have a specific application which requires dpkg-deb, you should
+-	  probably say N here.
++	  Unless you have a specific application which requires dpkg-deb,
++	  say N here.
+ 
+ config FEATURE_DPKG_DEB_EXTRACT_ONLY
+ 	bool "Extract only (-x)"
+diff --git a/archival/ar.c b/archival/ar.c
+index d49329c..dbff677 100644
+--- a/archival/ar.c
++++ b/archival/ar.c
+@@ -45,7 +45,6 @@ int ar_main(int argc, char **argv)
+ 
+ 	archive_handle_t *archive_handle;
+ 	unsigned opt;
+-	char magic[8];
+ 
+ 	archive_handle = init_handle();
+ 
+@@ -82,14 +81,7 @@ int ar_main(int argc, char **argv)
+ 		llist_add_to(&(archive_handle->accept), argv[optind++]);
+ 	}
+ 
+-	xread(archive_handle->src_fd, magic, 7);
+-	if (strncmp(magic, "!<arch>", 7) != 0) {
+-		bb_error_msg_and_die("invalid ar magic");
+-	}
+-	archive_handle->offset += 7;
+-
+-	while (get_header_ar(archive_handle) == EXIT_SUCCESS)
+-		continue;
++	unpack_ar_archive(archive_handle);
+ 
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/archival/dpkg_deb.c b/archival/dpkg_deb.c
+index cbacc91..9e6340f 100644
+--- a/archival/dpkg_deb.c
++++ b/archival/dpkg_deb.c
+@@ -20,8 +20,8 @@ int dpkg_deb_main(int argc, char **argv)
+ 	archive_handle_t *tar_archive;
+ 	llist_t *control_tar_llist = NULL;
+ 	unsigned opt;
+-	const char *extract_dir = NULL;
+-	short argcount = 1;
++	const char *extract_dir;
++	int need_args;
+ 
+ 	/* Setup the tar archive handle */
+ 	tar_archive = init_handle();
+@@ -43,17 +43,21 @@ int dpkg_deb_main(int argc, char **argv)
+ 
+ 	opt_complementary = "c--efXx:e--cfXx:f--ceXx:X--cefx:x--cefX";
+ 	opt = getopt32(argv, "cefXx");
++	argv += optind;
++	argc -= optind;
+ 
+ 	if (opt & DPKG_DEB_OPT_CONTENTS) {
+ 		tar_archive->action_header = header_verbose_list;
+ 	}
++	extract_dir = NULL;
++	need_args = 1;
+ 	if (opt & DPKG_DEB_OPT_CONTROL) {
+ 		ar_archive->accept = control_tar_llist;
+ 		tar_archive->action_data = data_extract_all;
+-		if (optind + 1 == argc) {
++		if (1 == argc) {
+ 			extract_dir = "./DEBIAN";
+ 		} else {
+-			argcount++;
++			need_args++;
+ 		}
+ 	}
+ 	if (opt & DPKG_DEB_OPT_FIELD) {
+@@ -70,28 +74,31 @@ int dpkg_deb_main(int argc, char **argv)
+ 	}
+ 	if (opt & (DPKG_DEB_OPT_EXTRACT_VERBOSE | DPKG_DEB_OPT_EXTRACT)) {
+ 		tar_archive->action_data = data_extract_all;
+-		argcount = 2;
++		need_args = 2;
+ 	}
+ 
+-	if ((optind + argcount) != argc) {
++	if (need_args != argc) {
+ 		bb_show_usage();
+ 	}
+ 
+-	tar_archive->src_fd = ar_archive->src_fd = xopen(argv[optind++], O_RDONLY);
++	tar_archive->src_fd = ar_archive->src_fd = xopen(argv[0], O_RDONLY);
+ 
+-	/* Workout where to extract the files */
++	/* Work out where to extract the files */
+ 	/* 2nd argument is a dir name */
+-	if (argv[optind]) {
+-		extract_dir = argv[optind];
++	if (argv[1]) {
++		extract_dir = argv[1];
+ 	}
+ 	if (extract_dir) {
+ 		mkdir(extract_dir, 0777); /* bb_make_directory(extract_dir, 0777, 0) */
+ 		xchdir(extract_dir);
+ 	}
++
++	/* Do it */
+ 	unpack_ar_archive(ar_archive);
+ 
+ 	/* Cleanup */
+-	close(ar_archive->src_fd);
++	if (ENABLE_FEATURE_CLEAN_UP)
++		close(ar_archive->src_fd);
+ 
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/archival/libunarchive/filter_accept_list_reassign.c b/archival/libunarchive/filter_accept_list_reassign.c
+index 4f2d4cd..4dbc2d1 100644
+--- a/archival/libunarchive/filter_accept_list_reassign.c
++++ b/archival/libunarchive/filter_accept_list_reassign.c
+@@ -8,6 +8,8 @@
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
++/* Built and used only if ENABLE_DPKG || ENABLE_DPKG_DEB */
++
+ /*
+  * Reassign the subarchive metadata parser based on the filename extension
+  * e.g. if its a .tar.gz modify archive_handle->sub_archive to process a .tar.gz
+@@ -19,23 +21,25 @@ char FAST_FUNC filter_accept_list_reassign(archive_handle_t *archive_handle)
+ 	if (find_list_entry(archive_handle->accept, archive_handle->file_header->name)) {
+ 		const char *name_ptr;
+ 
+-		/* Extract the last 2 extensions */
++		/* Find extension */
+ 		name_ptr = strrchr(archive_handle->file_header->name, '.');
+ 
+ 		/* Modify the subarchive handler based on the extension */
+-#if ENABLE_FEATURE_DEB_TAR_GZ
+-		if (strcmp(name_ptr, ".gz") == 0) {
++		if (ENABLE_FEATURE_DEB_TAR_GZ
++		 && strcmp(name_ptr, ".gz") == 0
++		) {
+ 			archive_handle->action_data_subarchive = get_header_tar_gz;
+ 			return EXIT_SUCCESS;
+ 		}
+-#endif
+-#if ENABLE_FEATURE_DEB_TAR_BZ2
+-		if (strcmp(name_ptr, ".bz2") == 0) {
++		if (ENABLE_FEATURE_DEB_TAR_BZ2
++		 && strcmp(name_ptr, ".bz2") == 0
++		) {
+ 			archive_handle->action_data_subarchive = get_header_tar_bz2;
+ 			return EXIT_SUCCESS;
+ 		}
+-#endif
+-		if (ENABLE_FEATURE_DEB_TAR_LZMA && !strcmp(name_ptr, ".lzma")) {
++		if (ENABLE_FEATURE_DEB_TAR_LZMA
++		 && strcmp(name_ptr, ".lzma") == 0
++		) {
+ 			archive_handle->action_data_subarchive = get_header_tar_lzma;
+ 			return EXIT_SUCCESS;
+ 		}
+diff --git a/archival/libunarchive/get_header_ar.c b/archival/libunarchive/get_header_ar.c
+index 59fd34c..d476a9d 100644
+--- a/archival/libunarchive/get_header_ar.c
++++ b/archival/libunarchive/get_header_ar.c
+@@ -108,12 +108,13 @@ char FAST_FUNC get_header_ar(archive_handle_t *archive_handle)
+ 
+ 	if (archive_handle->filter(archive_handle) == EXIT_SUCCESS) {
+ 		archive_handle->action_header(typed);
++#if ENABLE_DPKG || ENABLE_DPKG_DEB
+ 		if (archive_handle->sub_archive) {
+ 			while (archive_handle->action_data_subarchive(archive_handle->sub_archive) == EXIT_SUCCESS)
+ 				continue;
+-		} else {
++		} else
++#endif
+ 			archive_handle->action_data(archive_handle);
+-		}
+ 	} else {
+ 		data_skip(archive_handle);
+ 	}
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index 69362f1..cf35d41 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -92,22 +92,32 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+  again_after_align:
+ 
+ #if ENABLE_DESKTOP
++	/* to prevent misdetection of bz2 sig */
++	*(uint32_t*)(&tar) = 0;
+ 	i = full_read(archive_handle->src_fd, &tar, 512);
+ 	/* If GNU tar sees EOF in above read, it says:
+ 	 * "tar: A lone zero block at N", where N = kilobyte
+ 	 * where EOF was met (not EOF block, actual EOF!),
+-	 * and tar will exit with error code 0.
++	 * and exits with EXIT_SUCCESS.
+ 	 * We will mimic exit(EXIT_SUCCESS), although we will not mimic
+ 	 * the message and we don't check whether we indeed
+ 	 * saw zero block directly before this. */
+-	if (i == 0)
++	if (i == 0) {
+ 		xfunc_error_retval = 0;
+-	if (i != 512)
++ short_read:
+ 		bb_error_msg_and_die("short read");
++	}
++	if (i != 512) {
++		if (ENABLE_FEATURE_TAR_AUTODETECT)
++			goto autodetect;
++		goto short_read;
++	}
++
+ #else
+-	xread(archive_handle->src_fd, &tar, 512);
++	i = 512;
++	xread(archive_handle->src_fd, &tar, i);
+ #endif
+-	archive_handle->offset += 512;
++	archive_handle->offset += i;
+ 
+ 	/* If there is no filename its an empty header */
+ 	if (tar.name[0] == 0 && tar.prefix[0] == 0) {
+@@ -133,6 +143,7 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+ #if ENABLE_FEATURE_TAR_AUTODETECT
+ 		char FAST_FUNC (*get_header_ptr)(archive_handle_t *);
+ 
++ USE_DESKTOP(autodetect:)
+ 		/* tar gz/bz autodetect: check for gz/bz2 magic.
+ 		 * If we see the magic, and it is the very first block,
+ 		 * we can switch to get_header_tar_gz/bz2/lzma().
+@@ -154,7 +165,7 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+ 		/* Two different causes for lseek() != 0:
+ 		 * unseekable fd (would like to support that too, but...),
+ 		 * or not first block (false positive, it's not .gz/.bz2!) */
+-		if (lseek(archive_handle->src_fd, -512, SEEK_CUR) != 0)
++		if (lseek(archive_handle->src_fd, -i, SEEK_CUR) != 0)
+ 			goto err;
+ 		while (get_header_ptr(archive_handle) == EXIT_SUCCESS)
+ 			continue;
+@@ -328,7 +339,7 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+ 		p_linkname = NULL;
+ 	}
+ #endif
+-	if (!strncmp(file_header->name, "/../"+1, 3)
++	if (strncmp(file_header->name, "/../"+1, 3) == 0
+ 	 || strstr(file_header->name, "/../")
+ 	) {
+ 		bb_error_msg_and_die("name with '..' encountered: '%s'",
+@@ -340,7 +351,7 @@ char FAST_FUNC get_header_tar(archive_handle_t *archive_handle)
+ 	cp = last_char_is(file_header->name, '/');
+ 
+ 	if (archive_handle->filter(archive_handle) == EXIT_SUCCESS) {
+-		archive_handle->action_header(archive_handle->file_header);
++		archive_handle->action_header(/*archive_handle->*/ file_header);
+ 		/* Note that we kill the '/' only after action_header() */
+ 		/* (like GNU tar 1.15.1: verbose mode outputs "dir/dir/") */
+ 		if (cp) *cp = '\0';
+diff --git a/archival/libunarchive/get_header_tar_gz.c b/archival/libunarchive/get_header_tar_gz.c
+index 086c6df..e88b720 100644
+--- a/archival/libunarchive/get_header_tar_gz.c
++++ b/archival/libunarchive/get_header_tar_gz.c
+@@ -20,6 +20,7 @@ char FAST_FUNC get_header_tar_gz(archive_handle_t *archive_handle)
+ 	 * need the header. */
+ #if BB_MMU
+ 	xread(archive_handle->src_fd, &magic, 2);
++	/* Can skip this check, but error message will be less clear */
+ 	if ((magic[0] != 0x1f) || (magic[1] != 0x8b)) {
+ 		bb_error_msg_and_die("invalid gzip magic");
+ 	}
+diff --git a/archival/libunarchive/unpack_ar_archive.c b/archival/libunarchive/unpack_ar_archive.c
+index 9c2f68b..dc2eec2 100644
+--- a/archival/libunarchive/unpack_ar_archive.c
++++ b/archival/libunarchive/unpack_ar_archive.c
+@@ -16,5 +16,6 @@ void FAST_FUNC unpack_ar_archive(archive_handle_t *ar_archive)
+ 	}
+ 	ar_archive->offset += 7;
+ 
+-	while (get_header_ar(ar_archive) == EXIT_SUCCESS);
++	while (get_header_ar(ar_archive) == EXIT_SUCCESS)
++		continue;
+ }
+diff --git a/include/unarchive.h b/include/unarchive.h
+index 0e380db..5b71d3e 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -47,11 +47,13 @@ typedef struct archive_handle_t {
+ 	/* Process the data component, e.g. extract to filesystem */
+ 	void FAST_FUNC (*action_data)(struct archive_handle_t *);
+ 
++#if ENABLE_DPKG || ENABLE_DPKG_DEB
++	/* "subarchive" is used only by dpkg[-deb] applets */
+ 	/* How to process any sub archive, e.g. get_header_tar_gz */
+ 	char FAST_FUNC (*action_data_subarchive)(struct archive_handle_t *);
+-
+ 	/* Contains the handle to a sub archive */
+ 	struct archive_handle_t *sub_archive;
++#endif
+ 
+ 	/* The raw stream as read from disk or stdin */
+ 	int src_fd;

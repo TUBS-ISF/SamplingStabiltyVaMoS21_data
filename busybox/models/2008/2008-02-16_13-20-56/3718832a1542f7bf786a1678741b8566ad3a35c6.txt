@@ -1,0 +1,502 @@
+2008-02-16 13:20:56 +0000
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index d6f5e62..3c551de 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -15,10 +15,10 @@ int open_transformer(int src_fd,
+ 	USE_DESKTOP(long long) int (*transformer)(int src_fd, int dst_fd),
+ 	const char *transform_prog)
+ {
+-	int fd_pipe[2];
++	struct fd_pair fd_pipe;
+ 	int pid;
+ 
+-	xpipe(fd_pipe);
++	xpiped_pair(fd_pipe);
+ 
+ #if BB_MMU
+ 	pid = fork();
+@@ -30,12 +30,12 @@ int open_transformer(int src_fd,
+ 
+ 	if (pid == 0) {
+ 		/* child process */
+-		close(fd_pipe[0]); /* We don't want to read from the parent */
++		close(fd_pipe.rd); /* We don't want to read from the parent */
+ 		// FIXME: error check?
+ #if BB_MMU
+-		transformer(src_fd, fd_pipe[1]);
++		transformer(src_fd, fd_pipe.wr);
+ 		if (ENABLE_FEATURE_CLEAN_UP) {
+-			close(fd_pipe[1]); /* Send EOF */
++			close(fd_pipe.wr); /* Send EOF */
+ 			close(src_fd);
+ 		}
+ 		exit(0);
+@@ -43,7 +43,7 @@ int open_transformer(int src_fd,
+ 		{
+ 			char *argv[4];
+ 			xmove_fd(src_fd, 0);
+-			xmove_fd(fd_pipe[1], 1);
++			xmove_fd(fd_pipe.wr, 1);
+ 			argv[0] = (char*)transform_prog;
+ 			argv[1] = (char*)"-cf";
+ 			argv[2] = (char*)"-";
+@@ -56,7 +56,7 @@ int open_transformer(int src_fd,
+ 	}
+ 
+ 	/* parent process */
+-	close(fd_pipe[1]); /* Don't want to write to the child */
++	close(fd_pipe.wr); /* Don't want to write to the child */
+ 
+-	return fd_pipe[0];
++	return fd_pipe.rd;
+ }
+diff --git a/archival/libunarchive/seek_by_jump.c b/archival/libunarchive/seek_by_jump.c
+index edbf46b..8b5f3e8 100644
+--- a/archival/libunarchive/seek_by_jump.c
++++ b/archival/libunarchive/seek_by_jump.c
+@@ -6,7 +6,7 @@
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
+-void seek_by_jump(const archive_handle_t *archive_handle, const unsigned int amount)
++void seek_by_jump(const archive_handle_t *archive_handle, unsigned amount)
+ {
+ 	if (lseek(archive_handle->src_fd, (off_t) amount, SEEK_CUR) == (off_t) -1) {
+ #if ENABLE_FEATURE_UNARCHIVE_TAPE
+diff --git a/archival/libunarchive/seek_by_read.c b/archival/libunarchive/seek_by_read.c
+index 452d82d..1f2b805 100644
+--- a/archival/libunarchive/seek_by_read.c
++++ b/archival/libunarchive/seek_by_read.c
+@@ -6,10 +6,10 @@
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
+-/*  If we are reading through a pipe(), or from stdin then we can't lseek,
++/*  If we are reading through a pipe, or from stdin then we can't lseek,
+  *  we must read and discard the data to skip over it.
+  */
+-void seek_by_read(const archive_handle_t *archive_handle, const unsigned int jump_size)
++void seek_by_read(const archive_handle_t *archive_handle, unsigned jump_size)
+ {
+ 	if (jump_size)
+ 		bb_copyfd_exact_size(archive_handle->src_fd, -1, jump_size);
+diff --git a/archival/tar.c b/archival/tar.c
+index a8ff7b8..4ec454b 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -521,14 +521,14 @@ static int writeTarFile(const int tar_fd, const int verboseFlag,
+ 
+ 		volatile int vfork_exec_errno = 0;
+ #if WAIT_FOR_CHILD
+-		struct { int rd; int wr; } gzipStatusPipe;
++		struct fd_pair gzipStatusPipe;
+ #endif
+-		struct { int rd; int wr; } gzipDataPipe;
++		struct fd_pair gzipDataPipe;
+ 		const char *zip_exec = (gzip == 1) ? "gzip" : "bzip2";
+ 
+-		xpipe(&gzipDataPipe.rd);
++		xpiped_pair(gzipDataPipe);
+ #if WAIT_FOR_CHILD
+-		xpipe(&gzipStatusPipe.rd);
++		xpiped_pair(gzipStatusPipe);
+ #endif
+ 
+ 		signal(SIGPIPE, SIG_IGN); /* we only want EPIPE on errors */
+diff --git a/include/libbb.h b/include/libbb.h
+index 3175c8e..f505cc7 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -294,10 +294,15 @@ int xopen(const char *pathname, int flags);
+ int xopen3(const char *pathname, int flags, int mode);
+ int open_or_warn(const char *pathname, int flags);
+ int open3_or_warn(const char *pathname, int flags, int mode);
+-void xpipe(int filedes[2]);
+ off_t xlseek(int fd, off_t offset, int whence);
+ off_t fdlength(int fd);
+ 
++void xpipe(int filedes[2]);
++/* In this form code with pipes is much more readable */
++struct fd_pair { int rd; int wr; };
++#define piped_pair(pair)  pipe(&((pair).rd))
++#define xpiped_pair(pair) xpipe(&((pair).rd))
++
+ /* Useful for having small structure members/global variables */
+ typedef int8_t socktype_t;
+ typedef int8_t family_t;
+diff --git a/include/unarchive.h b/include/unarchive.h
+index 8b76217..bfd6488 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -92,8 +92,8 @@ extern char get_header_tar_bz2(archive_handle_t *archive_handle);
+ extern char get_header_tar_lzma(archive_handle_t *archive_handle);
+ extern char get_header_tar_gz(archive_handle_t *archive_handle);
+ 
+-extern void seek_by_jump(const archive_handle_t *archive_handle, const unsigned amount);
+-extern void seek_by_read(const archive_handle_t *archive_handle, const unsigned amount);
++extern void seek_by_jump(const archive_handle_t *archive_handle, unsigned amount);
++extern void seek_by_read(const archive_handle_t *archive_handle, unsigned amount);
+ 
+ extern ssize_t archive_xread_all_eof(archive_handle_t *archive_handle, unsigned char *buf, size_t count);
+ 
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 71037b7..b292535 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -70,18 +70,18 @@ static void edit_file(const struct passwd *pas, const char *file)
+ 
+ static int open_as_user(const struct passwd *pas, const char *file)
+ {
+-	int filedes[2];
++	struct fd_pair filedes;
+ 	pid_t pid;
+ 	char c;
+ 
+-	xpipe(filedes);
++	xpiped_pair(filedes);
+ 	pid = vfork();
+ 	if (pid < 0) /* ERROR */
+ 		bb_perror_msg_and_die("vfork");
+ 	if (pid) { /* PARENT */
+-		int n = safe_read(filedes[0], &c, 1);
+-		close(filedes[0]);
+-		close(filedes[1]);
++		int n = safe_read(filedes.rd, &c, 1);
++		close(filedes.rd);
++		close(filedes.wr);
+ 		if (n > 0) /* child says it can read */
+ 			return open(file, O_RDONLY);
+ 		return -1;
+@@ -95,7 +95,7 @@ static int open_as_user(const struct passwd *pas, const char *file)
+ 	/* We just try to read one byte. If that works, file is readable
+ 	 * under this user. We signal that by sending one byte to parent. */
+ 	if (safe_read(xopen(file, O_RDONLY), &c, 1) == 1)
+-		safe_write(filedes[1], &c, 1); /* "papa, I can read!" */
++		safe_write(filedes.wr, &c, 1); /* "papa, I can read!" */
+ 	_exit(0);
+ }
+ 
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 1ac49e7..2c580b0 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1305,8 +1305,8 @@ static void send_cgi_and_exit(
+ 		const char *cookie,
+ 		const char *content_type)
+ {
+-	struct { int rd; int wr; } fromCgi;  /* CGI -> httpd pipe */
+-	struct { int rd; int wr; } toCgi;    /* httpd -> CGI pipe */
++	struct fd_pair fromCgi;  /* CGI -> httpd pipe */
++	struct fd_pair toCgi;    /* httpd -> CGI pipe */
+ 	char *fullpath;
+ 	char *script;
+ 	char *purl;
+@@ -1396,8 +1396,8 @@ static void send_cgi_and_exit(
+ 	if (referer)
+ 		setenv1("HTTP_REFERER", referer);
+ 
+-	xpipe(&fromCgi.rd);
+-	xpipe(&toCgi.rd);
++	xpiped_pair(fromCgi);
++	xpiped_pair(toCgi);
+ 
+ 	pid = vfork();
+ 	if (pid < 0) {
+diff --git a/networking/ifupdown.c b/networking/ifupdown.c
+index d0d7bfe..58e6953 100644
+--- a/networking/ifupdown.c
++++ b/networking/ifupdown.c
+@@ -987,11 +987,11 @@ static int iface_down(struct interface_defn_t *iface)
+ static int popen2(FILE **in, FILE **out, char *command, char *param)
+ {
+ 	char *argv[3] = { command, param, NULL };
+-	int infd[2], outfd[2];
++	struct fd_pair infd, outfd;
+ 	pid_t pid;
+ 
+-	xpipe(infd);
+-	xpipe(outfd);
++	xpiped_pair(infd);
++	xpiped_pair(outfd);
+ 
+ 	fflush(NULL);
+ 	pid = fork();
+@@ -1001,18 +1001,18 @@ static int popen2(FILE **in, FILE **out, char *command, char *param)
+ 		bb_perror_msg_and_die("fork");
+ 	case 0:  /* child */
+ 		/* NB: close _first_, then move fds! */
+-		close(infd[1]);
+-		close(outfd[0]);
+-		xmove_fd(infd[0], 0);
+-		xmove_fd(outfd[1], 1);
++		close(infd.wr);
++		close(outfd.rd);
++		xmove_fd(infd.rd, 0);
++		xmove_fd(outfd.wr, 1);
+ 		BB_EXECVP(command, argv);
+ 		_exit(127);
+ 	}
+ 	/* parent */
+-	close(infd[0]);
+-	close(outfd[1]);
+-	*in = fdopen(infd[1], "w");
+-	*out = fdopen(outfd[0], "r");
++	close(infd.rd);
++	close(outfd.wr);
++	*in = fdopen(infd.wr, "w");
++	*out = fdopen(outfd.rd, "r");
+ 	return pid;
+ }
+ 
+diff --git a/networking/udhcp/signalpipe.c b/networking/udhcp/signalpipe.c
+index 845aa3a..918abd0 100644
+--- a/networking/udhcp/signalpipe.c
++++ b/networking/udhcp/signalpipe.c
+@@ -23,12 +23,12 @@
+ #include "common.h"
+ 
+ 
+-static int signal_pipe[2];
++static struct fd_pair signal_pipe;
+ 
+ static void signal_handler(int sig)
+ {
+ 	unsigned char ch = sig; /* use char, avoid dealing with partial writes */
+-	if (write(signal_pipe[1], &ch, 1) != 1)
++	if (write(signal_pipe.wr, &ch, 1) != 1)
+ 		bb_perror_msg("cannot send signal");
+ }
+ 
+@@ -38,10 +38,10 @@ static void signal_handler(int sig)
+ void udhcp_sp_setup(void)
+ {
+ 	/* was socketpair, but it needs AF_UNIX in kernel */
+-	xpipe(signal_pipe);
+-	close_on_exec_on(signal_pipe[0]);
+-	close_on_exec_on(signal_pipe[1]);
+-	ndelay_on(signal_pipe[1]);
++	xpiped_pair(signal_pipe);
++	close_on_exec_on(signal_pipe.rd);
++	close_on_exec_on(signal_pipe.wr);
++	ndelay_on(signal_pipe.wr);
+ 	signal(SIGUSR1, signal_handler);
+ 	signal(SIGUSR2, signal_handler);
+ 	signal(SIGTERM, signal_handler);
+@@ -54,12 +54,12 @@ void udhcp_sp_setup(void)
+ int udhcp_sp_fd_set(fd_set *rfds, int extra_fd)
+ {
+ 	FD_ZERO(rfds);
+-	FD_SET(signal_pipe[0], rfds);
++	FD_SET(signal_pipe.rd, rfds);
+ 	if (extra_fd >= 0) {
+ 		close_on_exec_on(extra_fd);
+ 		FD_SET(extra_fd, rfds);
+ 	}
+-	return signal_pipe[0] > extra_fd ? signal_pipe[0] : extra_fd;
++	return signal_pipe.rd > extra_fd ? signal_pipe.rd : extra_fd;
+ }
+ 
+ 
+@@ -70,10 +70,10 @@ int udhcp_sp_read(const fd_set *rfds)
+ {
+ 	unsigned char sig;
+ 
+-	if (!FD_ISSET(signal_pipe[0], rfds))
++	if (!FD_ISSET(signal_pipe.rd, rfds))
+ 		return 0;
+ 
+-	if (read(signal_pipe[0], &sig, 1) != 1)
++	if (safe_read(signal_pipe.rd, &sig, 1) != 1)
+ 		return -1;
+ 
+ 	return sig;
+diff --git a/runit/runsv.c b/runit/runsv.c
+index e9a0745..e1d99e2 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -90,8 +90,8 @@ struct globals {
+ 	smallint haslog;
+ 	smallint sigterm;
+ 	smallint pidchanged;
+-	int selfpipe[2];
+-	int logpipe[2];
++	struct fd_pair selfpipe;
++	struct fd_pair logpipe;
+ 	char *dir;
+ 	struct svdir svd[2];
+ };
+@@ -130,13 +130,13 @@ static void warn_cannot(const char *m)
+ 
+ static void s_child(int sig_no)
+ {
+-	write(selfpipe[1], "", 1);
++	write(selfpipe.wr, "", 1);
+ }
+ 
+ static void s_term(int sig_no)
+ {
+ 	sigterm = 1;
+-	write(selfpipe[1], "", 1); /* XXX */
++	write(selfpipe.wr, "", 1); /* XXX */
+ }
+ 
+ static char *add_str(char *p, const char *to_add)
+@@ -275,7 +275,7 @@ static unsigned custom(struct svdir *s, char c)
+ 				return 0;
+ 			}
+ 			if (!pid) {
+-				if (haslog && dup2(logpipe[1], 1) == -1)
++				if (haslog && dup2(logpipe.wr, 1) == -1)
+ 					warn_cannot("setup stdout for control/?");
+ 				prog[0] = a;
+ 				prog[1] = NULL;
+@@ -335,13 +335,14 @@ static void startservice(struct svdir *s)
+ 	if (p == 0) {
+ 		/* child */
+ 		if (haslog) {
++			/* NB: bug alert! right order is close, then dup2 */
+ 			if (s->islog) {
+-				xdup2(logpipe[0], 0);
+-				close(logpipe[1]);
+ 				xchdir("./log");
++				close(logpipe.wr);
++				xdup2(logpipe.rd, 0);
+ 			} else {
+-				xdup2(logpipe[1], 1);
+-				close(logpipe[0]);
++				close(logpipe.rd);
++				xdup2(logpipe.wr, 1);
+ 			}
+ 		}
+ 		signal(SIGCHLD, SIG_DFL);
+@@ -452,11 +453,11 @@ int runsv_main(int argc, char **argv)
+ 		bb_show_usage();
+ 	dir = argv[1];
+ 
+-	xpipe(selfpipe);
+-	close_on_exec_on(selfpipe[0]);
+-	close_on_exec_on(selfpipe[1]);
+-	ndelay_on(selfpipe[0]);
+-	ndelay_on(selfpipe[1]);
++	xpiped_pair(selfpipe);
++	close_on_exec_on(selfpipe.rd);
++	close_on_exec_on(selfpipe.wr);
++	ndelay_on(selfpipe.rd);
++	ndelay_on(selfpipe.wr);
+ 
+ 	sig_block(SIGCHLD);
+ 	sig_catch(SIGCHLD, s_child);
+@@ -489,9 +490,9 @@ int runsv_main(int argc, char **argv)
+ 			gettimeofday_ns(&svd[1].start);
+ 			if (stat("log/down", &s) != -1)
+ 				svd[1].want = W_DOWN;
+-			xpipe(logpipe);
+-			close_on_exec_on(logpipe[0]);
+-			close_on_exec_on(logpipe[1]);
++			xpiped_pair(logpipe);
++			close_on_exec_on(logpipe.rd);
++			close_on_exec_on(logpipe.wr);
+ 		}
+ 	}
+ 
+@@ -572,7 +573,7 @@ int runsv_main(int argc, char **argv)
+ 			if (svd[0].want == W_UP || svd[0].state == S_FINISH)
+ 				startservice(&svd[0]);
+ 
+-		x[0].fd = selfpipe[0];
++		x[0].fd = selfpipe.rd;
+ 		x[0].events = POLLIN;
+ 		x[1].fd = svd[0].fdcontrol;
+ 		x[1].events = POLLIN;
+@@ -585,7 +586,7 @@ int runsv_main(int argc, char **argv)
+ 		sig_block(SIGTERM);
+ 		sig_block(SIGCHLD);
+ 
+-		while (read(selfpipe[0], &ch, 1) == 1)
++		while (read(selfpipe.rd, &ch, 1) == 1)
+ 			continue;
+ 
+ 		for (;;) {
+@@ -630,7 +631,7 @@ int runsv_main(int argc, char **argv)
+ 						sleep(1);
+ 				}
+ 			}
+-		}
++		} /* for (;;) */
+ 		if (read(svd[0].fdcontrol, &ch, 1) == 1)
+ 			ctrl(&svd[0], ch);
+ 		if (haslog)
+@@ -649,11 +650,11 @@ int runsv_main(int argc, char **argv)
+ 				svd[1].want = W_EXIT;
+ 				/* stopservice(&svd[1]); */
+ 				update_status(&svd[1]);
+-				close(logpipe[1]);
+-				close(logpipe[0]);
++				close(logpipe.wr);
++				close(logpipe.rd);
+ 			}
+ 		}
+-	}
++	} /* for (;;) */
+ 	/* not reached */
+ 	return 0;
+ }
+diff --git a/runit/runsvdir.c b/runit/runsvdir.c
+index 8384903..4225ac1 100644
+--- a/runit/runsvdir.c
++++ b/runit/runsvdir.c
+@@ -47,7 +47,7 @@ static char *svdir;
+ static int svnum;
+ static char *rplog;
+ static int rploglen;
+-static int logpipe[2];
++static struct fd_pair logpipe;
+ static struct pollfd pfd[1];
+ static unsigned stamplog;
+ static smallint check = 1;
+@@ -186,19 +186,19 @@ static int setup_log(void)
+ 		warnx("log must have at least seven characters");
+ 		return 0;
+ 	}
+-	if (pipe(logpipe)) {
++	if (piped_pair(logpipe)) {
+ 		warnx("cannot create pipe for log");
+ 		return -1;
+ 	}
+-	close_on_exec_on(logpipe[1]);
+-	close_on_exec_on(logpipe[0]);
+-	ndelay_on(logpipe[0]);
+-	ndelay_on(logpipe[1]);
+-	if (dup2(logpipe[1], 2) == -1) {
++	close_on_exec_on(logpipe.rd);
++	close_on_exec_on(logpipe.wr);
++	ndelay_on(logpipe.rd);
++	ndelay_on(logpipe.wr);
++	if (dup2(logpipe.wr, 2) == -1) {
+ 		warnx("cannot set filedescriptor for log");
+ 		return -1;
+ 	}
+-	pfd[0].fd = logpipe[0];
++	pfd[0].fd = logpipe.rd;
+ 	pfd[0].events = POLLIN;
+ 	stamplog = monotonic_sec();
+ 	return 1;
+@@ -296,7 +296,7 @@ int runsvdir_main(int argc, char **argv)
+ 
+ 		if (rplog) {
+ 			if ((int)(now - stamplog) >= 0) {
+-				write(logpipe[1], ".", 1);
++				write(logpipe.wr, ".", 1);
+ 				stamplog = now + 900;
+ 			}
+ 		}
+@@ -311,7 +311,7 @@ int runsvdir_main(int argc, char **argv)
+ 		sig_unblock(SIGCHLD);
+ 
+ 		if (pfd[0].revents & POLLIN) {
+-			while (read(logpipe[0], &ch, 1) > 0) {
++			while (read(logpipe.rd, &ch, 1) > 0) {
+ 				if (ch) {
+ 					for (i = 6; i < rploglen; i++)
+ 						rplog[i-1] = rplog[i];

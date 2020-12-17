@@ -1,0 +1,27 @@
+2007-06-17 00:36:57 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 7e23de9..f5bd96a 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -88,7 +88,7 @@
+        "	-A		ARP answer mode, update your neighbours\n" \
+        "	-c count	Stop after sending count ARP request packets\n" \
+        "	-w timeout	Time to wait for ARP reply, in seconds\n" \
+-       "	-i device	Outgoing interface name, default is eth0\n" \
++       "	-I device	Outgoing interface name, default is eth0\n" \
+        "	-s sender	Set specific sender IP address\n" \
+        "	target		Target IP address of ARP request"
+ 
+diff --git a/networking/arping.c b/networking/arping.c
+index d65be81..1b26049 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -259,7 +259,7 @@ int arping_main(int argc, char **argv)
+ 		 * Advert also sets unsolicited.
+ 		 */
+ 		opt_complementary = "Df:AU";
+-		opt = getopt32(argc, argv, "DUAqfbc:w:i:s:",
++		opt = getopt32(argc, argv, "DUAqfbc:w:I:s:",
+ 					&_count, &_timeout, &device, &source);
+ 		cfg |= opt & 0x3f; /* set respective flags */
+ 		if (opt & 0x40) /* -c: count */

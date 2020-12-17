@@ -1,0 +1,116 @@
+2008-02-18 23:24:46 +0000
+diff --git a/include/applets.h b/include/applets.h
+index 90b6e70..1c654cd 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -93,6 +93,7 @@ USE_BZIP2(APPLET(bzip2, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_CAL(APPLET(cal, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_CAT(APPLET_NOFORK(cat, cat, _BB_DIR_BIN, _BB_SUID_NEVER, cat))
+ USE_CATV(APPLET(catv, _BB_DIR_BIN, _BB_SUID_NEVER))
++USE_CHAT(APPLET(chat, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_CHATTR(APPLET(chattr, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_CHCON(APPLET(chcon, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_CHGRP(APPLET_NOEXEC(chgrp, chgrp, _BB_DIR_BIN, _BB_SUID_NEVER, chgrp))
+diff --git a/include/usage.h b/include/usage.h
+index d187882..0422c7f 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -204,6 +204,15 @@ USE_FEATURE_BRCTL_FANCY("\n" \
+        "	-e	End each line with $\n" \
+        "	-t	Show tabs as ^I\n" \
+        "	-v	Don't use ^x or M-x escapes"
++
++#define chat_trivial_usage \
++       "EXPECT [SEND [EXPECT [SEND...]]]"
++#define chat_full_usage \
++       "Useful for interacting with a modem connected to stdin/stdout.\n" \
++       "A script consists of one or more \"expect-send\" pairs of strings,\n" \
++       "each pair is a pair of arguments. Example:\n" \
++       "chat '' ATZ OK ATD123456 CONNECT '' ogin: pppuser word: ppppass '~'" \
++
+ #define chattr_trivial_usage \
+        "[-R] [-+=AacDdijsStTu] [-v version] files..."
+ #define chattr_full_usage \
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index d64d053..9df1b0e 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -19,6 +19,66 @@ config BBCONFIG
+ 	  The bbconfig applet will print the config file with which
+ 	  busybox was built.
+ 
++config CHAT
++	bool "chat"
++	default n
++	help
++	  Simple chat utility.
++
++config FEATURE_CHAT_NOFAIL
++	bool "Enable NOFAIL expect strings"
++	default y
++	help
++	  When enabled expect strings which are started with a dash trigger
++	  no-fail mode. That is when expectation is not met within timeout
++	  the script is not terminated but sends next SEND string and waits
++	  for next EXPECT string. This allows to compose far more flexible
++	  scripts.
++
++config FEATURE_CHAT_TTY_HIFI
++	bool "Force STDIN to be a TTY"
++	default n
++	help
++	  Original chat always treats STDIN as a TTY device and sets for it
++	  so-called raw mode. This option turns on such behaviour.
++
++config FEATURE_CHAT_IMPLICIT_CR
++	bool "Enable implicit Carriage Return"
++	default y
++	help
++	  When enabled make chat to terminate all SEND strings with a "\r"
++	  unless "\c" is met anywhere in the string.
++
++config FEATURE_CHAT_SWALLOW_OPTS
++	bool "Swallow options"
++	default n
++	help
++	  Busybox chat require no options. To make it not fail when used
++	  in place of original chat (which has a bunch of options) turn
++	  this on.
++
++config FEATURE_CHAT_SEND_ESCAPES
++	bool "Support weird SEND escapes"
++	default n
++	help
++	  Original chat uses some escape sequences in SEND arguments which
++	  are not sent to device but rather performs special actions.
++	  E.g. "\K" means to send a break sequence to device.
++	  "\d" delays execution for a second, "\p" -- for a 1/100 of second.
++	  Before turning this option on think twice: do you really need them?
++
++config FEATURE_CHAT_VAR_ABORT_LEN
++	bool "Support variable-length ABORT conditions"
++	default n
++	help
++	  Original chat uses fixed 50-bytes length ABORT conditions. Say N here.
++
++config FEATURE_CHAT_CLR_ABORT
++	bool "Support revoking of ABORT conditions"
++	default n
++	help
++	  Support CLR_ABORT directive.
++
+ config CHRT
+ 	bool "chrt"
+ 	default n
+diff --git a/miscutils/Kbuild b/miscutils/Kbuild
+index a9dc833..51187c5 100644
+--- a/miscutils/Kbuild
++++ b/miscutils/Kbuild
+@@ -7,6 +7,7 @@
+ lib-y:=
+ lib-$(CONFIG_ADJTIMEX)    += adjtimex.o
+ lib-$(CONFIG_BBCONFIG)    += bbconfig.o
++lib-$(CONFIG_CHAT)        += chat.o
+ lib-$(CONFIG_CHRT)        += chrt.o
+ lib-$(CONFIG_CROND)       += crond.o
+ lib-$(CONFIG_CRONTAB)     += crontab.o

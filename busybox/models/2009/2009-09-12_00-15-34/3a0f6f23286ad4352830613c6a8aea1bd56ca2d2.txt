@@ -1,0 +1,70 @@
+2009-09-12 00:15:34 +0200
+diff --git a/include/libbb.h b/include/libbb.h
+index 14a1667..fd61517 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1359,9 +1359,9 @@ enum {
+ //procps_status_t* alloc_procps_scan(void) FAST_FUNC;
+ void free_procps_scan(procps_status_t* sp) FAST_FUNC;
+ procps_status_t* procps_scan(procps_status_t* sp, int flags) FAST_FUNC;
+-/* Format cmdline (up to col chars) into char buf[col+1] */
++/* Format cmdline (up to col chars) into char buf[size] */
+ /* Puts [comm] if cmdline is empty (-> process is a kernel thread) */
+-void read_cmdline(char *buf, int col, unsigned pid, const char *comm) FAST_FUNC;
++void read_cmdline(char *buf, int size, unsigned pid, const char *comm) FAST_FUNC;
+ pid_t *find_pid_by_name(const char* procName) FAST_FUNC;
+ pid_t *pidlist_reverse(pid_t *pidList) FAST_FUNC;
+ 
+diff --git a/libbb/procps.c b/libbb/procps.c
+index 9a8e42d..9746617 100644
+--- a/libbb/procps.c
++++ b/libbb/procps.c
+@@ -464,18 +464,19 @@ procps_status_t* FAST_FUNC procps_scan(procps_status_t* sp, int flags)
+ 
+ void FAST_FUNC read_cmdline(char *buf, int col, unsigned pid, const char *comm)
+ {
+-	ssize_t sz;
++	int sz;
+ 	char filename[sizeof("/proc//cmdline") + sizeof(int)*3];
+ 
+ 	sprintf(filename, "/proc/%u/cmdline", pid);
+-	sz = open_read_close(filename, buf, col);
++	sz = open_read_close(filename, buf, col - 1);
+ 	if (sz > 0) {
+ 		buf[sz] = '\0';
+ 		while (--sz >= 0 && buf[sz] == '\0')
+ 			continue;
+-		while (--sz >= 0)
++		do {
+ 			if ((unsigned char)(buf[sz]) < ' ')
+ 				buf[sz] = ' ';
++		} while (--sz >= 0);
+ 	} else {
+ 		snprintf(buf, col, "[%s]", comm);
+ 	}
+diff --git a/procps/ps.c b/procps/ps.c
+index 4a6b60b..6523f0f 100644
+--- a/procps/ps.c
++++ b/procps/ps.c
+@@ -186,7 +186,7 @@ static void func_comm(char *buf, int size, const procps_status_t *ps)
+ 
+ static void func_args(char *buf, int size, const procps_status_t *ps)
+ {
+-	read_cmdline(buf, size, ps->pid, ps->comm);
++	read_cmdline(buf, size+1, ps->pid, ps->comm);
+ }
+ 
+ static void func_pid(char *buf, int size, const procps_status_t *ps)
+diff --git a/procps/top.c b/procps/top.c
+index 92360a0..7133e5c 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -617,7 +617,7 @@ static NOINLINE void display_process_list(int lines_rem, int scr_width)
+ #endif
+ 		);
+ 		if ((int)(col + 1) < scr_width)
+-			read_cmdline(line_buf + col, scr_width - col - 1, s->pid, s->comm);
++			read_cmdline(line_buf + col, scr_width - col, s->pid, s->comm);
+ 		fputs(line_buf, stdout);
+ 		/* printf(" %d/%d %lld/%lld", s->pcpu, total_pcpu,
+ 			cur_jif.busy - prev_jif.busy, cur_jif.total - prev_jif.total); */

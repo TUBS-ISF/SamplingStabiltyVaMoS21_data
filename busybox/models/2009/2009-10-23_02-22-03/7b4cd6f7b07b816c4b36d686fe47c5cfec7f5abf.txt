@@ -1,0 +1,18 @@
+2009-10-23 02:22:03 +0200
+diff --git a/include/libbb.h b/include/libbb.h
+index fb7296f..ad0d59d 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1579,9 +1579,10 @@ extern const char bb_default_login_shell[];
+ #undef isupper
+ #undef isxdigit
+ 
+-/* This one is more efficient - we save ~400 bytes */
++/* This one is more efficient - we save ~500 bytes.
++ * BTW, x86 likes (unsigned char) cast more than (unsigned). */
+ #undef isdigit
+-#define isdigit(a) ((unsigned)((a) - '0') <= 9)
++#define isdigit(a) ((unsigned char)((a) - '0') <= 9)
+ 
+ /* This one is more efficient too! ~200 bytes */
+ /* In POSIX/C locale (the only locale we care about: do we REALLY want

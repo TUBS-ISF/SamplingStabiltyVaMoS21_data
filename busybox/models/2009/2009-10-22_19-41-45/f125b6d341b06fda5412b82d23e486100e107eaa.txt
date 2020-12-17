@@ -1,0 +1,60 @@
+2009-10-22 19:41:45 +0200
+diff --git a/include/libbb.h b/include/libbb.h
+index 97dbe86..fb7296f 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1576,7 +1576,6 @@ extern const char bb_default_login_shell[];
+ #undef islower
+ #undef isprint
+ #undef ispunct
+-#undef isspace
+ #undef isupper
+ #undef isxdigit
+ 
+@@ -1584,6 +1583,16 @@ extern const char bb_default_login_shell[];
+ #undef isdigit
+ #define isdigit(a) ((unsigned)((a) - '0') <= 9)
+ 
++/* This one is more efficient too! ~200 bytes */
++/* In POSIX/C locale (the only locale we care about: do we REALLY want
++ * to allow Unicode whitespace in, say, .conf files? nuts!)
++ * isspace is only these chars: "\t\n\v\f\r" and space.
++ * "\t\n\v\f\r" happen to have ASCII codes 9,10,11,12,13.
++ * Use that.
++ */
++#undef isspace
++#define isspace(a) ({ unsigned char bb__isspace = (a) - 9; bb__isspace == (' ' - 9) || bb__isspace <= (13 - 9); })
++
+ #define ARRAY_SIZE(x) ((unsigned)(sizeof(x) / sizeof((x)[0])))
+ 
+ 
+diff --git a/libbb/skip_whitespace.c b/libbb/skip_whitespace.c
+index e85f385..7b12326 100644
+--- a/libbb/skip_whitespace.c
++++ b/libbb/skip_whitespace.c
+@@ -11,15 +11,22 @@
+ 
+ char* FAST_FUNC skip_whitespace(const char *s)
+ {
+-	/* NB: isspace('\0') returns 0 */
+-	while (isspace(*s)) ++s;
++	/* In POSIX/C locale (the only locale we care about: do we REALLY want
++	 * to allow Unicode whitespace in, say, .conf files? nuts!)
++	 * isspace is only these chars: "\t\n\v\f\r" and space.
++	 * "\t\n\v\f\r" happen to have ASCII codes 9,10,11,12,13.
++	 * Use that.
++	 */
++	while (*s == ' ' || (unsigned char)(*s - 9) <= (13 - 9))
++		s++;
+ 
+ 	return (char *) s;
+ }
+ 
+ char* FAST_FUNC skip_non_whitespace(const char *s)
+ {
+-	while (*s && !isspace(*s)) ++s;
++	while (*s != '\0' && *s != ' ' && (unsigned char)(*s - 9) > (13 - 9))
++		s++;
+ 
+ 	return (char *) s;
+ }

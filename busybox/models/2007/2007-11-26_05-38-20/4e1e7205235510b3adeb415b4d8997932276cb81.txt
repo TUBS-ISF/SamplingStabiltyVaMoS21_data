@@ -1,0 +1,91 @@
+2007-11-26 05:38:20 +0000
+diff --git a/testsuite/cut.tests b/testsuite/cut.tests
+new file mode 100644
+index 0000000..e332e80
+--- /dev/null
++++ b/testsuite/cut.tests
+@@ -0,0 +1,19 @@
++#!/bin/sh
++
++# grep tests.
++# Copyright 2007 by Denys Vlasenko <vda.linux@googlemail.com>
++# Licensed under GPL v2, see file LICENSE for details.
++
++. testing.sh
++
++# testing "test name" "options" "expected result" "file input" "stdin"
++#   file input will be file called "input"
++#   test can create a file "actual" instead of writing to stdout
++
++testing "cut '-' (stdin) and multi file handling" \
++	"cut -d' ' -f2 - input" \
++	"over\n""quick\n" \
++	"the quick brown fox\n" \
++	"jumps over the lazy dog\n" \
++
++exit $FAILCOUNT
+diff --git a/testsuite/grep.tests b/testsuite/grep.tests
+index ef0de48..afbe8e7 100755
+--- a/testsuite/grep.tests
++++ b/testsuite/grep.tests
+@@ -29,9 +29,10 @@ testing "grep input (specify file)" "grep two input" "two\n" \
+ 
+ testing "grep (no newline at EOL)" "grep bug" "bug" "bug" ""
+ 
+-# Note that this assumes actual is empty.
+-testing "grep input actual (two files)" "grep two input actual 2> /dev/null" \
++>empty
++testing "grep two files" "grep two input empty 2>/dev/null" \
+ 	"input:two\n" "one\ntwo\nthree\nthree\nthree\n" ""
++rm empty
+ 
+ testing "grep - infile (specify stdin and file)" "grep two - input" \
+ 	"(standard input):two\ninput:two\n" "one\ntwo\nthree\n" \
+@@ -73,6 +74,8 @@ testing "grep matches NUL" "grep . input > /dev/null 2>&1 ; echo \$?" \
+ # -e regex
+ testing "grep handles multiple regexps" "grep -e one -e two input ; echo \$?" \
+ 	"one\ntwo\n0\n" "one\ntwo\n" ""
++testing "grep -F handles multiple expessions" "grep -F -e one -e two input ; echo \$?" \
++	"one\ntwo\n0\n" "one\ntwo\n" ""
+ 
+ optional FEATURE_GREP_EGREP_ALIAS
+ testing "grep -E supports extended regexps" "grep -E fo+" "foo\n" "" \
+diff --git a/testsuite/runtest b/testsuite/runtest
+index 0f081f9..92cbfdf 100755
+--- a/testsuite/runtest
++++ b/testsuite/runtest
+@@ -127,7 +127,7 @@ for applet in $applets; do
+ 			echo "SKIPPED: $applet (not built)"
+ 			continue
+ 		fi
+-		if PATH="$LINKSDIR":$tsdir:$bindir:$PATH \
++		if PATH="$LINKSDIR:$tsdir:$bindir:$PATH" \
+ 				"${tsdir:-.}/$applet".tests
+ 		then
+ 			:
+@@ -137,5 +137,11 @@ for applet in $applets; do
+ 	fi
+ 
+ done
+-rm -rf "$LINKSDIR"
++
++# Leaving the dir makes it somewhat easier to run failed test by hand
++#rm -rf "$LINKSDIR"
++
++if [ $status != 0 -a x"$VERBOSE" = x ]; then
++	echo "Failures detected, running with VERBOSE=1 will give more info"
++fi
+ exit $status
+diff --git a/testsuite/testing.sh b/testsuite/testing.sh
+index a886a76..94e90d7 100755
+--- a/testsuite/testing.sh
++++ b/testsuite/testing.sh
+@@ -58,7 +58,7 @@ testing()
+ 
+   if [ $# -ne 5 ]
+   then
+-    echo "Test $NAME has the wrong number of arguments ($# $*)" >&2
++    echo "Test $NAME has wrong number of arguments (must be 5) ($# $*)" >&2
+     exit
+   fi
+ 

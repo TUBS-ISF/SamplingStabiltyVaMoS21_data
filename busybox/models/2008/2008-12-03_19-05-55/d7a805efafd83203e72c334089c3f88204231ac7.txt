@@ -1,0 +1,133 @@
+2008-12-03 19:05:55 +0000
+diff --git a/coreutils/id.c b/coreutils/id.c
+index 33e06f4..43f403f 100644
+--- a/coreutils/id.c
++++ b/coreutils/id.c
+@@ -124,9 +124,7 @@ int id_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	username = argv[optind];
+ 	if (username) {
+-		struct passwd *p = getpwnam(username);
+-		if (!p)
+-			bb_error_msg_and_die("unknown user %s", username);
++		struct passwd *p = xgetpwnam(username);
+ 		euid = ruid = p->pw_uid;
+ 		egid = rgid = p->pw_gid;
+ 	} else {
+diff --git a/include/libbb.h b/include/libbb.h
+index a34e8a1..80311db 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -702,6 +702,7 @@ int get_uidgid(struct bb_uidgid_t*, const char*, int numeric_ok) FAST_FUNC;
+ void xget_uidgid(struct bb_uidgid_t*, const char*) FAST_FUNC;
+ /* chown-like handling of "user[:[group]" */
+ void parse_chown_usergroup_or_die(struct bb_uidgid_t *u, char *user_group) FAST_FUNC;
++struct passwd* xgetpwnam(const char *name) FAST_FUNC;
+ struct passwd* xgetpwuid(uid_t uid) FAST_FUNC;
+ struct group* xgetgrgid(gid_t gid) FAST_FUNC;
+ char* xuid2uname(uid_t uid) FAST_FUNC;
+diff --git a/libbb/bb_pwd.c b/libbb/bb_pwd.c
+index 5e44edc..5dbc58d 100644
+--- a/libbb/bb_pwd.c
++++ b/libbb/bb_pwd.c
+@@ -15,7 +15,15 @@
+  * pointers to static data (getpwuid)
+  */
+ 
+-/* TODO: add xgetpwnam, this construct is used a lot */
++struct passwd* FAST_FUNC xgetpwnam(const char *name)
++{
++	struct passwd *pw = getpwnam(name);
++	if (!pw)
++		bb_error_msg_and_die("unknown user %s", name);
++	return pw;
++}
++
++/* xgetgrnam too? */
+ 
+ struct passwd* FAST_FUNC xgetpwuid(uid_t uid)
+ {
+@@ -73,10 +81,7 @@ long FAST_FUNC xuname2uid(const char *name)
+ {
+ 	struct passwd *myuser;
+ 
+-	myuser = getpwnam(name);
+-	if (myuser == NULL)
+-		bb_error_msg_and_die("unknown user %s", name);
+-
++	myuser = xgetpwnam(name);
+ 	return myuser->pw_uid;
+ }
+ 
+diff --git a/loginutils/addgroup.c b/loginutils/addgroup.c
+index 89414d7..2a840d7 100644
+--- a/loginutils/addgroup.c
++++ b/loginutils/addgroup.c
+@@ -159,6 +159,7 @@ int addgroup_main(int argc UNUSED_PARAM, char **argv)
+ 		/* check if group and user exist */
+ 		xuname2uid(argv[0]); /* unknown user: exit */
+ 		xgroup2gid(argv[1]); /* unknown group: exit */
++// race here!
+ 		/* check if user is already in this group */
+ 		gr = getgrnam(argv[1]);
+ 		for (; *(gr->gr_mem) != NULL; (gr->gr_mem)++) {
+diff --git a/loginutils/passwd.c b/loginutils/passwd.c
+index e3e74ba..aa89b87 100644
+--- a/loginutils/passwd.c
++++ b/loginutils/passwd.c
+@@ -118,9 +118,7 @@ int passwd_main(int argc UNUSED_PARAM, char **argv)
+ 	myname = xstrdup(xuid2uname(myuid));
+ 	name = argv[0] ? argv[0] : myname;
+ 
+-	pw = getpwnam(name);
+-	if (!pw)
+-		bb_error_msg_and_die("unknown user %s", name);
++	pw = xgetpwnam(name);
+ 	if (myuid && pw->pw_uid != myuid) {
+ 		/* LOGMODE_BOTH */
+ 		bb_error_msg_and_die("%s can't change password for %s", myname, name);
+diff --git a/loginutils/su.c b/loginutils/su.c
+index 61039d8..e7e0001 100644
+--- a/loginutils/su.c
++++ b/loginutils/su.c
+@@ -48,9 +48,7 @@ int su_main(int argc UNUSED_PARAM, char **argv)
+ 		openlog(applet_name, 0, LOG_AUTH);
+ 	}
+ 
+-	pw = getpwnam(opt_username);
+-	if (!pw)
+-		bb_error_msg_and_die("unknown id: %s", opt_username);
++	pw = xgetpwnam(opt_username);
+ 
+ 	/* Make sure pw->pw_shell is non-NULL.  It may be NULL when NEW_USER
+ 	   is a username that is retrieved via NIS (YP), but that doesn't have
+diff --git a/miscutils/crontab.c b/miscutils/crontab.c
+index 9020149..13dfd77 100644
+--- a/miscutils/crontab.c
++++ b/miscutils/crontab.c
+@@ -126,9 +126,7 @@ int crontab_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+ 
+ 	if (opt_ler & OPT_u) {
+-		pas = getpwnam(user_name);
+-		if (!pas)
+-			bb_error_msg_and_die("user %s is not known", user_name);
++		pas = xgetpwnam(user_name);
+ 	} else {
+ 		pas = xgetpwuid(getuid());
+ 	}
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 1f70685..799dd99 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -223,9 +223,7 @@ static int tftp_protocol(
+ 		}
+ 
+ 		if (user_opt) {
+-			struct passwd *pw = getpwnam(user_opt);
+-			if (!pw)
+-				bb_error_msg_and_die("unknown user %s", user_opt);
++			struct passwd *pw = xgetpwnam(user_opt);
+ 			change_identity(pw); /* initgroups, setgid, setuid */
+ 		}
+ 	}

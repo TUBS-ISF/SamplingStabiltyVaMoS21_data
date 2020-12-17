@@ -1,0 +1,58 @@
+2007-06-19 15:58:02 +0000
+diff --git a/Makefile b/Makefile
+index 341bd7d..4a87573 100644
+--- a/Makefile
++++ b/Makefile
+@@ -677,8 +677,12 @@ busybox_unstripped: $(busybox-all) FORCE
+ 	$(Q)rm -f .old_version
+ 
+ busybox: busybox_unstripped
++ifeq ($(SKIP_STRIP),y)
++	$(Q)cp $< $@
++else
+ 	$(Q)$(STRIP) -s --remove-section=.note --remove-section=.comment \
+ 		busybox_unstripped -o $@
++endif
+ 
+ # The actual objects are generated when descending,
+ # make sure no implicit rule kicks in
+diff --git a/Makefile.custom b/Makefile.custom
+index cf3d143..bb59776 100644
+--- a/Makefile.custom
++++ b/Makefile.custom
+@@ -2,9 +2,6 @@
+ # Build system
+ # ==========================================================================
+ 
+-%.bflt: %_unstripped
+-	$(CROSS_COMPILE)elf2flt $(ELF2FLTFLAGS) $< -o $@
+-
+ busybox.links: $(srctree)/applets/busybox.mkll $(objtree)/include/autoconf.h $(srctree)/include/applets.h
+ 	$(Q)-$(SHELL) $^ >$@
+ 
+diff --git a/Makefile.flags b/Makefile.flags
+index 322e437..c9b713b 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -3,6 +3,7 @@
+ # ==========================================================================
+ 
+ BB_VER = $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
++SKIP_STRIP = n
+ 
+ # -std=gnu99 needed for [U]LLONG_MAX on some systems
+ CPPFLAGS += $(call cc-option,-std=gnu99,)
+@@ -69,6 +70,12 @@ endif
+ 
+ #LDFLAGS += -nostdlib
+ 
++LDFLAGS_ELF2FLT = -Wl,-elf2flt
++ifneq (,$(findstring $(LDFLAGS_ELF2FLT),$(LDFLAGS)))
++SKIP_STRIP = y
++endif
++
+ # Busybox is a stack-fatty so make sure we increase default size
+-# (TODO: use "make stksizes" to find & fix big stack users)
++# TODO: use "make stksizes" to find & fix big stack users; should
++#       just steal scripts/checkstack.pl from the kernel ...
+ FLTFLAGS += -s 20000

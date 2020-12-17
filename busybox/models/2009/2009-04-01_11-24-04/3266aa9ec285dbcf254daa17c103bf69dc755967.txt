@@ -1,0 +1,111 @@
+2009-04-01 11:24:04 +0000
+diff --git a/archival/libunarchive/get_header_tar.c b/archival/libunarchive/get_header_tar.c
+index 0280bbc..443052f 100644
+--- a/archival/libunarchive/get_header_tar.c
++++ b/archival/libunarchive/get_header_tar.c
+@@ -48,7 +48,7 @@ static off_t getBase256_len12(const char *str)
+ 	while (1) {
+ 		if (c)
+ 			bb_error_msg_and_die("overflow in base-256 encoded file size");
+-		if (--len == sizeof(off_t)) 
++		if (--len == sizeof(off_t))
+ 			break;
+ 		c = *str++;
+ 	}
+diff --git a/docs/busybox.net/svnindex.xsl b/docs/busybox.net/svnindex.xsl
+index b4cc5f9..2d3297c 100644
+--- a/docs/busybox.net/svnindex.xsl
++++ b/docs/busybox.net/svnindex.xsl
+@@ -25,9 +25,9 @@
+         <div class="header" style="font-family: lucida, helvetica; font-size: 248%">
+             <xsl:text>BUSYBOX</xsl:text>
+         </div>
+-        <div class="header"> 
+-          <a href="http://www.busybox.net"><img src="/images/busybox1.png" border="0" /></a> 
+-        </div> 
++        <div class="header">
++          <a href="http://www.busybox.net"><img src="/images/busybox1.png" border="0" /></a>
++        </div>
+         <div class="svn">
+           <xsl:apply-templates/>
+         </div>
+diff --git a/editors/vi.c b/editors/vi.c
+index 7f5f2dc..0497bc2 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -1677,12 +1677,12 @@ static char *char_insert(char *p, char c) // insert the char c at 'p'
+ 			q = prev_line(p);	// use prev line as template
+ 			len = strspn(q, " \t"); // space or tab
+ 			if (len) {
+-				uintptr_t bias;			    
++				uintptr_t bias;
+ 				bias = text_hole_make(p, len);
+ 				p += bias;
+ 				q += bias;
+ 				memcpy(p, q, len);
+-				p += len;			
++				p += len;
+ 			}
+ 		}
+ #endif
+diff --git a/findutils/grep.c b/findutils/grep.c
+index 723c351..e23f9bc 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -30,7 +30,7 @@
+ 	USE_DESKTOP("w") \
+ 	USE_EXTRA_COMPAT("z") \
+ 	"aI"
+-	
++
+ /* ignored: -a "assume all files to be text" */
+ /* ignored: -I "assume binary files have no matches" */
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index c2e0344..74ec678 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1301,7 +1301,7 @@ enum {
+ 	PSSCAN_ARGVN    = (1 << 16) * (ENABLE_KILLALL
+ 				|| ENABLE_PGREP || ENABLE_PKILL
+ 				|| ENABLE_PIDOF
+-				|| ENABLE_SESTATUS 
++				|| ENABLE_SESTATUS
+ 				),
+ 	USE_SELINUX(PSSCAN_CONTEXT = 1 << 17,)
+ 	PSSCAN_START_TIME = 1 << 18,
+diff --git a/loginutils/login.c b/loginutils/login.c
+index b7b9ee1..d57d529 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -465,7 +465,7 @@ int login_main(int argc UNUSED_PARAM, char **argv)
+ 	fchmod(0, 0600);
+ 
+ 	/* We trust environment only if we run by root */
+-	if (ENABLE_LOGIN_SCRIPTS && run_by_root) 
++	if (ENABLE_LOGIN_SCRIPTS && run_by_root)
+ 		run_login_script(pw, full_tty);
+ 
+ 	change_identity(pw);
+diff --git a/miscutils/ionice.c b/miscutils/ionice.c
+index 88d771c..361c141 100644
+--- a/miscutils/ionice.c
++++ b/miscutils/ionice.c
+@@ -57,7 +57,7 @@ int ionice_main(int argc UNUSED_PARAM, char **argv)
+ 	/* '+': stop at first non-option */
+ 	opt = getopt32(argv, "+n:c:p:", &pri, &ioclass, &pid);
+ 	argv += optind;
+-	
++
+ 	if (opt & OPT_c) {
+ 		if (ioclass > 3)
+ 			bb_error_msg_and_die("bad class %d", ioclass);
+@@ -70,7 +70,7 @@ int ionice_main(int argc UNUSED_PARAM, char **argv)
+ //			pri = 7;
+ //		}
+ 	}
+-	
++
+ 	if (!(opt & (OPT_n|OPT_c))) {
+ 		if (!(opt & OPT_p) && *argv)
+ 			pid = xatoi_u(*argv);

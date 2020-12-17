@@ -1,0 +1,14 @@
+2007-08-19 21:21:16 +0000
+diff --git a/networking/udhcp/script.c b/networking/udhcp/script.c
+index 98706a5..68de358 100644
+--- a/networking/udhcp/script.c
++++ b/networking/udhcp/script.c
+@@ -14,7 +14,7 @@
+ 
+ 
+ /* get a rough idea of how long an option will be (rounding up...) */
+-static const int max_option_length[] = {
++static const uint8_t max_option_length[] = {
+ 	[OPTION_IP] =		sizeof("255.255.255.255 "),
+ 	[OPTION_IP_PAIR] =	sizeof("255.255.255.255 ") * 2,
+ 	[OPTION_STRING] =	1,

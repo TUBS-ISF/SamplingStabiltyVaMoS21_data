@@ -1,0 +1,146 @@
+2007-06-26 15:59:37 +0000
+diff --git a/coreutils/uuencode.c b/coreutils/uuencode.c
+index b54e317..c1458f7 100644
+--- a/coreutils/uuencode.c
++++ b/coreutils/uuencode.c
+@@ -10,64 +10,52 @@
+ 
+ #include "libbb.h"
+ 
++enum {
++	SRC_BUF_SIZE = 45,  /* This *MUST* be a multiple of 3 */
++	DST_BUF_SIZE = 4 * ((SRC_BUF_SIZE + 2) / 3),
++};
+ 
+-#define SRC_BUF_SIZE	45  // This *MUST* be a multiple of 3
+-#define DST_BUF_SIZE    4 * ((SRC_BUF_SIZE + 2) / 3)
+ int uuencode_main(int argc, char **argv);
+ int uuencode_main(int argc, char **argv)
+ {
+-	const size_t src_buf_size = SRC_BUF_SIZE;
+-	const size_t dst_buf_size = DST_BUF_SIZE;
+-	size_t write_size = dst_buf_size;
+ 	struct stat stat_buf;
+-	FILE *src_stream = stdin;
++	int src_fd = STDIN_FILENO;
+ 	const char *tbl;
+-	size_t size;
+ 	mode_t mode;
+-	RESERVE_CONFIG_BUFFER(src_buf, SRC_BUF_SIZE + 1);
+-	RESERVE_CONFIG_BUFFER(dst_buf, DST_BUF_SIZE + 1);
++	char src_buf[SRC_BUF_SIZE];
++	char dst_buf[DST_BUF_SIZE + 1];
+ 
+ 	tbl = bb_uuenc_tbl_std;
++	mode = 0666 & ~umask(0666);
++	opt_complementary = "-1:?2"; /* must have 1 or 2 args */
+ 	if (getopt32(argc, argv, "m")) {
+ 		tbl = bb_uuenc_tbl_base64;
+ 	}
+-
+-	switch (argc - optind) {
+-		case 2:
+-			src_stream = xfopen(argv[optind], "r");
+-			xstat(argv[optind], &stat_buf);
+-			mode = stat_buf.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+-			break;
+-		case 1:
+-			mode = 0666 & ~umask(0666);
+-			break;
+-		default:
+-			bb_show_usage();
++	argv += optind;
++	if (argc == optind + 2) {
++		src_fd = xopen(*argv, O_RDONLY);
++		fstat(src_fd, &stat_buf);
++		mode = stat_buf.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
++		argv++;
+ 	}
+ 
+-	printf("begin%s %o %s", tbl == bb_uuenc_tbl_std ? "" : "-base64", mode, argv[argc - 1]);
+-
+-	while ((size = fread(src_buf, 1, src_buf_size, src_stream)) > 0) {
+-		if (size != src_buf_size) {
+-			/* write_size is always 60 until the last line */
+-			write_size = (4 * ((size + 2) / 3));
+-			/* pad with 0s so we can just encode extra bits */
+-			memset(&src_buf[size], 0, src_buf_size - size);
+-		}
++	printf("begin%s %o %s", tbl == bb_uuenc_tbl_std ? "" : "-base64", mode, *argv);
++	while (1) {
++		size_t size = full_read(src_fd, src_buf, SRC_BUF_SIZE);
++		if (!size)
++			break;
++		if ((ssize_t)size < 0)
++			bb_perror_msg_and_die(bb_msg_read_error);
+ 		/* Encode the buffer we just read in */
+-		bb_uuencode((unsigned char*)src_buf, dst_buf, size, tbl);
+-
++		bb_uuencode(dst_buf, src_buf, size, tbl);
+ 		putchar('\n');
+ 		if (tbl == bb_uuenc_tbl_std) {
+ 			putchar(tbl[size]);
+ 		}
+-		if (fwrite(dst_buf, 1, write_size, stdout) != write_size) {
+-			bb_perror_msg_and_die(bb_msg_write_error);
+-		}
++		fflush(stdout);
++		xwrite(STDOUT_FILENO, dst_buf, 4 * ((size + 2) / 3));
+ 	}
+ 	printf(tbl == bb_uuenc_tbl_std ? "\n`\nend\n" : "\n====\n");
+ 
+-	die_if_ferror(src_stream, "source");	/* TODO - Fix this! */
+-
+ 	fflush_stdout_and_exit(EXIT_SUCCESS);
+ }
+diff --git a/include/libbb.h b/include/libbb.h
+index 3cdf28f..124b11f 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -884,7 +884,7 @@ pid_t *pidlist_reverse(pid_t *pidList);
+ 
+ extern const char bb_uuenc_tbl_base64[];
+ extern const char bb_uuenc_tbl_std[];
+-void bb_uuencode(const unsigned char *s, char *store, const int length, const char *tbl);
++void bb_uuencode(char *store, const void *s, int length, const char *tbl);
+ 
+ typedef struct sha1_ctx_t {
+ 	uint32_t count[2];
+diff --git a/libbb/uuencode.c b/libbb/uuencode.c
+index bbb92d6..08fe3f3 100644
+--- a/libbb/uuencode.c
++++ b/libbb/uuencode.c
+@@ -34,14 +34,15 @@ const char bb_uuenc_tbl_std[65] = {
+ };
+ 
+ /*
+- * Encode the string S of length LENGTH to base64 format and place it
++ * Encode bytes at S of length LENGTH to uuencode or base64 format and place it
+  * to STORE.  STORE will be 0-terminated, and must point to a writable
+  * buffer of at least 1+BASE64_LENGTH(length) bytes.
+  * where BASE64_LENGTH(len) = (4 * ((LENGTH + 2) / 3))
+  */
+-void bb_uuencode(const unsigned char *s, char *store, const int length, const char *tbl)
++void bb_uuencode(char *store, const void *src, int length, const char *tbl)
+ {
+ 	int i;
++	const unsigned char *s = src;
+ 	char *p = store;
+ 
+ 	/* Transform the 3x8 bits to 4x6 bits, as required by base64.  */
+diff --git a/networking/wget.c b/networking/wget.c
+index ef27ab0..bd9480c 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -76,9 +76,9 @@ static char *safe_fgets(char *s, int size, FILE *stream)
+ 
+ #if ENABLE_FEATURE_WGET_AUTHENTICATION
+ /* Base64-encode character string and return the string.  */
+-static char *base64enc(unsigned char *p, char *buf, int len)
++static char *base64enc(const unsigned char *p, char *buf, int len)
+ {
+-	bb_uuencode(p, buf, len, bb_uuenc_tbl_base64);
++	bb_uuencode(buf, p, len, bb_uuenc_tbl_base64);
+ 	return buf;
+ }
+ #endif

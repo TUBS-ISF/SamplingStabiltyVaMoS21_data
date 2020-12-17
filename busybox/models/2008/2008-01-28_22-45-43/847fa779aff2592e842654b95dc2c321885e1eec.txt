@@ -1,0 +1,168 @@
+2008-01-28 22:45:43 +0000
+diff --git a/archival/libunarchive/open_transformer.c b/archival/libunarchive/open_transformer.c
+index 757a2a3..d6f5e62 100644
+--- a/archival/libunarchive/open_transformer.c
++++ b/archival/libunarchive/open_transformer.c
+@@ -30,7 +30,7 @@ int open_transformer(int src_fd,
+ 
+ 	if (pid == 0) {
+ 		/* child process */
+-		close(fd_pipe[0]); /* We don't wan't to read from the parent */
++		close(fd_pipe[0]); /* We don't want to read from the parent */
+ 		// FIXME: error check?
+ #if BB_MMU
+ 		transformer(src_fd, fd_pipe[1]);
+diff --git a/coreutils/env.c b/coreutils/env.c
+index b45cbcc..7273d39 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -30,8 +30,6 @@
+  */
+ 
+ #include <getopt.h> /* struct option */
+-extern char **environ;
+-
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_ENV_LONG_OPTIONS
+diff --git a/coreutils/printenv.c b/coreutils/printenv.c
+index bac77e2..06d68d0 100644
+--- a/coreutils/printenv.c
++++ b/coreutils/printenv.c
+@@ -9,7 +9,6 @@
+  */
+ 
+ #include "libbb.h"
+-extern char **environ;
+ 
+ int printenv_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int printenv_main(int argc, char **argv)
+diff --git a/editors/awk.c b/editors/awk.c
+index da3401b..983b311 100644
+--- a/editors/awk.c
++++ b/editors/awk.c
+@@ -10,7 +10,6 @@
+ #include "libbb.h"
+ #include "xregex.h"
+ #include <math.h>
+-extern char **environ;
+ 
+ /* This is a NOEXEC applet. Be very careful! */
+ 
+diff --git a/include/libbb.h b/include/libbb.h
+index 9d70e70..c5b6859 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -67,6 +67,9 @@
+ #include "shadow_.h"
+ #endif
+ 
++/* Some libc's don't declare it, help them */
++extern char **environ;
++
+ #if defined(__GLIBC__) && __GLIBC__ < 2
+ int vdprintf(int d, const char *format, va_list ap);
+ #endif
+diff --git a/networking/inetd.c b/networking/inetd.c
+index d643dc6..a7259f3 100644
+--- a/networking/inetd.c
++++ b/networking/inetd.c
+@@ -172,9 +172,6 @@
+ #include <rpc/pmap_clnt.h>
+ #endif
+ 
+-extern char **environ;
+-
+-
+ #define _PATH_INETDPID  "/var/run/inetd.pid"
+ 
+ #define CNT_INTVL       60              /* servers in CNT_INTVL sec. */
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 84f5193..e9a0745 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -279,7 +279,7 @@ static unsigned custom(struct svdir *s, char c)
+ 					warn_cannot("setup stdout for control/?");
+ 				prog[0] = a;
+ 				prog[1] = NULL;
+-				execve(a, prog, environ);
++				execv(a, prog);
+ 				fatal_cannot("run control/?");
+ 			}
+ 			while (safe_waitpid(pid, &w, 0) == -1) {
+diff --git a/runit/svlogd.c b/runit/svlogd.c
+index 1d679c9..9c169da 100644
+--- a/runit/svlogd.c
++++ b/runit/svlogd.c
+@@ -252,7 +252,7 @@ static unsigned processorstart(struct logdir *ld)
+ 		prog[1] = (char*)"-c";
+ 		prog[2] = ld->processor;
+ 		prog[3] = NULL;
+-		execve("/bin/sh", prog, environ);
++		execv("/bin/sh", prog);
+ 		bb_perror_msg_and_die(FATAL"cannot %s processor %s", "run", ld->name);
+ 	}
+ 	ld->ppid = pid;
+diff --git a/shell/ash.c b/shell/ash.c
+index 96563bf..2a9e96a 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -60,7 +60,6 @@
+ #if JOBS || ENABLE_ASH_READ_NCHARS
+ #include <termios.h>
+ #endif
+-extern char **environ;
+ 
+ #if defined(__uClinux__)
+ #error "Do not even bother, ash will not run on uClinux"
+diff --git a/shell/hush.c b/shell/hush.c
+index 9dc85d0..a754076 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -81,8 +81,6 @@
+ #include <getopt.h>    /* should be pretty obvious */
+ /* #include <dmalloc.h> */
+ 
+-extern char **environ; /* This is in <unistd.h>, but protected with __USE_GNU */
+-
+ #include "busybox.h" /* for APPLET_IS_NOFORK/NOEXEC */
+ 
+ 
+diff --git a/shell/msh.c b/shell/msh.c
+index 9e9b798..7371120 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -84,7 +84,6 @@ static char *itoa(int n)
+ }
+ #else
+ # include "busybox.h" /* for applet_names */
+-extern char **environ;
+ #endif
+ 
+ /*#define MSHDEBUG 1*/
+@@ -2825,11 +2824,13 @@ static int forkexec(struct op *t, int *pin, int *pout, int act, char **wp)
+ 
+ 	if (pin != NULL) {
+ 		xmove_fd(pin[0], 0);
+-		if (pin[1] != 0) close(pin[1]);
++		if (pin[1] != 0)
++			close(pin[1]);
+ 	}
+ 	if (pout != NULL) {
+ 		xmove_fd(pout[1], 1);
+-		if (pout[1] != 1) close(pout[0]);
++		if (pout[1] != 1)
++			close(pout[0]);
+ 	}
+ 
+ 	iopp = t->ioact;
+@@ -4181,7 +4182,8 @@ static int grave(int quoted)
+ 	 *  echo "$files" >zz
+ 	 */
+ 	xmove_fd(pf[1], 1);
+-	if (pf[0] != 1) close(pf[0]);
++	if (pf[0] != 1)
++		close(pf[0]);
+ 
+ 	argument_list[0] = (char *) DEFAULT_SHELL;
+ 	argument_list[1] = (char *) "-c";

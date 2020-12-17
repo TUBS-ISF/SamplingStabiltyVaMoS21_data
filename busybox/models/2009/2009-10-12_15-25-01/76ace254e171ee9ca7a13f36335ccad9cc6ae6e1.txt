@@ -1,0 +1,132 @@
+2009-10-12 15:25:01 +0200
+diff --git a/shell/ash.c b/shell/ash.c
+index cc26771..d81dbd3 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -4725,10 +4725,12 @@ forkshell(struct job *jp, union node *n, int mode)
+ 			freejob(jp);
+ 		ash_msg_and_raise_error("can't fork");
+ 	}
+-	if (pid == 0)
++	if (pid == 0) {
++		CLEAR_RANDOM_T(&random_gen); /* or else $RANDOM repeats in child */
+ 		forkchild(jp, n, mode);
+-	else
++	} else {
+ 		forkparent(jp, n, mode, pid);
++	}
+ 	return pid;
+ }
+ 
+@@ -10079,12 +10081,6 @@ setcmd(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ static void FAST_FUNC
+ change_random(const char *value)
+ {
+-	/* Galois LFSR parameter */
+-	/* Taps at 32 31 29 1: */
+-	enum { MASK = 0x8000000b };
+-	/* Another example - taps at 32 31 30 10: */
+-	/* MASK = 0x00400007 */
+-
+ 	uint32_t t;
+ 
+ 	if (value == NULL) {
+@@ -13268,11 +13264,6 @@ int ash_main(int argc UNUSED_PARAM, char **argv)
+ #endif
+ 	rootpid = getpid();
+ 
+-#if ENABLE_ASH_RANDOM_SUPPORT
+-	/* Can use monotonic_ns() for better randomness but for now it is
+-	 * not used anywhere else in busybox... so avoid bloat */
+-	INIT_RANDOM_T(&random_gen, rootpid, monotonic_us());
+-#endif
+ 	init();
+ 	setstackmark(&smark);
+ 	procargs(argv);
+diff --git a/shell/hush.c b/shell/hush.c
+index d105029..21f3edc 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -88,6 +88,8 @@
+ #include "match.h"
+ #if ENABLE_HUSH_RANDOM_SUPPORT
+ # include "random.h"
++#else
++# define CLEAR_RANDOM_T(rnd) ((void)0)
+ #endif
+ #ifndef PIPE_BUF
+ # define PIPE_BUF 4096  /* amount of buffering in a pipe */
+@@ -1319,8 +1321,6 @@ static const char *get_local_var_value(const char *name)
+ 	// bash compat: UID? EUID?
+ #if ENABLE_HUSH_RANDOM_SUPPORT
+ 	if (strcmp(name, "RANDOM") == 0) {
+-		if (G.random_gen.galois_LFSR == 0)
+-			INIT_RANDOM_T(&G.random_gen, G.root_pid, monotonic_us());
+ 		return utoa(next_random(&G.random_gen));
+ 	}
+ #endif
+@@ -4000,6 +4000,7 @@ static NOINLINE int run_pipe(struct pipe *pi)
+ 		if (!command->pid) { /* child */
+ #if ENABLE_HUSH_JOB
+ 			disable_restore_tty_pgrp_on_exit();
++			CLEAR_RANDOM_T(&G.random_gen); /* or else $RANDOM repeats in child */
+ 
+ 			/* Every child adds itself to new process group
+ 			 * with pgid == pid_of_first_child_in_pipe */
+@@ -5207,6 +5208,7 @@ static FILE *generate_stream_from_string(const char *s)
+ 			+ (1 << SIGTTIN)
+ 			+ (1 << SIGTTOU)
+ 			, SIG_IGN);
++		CLEAR_RANDOM_T(&G.random_gen); /* or else $RANDOM repeats in child */
+ 		close(channel[0]); /* NB: close _first_, then move fd! */
+ 		xmove_fd(channel[1], 1);
+ 		/* Prevent it from trying to handle ctrl-z etc */
+diff --git a/shell/math.c b/shell/math.c
+index 3791b84..fc20def 100644
+--- a/shell/math.c
++++ b/shell/math.c
+@@ -258,7 +258,7 @@ static int
+ arith_lookup_val(v_n_t *t, a_e_h_t *math_hooks)
+ {
+ 	if (t->var) {
+-		const char * p = lookupvar(t->var);
++		const char *p = lookupvar(t->var);
+ 
+ 		if (p) {
+ 			int errcode;
+diff --git a/shell/random.c b/shell/random.c
+index cca9d12..7f5821c 100644
+--- a/shell/random.c
++++ b/shell/random.c
+@@ -20,6 +20,13 @@ next_random(random_t *rnd)
+ 
+ 	uint32_t t;
+ 
++	if (UNINITED_RANDOM_T(rnd)) {
++		/* Can use monotonic_ns() for better randomness but for now
++		 * it is not used anywhere else in busybox... so avoid bloat
++		 */
++		INIT_RANDOM_T(rnd, getpid(), monotonic_us());
++	}
++
+ 	/* LCG has period of 2^32 and alternating lowest bit */
+ 	rnd->LCG = 1664525 * rnd->LCG + 1013904223;
+ 	/* Galois LFSR has period of 2^32-1 = 3 * 5 * 17 * 257 * 65537 */
+diff --git a/shell/random.h b/shell/random.h
+index 8667e1c..e22a2e8 100644
+--- a/shell/random.h
++++ b/shell/random.h
+@@ -13,7 +13,13 @@ typedef struct random_t {
+ 	uint32_t LCG;        /* LCG (fast but weak) */
+ } random_t;
+ 
++#define UNINITED_RANDOM_T(rnd) \
++	((rnd)->galois_LFSR == 0)
++
+ #define INIT_RANDOM_T(rnd, nonzero, v) \
+ 	((rnd)->galois_LFSR = (nonzero), (rnd)->LCG = (v))
+ 
++#define CLEAR_RANDOM_T(rnd) \
++	((rnd)->galois_LFSR = 0)
++
+ uint32_t next_random(random_t *rnd) FAST_FUNC;

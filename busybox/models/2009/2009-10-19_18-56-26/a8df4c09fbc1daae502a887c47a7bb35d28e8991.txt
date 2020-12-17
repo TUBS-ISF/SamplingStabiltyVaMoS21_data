@@ -1,0 +1,55 @@
+2009-10-19 18:56:26 +0200
+diff --git a/Config.in b/Config.in
+index 05bc3a5..2ed8889 100644
+--- a/Config.in
++++ b/Config.in
+@@ -30,6 +30,15 @@ config EXTRA_COMPAT
+ 	  some GNU extensions in libc. You probably only need this option
+ 	  if you plan to run busybox on desktop.
+ 
++config INCLUDE_SUSv2
++	bool "Enable obsolete features removed before SUSv3"
++	default y
++	help
++	  This option will enable backwards compatibility with SuSv2,
++	  specifically, old-style numeric options ('command -1 <file>')
++	  will be supported in head, tail, and fold. (Note: should
++	  affect renice too.)
++
+ config USE_PORTABLE_CODE
+ 	bool "Avoid using GCC-specific code constructs"
+ 	default n
+@@ -511,15 +520,6 @@ config EFENCE
+ 
+ endchoice
+ 
+-config INCLUDE_SUSv2
+-	bool "Enable obsolete features removed before SUSv3?"
+-	default y
+-	help
+-	  This option will enable backwards compatibility with SuSv2,
+-	  specifically, old-style numeric options ('command -1 <file>')
+-	  will be supported in head, tail, and fold. (Note: should
+-	  affect renice too.)
+-
+ ### config PARSE
+ ### 	bool "Uniform config file parser debugging applet: parse"
+ 
+diff --git a/miscutils/Config.in b/miscutils/Config.in
+index 9a81ecc..9b80488 100644
+--- a/miscutils/Config.in
++++ b/miscutils/Config.in
+@@ -137,11 +137,11 @@ config FEATURE_CROND_D
+ 	  -d sets loglevel to 0 (most verbose) and directs all output to stderr.
+ 
+ config FEATURE_CROND_CALL_SENDMAIL
+-	bool "Using /usr/sbin/sendmail?"
++	bool "Report command output via email (using sendmail)"
+ 	default n
+ 	depends on CROND
+ 	help
+-	  Support calling /usr/sbin/sendmail for send cmd outputs.
++	  Command output will be sent to corresponding user via email.
+ 
+ config FEATURE_CROND_DIR
+ 	string "crond spool directory"

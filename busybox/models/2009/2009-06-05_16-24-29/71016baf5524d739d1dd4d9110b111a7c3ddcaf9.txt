@@ -1,0 +1,72 @@
+2009-06-05 16:24:29 +0200
+diff --git a/coreutils/printf.c b/coreutils/printf.c
+index 0b004ea..2beea71 100644
+--- a/coreutils/printf.c
++++ b/coreutils/printf.c
+@@ -78,6 +78,14 @@ static int multiconvert(const char *arg, void *result, converter convert)
+ static void FAST_FUNC conv_strtoull(const char *arg, void *result)
+ {
+ 	*(unsigned long long*)result = bb_strtoull(arg, NULL, 0);
++	/* both coreutils 6.10 and bash 3.2:
++	 * $ printf '%x\n' -2
++	 * fffffffffffffffe
++	 * Mimic that:
++	 */
++	if (errno) {
++		*(unsigned long long*)result = bb_strtoll(arg, NULL, 0);
++	}
+ }
+ static void FAST_FUNC conv_strtoll(const char *arg, void *result)
+ {
+diff --git a/shell/math.c b/shell/math.c
+index cc298bd..d75bcae 100644
+--- a/shell/math.c
++++ b/shell/math.c
+@@ -562,7 +562,11 @@ arith(const char *expr, int *perrcode, a_e_h_t *math_hooks)
+ 		}
+ 		if (isdigit(arithval)) {
+ 			numstackptr->var = NULL;
++			errno = 0;
++			/* call strtoul[l]: */
+ 			numstackptr->val = strto_arith_t(expr, (char **) &expr, 0);
++			if (errno)
++				numstackptr->val = 0; /* bash compat */
+ 			goto num;
+ 		}
+ 		for (p = op_tokens; ; p++) {
+@@ -592,7 +596,7 @@ arith(const char *expr, int *perrcode, a_e_h_t *math_hooks)
+ 			lasttok = TOK_NUM;
+ 
+ 		/* Plus and minus are binary (not unary) _only_ if the last
+-		 * token was as number, or a right paren (which pretends to be
++		 * token was a number, or a right paren (which pretends to be
+ 		 * a number, since it evaluates to one). Think about it.
+ 		 * It makes sense. */
+ 		if (lasttok != TOK_NUM) {
+@@ -611,7 +615,7 @@ arith(const char *expr, int *perrcode, a_e_h_t *math_hooks)
+ 				break;
+ 			}
+ 		}
+-		/* We don't want a unary operator to cause recursive descent on the
++		/* We don't want an unary operator to cause recursive descent on the
+ 		 * stack, because there can be many in a row and it could cause an
+ 		 * operator to be evaluated before its argument is pushed onto the
+ 		 * integer stack. */
+diff --git a/shell/math.h b/shell/math.h
+index 51dbb56..7b7898e 100644
+--- a/shell/math.h
++++ b/shell/math.h
+@@ -80,11 +80,11 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ #if ENABLE_SH_MATH_SUPPORT_64
+ typedef long long arith_t;
+ #define arith_t_fmt "%lld"
+-#define strto_arith_t strtoll
++#define strto_arith_t strtoull
+ #else
+ typedef long arith_t;
+ #define arith_t_fmt "%ld"
+-#define strto_arith_t strtol
++#define strto_arith_t strtoul
+ #endif
+ 
+ typedef const char *(*arith_var_lookup_t)(const char *name);

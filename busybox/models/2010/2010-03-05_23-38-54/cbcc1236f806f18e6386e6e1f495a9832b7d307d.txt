@@ -1,0 +1,93 @@
+2010-03-05 23:38:54 +0100
+diff --git a/include/libbb.h b/include/libbb.h
+index 515e995..ead1020 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1490,6 +1490,7 @@ typedef struct bb_progress_t {
+ 	off_t lastsize;
+ 	unsigned lastupdate_sec;
+ 	unsigned start_sec;
++	smallint inited;
+ } bb_progress_t;
+ 
+ void bb_progress_init(bb_progress_t *p) FAST_FUNC;
+diff --git a/libbb/progress.c b/libbb/progress.c
+index 3a245ae..0e484da 100644
+--- a/libbb/progress.c
++++ b/libbb/progress.c
+@@ -57,6 +57,7 @@ void FAST_FUNC bb_progress_init(bb_progress_t *p)
+ 	p->start_sec = monotonic_sec();
+ 	p->lastupdate_sec = p->start_sec;
+ 	p->lastsize = 0;
++	p->inited = 1;
+ }
+ 
+ void FAST_FUNC bb_progress_update(bb_progress_t *p,
+diff --git a/networking/Config.in b/networking/Config.in
+index 90d905e..b01c38e 100644
+--- a/networking/Config.in
++++ b/networking/Config.in
+@@ -860,7 +860,7 @@ config TFTPD
+ 	  or from udpsvd. Example: "udpsvd -E 0 69 tftpd DIR"
+ 
+ config FEATURE_TFTP_GET
+-	bool "Enable \"get\" command"
++	bool "Enable 'tftp get' and/or tftpd upload code"
+ 	default y
+ 	depends on TFTP || TFTPD
+ 	help
+@@ -868,8 +868,11 @@ config FEATURE_TFTP_GET
+ 	  a client to retrieve a file from a TFTP server.
+ 	  Also enable upload support in tftpd, if tftpd is selected.
+ 
++	  Note: this option does _not_ make tftpd capable of download
++	  (the usual operation people need from it)!
++
+ config FEATURE_TFTP_PUT
+-	bool "Enable \"put\" command"
++	bool "Enable 'tftp put' and/or tftpd download code"
+ 	default y
+ 	depends on TFTP || TFTPD
+ 	help
+diff --git a/networking/dnsd.c b/networking/dnsd.c
+index e73e244..6771c53 100644
+--- a/networking/dnsd.c
++++ b/networking/dnsd.c
+@@ -376,11 +376,6 @@ static int process_packet(struct dns_entry *conf_data,
+ 	/* QR = 1 "response", RCODE = 4 "Not Implemented" */
+ 	outr_flags = htons(0x8000 | 4);
+ 	err_msg = NULL;
+-	/* OPCODE != 0 "standard query" ? */
+-	if ((head->flags & htons(0x7800)) != 0) {
+-		err_msg = "opcode != 0";
+-		goto empty_packet;
+-	}
+ 
+ 	/* start of query string */
+ 	query_string = (void *)(head + 1);
+@@ -392,6 +387,11 @@ static int process_packet(struct dns_entry *conf_data,
+ 	/* where to append answer block */
+ 	answb = (void *)(unaligned_type_class + 1);
+ 
++	/* OPCODE != 0 "standard query"? */
++	if ((head->flags & htons(0x7800)) != 0) {
++		err_msg = "opcode != 0";
++		goto empty_packet;
++	}
+ 	move_from_unaligned16(class, &unaligned_type_class->class);
+ 	if (class != htons(1)) { /* not class INET? */
+ 		err_msg = "class != 1";
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 0e5b48d..d76f7ae 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -135,7 +135,8 @@ static void tftp_progress_init(void)
+ }
+ static void tftp_progress_done(void)
+ {
+-	progress_meter(0);
++	if (G.pmt.inited)
++		progress_meter(0);
+ }
+ #else
+ # define tftp_progress_init() ((void)0)

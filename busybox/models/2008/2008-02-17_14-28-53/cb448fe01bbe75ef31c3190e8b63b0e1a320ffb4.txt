@@ -1,0 +1,219 @@
+2008-02-17 14:28:53 +0000
+diff --git a/editors/patch.c b/editors/patch.c
+index 07fa5cf..1b283a1 100644
+--- a/editors/patch.c
++++ b/editors/patch.c
+@@ -150,10 +150,7 @@ int patch_main(int argc, char **argv)
+ 			backup_filename = xmalloc(strlen(new_filename) + 6);
+ 			strcpy(backup_filename, new_filename);
+ 			strcat(backup_filename, ".orig");
+-			if (rename(new_filename, backup_filename) == -1) {
+-				bb_perror_msg_and_die("cannot create file %s",
+-						backup_filename);
+-			}
++			xrename(new_filename, backup_filename);
+ 			dst_stream = xfopen(new_filename, "w");
+ 		}
+ 
+diff --git a/editors/sed.c b/editors/sed.c
+index 4334182..e55bcaf 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -1340,8 +1340,7 @@ int sed_main(int argc, char **argv)
+ 
+ 			G.nonstdout = stdout;
+ 			/* unlink(argv[i]); */
+-			// FIXME: error check / message?
+-			rename(G.outname, argv[i]);
++			xrename(G.outname, argv[i]);
+ 			free(G.outname);
+ 			G.outname = NULL;
+ 		}
+diff --git a/include/libbb.h b/include/libbb.h
+index 67afcdf..2af89df 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -298,6 +298,8 @@ int xopen(const char *pathname, int flags);
+ int xopen3(const char *pathname, int flags, int mode);
+ int open_or_warn(const char *pathname, int flags);
+ int open3_or_warn(const char *pathname, int flags, int mode);
++void xrename(const char *oldpath, const char *newpath);
++int rename_or_warn(const char *oldpath, const char *newpath);
+ off_t xlseek(int fd, off_t offset, int whence);
+ off_t fdlength(int fd);
+ 
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 98339c9..1567d89 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -98,11 +98,6 @@ int wait4pid(int pid)
+ 	if (WIFSIGNALED(status))
+ 		return WTERMSIG(status) + 1000;
+ 	return 0;
+-	if (WIFEXITED(status))
+-		return WEXITSTATUS(status);
+-	if (WIFSIGNALED(status))
+-		return WTERMSIG(status) + 1000;
+-	return 0;
+ }
+ 
+ #if ENABLE_FEATURE_PREFER_APPLETS
+diff --git a/libbb/xfuncs.c b/libbb/xfuncs.c
+index 8dd414d..b4c059f 100644
+--- a/libbb/xfuncs.c
++++ b/libbb/xfuncs.c
+@@ -146,18 +146,32 @@ int open_or_warn(const char *pathname, int flags)
+ 	return open3_or_warn(pathname, flags, 0666);
+ }
+ 
+-void xpipe(int filedes[2])
+-{
+-	if (pipe(filedes))
+-		bb_perror_msg_and_die("can't create pipe");
+-}
+-
+ void xunlink(const char *pathname)
+ {
+ 	if (unlink(pathname))
+ 		bb_perror_msg_and_die("can't remove file '%s'", pathname);
+ }
+ 
++void xrename(const char *oldpath, const char *newpath)
++{
++	if (rename(oldpath, newpath))
++		bb_perror_msg_and_die("can't move '%s' to '%s'", oldpath, newpath);
++}
++
++int rename_or_warn(const char *oldpath, const char *newpath)
++{
++	int n = rename(oldpath, newpath);
++	if (n)
++		bb_perror_msg("can't move '%s' to '%s'", oldpath, newpath);
++	return n;
++}
++
++void xpipe(int filedes[2])
++{
++	if (pipe(filedes))
++		bb_perror_msg_and_die("can't create pipe");
++}
++
+ // Turn on nonblocking I/O on a fd
+ int ndelay_on(int fd)
+ {
+diff --git a/miscutils/crond.c b/miscutils/crond.c
+index 0df143a..9721a8a 100644
+--- a/miscutils/crond.c
++++ b/miscutils/crond.c
+@@ -548,7 +548,7 @@ static void CheckUpdates(void)
+ 
+ 	fi = fopen(CRONUPDATE, "r");
+ 	if (fi != NULL) {
+-		remove(CRONUPDATE);
++		unlink(CRONUPDATE);
+ 		while (fgets(buf, sizeof(buf), fi) != NULL) {
+ 			SynchronizeFile(strtok(buf, " \t\r\n"));
+ 		}
+@@ -579,7 +579,7 @@ static void SynchronizeDir(void)
+ 	 * scan directory and add associated users
+ 	 */
+ 
+-	remove(CRONUPDATE);
++	unlink(CRONUPDATE);
+ 	if (chdir(CDir) < 0) {
+ 		crondlog("\311cannot find %s\n", CDir);
+ 	}
+@@ -814,7 +814,7 @@ ForkJob(const char *user, CronLine * line, int mailFd,
+ 		crondlog("\024cannot fork\n");
+ 		line->cl_Pid = 0;
+ 		if (mail_filename) {
+-			remove(mail_filename);
++			unlink(mail_filename);
+ 		}
+ 	} else if (mail_filename) {
+ 		/* PARENT, FORK SUCCESS
+@@ -823,7 +823,7 @@ ForkJob(const char *user, CronLine * line, int mailFd,
+ 		char mailFile2[128];
+ 
+ 		snprintf(mailFile2, sizeof(mailFile2), TMPDIR "/cron.%s.%d", user, pid);
+-		rename(mail_filename, mailFile2);
++		rename(mail_filename, mailFile2); // TODO: xrename?
+ 	}
+ 	/*
+ 	 * Close the mail file descriptor.. we can't just leave it open in
+@@ -896,7 +896,7 @@ static void EndJob(const char *user, CronLine * line)
+ 	 */
+ 
+ 	mailFd = open(mailFile, O_RDONLY);
+-	remove(mailFile);
++	unlink(mailFile);
+ 	if (mailFd < 0) {
+ 		return;
+ 	}
+diff --git a/networking/sendmail.c b/networking/sendmail.c
+index fa995ab..b2fbc5a 100644
+--- a/networking/sendmail.c
++++ b/networking/sendmail.c
+@@ -512,10 +512,7 @@ int sendgetmail_main(int argc, char **argv)
+ 				if (fd < 0)
+ 					bb_perror_msg_and_die("cannot create unique file");
+ 				close(fd);
+-				if (rename(tmp_name, new_name) < 0) {
+-					// something is very wrong
+-					bb_perror_msg_and_die("cannot move %s to %s", tmp_name, new_name);
+-				}
++				xrename(tmp_name, new_name);
+ 			}
+ 
+ 			// delete message from server
+diff --git a/runit/runsv.c b/runit/runsv.c
+index 02271d6..02dcf50 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -157,16 +157,6 @@ static int open_trunc_or_warn(const char *name)
+ 	return fd;
+ }
+ 
+-static int rename_or_warn(const char *old, const char *new)
+-{
+-	if (rename(old, new) == -1) {
+-		bb_perror_msg("%s: warning: cannot rename %s to %s",
+-				dir, old, new);
+-		return -1;
+-	}
+-	return 0;
+-}
+-
+ static void update_status(struct svdir *s)
+ {
+ 	ssize_t sz;
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index c6e0571..dc5e625 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -344,10 +344,10 @@ static void log_locally(time_t now, char *msg)
+ 				sprintf(newFile, "%s.%d", G.logFilePath, i);
+ 				if (i == 0) break;
+ 				sprintf(oldFile, "%s.%d", G.logFilePath, --i);
+-				rename(oldFile, newFile);
++				xrename(oldFile, newFile);
+ 			}
+ 			/* newFile == "f.0" now */
+-			rename(G.logFilePath, newFile);
++			xrename(G.logFilePath, newFile);
+ 			fl.l_type = F_UNLCK;
+ 			fcntl(G.logFD, F_SETLKW, &fl);
+ 			close(G.logFD);
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index a18fc09..2bb0224 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -209,7 +209,7 @@ static void make_device(char *path, int delete)
+ 				} else
+ 					dest = alias;
+ 
+-				rename(device_name, dest);
++				rename(device_name, dest); // TODO: xrename?
+ 				symlink(dest, device_name);
+ 
+ 				if (alias != dest)

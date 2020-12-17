@@ -1,0 +1,21 @@
+2009-11-07 18:21:03 +0100
+diff --git a/examples/mdev_fat.conf b/examples/mdev_fat.conf
+index 9ac3336..8b94636 100644
+--- a/examples/mdev_fat.conf
++++ b/examples/mdev_fat.conf
+@@ -7,11 +7,14 @@
+ # instead of the default 0:0 660.
+ #
+ # Syntax:
+-# devicename_regex user:group mode [>|=path] [@|$|*command args...]
++# devicename_regex user:group mode [>|=path] [@|$|*cmd args...]
+ #
+ # =: move, >: move and create a symlink
+ # @|$|*: run $cmd on delete, @cmd on create, *cmd on both
+ 
++# support module loading on hotplug
++$MODALIAS=.*	root:root 660 @modprobe "$MODALIAS"
++
+ # null may already exist; therefore ownership has to be changed with command
+ null		root:root 666 @chmod 666 $MDEV
+ zero		root:root 666

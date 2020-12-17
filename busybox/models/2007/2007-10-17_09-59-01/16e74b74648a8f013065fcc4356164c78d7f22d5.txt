@@ -1,0 +1,12 @@
+2007-10-17 09:59:01 +0000
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index 87cc698..6791299 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -126,5 +126,6 @@ lib-$(CONFIG_EXPR) += xregcomp.o
+ lib-$(CONFIG_MDEV) += xregcomp.o
+ lib-$(CONFIG_LESS) += xregcomp.o
+ lib-$(CONFIG_PGREP) += xregcomp.o
++lib-$(CONFIG_PKILL) += xregcomp.o
+ lib-$(CONFIG_DEVFSD) += xregcomp.o
+ lib-$(CONFIG_FEATURE_FIND_REGEX) += xregcomp.o

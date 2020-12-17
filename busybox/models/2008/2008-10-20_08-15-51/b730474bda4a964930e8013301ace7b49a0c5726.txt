@@ -1,0 +1,85 @@
+2008-10-20 08:15:51 +0000
+diff --git a/coreutils/env.c b/coreutils/env.c
+index 66199e8..2f8c8b7 100644
+--- a/coreutils/env.c
++++ b/coreutils/env.c
+@@ -29,6 +29,8 @@
+  * - use xfunc_error_retval
+  */
+ 
++/* This is a NOEXEC applet. Be very careful! */
++
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_ENV_LONG_OPTIONS
+@@ -119,5 +121,3 @@ int env_main(int argc UNUSED_PARAM, char **argv)
+  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  * SUCH DAMAGE.
+  */
+-
+-
+diff --git a/include/applets.h b/include/applets.h
+index 828900e..9c16c5d 100644
+--- a/include/applets.h
++++ b/include/applets.h
+@@ -137,7 +137,7 @@ USE_ECHO(APPLET_NOFORK(echo, echo, _BB_DIR_BIN, _BB_SUID_NEVER, echo))
+ USE_ED(APPLET(ed, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_FEATURE_GREP_EGREP_ALIAS(APPLET_ODDNAME(egrep, grep, _BB_DIR_BIN, _BB_SUID_NEVER, egrep))
+ USE_EJECT(APPLET(eject, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+-USE_ENV(APPLET(env, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
++USE_ENV(APPLET_NOEXEC(env, env, _BB_DIR_USR_BIN, _BB_SUID_NEVER, env))
+ USE_ENVDIR(APPLET_ODDNAME(envdir, chpst, _BB_DIR_USR_BIN, _BB_SUID_NEVER, envdir))
+ USE_ENVUIDGID(APPLET_ODDNAME(envuidgid, chpst, _BB_DIR_USR_BIN, _BB_SUID_NEVER, envuidgid))
+ USE_ETHER_WAKE(APPLET_ODDNAME(ether-wake, ether_wake, _BB_DIR_USR_BIN, _BB_SUID_NEVER, ether_wake))
+@@ -172,7 +172,7 @@ USE_GREP(APPLET(grep, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_GUNZIP(APPLET(gunzip, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_GZIP(APPLET(gzip, _BB_DIR_BIN, _BB_SUID_NEVER))
+ USE_HALT(APPLET(halt, _BB_DIR_SBIN, _BB_SUID_NEVER))
+-USE_HD(APPLET_ODDNAME(hd, hexdump, _BB_DIR_USR_BIN, _BB_SUID_NEVER, hd))
++USE_HD(APPLET_NOEXEC(hd, hexdump, _BB_DIR_USR_BIN, _BB_SUID_NEVER, hd))
+ USE_HDPARM(APPLET(hdparm, _BB_DIR_SBIN, _BB_SUID_NEVER))
+ USE_HEAD(APPLET(head, _BB_DIR_USR_BIN, _BB_SUID_NEVER))
+ USE_HEXDUMP(APPLET_NOEXEC(hexdump, hexdump, _BB_DIR_USR_BIN, _BB_SUID_NEVER, hexdump))
+diff --git a/shell/ash.c b/shell/ash.c
+index 70b7ae3..81ac563 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -7008,8 +7008,11 @@ tryexec(USE_FEATURE_SH_STANDALONE(int applet_no,) char *cmd, char **argv, char *
+ 
+ #if ENABLE_FEATURE_SH_STANDALONE
+ 	if (applet_no >= 0) {
+-		if (APPLET_IS_NOEXEC(applet_no))
++		if (APPLET_IS_NOEXEC(applet_no)) {
++			while (*envp)
++				putenv(*envp++);
+ 			run_applet_no_and_exit(applet_no, argv);
++		}
+ 		/* re-exec ourselves with the new arguments */
+ 		execve(bb_busybox_exec_path, argv, envp);
+ 		/* If they called chroot or otherwise made the binary no longer
+@@ -12094,7 +12097,7 @@ exportcmd(int argc UNUSED_PARAM, char **argv)
+ 	char *name;
+ 	const char *p;
+ 	char **aptr;
+-	int flag = argv[0][0] == 'r'? VREADONLY : VEXPORT;
++	int flag = argv[0][0] == 'r' ? VREADONLY : VEXPORT;
+ 
+ 	if (nextopt("p") != 'p') {
+ 		aptr = argptr;
+diff --git a/shell/ash_test/ash-standalone/noexec_gets_no_env.right b/shell/ash_test/ash-standalone/noexec_gets_no_env.right
+new file mode 100644
+index 0000000..3d55d73
+--- /dev/null
++++ b/shell/ash_test/ash-standalone/noexec_gets_no_env.right
+@@ -0,0 +1,2 @@
++VAR7=VAL
++0
+diff --git a/shell/ash_test/ash-standalone/noexec_gets_no_env.tests b/shell/ash_test/ash-standalone/noexec_gets_no_env.tests
+new file mode 100755
+index 0000000..5e12e5a
+--- /dev/null
++++ b/shell/ash_test/ash-standalone/noexec_gets_no_env.tests
+@@ -0,0 +1,3 @@
++export VAR7=VAL
++env | grep ^VAR7=
++echo $?

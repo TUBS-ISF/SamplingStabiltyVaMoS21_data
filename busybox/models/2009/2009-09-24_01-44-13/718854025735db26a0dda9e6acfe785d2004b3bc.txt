@@ -1,0 +1,14 @@
+2009-09-24 01:44:13 +0200
+diff --git a/shell/hush.c b/shell/hush.c
+index 85a45dd..866593f 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -899,7 +899,7 @@ static int is_well_formed_var_name(const char *s, char terminator)
+ /* Replace each \x with x in place, return ptr past NUL. */
+ static char *unbackslash(char *src)
+ {
+-	char *dst = src;
++	char *dst = src = strchrnul(src, '\\');
+ 	while (1) {
+ 		if (*src == '\\')
+ 			src++;

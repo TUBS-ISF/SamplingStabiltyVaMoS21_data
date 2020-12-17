@@ -1,0 +1,114 @@
+2010-02-26 10:01:18 +0100
+diff --git a/include/libbb.h b/include/libbb.h
+index 98080e8..515e995 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -1139,7 +1139,6 @@ extern void selinux_preserve_fcontext(int fdesc) FAST_FUNC;
+ #define selinux_preserve_fcontext(fdesc) ((void)0)
+ #endif
+ extern void selinux_or_die(void) FAST_FUNC;
+-extern int restricted_shell(const char *shell) FAST_FUNC;
+ 
+ /* setup_environment:
+  * if chdir pw->pw_dir: ok: else if to_tmp == 1: goto /tmp else: goto / or die
+diff --git a/libbb/Kbuild b/libbb/Kbuild
+index c205ceb..49cf4b8 100644
+--- a/libbb/Kbuild
++++ b/libbb/Kbuild
+@@ -84,7 +84,6 @@ lib-y += read.o
+ lib-y += read_key.o
+ lib-y += recursive_action.o
+ lib-y += remove_file.o
+-lib-y += restricted_shell.o
+ lib-y += run_shell.o
+ lib-y += safe_gethostname.o
+ lib-y += safe_poll.o
+diff --git a/libbb/restricted_shell.c b/libbb/restricted_shell.c
+deleted file mode 100644
+index 2a5073f..0000000
+--- a/libbb/restricted_shell.c
++++ /dev/null
+@@ -1,46 +0,0 @@
+-/* vi: set sw=4 ts=4: */
+-/*
+- * Copyright 1989 - 1991, Julianne Frances Haugh <jockgrrl@austin.rr.com>
+- * All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in the
+- *    documentation and/or other materials provided with the distribution.
+- * 3. Neither the name of Julianne F. Haugh nor the names of its contributors
+- *    may be used to endorse or promote products derived from this software
+- *    without specific prior written permission.
+- *
+- * THIS SOFTWARE IS PROVIDED BY JULIE HAUGH AND CONTRIBUTORS ``AS IS'' AND
+- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+- * ARE DISCLAIMED.  IN NO EVENT SHALL JULIE HAUGH OR CONTRIBUTORS BE LIABLE
+- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- */
+-
+-#include "libbb.h"
+-
+-/* Return 1 if SHELL is a restricted shell (one not returned by
+-   getusershell), else 0, meaning it is a standard shell.  */
+-int FAST_FUNC restricted_shell(const char *shell)
+-{
+-	char *line;
+-
+-	setusershell();
+-	while ((line = getusershell())) {
+-		if (*line != '#' && strcmp(line, shell) == 0)
+-			return 0;
+-	}
+-	endusershell();
+-	return 1;
+-}
+diff --git a/loginutils/su.c b/loginutils/su.c
+index 6356631..af25655 100644
+--- a/loginutils/su.c
++++ b/loginutils/su.c
+@@ -8,6 +8,23 @@
+ #include "libbb.h"
+ #include <syslog.h>
+ 
++#if ENABLE_FEATURE_SU_CHECKS_SHELLS
++/* Return 1 if SHELL is a restricted shell (one not returned by
++   getusershell), else 0, meaning it is a standard shell.  */
++static int restricted_shell(const char *shell)
++{
++	char *line;
++
++	/*setusershell(); - getusershell does it itself*/
++	while ((line = getusershell()) != NULL) {
++		if (/* *line != '#' && */ strcmp(line, shell) == 0)
++			return 0;
++	}
++	endusershell();
++	return 1;
++}
++#endif
++
+ #define SU_OPT_mp (3)
+ #define SU_OPT_l (4)
+ 
+@@ -89,7 +106,7 @@ int su_main(int argc UNUSED_PARAM, char **argv)
+ 		opt_shell = getenv("SHELL");
+ 
+ #if ENABLE_FEATURE_SU_CHECKS_SHELLS
+-	if (opt_shell && cur_uid && restricted_shell(pw->pw_shell)) {
++	if (opt_shell && cur_uid != 0 && restricted_shell(pw->pw_shell)) {
+ 		/* The user being su'd to has a nonstandard shell, and so is
+ 		   probably a uucp account or has restricted access.  Don't
+ 		   compromise the account by allowing access with a standard

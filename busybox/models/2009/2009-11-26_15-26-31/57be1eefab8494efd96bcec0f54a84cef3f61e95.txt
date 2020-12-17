@@ -1,0 +1,34 @@
+2009-11-26 15:26:31 +0100
+diff --git a/include/platform.h b/include/platform.h
+index 8ed05a4..a41daa0 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -194,12 +194,14 @@
+  * a lvalue. This makes it more likely to not swap them by mistake
+  */
+ #if defined(i386) || defined(__x86_64__)
++# define move_from_unaligned_int(v, intp) ((v) = *(int*)(intp))
+ # define move_from_unaligned16(v, u16p) ((v) = *(uint16_t*)(u16p))
+ # define move_from_unaligned32(v, u32p) ((v) = *(uint32_t*)(u32p))
+ # define move_to_unaligned32(u32p, v)   (*(uint32_t*)(u32p) = (v))
+ /* #elif ... - add your favorite arch today! */
+ #else
+ /* performs reasonably well (gcc usually inlines memcpy here) */
++# define move_from_unaligned_int(v, intp) (memcpy(&(v), (intp), sizeof(int)))
+ # define move_from_unaligned16(v, u16p) (memcpy(&(v), (u16p), 2))
+ # define move_from_unaligned32(v, u32p) (memcpy(&(v), (u32p), 4))
+ # define move_to_unaligned32(u32p, v) do { \
+diff --git a/networking/ping.c b/networking/ping.c
+index c7b6cbe..4e770bd 100644
+--- a/networking/ping.c
++++ b/networking/ping.c
+@@ -690,7 +690,8 @@ static void ping6(len_and_sockaddr *lsa)
+ 			 /* don't check len - we trust the kernel: */
+ 			 /* && mp->cmsg_len >= CMSG_LEN(sizeof(int)) */
+ 			) {
+-				hoplimit = *(int*)CMSG_DATA(mp);
++				/*hoplimit = *(int*)CMSG_DATA(mp); - unaligned access */
++				move_from_unaligned_int(hoplimit, CMSG_DATA(mp));
+ 			}
+ 		}
+ 		unpack6(packet, c, /*&from,*/ hoplimit);

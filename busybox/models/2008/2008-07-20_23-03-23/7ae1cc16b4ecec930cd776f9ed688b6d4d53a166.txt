@@ -1,0 +1,55 @@
+2008-07-20 23:03:23 +0000
+diff --git a/shell/msh.c b/shell/msh.c
+index 44213c6..eb17eb6 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -2573,6 +2573,10 @@ static int execute(struct op *t, int *pin, int *pout, int no_fork)
+ 		while (setjmp(bc.brkpt))
+ 			if (isbreak)
+ 				goto broken;
++		/* Restore areanum value. It may be incremented by execute()
++		 * below, and then "continue" may jump back to setjmp above */
++		areanum = a + 1;
++		freearea(areanum + 1);
+ 		brkset(&bc);
+ 		for (t1 = t->left; i-- && *wp != NULL;) {
+ 			setval(vp, *wp++);
+@@ -2586,6 +2590,10 @@ static int execute(struct op *t, int *pin, int *pout, int no_fork)
+ 		while (setjmp(bc.brkpt))
+ 			if (isbreak)
+ 				goto broken;
++		/* Restore areanum value. It may be incremented by execute()
++		 * below, and then "continue" may jump back to setjmp above */
++		areanum = a + 1;
++		freearea(areanum + 1);
+ 		brkset(&bc);
+ 		t1 = t->left;
+ 		while ((execute(t1, pin, pout, /* no_fork: */ 0) == 0) == (t->op_type == TWHILE))
+diff --git a/shell/msh_test/msh-execution/many_continues.right b/shell/msh_test/msh-execution/many_continues.right
+new file mode 100644
+index 0000000..d86bac9
+--- /dev/null
++++ b/shell/msh_test/msh-execution/many_continues.right
+@@ -0,0 +1 @@
++OK
+diff --git a/shell/msh_test/msh-execution/many_continues.tests b/shell/msh_test/msh-execution/many_continues.tests
+new file mode 100755
+index 0000000..86c729a
+--- /dev/null
++++ b/shell/msh_test/msh-execution/many_continues.tests
+@@ -0,0 +1,15 @@
++if test $# = 0; then
++    # Child will kill us in 1 second
++    "$THIS_SH" "$0" $$ &
++
++    # Loop many, many times
++    trap 'echo OK; exit 0' 15
++    while true; do
++	continue
++    done
++    echo BAD
++    exit 1
++fi
++
++sleep 1
++kill $1

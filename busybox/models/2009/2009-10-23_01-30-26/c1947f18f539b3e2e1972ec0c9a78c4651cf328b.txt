@@ -1,0 +1,33 @@
+2009-10-23 01:30:26 +0200
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 0ebea4f..b31532a 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -27,10 +27,10 @@
+  * FEATURE_INSTALLER or FEATURE_SUID will still link printf routines in. :(
+  */
+ 
++#include "busybox.h"
+ #include <assert.h>
+ #include <malloc.h>
+ #include <sys/user.h> /* PAGE_SIZE */
+-#include "busybox.h"
+ 
+ 
+ /* Declare <applet>_main() */
+diff --git a/shell/hush.c b/shell/hush.c
+index 5edcdb8..1187cbe 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -454,9 +454,9 @@ struct function {
+ 	char *name;
+ 	struct command *parent_cmd;
+ 	struct pipe *body;
+-#if !BB_MMU
++# if !BB_MMU
+ 	char *body_as_string;
+-#endif
++# endif
+ };
+ #endif
+ 

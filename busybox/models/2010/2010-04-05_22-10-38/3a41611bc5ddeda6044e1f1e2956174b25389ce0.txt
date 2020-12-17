@@ -1,0 +1,384 @@
+2010-04-05 22:10:38 +0200
+diff --git a/include/libbb.h b/include/libbb.h
+index ea61701..f3121eb 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -797,9 +797,11 @@ void die_if_bad_username(const char* name) FAST_FUNC;
+ #endif
+ 
+ #if ENABLE_FEATURE_UTMP
+-void FAST_FUNC update_utmp(int new_type, const char *short_tty, const char *username, const char *opt_host);
++void FAST_FUNC write_new_utmp(pid_t pid, int new_type, const char *tty_name, const char *username, const char *hostname);
++void FAST_FUNC update_utmp(pid_t pid, int new_type, const char *tty_name, const char *username, const char *hostname);
+ #else
+-# define update_utmp(new_type, short_tty, username, opt_host) ((void)0)
++# define write_new_utmp(pid, new_type, tty_name, username, hostname) ((void)0)
++# define update_utmp(pid, new_type, tty_name, username, hostname) ((void)0)
+ #endif
+ 
+ int execable_file(const char *name) FAST_FUNC;
+diff --git a/init/halt.c b/init/halt.c
+index a3459ee..f1bb2c4 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -18,17 +18,18 @@ static void write_wtmp(void)
+ {
+ 	struct utmp utmp;
+ 	struct utsname uts;
+-	if (access(bb_path_wtmp_file, R_OK|W_OK) == -1) {
++	/* "man utmp" says wtmp file should *not* be created automagically */
++	/*if (access(bb_path_wtmp_file, R_OK|W_OK) == -1) {
+ 		close(creat(bb_path_wtmp_file, 0664));
+-	}
++	}*/
+ 	memset(&utmp, 0, sizeof(utmp));
+ 	utmp.ut_tv.tv_sec = time(NULL);
+-	safe_strncpy(utmp.ut_user, "shutdown", UT_NAMESIZE);
++	strcpy(utmp.ut_user, "shutdown"); /* it is wide enough */
+ 	utmp.ut_type = RUN_LVL;
+-	safe_strncpy(utmp.ut_id, "~~", sizeof(utmp.ut_id));
+-	safe_strncpy(utmp.ut_line, "~~", UT_LINESIZE);
+-	if (uname(&uts) == 0)
+-		safe_strncpy(utmp.ut_host, uts.release, sizeof(utmp.ut_host));
++	utmp.ut_id[0] = '~'; utmp.ut_id[1] = '~'; /* = strcpy(utmp.ut_id, "~~"); */
++	utmp.ut_line[0] = '~'; utmp.ut_line[1] = '~'; /* = strcpy(utmp.ut_line, "~~"); */
++	uname(&uts);
++	safe_strncpy(utmp.ut_host, uts.release, sizeof(utmp.ut_host));
+ 	updwtmp(bb_path_wtmp_file, &utmp);
+ }
+ #else
+diff --git a/libbb/utmp.c b/libbb/utmp.c
+index 06b939b..d6ba336 100644
+--- a/libbb/utmp.c
++++ b/libbb/utmp.c
+@@ -15,37 +15,87 @@ static void touch(const char *filename)
+ 		close(open(filename, O_WRONLY | O_CREAT, 0664));
+ }
+ 
++// TODO: move to libbb
++static const char* skip_dev_pfx(const char *tty_name)
++{
++	if (strncmp(tty_name, "/dev/", 5) == 0)
++		tty_name += 5;
++	return tty_name;
++}
++
++void FAST_FUNC write_new_utmp(pid_t pid, int new_type, const char *tty_name, const char *username, const char *hostname)
++{
++	struct utmp utent;
++	char *id;
++	unsigned width;
++
++	memset(&utent, 0, sizeof(utent));
++	utent.ut_pid = pid;
++	utent.ut_type = new_type;
++	tty_name = skip_dev_pfx(tty_name);
++	safe_strncpy(utent.ut_line, tty_name, sizeof(utent.ut_line));
++	if (username)
++		safe_strncpy(utent.ut_user, username, sizeof(utent.ut_user));
++	if (hostname)
++		safe_strncpy(utent.ut_host, hostname, sizeof(utent.ut_host));
++	utent.ut_tv.tv_sec = time(NULL);
++
++	/* Invent our own ut_id. ut_id is only 4 chars wide.
++	 * Try to fit something remotely meaningful... */
++	id = utent.ut_id;
++	width = sizeof(utent.ut_id);
++	if (tty_name[0] == 'p') {
++		/* if "ptyXXX", map to "pXXX" */
++		/* if "pts/XX", map to "p/XX" */
++		*id++ = 'p';
++		width--;
++	} /* else: usually it's "ttyXXXX", map to "XXXX" */
++	if (strlen(tty_name) > 3)
++		tty_name += 3;
++	strncpy(id, tty_name, width);
++
++	touch(_PATH_UTMP);
++	//utmpname(_PATH_UTMP);
++	setutent();
++	/* Append new one (hopefully, unless we collide on ut_id) */
++	pututline(&utent);
++	endutent();
++
++#if ENABLE_FEATURE_WTMP
++	/* "man utmp" says wtmp file should *not* be created automagically */
++	/*touch(bb_path_wtmp_file);*/
++	updwtmp(bb_path_wtmp_file, &utent);
++#endif
++}
++
+ /*
+  * Read "man utmp" to make sense out of it.
+  */
+-void FAST_FUNC update_utmp(int new_type, const char *short_tty, const char *username, const char *opt_host)
++void FAST_FUNC update_utmp(pid_t pid, int new_type, const char *tty_name, const char *username, const char *hostname)
+ {
+ 	struct utmp utent;
+-	struct utmp *ut;
+-	pid_t pid;
++	struct utmp *utp;
+ 
+ 	touch(_PATH_UTMP);
+-	utmpname(_PATH_UTMP);
++	//utmpname(_PATH_UTMP);
+ 	setutent();
+ 
+-	pid = getpid();
+ 	/* Did init/getty/telnetd/sshd/... create an entry for us?
+ 	 * It should be (new_type-1), but we'd also reuse
+ 	 * any other potentially stale xxx_PROCESS entry */
+-	while ((ut = getutent()) != NULL) {
+-		if (ut->ut_pid == pid
++	while ((utp = getutent()) != NULL) {
++		if (utp->ut_pid == pid
+ 		// && ut->ut_line[0]
+-		 && ut->ut_id[0] /* must have nonzero id */
+-		 && (  ut->ut_type == INIT_PROCESS
+-		    || ut->ut_type == LOGIN_PROCESS
+-		    || ut->ut_type == USER_PROCESS
+-		    || ut->ut_type == DEAD_PROCESS
++		 && utp->ut_id[0] /* must have nonzero id */
++		 && (  utp->ut_type == INIT_PROCESS
++		    || utp->ut_type == LOGIN_PROCESS
++		    || utp->ut_type == USER_PROCESS
++		    || utp->ut_type == DEAD_PROCESS
+ 		    )
+ 		) {
+-			utent = *ut; /* struct copy */
+-			if (ut->ut_type >= new_type) {
++			if (utp->ut_type >= new_type) {
+ 				/* Stale record. Nuke hostname */
+-				memset(utent.ut_host, 0, sizeof(utent.ut_host));
++				memset(utp->ut_host, 0, sizeof(utp->ut_host));
+ 			}
+ 			/* NB: pututline (see later) searches for matching utent
+ 			 * using getutid(utent) - we must not change ut_id
+@@ -54,39 +104,38 @@ void FAST_FUNC update_utmp(int new_type, const char *short_tty, const char *user
+ 			break;
+ 		}
+ 	}
+-	endutent();
++	//endutent(); - no need, pututline can deal with (and actually likes)
++	//the situation when utmp file is positioned on found record
+ 
+-	if (!ut) {
+-		/* Didn't find anything, create new one */
+-		memset(&utent, 0, sizeof(utent));
+-		utent.ut_pid = pid;
+-		/* Invent our own ut_id. ut_id is only 4 chars wide.
+-		 * Try to fit something remotely meaningful... */
+-		if (short_tty[0] == 'p') {
+-			/* if "ptyXXX", map to "pXXX" */
+-			/* if "pts/XX", map to "p/XX" */
+-			utent.ut_id[0] = 'p';
+-			strncpy(utent.ut_id + 1, short_tty + 3, sizeof(utent.ut_id)-1);
+-		} else {
+-			/* assuming it's "ttyXXXX", map to "XXXX" */
+-			strncpy(utent.ut_id, short_tty + 3, sizeof(utent.ut_id));
+-		}
++	if (!utp) {
++		if (new_type != DEAD_PROCESS)
++			write_new_utmp(pid, new_type, tty_name, username, hostname);
++		else
++			endutent();
++		return;
+ 	}
+ 
++	/* Make a copy. We can't use *utp, pututline's internal getutid
++	 * will overwrite it before it is used! */
++	utent = *utp;
++
+ 	utent.ut_type = new_type;
+-	safe_strncpy(utent.ut_line, short_tty, sizeof(utent.ut_line));
+-	safe_strncpy(utent.ut_user, username, sizeof(utent.ut_user));
+-	if (opt_host)
+-		safe_strncpy(utent.ut_host, opt_host, sizeof(utent.ut_host));
++	if (tty_name)
++		safe_strncpy(utent.ut_line, skip_dev_pfx(tty_name), sizeof(utent.ut_line));
++	if (username)
++		safe_strncpy(utent.ut_user, username, sizeof(utent.ut_user));
++	if (hostname)
++		safe_strncpy(utent.ut_host, hostname, sizeof(utent.ut_host));
+ 	utent.ut_tv.tv_sec = time(NULL);
+ 
+ 	/* Update, or append new one */
+-	setutent();
++	//setutent();
+ 	pututline(&utent);
+ 	endutent();
+ 
+ #if ENABLE_FEATURE_WTMP
+-	touch(bb_path_wtmp_file);
++	/* "man utmp" says wtmp file should *not* be created automagically */
++	/*touch(bb_path_wtmp_file);*/
+ 	updwtmp(bb_path_wtmp_file, &utent);
+ #endif
+ }
+diff --git a/loginutils/getty.c b/loginutils/getty.c
+index 8d1d525..d032357 100644
+--- a/loginutils/getty.c
++++ b/loginutils/getty.c
+@@ -19,7 +19,7 @@
+ #include <syslog.h>
+ 
+ #if ENABLE_FEATURE_UTMP
+-#include <utmp.h> /* LOGIN_PROCESS */
++# include <utmp.h> /* LOGIN_PROCESS */
+ #endif
+ 
+ #ifndef IUCLC
+@@ -579,6 +579,7 @@ int getty_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int getty_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	int n;
++	pid_t pid;
+ 	char *fakehost = NULL;          /* Fake hostname for ut_host */
+ 	char *logname;                  /* login name, given to /bin/login */
+ 	/* Merging these into "struct local" may _seem_ to reduce
+@@ -651,17 +652,18 @@ int getty_main(int argc UNUSED_PARAM, char **argv)
+ 	/* tcgetattr() + error check */
+ 	ioctl_or_perror_and_die(0, TCGETS, &termios, "%s: TCGETS", options.tty);
+ 
++	pid = getpid();
+ #ifdef __linux__
+ // FIXME: do we need this? Otherwise "-" case seems to be broken...
+ 	// /* Forcibly make fd 0 our controlling tty, even if another session
+ 	//  * has it as a ctty. (Another session loses ctty). */
+ 	// ioctl(0, TIOCSCTTY, (void*)1);
+ 	/* Make ourself a foreground process group within our session */
+-	tcsetpgrp(0, getpid());
++	tcsetpgrp(0, pid);
+ #endif
+ 
+ 	/* Update the utmp file. This tty is ours now! */
+-	update_utmp(LOGIN_PROCESS, options.tty, "LOGIN", fakehost);
++	update_utmp(pid, LOGIN_PROCESS, options.tty, "LOGIN", fakehost);
+ 
+ 	/* Initialize the termios settings (raw mode, eight-bit, blocking i/o). */
+ 	debug("calling termios_init\n");
+diff --git a/loginutils/login.c b/loginutils/login.c
+index 4a82037..bf21d61 100644
+--- a/loginutils/login.c
++++ b/loginutils/login.c
+@@ -384,7 +384,7 @@ int login_main(int argc UNUSED_PARAM, char **argv)
+ 	fchown(0, pw->pw_uid, pw->pw_gid);
+ 	fchmod(0, 0600);
+ 
+-	update_utmp(USER_PROCESS, short_tty, username, run_by_root ? opt_host : NULL);
++	update_utmp(getpid(), USER_PROCESS, short_tty, username, run_by_root ? opt_host : NULL);
+ 
+ 	/* We trust environment only if we run by root */
+ 	if (ENABLE_LOGIN_SCRIPTS && run_by_root)
+diff --git a/miscutils/last.c b/miscutils/last.c
+index 6e3ed90..55c03ae 100644
+--- a/miscutils/last.c
++++ b/miscutils/last.c
+@@ -92,7 +92,8 @@ int last_main(int argc UNUSED_PARAM, char **argv UNUSED_PARAM)
+ 				goto next;
+ 			}
+ 			if (ut.ut_type != DEAD_PROCESS
+-			 && ut.ut_user[0] && ut.ut_line[0]
++			 && ut.ut_user[0]
++			 && ut.ut_line[0]
+ 			) {
+ 				ut.ut_type = USER_PROCESS;
+ 			}
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index cab94f0..b3e66eb 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -20,18 +20,22 @@
+  * Vladimir Oleynik <dzo@simtreas.ru> 2001
+  * Set process group corrections, initial busybox port
+  */
+-
+ #define DEBUG 0
+ 
+ #include "libbb.h"
+ #include <syslog.h>
+ 
+ #if DEBUG
+-#define TELCMDS
+-#define TELOPTS
++# define TELCMDS
++# define TELOPTS
+ #endif
+ #include <arpa/telnet.h>
+ 
++#if ENABLE_FEATURE_UTMP
++# include <utmp.h> /* LOGIN_PROCESS */
++#endif
++
++
+ struct tsession {
+ 	struct tsession *next;
+ 	pid_t shell_pid;
+@@ -319,7 +323,11 @@ make_new_session(
+ 	xopen(tty_name, O_RDWR); /* becomes our ctty */
+ 	xdup2(0, 1);
+ 	xdup2(0, 2);
+-	tcsetpgrp(0, getpid()); /* switch this tty's process group to us */
++	pid = getpid();
++	tcsetpgrp(0, pid); /* switch this tty's process group to us */
++
++//TODO: fetch remote addr via getpeername (see ftpd.c)
++	write_new_utmp(pid, LOGIN_PROCESS, tty_name, /*username:*/ "LOGIN", /*hostname:*/ NULL);
+ 
+ 	/* The pseudo-terminal allocated to the client is configured to operate
+ 	 * in cooked mode, and with XTABS CRMOD enabled (see tty(4)) */
+@@ -358,12 +366,13 @@ make_new_session(
+ static void
+ free_session(struct tsession *ts)
+ {
+-	struct tsession *t = G.sessions;
++	struct tsession *t;
+ 
+ 	if (option_mask32 & OPT_INETD)
+ 		exit(EXIT_SUCCESS);
+ 
+ 	/* Unlink this telnet session from the session list */
++	t = G.sessions;
+ 	if (t == ts)
+ 		G.sessions = ts->next;
+ 	else {
+@@ -414,6 +423,7 @@ static void handle_sigchld(int sig UNUSED_PARAM)
+ {
+ 	pid_t pid;
+ 	struct tsession *ts;
++	int save_errno = errno;
+ 
+ 	/* Looping: more than one child may have exited */
+ 	while (1) {
+@@ -424,11 +434,22 @@ static void handle_sigchld(int sig UNUSED_PARAM)
+ 		while (ts) {
+ 			if (ts->shell_pid == pid) {
+ 				ts->shell_pid = -1;
++// man utmp:
++// When init(8) finds that a process has exited, it locates its utmp entry
++// by ut_pid, sets ut_type to DEAD_PROCESS, and clears ut_user, ut_host
++// and ut_time with null bytes.
++// [same applies to other processes which maintain utmp entries, like telnetd]
++//
++// We do not bother actually clearing fields:
++// it might be interesting to know who was logged in and from where
++				update_utmp(pid, DEAD_PROCESS, /*tty_name:*/ NULL, /*username:*/ NULL, /*hostname:*/ NULL);
+ 				break;
+ 			}
+ 			ts = ts->next;
+ 		}
+ 	}
++
++	errno = save_errno;
+ }
+ 
+ int telnetd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+@@ -689,6 +710,8 @@ int telnetd_main(int argc UNUSED_PARAM, char **argv)
+ 		ts = next;
+ 		continue;
+  kill_session:
++		if (ts->shell_pid > 0)
++			update_utmp(ts->shell_pid, DEAD_PROCESS, /*tty_name:*/ NULL, /*username:*/ NULL, /*hostname:*/ NULL);
+ 		free_session(ts);
+ 		ts = next;
+ 	}

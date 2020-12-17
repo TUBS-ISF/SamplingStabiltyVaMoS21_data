@@ -1,0 +1,15 @@
+2008-06-17 12:45:39 +0000
+diff --git a/libbb/strrstr.c b/libbb/strrstr.c
+index 3cd7667..5a26859 100644
+--- a/libbb/strrstr.c
++++ b/libbb/strrstr.c
+@@ -7,8 +7,7 @@
+  * Licensed under GPLv2 or later, see file License in this tarball for details.
+  */
+ 
+-#include <string.h>
+-#include <stdio.h>
++#include "libbb.h"
+ 
+ /*
+  * The strrstr() function finds the last occurrence of the substring needle

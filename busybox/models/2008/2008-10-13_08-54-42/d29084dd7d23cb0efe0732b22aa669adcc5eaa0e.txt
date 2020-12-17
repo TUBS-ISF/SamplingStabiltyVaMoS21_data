@@ -1,0 +1,33 @@
+2008-10-13 08:54:42 +0000
+diff --git a/shell/hush_test/hush-vars/var_preserved.right b/shell/hush_test/hush-vars/var_preserved.right
+new file mode 100644
+index 0000000..b0def4b
+--- /dev/null
++++ b/shell/hush_test/hush-vars/var_preserved.right
+@@ -0,0 +1,4 @@
++a=a
++a=a
++a=a
++OK
+diff --git a/shell/hush_test/hush-vars/var_preserved.tests b/shell/hush_test/hush-vars/var_preserved.tests
+new file mode 100755
+index 0000000..132d387
+--- /dev/null
++++ b/shell/hush_test/hush-vars/var_preserved.tests
+@@ -0,0 +1,16 @@
++export a=a
++
++# external program
++a=b /bin/true
++env | grep ^a=
++
++# builtin
++a=b true
++env | grep ^a=
++
++# exec with redirection only
++# in bash, this leaks!
++a=b exec 1>&1
++env | grep ^a=
++
++echo OK

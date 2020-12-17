@@ -1,0 +1,590 @@
+2007-07-01 17:05:57 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 6d02c8b..6832504 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -3575,7 +3575,8 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "Adjust filesystem options on ext[23] filesystems"
+ 
+ #define udhcpc_trivial_usage \
+-       "[-Cfbnqtv] [-c CID] [-V VCLS] [-H HOSTNAME] [-i INTERFACE]\n[-p pidfile] [-r IP] [-s script]"
++       "[-Cfbnqtv] [-c CID] [-V VCLS] [-H HOSTNAME] [-i INTERFACE]\n" \
++       "	[-p pidfile] [-r IP] [-s script]"
+ #define udhcpc_full_usage \
+        "	-V,--vendorclass=CLASSID	Set vendor class identifier\n" \
+        "	-i,--interface=INTERFACE	Interface to use (default: eth0)\n" \
+@@ -3594,7 +3595,7 @@ USE_FEATURE_RUN_PARTS_FANCY("\n	-l	Prints names of all matching files even when
+        "	-v,--version	Display version" \
+ 
+ #define udhcpd_trivial_usage \
+-       "[configfile]\n" \
++       "[configfile]" \
+ 
+ #define udhcpd_full_usage \
+        ""
+diff --git a/networking/udhcp/Config.in b/networking/udhcp/Config.in
+index 9dd02c4..7a3eda9 100644
+--- a/networking/udhcp/Config.in
++++ b/networking/udhcp/Config.in
+@@ -32,6 +32,16 @@ config APP_DUMPLEASES
+ 
+ 	  See http://udhcp.busybox.net for further details.
+ 
++config FEATURE_UDHCPD_WRITE_LEASES_EARLY
++	bool "Rewrite the lease file at every new acknowledge"
++	default n
++	depends on APP_UDHCPD
++	help
++	  If selected, udhcpd will write a new file with leases every
++	  time a new lease has been accepted, thus eleminating the need
++	  to send SIGUSR1 for the initial writing, or updating. Any timed
++	  rewriting remains undisturbed
++
+ config APP_UDHCPC
+ 	bool "udhcp Client (udhcpc)"
+ 	default n
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 06806ec..50ac31e 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -114,8 +114,7 @@ static void client_background(void)
+  * If that will be properly disabled for NOMMU, client_background()
+  * will work on NOMMU too */
+ #else
+-// chdir(/) is problematic. Imagine that e.g. pidfile name is RELATIVE! what will unlink do then, eh?
+-	bb_daemonize(DAEMON_CHDIR_ROOT);
++	bb_daemonize(0);
+ 	/* rewrite pidfile, as our pid is different now */
+ 	if (client_config.pidfile)
+ 		write_pidfile(client_config.pidfile);
+diff --git a/networking/udhcp/dhcpc.h b/networking/udhcp/dhcpc.h
+index fa091bf..09b0142 100644
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -17,12 +17,12 @@ struct client_config_t {
+ 	/* (can be set directly to the result of getopt32) */
+ 	char foreground;                /* Do not fork */
+ 	char quit_after_lease;          /* Quit after obtaining lease */
+-	char release_on_quit;           /* perform release on quit */
++	char release_on_quit;           /* Perform release on quit */
+ 	char abort_if_no_lease;         /* Abort if no lease */
+ 	char background_if_no_lease;    /* Fork to background if no lease */
+-	const char *interface;                /* The name of the interface to use */
++	const char *interface;          /* The name of the interface to use */
+ 	char *pidfile;                  /* Optionally store the process ID */
+-	const char *script;                   /* User script to run at dhcp events */
++	const char *script;             /* User script to run at dhcp events */
+ 	uint8_t *clientid;              /* Optional client id to use */
+ 	uint8_t *vendorclass;           /* Optional vendor class-id to use */
+ 	uint8_t *hostname;              /* Optional hostname to use */
+diff --git a/networking/udhcp/dhcpd.c b/networking/udhcp/dhcpd.c
+index 778121b..6be3c0e 100644
+--- a/networking/udhcp/dhcpd.c
++++ b/networking/udhcp/dhcpd.c
+@@ -37,7 +37,7 @@ int udhcpd_main(int argc, char **argv)
+ //Huh, dhcpd don't have --foreground, --syslog options?? TODO
+ 
+ 	if (!ENABLE_FEATURE_UDHCP_DEBUG) {
+-		bb_daemonize_or_rexec(DAEMON_CHDIR_ROOT, argv);
++		bb_daemonize_or_rexec(0, argv);
+ 		logmode &= ~LOGMODE_STDIO;
+ 	}
+ 
+@@ -60,15 +60,15 @@ int udhcpd_main(int argc, char **argv)
+ 	}
+ 
+ 	/* Sanity check */
+-	num_ips = ntohl(server_config.end) - ntohl(server_config.start) + 1;
++	num_ips = server_config.end_ip - server_config.start_ip + 1;
+ 	if (server_config.max_leases > num_ips) {
+-		bb_error_msg("max_leases value (%lu) not sane, "
+-			"setting to %lu instead",
++		bb_error_msg("max_leases=%lu is too big, "
++			"setting to %lu",
+ 			server_config.max_leases, num_ips);
+ 		server_config.max_leases = num_ips;
+ 	}
+ 
+-	leases = xzalloc(server_config.max_leases * sizeof(struct dhcpOfferedAddr));
++	leases = xzalloc(server_config.max_leases * sizeof(*leases));
+ 	read_leases(server_config.lease_file);
+ 
+ 	if (read_interface(server_config.interface, &server_config.ifindex,
+@@ -207,10 +207,13 @@ int udhcpd_main(int argc, char **argv)
+ 					/* make some contention for this address */
+ 					} else
+ 						sendNAK(&packet);
+-				} else if (requested_align < server_config.start
+-				        || requested_align > server_config.end
+-				) {
+-					sendNAK(&packet);
++				} else {
++					uint32_t r = ntohl(requested_align);
++					if (r < server_config.start_ip
++				         || r > server_config.end_ip
++					) {
++						sendNAK(&packet);
++					}
+ 				} /* else remain silent */
+ 
+ 			} else {
+diff --git a/networking/udhcp/dhcpd.h b/networking/udhcp/dhcpd.h
+index 7c4fe69..05e3cf0 100644
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -27,23 +27,24 @@ struct static_lease {
+ 
+ struct server_config_t {
+ 	uint32_t server;		/* Our IP, in network order */
+-	uint32_t start;			/* Start address of leases, network order */
+-	uint32_t end;			/* End of leases, network order */
++	/* start,end are in host order: we need to compare start <= ip <= end */
++	uint32_t start_ip;		/* Start address of leases, in host order */
++	uint32_t end_ip;		/* End of leases, in host order */
+ 	struct option_set *options;	/* List of DHCP options loaded from the config file */
+ 	char *interface;		/* The name of the interface to use */
+ 	int ifindex;			/* Index number of the interface to use */
+ 	uint8_t arp[6];			/* Our arp address */
+-	unsigned long lease;		/* lease time in seconds (host order) */
+-	unsigned long max_leases;	/* maximum number of leases (including reserved address) */
+ 	char remaining;			/* should the lease file be interpreted as lease time remaining, or
+ 					 * as the time the lease expires */
++	unsigned long lease;		/* lease time in seconds (host order) */
++	unsigned long max_leases;	/* maximum number of leases (including reserved address) */
+ 	unsigned long auto_time;	/* how long should udhcpd wait before writing a config file.
+ 					 * if this is zero, it will only write one on SIGUSR1 */
+ 	unsigned long decline_time;	/* how long an address is reserved if a client returns a
+ 					 * decline message */
+ 	unsigned long conflict_time;	/* how long an arp conflict offender is leased for */
+ 	unsigned long offer_time;	/* how long an offered address is reserved */
+-	unsigned long min_lease;	/* minimum lease a client can request*/
++	unsigned long min_lease;	/* minimum lease a client can request */
+ 	char *lease_file;
+ 	char *pidfile;
+ 	char *notify_file;		/* What to run whenever leases are written */
+@@ -95,13 +96,6 @@ int send_inform(struct dhcpMessage *oldpacket);
+ 
+ /*** files.h ***/
+ 
+-struct config_keyword {
+-	const char *keyword;
+-	int (* const handler)(const char *line, void *var);
+-	void *var;
+-	const char *def;
+-};
+-
+ int read_config(const char *file);
+ void write_leases(void);
+ void read_leases(const char *file);
+diff --git a/networking/udhcp/files.c b/networking/udhcp/files.c
+index 41c8717..7fc7348 100644
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -11,42 +11,30 @@
+ #include "options.h"
+ 
+ 
+-/*
+- * Domain names may have 254 chars, and string options can be 254
+- * chars long. However, 80 bytes will be enough for most, and won't
+- * hog up memory. If you have a special application, change it
+- */
+-#define READ_CONFIG_BUF_SIZE 80
+-
+-/* on these functions, make sure you datatype matches */
++/* on these functions, make sure your datatype matches */
+ static int read_ip(const char *line, void *arg)
+ {
+ 	len_and_sockaddr *lsa;
+-	int retval = 0;
+ 
+ 	lsa = host_and_af2sockaddr(line, 0, AF_INET);
+ 	if (lsa) {
+-		*(struct in_addr*)arg = lsa->sin.sin_addr;
++		*(uint32_t*)arg = lsa->sin.sin_addr.s_addr;
+ 		free(lsa);
+-		retval = 1;
++		return 1;
+ 	}
+-	return retval;
++	return 0;
+ }
+ 
+ static int read_mac(const char *line, void *arg)
+ {
+ 	uint8_t *mac_bytes = arg;
+ 	struct ether_addr *temp_ether_addr;
+-	int retval = 1;
+ 
+ 	temp_ether_addr = ether_aton(line);
+-
+ 	if (temp_ether_addr == NULL)
+-		retval = 0;
+-	else
+-		memcpy(mac_bytes, temp_ether_addr, 6);
+-
+-	return retval;
++		return 0;
++	memcpy(mac_bytes, temp_ether_addr, 6);
++	return 1;
+ }
+ 
+ 
+@@ -56,14 +44,13 @@ static int read_str(const char *line, void *arg)
+ 
+ 	free(*dest);
+ 	*dest = xstrdup(line);
+-
+ 	return 1;
+ }
+ 
+ 
+ static int read_u32(const char *line, void *arg)
+ {
+-	*((uint32_t*)arg) = bb_strtou32(line, NULL, 10);
++	*(uint32_t*)arg = bb_strtou32(line, NULL, 10);
+ 	return errno == 0;
+ }
+ 
+@@ -71,15 +58,16 @@ static int read_u32(const char *line, void *arg)
+ static int read_yn(const char *line, void *arg)
+ {
+ 	char *dest = arg;
+-	int retval = 1;
+ 
+-	if (!strcasecmp("yes", line))
++	if (!strcasecmp("yes", line)) {
+ 		*dest = 1;
+-	else if (!strcasecmp("no", line))
++		return 1;
++	}
++	if (!strcasecmp("no", line)) {
+ 		*dest = 0;
+-	else retval = 0;
+-
+-	return retval;
++		return 1;
++	}
++	return 0;
+ }
+ 
+ 
+@@ -89,8 +77,9 @@ struct option_set *find_option(struct option_set *opt_list, char code)
+ 	while (opt_list && opt_list->data[OPT_CODE] < code)
+ 		opt_list = opt_list->next;
+ 
+-	if (opt_list && opt_list->data[OPT_CODE] == code) return opt_list;
+-	else return NULL;
++	if (opt_list && opt_list->data[OPT_CODE] == code)
++		return opt_list;
++	return NULL;
+ }
+ 
+ 
+@@ -111,7 +100,7 @@ static void attach_option(struct option_set **opt_list,
+ #endif
+ 
+ 		/* make a new option */
+-		new = xmalloc(sizeof(struct option_set));
++		new = xmalloc(sizeof(*new));
+ 		new->data = xmalloc(length + 2);
+ 		new->data[OPT_CODE] = option->code;
+ 		new->data[OPT_LEN] = length;
+@@ -184,7 +173,7 @@ static int read_opt(const char *const_line, void *arg)
+ 			return 0;
+ 		if (!strcasecmp(option->name, opt))
+ 			break;
+-		 option++;
++		option++;
+ 	}
+ 
+ 	do {
+@@ -199,8 +188,11 @@ static int read_opt(const char *const_line, void *arg)
+ 			break;
+ 		case OPTION_IP_PAIR:
+ 			retval = read_ip(val, buffer);
+-			if (!(val = strtok(NULL, ", \t/-"))) retval = 0;
+-			if (retval) retval = read_ip(val, buffer + 4);
++			val = strtok(NULL, ", \t/-");
++			if (!val)
++				retval = 0;
++			if (retval)
++				retval = read_ip(val, buffer + 4);
+ 			break;
+ 		case OPTION_STRING:
+ #if ENABLE_FEATURE_RFC3397
+@@ -220,22 +212,33 @@ static int read_opt(const char *const_line, void *arg)
+ 			buffer[0] = strtoul(val, &endptr, 0);
+ 			retval = (endptr[0] == '\0');
+ 			break;
+-		case OPTION_U16:
+-			*result_u16 = htons(strtoul(val, &endptr, 0));
+-			retval = (endptr[0] == '\0');
++		/* htonX are macros in older libc's, using temp var
++		 * in code below for safety */
++		/* TODO: use bb_strtoX? */
++		case OPTION_U16: {
++			unsigned long tmp = strtoul(val, &endptr, 0);
++			*result_u16 = htons(tmp);
++			retval = (endptr[0] == '\0' /*&& tmp < 0x10000*/);
+ 			break;
+-		case OPTION_S16:
+-			*result_u16 = htons(strtol(val, &endptr, 0));
++		}
++		case OPTION_S16: {
++			long tmp = strtol(val, &endptr, 0);
++			*result_u16 = htons(tmp);
+ 			retval = (endptr[0] == '\0');
+ 			break;
+-		case OPTION_U32:
+-			*result_u32 = htonl(strtoul(val, &endptr, 0));
++		}
++		case OPTION_U32: {
++			unsigned long tmp = strtoul(val, &endptr, 0);
++			*result_u32 = htonl(tmp);
+ 			retval = (endptr[0] == '\0');
+ 			break;
+-		case OPTION_S32:
+-			*result_u32 = htonl(strtol(val, &endptr, 0));
++		}
++		case OPTION_S32: {
++			long tmp = strtol(val, &endptr, 0);
++			*result_u32 = htonl(tmp);
+ 			retval = (endptr[0] == '\0');
+ 			break;
++		}
+ 		default:
+ 			break;
+ 		}
+@@ -253,7 +256,6 @@ static int read_staticlease(const char *const_line, void *arg)
+ 	uint8_t *mac_bytes;
+ 	uint32_t *ip;
+ 
+-
+ 	/* Allocate memory for addresses */
+ 	mac_bytes = xmalloc(sizeof(unsigned char) * 8);
+ 	ip = xmalloc(sizeof(uint32_t));
+@@ -275,39 +277,54 @@ static int read_staticlease(const char *const_line, void *arg)
+ }
+ 
+ 
++struct config_keyword {
++	const char *keyword;
++	int (*handler)(const char *line, void *var);
++	void *var;
++	const char *def;
++};
++
+ static const struct config_keyword keywords[] = {
+-	/* keyword	handler   variable address		default */
+-	{"start",	read_ip,  &(server_config.start),	"192.168.0.20"},
+-	{"end",		read_ip,  &(server_config.end),		"192.168.0.254"},
+-	{"interface",	read_str, &(server_config.interface),	"eth0"},
+-	{"option",	read_opt, &(server_config.options),	""},
+-	{"opt",		read_opt, &(server_config.options),	""},
+-	{"max_leases",	read_u32, &(server_config.max_leases),	"254"},
+-	{"remaining",	read_yn,  &(server_config.remaining),	"yes"},
+-	{"auto_time",	read_u32, &(server_config.auto_time),	"7200"},
+-	{"decline_time",read_u32, &(server_config.decline_time),"3600"},
+-	{"conflict_time",read_u32,&(server_config.conflict_time),"3600"},
+-	{"offer_time",	read_u32, &(server_config.offer_time),	"60"},
+-	{"min_lease",	read_u32, &(server_config.min_lease),	"60"},
+-	{"lease_file",	read_str, &(server_config.lease_file),	LEASES_FILE},
+-	{"pidfile",	read_str, &(server_config.pidfile),	"/var/run/udhcpd.pid"},
+-	{"notify_file", read_str, &(server_config.notify_file),	""},
+-	{"siaddr",	read_ip,  &(server_config.siaddr),	"0.0.0.0"},
+-	{"sname",	read_str, &(server_config.sname),	""},
+-	{"boot_file",	read_str, &(server_config.boot_file),	""},
+-	{"static_lease",read_staticlease, &(server_config.static_leases),	""},
+-	/*ADDME: static lease */
+-	{"",		NULL,	  NULL,				""}
++	/* keyword       handler   variable address               default */
++	{"start",        read_ip,  &(server_config.start_ip),     "192.168.0.20"},
++	{"end",          read_ip,  &(server_config.end_ip),       "192.168.0.254"},
++	{"interface",    read_str, &(server_config.interface),    "eth0"},
++	{"option",       read_opt, &(server_config.options),      ""},
++	{"opt",          read_opt, &(server_config.options),      ""},
++	/* Avoid "max_leases value not sane" warning by setting default
++	 * to default_end_ip - default_start_ip + 1: */
++	{"max_leases",   read_u32, &(server_config.max_leases),   "235"},
++	{"remaining",    read_yn,  &(server_config.remaining),    "yes"},
++	{"auto_time",    read_u32, &(server_config.auto_time),    "7200"},
++	{"decline_time", read_u32, &(server_config.decline_time), "3600"},
++	{"conflict_time",read_u32, &(server_config.conflict_time),"3600"},
++	{"offer_time",   read_u32, &(server_config.offer_time),   "60"},
++	{"min_lease",    read_u32, &(server_config.min_lease),    "60"},
++	{"lease_file",   read_str, &(server_config.lease_file),   LEASES_FILE},
++	{"pidfile",      read_str, &(server_config.pidfile),      "/var/run/udhcpd.pid"},
++	{"notify_file",  read_str, &(server_config.notify_file),  ""},
++	{"siaddr",       read_ip,  &(server_config.siaddr),       "0.0.0.0"},
++	{"sname",        read_str, &(server_config.sname),        ""},
++	{"boot_file",    read_str, &(server_config.boot_file),    ""},
++	{"static_lease", read_staticlease, &(server_config.static_leases), ""},
++	/* ADDME: static lease */
+ };
+ 
+ 
++/*
++ * Domain names may have 254 chars, and string options can be 254
++ * chars long. However, 80 bytes will be enough for most, and won't
++ * hog up memory. If you have a special application, change it
++ */
++#define READ_CONFIG_BUF_SIZE 80
++
+ int read_config(const char *file)
+ {
+ 	FILE *in;
+ 	char buffer[READ_CONFIG_BUF_SIZE], *token, *line;
+ 	int i, lm = 0;
+ 
+-	for (i = 0; keywords[i].keyword[0]; i++)
++	for (i = 0; i < ARRAY_SIZE(keywords); i++)
+ 		if (keywords[i].def[0])
+ 			keywords[i].handler(keywords[i].def, keywords[i].var);
+ 
+@@ -337,7 +354,7 @@ int read_config(const char *file)
+ 		while (i >= 0 && isspace(line[i]))
+ 			line[i--] = '\0';
+ 
+-		for (i = 0; keywords[i].keyword[0]; i++)
++		for (i = 0; i < ARRAY_SIZE(keywords); i++)
+ 			if (!strcasecmp(token, keywords[i].keyword))
+ 				if (!keywords[i].handler(line, keywords[i].var)) {
+ 					bb_error_msg("cannot parse line %d of %s", lm, file);
+@@ -348,6 +365,10 @@ int read_config(const char *file)
+ 				}
+ 	}
+ 	fclose(in);
++
++	server_config.start_ip = ntohl(server_config.start_ip);
++	server_config.end_ip = ntohl(server_config.end_ip);
++
+ 	return 1;
+ }
+ 
+@@ -408,9 +429,11 @@ void read_leases(const char *file)
+ 	 && full_read(fp, &lease, sizeof(lease)) == sizeof(lease)
+ 	) {
+ 		/* ADDME: is it a static lease */
+-		if (lease.yiaddr >= server_config.start && lease.yiaddr <= server_config.end) {
++		uint32_t y = ntohl(lease.yiaddr);
++		if (y >= server_config.start_ip && y <= server_config.end_ip) {
+ 			lease.expires = ntohl(lease.expires);
+-			if (!server_config.remaining) lease.expires -= time(0);
++			if (!server_config.remaining)
++				lease.expires -= time(0);
+ 			if (!(add_lease(lease.chaddr, lease.yiaddr, lease.expires))) {
+ 				bb_error_msg("too many leases while loading %s", file);
+ 				break;
+diff --git a/networking/udhcp/leases.c b/networking/udhcp/leases.c
+index 5d8775f..ceec073 100644
+--- a/networking/udhcp/leases.c
++++ b/networking/udhcp/leases.c
+@@ -119,8 +119,8 @@ uint32_t find_address(int check_expired)
+ 	uint32_t addr, ret;
+ 	struct dhcpOfferedAddr *lease = NULL;
+ 
+-	addr = ntohl(server_config.start); /* addr is in host order here */
+-	for (;addr <= ntohl(server_config.end); addr++) {
++	addr = server_config.start_ip; /* addr is in host order here */
++	for (;addr <= server_config.end_ip; addr++) {
+ 
+ 		/* ie, 192.168.55.0 */
+ 		if (!(addr & 0xFF)) continue;
+diff --git a/networking/udhcp/serverpacket.c b/networking/udhcp/serverpacket.c
+index e1a88ad..ecbf50a 100644
+--- a/networking/udhcp/serverpacket.c
++++ b/networking/udhcp/serverpacket.c
+@@ -122,19 +122,18 @@ int sendOffer(struct dhcpMessage *oldpacket)
+ 			if (!lease_expired(lease))
+ 				lease_time_align = lease->expires - time(0);
+ 			packet.yiaddr = lease->yiaddr;
+-
+ 		/* Or the client has a requested ip */
+ 		} else if ((req = get_option(oldpacket, DHCP_REQUESTED_IP))
+-			/* Don't look here (ugly hackish thing to do) */
+-			&& memcpy(&req_align, req, 4)
+-			/* and the ip is in the lease range */
+-			&& ntohl(req_align) >= ntohl(server_config.start)
+-			&& ntohl(req_align) <= ntohl(server_config.end)
+-			&& !static_lease_ip /* Check that its not a static lease */
+-			/* and is not already taken/offered */
+-			&& (!(lease = find_lease_by_yiaddr(req_align))
+-				/* or its taken, but expired */ /* ADDME: or maybe in here */
+-				|| lease_expired(lease))
++		 /* Don't look here (ugly hackish thing to do) */
++		 && memcpy(&req_align, req, 4)
++		 /* and the ip is in the lease range */
++		 && ntohl(req_align) >= server_config.start_ip
++		 && ntohl(req_align) <= server_config.end_ip
++		 && !static_lease_ip /* Check that its not a static lease */
++		 /* and is not already taken/offered */
++		 && (!(lease = find_lease_by_yiaddr(req_align))
++			/* or its taken, but expired */ /* ADDME: or maybe in here */
++			|| lease_expired(lease))
+ 		) {
+ 			packet.yiaddr = req_align; /* FIXME: oh my, is there a host using this IP? */
+ 			/* otherwise, find a free IP */
+@@ -142,7 +141,8 @@ int sendOffer(struct dhcpMessage *oldpacket)
+ 			/* Is it a static lease? (No, because find_address skips static lease) */
+ 			packet.yiaddr = find_address(0);
+ 			/* try for an expired lease */
+-			if (!packet.yiaddr) packet.yiaddr = find_address(1);
++			if (!packet.yiaddr)
++				packet.yiaddr = find_address(1);
+ 		}
+ 
+ 		if (!packet.yiaddr) {
+@@ -209,7 +209,8 @@ int sendACK(struct dhcpMessage *oldpacket, uint32_t yiaddr)
+ 	init_packet(&packet, oldpacket, DHCPACK);
+ 	packet.yiaddr = yiaddr;
+ 
+-	if ((lease_time = get_option(oldpacket, DHCP_LEASE_TIME))) {
++	lease_time = get_option(oldpacket, DHCP_LEASE_TIME);
++	if (lease_time) {
+ 		memcpy(&lease_time_align, lease_time, 4);
+ 		lease_time_align = ntohl(lease_time_align);
+ 		if (lease_time_align > server_config.lease)
+@@ -236,6 +237,10 @@ int sendACK(struct dhcpMessage *oldpacket, uint32_t yiaddr)
+ 		return -1;
+ 
+ 	add_lease(packet.chaddr, packet.yiaddr, lease_time_align);
++	if (ENABLE_FEATURE_UDHCPD_WRITE_LEASES_EARLY) {
++		/* rewrite the file with leases at every new acceptance */
++		write_leases();
++	}
+ 
+ 	return 0;
+ }
+diff --git a/networking/udhcp/socket.c b/networking/udhcp/socket.c
+index d294fb2..be5985f 100644
+--- a/networking/udhcp/socket.c
++++ b/networking/udhcp/socket.c
+@@ -43,7 +43,7 @@ int read_interface(const char *interface, int *ifindex, uint32_t *addr, uint8_t
+ 	struct ifreq ifr;
+ 	struct sockaddr_in *our_ip;
+ 
+-	memset(&ifr, 0, sizeof(struct ifreq));
++	memset(&ifr, 0, sizeof(ifr));
+ 	fd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+ 	if (fd < 0) {
+ 		bb_perror_msg("socket failed");
+@@ -54,7 +54,8 @@ int read_interface(const char *interface, int *ifindex, uint32_t *addr, uint8_t
+ 	strncpy(ifr.ifr_name, interface, sizeof(ifr.ifr_name));
+ 	if (addr) {
+ 		if (ioctl(fd, SIOCGIFADDR, &ifr) != 0) {
+-			bb_perror_msg("SIOCGIFADDR failed, is the interface up and configured?");
++			bb_perror_msg("SIOCGIFADDR failed (is interface %s "
++					"up and configured?)", interface);
+ 			close(fd);
+ 			return -1;
+ 		}
+@@ -117,7 +118,7 @@ int listen_socket(uint32_t ip, int port, const char *inf)
+ 		return -1;
+ 	}
+ 
+-	if (bind(fd, (struct sockaddr *)&addr, sizeof(struct sockaddr)) == -1) {
++	if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+ 		close(fd);
+ 		return -1;
+ 	}

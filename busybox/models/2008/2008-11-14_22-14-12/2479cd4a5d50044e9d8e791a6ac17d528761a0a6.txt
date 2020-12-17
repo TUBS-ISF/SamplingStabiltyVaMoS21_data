@@ -1,0 +1,27 @@
+2008-11-14 22:14:12 +0000
+diff --git a/include/usage.h b/include/usage.h
+index 69d37f9..67b2acf 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -1847,7 +1847,7 @@
+      "\n1. actual event(s)" \
+      "\n2. file name" \
+      "\n3. name of subfile (if any), in case of watching a directory" \
+-     "\ninotify waits for agent to exit." \
++     "\ninotifyd waits for agent to exit." \
+      "\nEvents:" \
+      "\n	a	File is accessed" \
+      "\n	c	File is modified" \
+diff --git a/miscutils/inotifyd.c b/miscutils/inotifyd.c
+index 216a696..2a13551 100644
+--- a/miscutils/inotifyd.c
++++ b/miscutils/inotifyd.c
+@@ -58,7 +58,7 @@ int inotifyd_main(int argc UNUSED_PARAM, char **argv)
+ 	const char *args[] = { *argv, NULL, NULL, NULL, NULL };
+ 
+ 	// sanity check: agent and at least one watch must be given
+-	if (!argv[1])
++	if (!argv[0] || !argv[1])
+ 		bb_show_usage();
+ 
+ 	// open inotify

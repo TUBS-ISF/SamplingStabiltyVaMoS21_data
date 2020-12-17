@@ -1,0 +1,213 @@
+2007-07-21 13:25:28 +0000
+diff --git a/libbb/update_passwd.c b/libbb/update_passwd.c
+index 5572db5..8914b8b 100644
+--- a/libbb/update_passwd.c
++++ b/libbb/update_passwd.c
+@@ -18,18 +18,18 @@ int update_passwd(const char *filename, const char *username,
+ 	struct flock lock;
+ 	FILE *old_fp;
+ 	FILE *new_fp;
+-	char *new_name;
+-	char *last_char;
++	char *fnamesfx;
++	char *sfx_char;
+ 	unsigned user_len;
+ 	int old_fd;
+ 	int new_fd;
+ 	int i;
+ 	int cnt = 0;
+-	int ret = 1; /* failure */
++	int ret = -1; /* failure */
+ 
+ 	/* New passwd file, "/etc/passwd+" for now */
+-	new_name = xasprintf("%s+", filename);
+-	last_char = &new_name[strlen(new_name)-1];
++	fnamesfx = xasprintf("%s+", filename);
++	sfx_char = &fnamesfx[strlen(fnamesfx)-1];
+ 	username = xasprintf("%s:", username);
+ 	user_len = strlen(username);
+ 
+@@ -42,12 +42,12 @@ int update_passwd(const char *filename, const char *username,
+ 	i = 30;
+ 	do {
+ 		// FIXME: on last iteration try w/o O_EXCL but with O_TRUNC?
+-		new_fd = open(new_name, O_WRONLY|O_CREAT|O_EXCL,0600);
++		new_fd = open(fnamesfx, O_WRONLY|O_CREAT|O_EXCL, 0600);
+ 		if (new_fd >= 0) goto created;
+ 		if (errno != EEXIST) break;
+ 		usleep(100000); /* 0.1 sec */
+ 	} while (--i);
+-	bb_perror_msg("cannot create '%s'", new_name);
++	bb_perror_msg("cannot create '%s'", fnamesfx);
+ 	goto close_old_fp;
+ 
+  created:
+@@ -62,12 +62,13 @@ int update_passwd(const char *filename, const char *username,
+ 	}
+ 
+ 	/* Backup file is "/etc/passwd-" */
+-	last_char[0] = '-';
+-	/* Delete old one, create new as a hardlink to current */
+-	i = (unlink(new_name) && errno != ENOENT);
+-	if (i || link(filename, new_name))
+-		bb_perror_msg("warning: cannot create backup copy '%s'", new_name);
+-	last_char[0] = '+';
++	*sfx_char = '-';
++	/* Delete old backup */
++	i = (unlink(fnamesfx) && errno != ENOENT);
++	/* Create backup as a hardlink to current */
++	if (i || link(filename, fnamesfx))
++		bb_perror_msg("warning: cannot create backup copy '%s'", fnamesfx);
++	*sfx_char = '+';
+ 
+ 	/* Lock the password file before updating */
+ 	lock.l_type = F_WRLCK;
+@@ -78,7 +79,7 @@ int update_passwd(const char *filename, const char *username,
+ 		bb_perror_msg("warning: cannot lock '%s'", filename);
+ 	lock.l_type = F_UNLCK;
+ 
+-	/* Read current password file, write updated one */
++	/* Read current password file, write updated /etc/passwd+ */
+ 	while (1) {
+ 		char *line = xmalloc_fgets(old_fp);
+ 		if (!line) break; /* EOF/error */
+@@ -86,8 +87,7 @@ int update_passwd(const char *filename, const char *username,
+ 			/* we have a match with "username:"... */
+ 			const char *cp = line + user_len;
+ 			/* now cp -> old passwd, skip it: */
+-			cp = strchr(cp, ':');
+-			if (!cp) cp = "";
++			cp = strchrnul(cp, ':');
+ 			/* now cp -> ':' after old passwd or -> "" */
+ 			fprintf(new_fp, "%s%s%s", username, new_pw, cp);
+ 			cnt++;
+@@ -99,7 +99,7 @@ int update_passwd(const char *filename, const char *username,
+ 
+ 	/* We do want all of them to execute, thus | instead of || */
+ 	if ((ferror(old_fp) | fflush(new_fp) | fsync(new_fd) | fclose(new_fp))
+-	 || rename(new_name, filename)
++	 || rename(fnamesfx, filename)
+ 	) {
+ 		/* At least one of those failed */
+ 		goto unlink_new;
+@@ -107,13 +107,13 @@ int update_passwd(const char *filename, const char *username,
+ 	ret = cnt; /* whee, success! */
+ 
+  unlink_new:
+-	if (ret) unlink(new_name);
++	if (ret < 0) unlink(fnamesfx);
+ 
+  close_old_fp:
+ 	fclose(old_fp);
+ 
+  free_mem:
+-	if (ENABLE_FEATURE_CLEAN_UP) free(new_name);
+-	if (ENABLE_FEATURE_CLEAN_UP) free((char*)username);
++	free(fnamesfx);
++	free((char*)username);
+ 	return ret;
+ }
+diff --git a/loginutils/chpasswd.c b/loginutils/chpasswd.c
+index 124fc86..d5de424 100644
+--- a/loginutils/chpasswd.c
++++ b/loginutils/chpasswd.c
+@@ -26,19 +26,13 @@ int chpasswd_main(int argc, char **argv)
+ {
+ 	char *name, *pass;
+ 	char salt[sizeof("$N$XXXXXXXX")];
+-	int opt, rc;
++	int opt;
+ 	int rnd = rnd; /* we *want* it to be non-initialized! */
+-	const char *pwfile = bb_path_passwd_file;
+ 
+-	if (getuid() != 0)
++	if (getuid())
+ 		bb_error_msg_and_die(bb_msg_perm_denied_are_you_root);
+ 
+-#if ENABLE_FEATURE_SHADOWPASSWDS
+-	if (access(bb_path_shadow_file, F_OK) == 0)
+-		pwfile = bb_path_shadow_file;
+-#endif
+-
+- 	opt_complementary = "m--e";
++ 	opt_complementary = "?m--e:e--m";
+ 	USE_GETOPT_LONG(applet_long_options = chpasswd_opts;)
+ 	opt = getopt32(argc, argv, "em");
+ 
+@@ -48,8 +42,7 @@ int chpasswd_main(int argc, char **argv)
+ 			bb_error_msg_and_die("missing new password");
+ 		*pass++ = '\0';
+ 
+-		//if (!getpwnam(name))
+-		//	bb_error_msg_and_die("unknown user %s", name);
++		xuname2uid(name); /* dies if there is no such user */
+ 
+ 		if (!(opt & OPT_ENC)) {
+ 			rnd = crypt_make_salt(salt, 1, rnd);
+@@ -60,15 +53,17 @@ int chpasswd_main(int argc, char **argv)
+ 			pass = pw_encrypt(pass, salt);
+ 		}
+ 
+-		rc = update_passwd(pwfile, name, pass);
+ 		/* LOGMODE_BOTH logs to syslog */
+ 		logmode = LOGMODE_BOTH;
+-		if (rc < 0)
+-			bb_error_msg_and_die("an error occurred updating %s", pwfile);
+-		if (rc > 0)
++
++		if ((ENABLE_FEATURE_SHADOWPASSWDS 
++			&& !update_passwd(bb_path_shadow_file, name, pass))
++			|| !update_passwd(bb_path_passwd_file, name, pass)
++		) {
++			bb_error_msg_and_die("an error occurred updating password for %s", name);
++		} else {
+ 			bb_info_msg("Password for '%s' changed", name);
+-		else
+-			bb_info_msg("User '%s' not found", name);
++		}
+ 		logmode = LOGMODE_STDIO;
+ 		free(name);
+ 	}
+diff --git a/runit/runit_lib.c b/runit/runit_lib.c
+index fcb66c3..295b45f 100644
+--- a/runit/runit_lib.c
++++ b/runit/runit_lib.c
+@@ -382,7 +382,6 @@ int seek_set(int fd,seek_pos pos)
+ {
+ 	if (lseek(fd,(off_t) pos,SEEK_SET) == -1) return -1; return 0;
+ }
+-#endif
+ 
+ 
+ /*** str_chr.c ***/
+@@ -402,3 +401,4 @@ unsigned str_chr(const char *s,int c)
+ 	}
+ 	return t - s;
+ }
++#endif
+diff --git a/runit/runit_lib.h b/runit/runit_lib.h
+index 25aeeaf..1dadb6e 100644
+--- a/runit/runit_lib.h
++++ b/runit/runit_lib.h
+@@ -125,7 +125,7 @@ extern unsigned pmatch(const char *, const char *, unsigned);
+ 
+ /*** str.h ***/
+ 
+-extern unsigned str_chr(const char *,int);  /* never returns NULL */
++//extern unsigned str_chr(const char *,int);  /* never returns NULL */
+ 
+ #define str_diff(s,t) strcmp((s), (t))
+ #define str_equal(s,t) (!strcmp((s), (t)))
+diff --git a/scripts/trylink b/scripts/trylink
+index cbd7023..bfc67bf 100755
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -22,6 +22,8 @@ try "-Wl,--start-group $l_list -Wl,--end-group" "$@" \
+     cat busybox_ld.err
+     exit 1
+ }
++# Hack: we are not supposed to know executable name,
++# but this hack cuts down link time
+ mv busybox_unstripped busybox_unstripped.tmp
+ 
+ # Now try to remove each lib and build without.

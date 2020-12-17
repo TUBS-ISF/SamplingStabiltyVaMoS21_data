@@ -1,0 +1,92 @@
+2008-02-13 18:09:56 +0000
+diff --git a/shell/ash_test/ash-redir/redir.tests b/shell/ash_test/ash-redir/redir.tests
+deleted file mode 100644
+index 7a1a668..0000000
+--- a/shell/ash_test/ash-redir/redir.tests
++++ /dev/null
+@@ -1,6 +0,0 @@
+-# test: closed fds should stay closed
+-exec 1>&-
+-echo TEST >TEST
+-echo JUNK # lost: stdout is closed
+-cat TEST >&2
+-rm TEST
+diff --git a/shell/ash_test/ash-signals/signal1.right b/shell/ash_test/ash-signals/signal1.right
+new file mode 100644
+index 0000000..66c30a5
+--- /dev/null
++++ b/shell/ash_test/ash-signals/signal1.right
+@@ -0,0 +1,20 @@
++got signal
++trap -- 'echo got signal' USR1
++sent 1 signal
++got signal
++sleep interrupted
++trap -- 'echo got signal' USR1
++sent 2 signal
++got signal
++sleep interrupted
++trap -- 'echo got signal' USR1
++sent 3 signal
++got signal
++sleep interrupted
++trap -- 'echo got signal' USR1
++sent 4 signal
++got signal
++sleep interrupted
++trap -- 'echo got signal' USR1
++sent 5 signal
++sleep completed
+diff --git a/shell/ash_test/ash-signals/signal1.tests b/shell/ash_test/ash-signals/signal1.tests
+new file mode 100755
+index 0000000..49a395b
+--- /dev/null
++++ b/shell/ash_test/ash-signals/signal1.tests
+@@ -0,0 +1,24 @@
++sleeping=true
++
++trap "echo got signal" USR1
++
++for try in 1 2 3 4 5; do
++    kill -USR1 $$
++    sleep 1
++    echo sent $try signal
++done &
++
++sleep 10 &
++
++while $sleeping; do
++    trap
++    if wait %%; then
++        echo sleep completed
++        sleeping=false
++    elif [ $? == 127 ]; then
++        echo no sleep tonite
++        sleeping=false
++    else
++        echo sleep interrupted;
++    fi
++done
+diff --git a/shell/ash_test/run-all b/shell/ash_test/run-all
+index 02f6d2a..416900a 100755
+--- a/shell/ash_test/run-all
++++ b/shell/ash_test/run-all
+@@ -1,6 +1,9 @@
+ #!/bin/sh
+ 
+-test -x ash || { echo "No ./ash?!"; exit; }
++test -x ash || {
++    echo "No ./ash?! Perhaps you want to run 'ln -s ../../busybox ash'"
++    exit
++}
+ test -x printenv || gcc -O2 -o printenv printenv.c || exit $?
+ test -x recho    || gcc -O2 -o recho    recho.c    || exit $?
+ test -x zecho    || gcc -O2 -o zecho    zecho.c    || exit $?
+@@ -50,6 +53,7 @@ if [ $# -lt 1 ]; then
+     modules=`ls -d ash-*`
+ 
+     for module in $modules; do
++	echo do_test $module
+ 	do_test $module
+     done
+ else

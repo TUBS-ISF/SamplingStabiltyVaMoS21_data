@@ -1,0 +1,224 @@
+2010-03-18 22:44:00 +0100
+diff --git a/debianutils/run_parts.c b/debianutils/run_parts.c
+index 2854a53..37e8487 100644
+--- a/debianutils/run_parts.c
++++ b/debianutils/run_parts.c
+@@ -159,14 +159,14 @@ int run_parts_main(int argc UNUSED_PARAM, char **argv)
+ 			continue;
+ 		}
+ 		cmd[0] = name;
+-		ret = wait4pid(spawn(cmd));
++		ret = spawn_and_wait(cmd);
+ 		if (ret == 0)
+ 			continue;
+ 		n = 1;
+ 		if (ret < 0)
+ 			bb_perror_msg("can't execute '%s'", name);
+ 		else /* ret > 0 */
+-			bb_error_msg("%s exited with code %d", name, ret);
++			bb_error_msg("%s exited with code %d", name, ret & 0xff);
+ 	}
+ 
+ 	return n;
+diff --git a/findutils/xargs.c b/findutils/xargs.c
+index c711777..f5dbc78 100644
+--- a/findutils/xargs.c
++++ b/findutils/xargs.c
+@@ -64,16 +64,9 @@ static int xargs_exec(char **args)
+ 		bb_error_msg("%s: exited with status 255; aborting", args[0]);
+ 		return 124;
+ 	}
+-/* Huh? I think we won't see this, ever. We don't wait with WUNTRACED!
+-	if (WIFSTOPPED(status)) {
+-		bb_error_msg("%s: stopped by signal %d",
+-			args[0], WSTOPSIG(status));
+-		return 125;
+-	}
+-*/
+-	if (status >= 1000) {
++	if (status >= 0x180) {
+ 		bb_error_msg("%s: terminated by signal %d",
+-			args[0], status - 1000);
++			args[0], status - 0x180);
+ 		return 125;
+ 	}
+ 	if (status)
+diff --git a/include/libbb.h b/include/libbb.h
+index 044d090..72d6c7d 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -812,21 +812,22 @@ int bb_execvp(const char *file, char *const argv[]) FAST_FUNC;
+ #define BB_EXECLP(prog,cmd,...) execlp(prog,cmd, __VA_ARGS__)
+ #endif
+ 
+-/* NOMMU friendy fork+exec */
++/* NOMMU friendy fork+exec: */
+ pid_t spawn(char **argv) FAST_FUNC;
+ pid_t xspawn(char **argv) FAST_FUNC;
+ 
+ pid_t safe_waitpid(pid_t pid, int *wstat, int options) FAST_FUNC;
+-/* Unlike waitpid, waits ONLY for one process.
++pid_t wait_any_nohang(int *wstat) FAST_FUNC;
++/* wait4pid: unlike waitpid, waits ONLY for one process.
++ * Returns sig + 0x180 if child is killed by signal.
+  * It's safe to pass negative 'pids' from failed [v]fork -
+  * wait4pid will return -1 (and will not clobber [v]fork's errno).
+  * IOW: rc = wait4pid(spawn(argv));
+  *      if (rc < 0) bb_perror_msg("%s", argv[0]);
+- *      if (rc > 0) bb_error_msg("exit code: %d", rc);
++ *      if (rc > 0) bb_error_msg("exit code: %d", rc & 0xff);
+  */
+ int wait4pid(pid_t pid) FAST_FUNC;
+-pid_t wait_any_nohang(int *wstat) FAST_FUNC;
+-/* wait4pid(spawn(argv)) + NOFORK/NOEXEC (if configured) */
++/* Same as wait4pid(spawn(argv)), but with NOFORK/NOEXEC if configured: */
+ int spawn_and_wait(char **argv) FAST_FUNC;
+ struct nofork_save_area {
+ 	jmp_buf die_jmp;
+diff --git a/libbb/vfork_daemon_rexec.c b/libbb/vfork_daemon_rexec.c
+index 9be9017..07024f5 100644
+--- a/libbb/vfork_daemon_rexec.c
++++ b/libbb/vfork_daemon_rexec.c
+@@ -97,7 +97,7 @@ int FAST_FUNC wait4pid(pid_t pid)
+ 	if (WIFEXITED(status))
+ 		return WEXITSTATUS(status);
+ 	if (WIFSIGNALED(status))
+-		return WTERMSIG(status) + 1000;
++		return WTERMSIG(status) + 0x180;
+ 	return 0;
+ }
+ 
+diff --git a/mailutils/mime.c b/mailutils/mime.c
+index 125ca01..ee14780 100644
+--- a/mailutils/mime.c
++++ b/mailutils/mime.c
+@@ -357,7 +357,7 @@ static int parse(const char *boundary, char **argv)
+ 			if (opts & OPT_X) {
+ 				signal(SIGPIPE, SIG_DFL);
+ 				// exit if helper exited >0
+-				rc = wait4pid(pid);
++				rc = (wait4pid(pid) & 0xff);
+ 				if (rc)
+ 					return rc+20;
+ 			}
+diff --git a/miscutils/devfsd.c b/miscutils/devfsd.c
+index 62f5de8..4ccb76d 100644
+--- a/miscutils/devfsd.c
++++ b/miscutils/devfsd.c
+@@ -751,7 +751,7 @@ static void action_modload(const struct devfsd_notify_struct *info,
+ 	argv[4] = concat_path_file("/dev", info->devname); /* device */
+ 	argv[5] = NULL;
+ 
+-	wait4pid(xspawn(argv));
++	spawn_and_wait(argv);
+ 	free(argv[4]);
+ }  /*  End Function action_modload  */
+ 
+@@ -783,7 +783,7 @@ static void action_execute(const struct devfsd_notify_struct *info,
+ 		argv[count] = largv[count];
+ 	}
+ 	argv[count] = NULL;
+-	wait4pid(spawn(argv));
++	spawn_and_wait(argv);
+ }   /*  End Function action_execute  */
+ 
+ 
+diff --git a/miscutils/inotifyd.c b/miscutils/inotifyd.c
+index 999b5e3..271f3ad 100644
+--- a/miscutils/inotifyd.c
++++ b/miscutils/inotifyd.c
+@@ -155,7 +155,7 @@ int inotifyd_main(int argc, char **argv)
+ 				args[1] = events;
+ 				args[2] = watches[ie->wd];
+ 				args[3] = ie->len ? ie->name : NULL;
+-				wait4pid(xspawn((char **)args));
++				spawn_and_wait((char **)args);
+ 				// we are done if all files got final x event
+ 				if (ie->mask & 0x8000) {
+ 					if (--argc <= 0)
+diff --git a/networking/ifplugd.c b/networking/ifplugd.c
+index ac6607c..62b1355 100644
+--- a/networking/ifplugd.c
++++ b/networking/ifplugd.c
+@@ -132,10 +132,10 @@ static int run_script(const char *action)
+ 	argv[3] = (char*) G.extra_arg;
+ 	argv[4] = NULL;
+ 
+-	/* r < 0 - can't exec, 0 <= r < 1000 - exited, >1000 - killed by sig (r-1000) */
+-	r = wait4pid(spawn(argv));
++	/* r < 0 - can't exec, 0 <= r < 0x180 - exited, >=0x180 - killed by sig (r-0x180) */
++	r = spawn_and_wait(argv);
+ 
+-	bb_error_msg("exit code: %d", r);
++	bb_error_msg("exit code: %d", r & 0xff);
+ 	return (option_mask32 & FLAG_IGNORE_RETVAL) ? 0 : r;
+ 
+ #else /* insanity */
+diff --git a/networking/ntpd.c b/networking/ntpd.c
+index 04df3fa..6d9183a 100644
+--- a/networking/ntpd.c
++++ b/networking/ntpd.c
+@@ -772,7 +772,7 @@ static void run_script(const char *action, double offset)
+ 
+ 	/* Don't want to wait: it may run hwclock --systohc, and that
+ 	 * may take some time (seconds): */
+-	/*wait4pid(spawn(argv));*/
++	/*spawn_and_wait(argv);*/
+ 	spawn(argv);
+ 
+ 	unsetenv("stratum");
+diff --git a/networking/udhcp/script.c b/networking/udhcp/script.c
+index 574c74f..a74697c 100644
+--- a/networking/udhcp/script.c
++++ b/networking/udhcp/script.c
+@@ -271,7 +271,7 @@ void FAST_FUNC udhcp_run_script(struct dhcp_packet *packet, const char *name)
+ 	argv[0] = (char*) client_config.script;
+ 	argv[1] = (char*) name;
+ 	argv[2] = NULL;
+-	wait4pid(spawn(argv));
++	spawn_and_wait(argv);
+ 
+ 	for (curr = envp; *curr; curr++) {
+ 		log2(" %s", *curr);
+diff --git a/networking/zcip.c b/networking/zcip.c
+index db10d0a..6b0b1c4 100644
+--- a/networking/zcip.c
++++ b/networking/zcip.c
+@@ -160,13 +160,13 @@ static int run(char *argv[3], const char *param, struct in_addr *ip)
+ 	}
+ 	bb_info_msg(fmt, argv[2], argv[0], addr);
+ 
+-	status = wait4pid(spawn(argv + 1));
++	status = spawn_and_wait(argv + 1);
+ 	if (status < 0) {
+ 		bb_perror_msg("%s %s %s" + 3, argv[2], argv[0]);
+ 		return -errno;
+ 	}
+ 	if (status != 0)
+-		bb_error_msg("script %s %s failed, exitcode=%d", argv[1], argv[2], status);
++		bb_error_msg("script %s %s failed, exitcode=%d", argv[1], argv[2], status & 0xff);
+ 	return status;
+ }
+ 
+diff --git a/util-linux/mount.c b/util-linux/mount.c
+index 620b146..e24fc40 100644
+--- a/util-linux/mount.c
++++ b/util-linux/mount.c
+@@ -456,7 +456,7 @@ static int mount_it_now(struct mntent *mp, long vfsflags, char *filteropts)
+ 				args[rc++] = filteropts;
+ 			}
+ 			args[rc] = NULL;
+-			rc = wait4pid(spawn(args));
++			rc = spawn_and_wait(args);
+ 			free(args[0]);
+ 			if (!rc)
+ 				break;
+@@ -1633,7 +1633,7 @@ static int singlemount(struct mntent *mp, int ignore_busy)
+ 		}
+ 		args[n++] = mp->mnt_dir;
+ 		args[n] = NULL;
+-		rc = wait4pid(xspawn(args));
++		rc = spawn_and_wait(args);
+ 		goto report_error;
+ 	}
+ 

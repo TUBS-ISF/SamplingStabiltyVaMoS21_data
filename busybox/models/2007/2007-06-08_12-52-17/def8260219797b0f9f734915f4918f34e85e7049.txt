@@ -1,0 +1,24 @@
+2007-06-08 12:52:17 +0000
+diff --git a/coreutils/echo.c b/coreutils/echo.c
+index 1016d38..11507b4 100644
+--- a/coreutils/echo.c
++++ b/coreutils/echo.c
+@@ -34,6 +34,8 @@ int bb_echo(char **argv)
+ 		nflag = 1,  /* 1 -- print '\n' */
+ 	};
+ 	arg = ++argv;
++	if (!arg)
++		goto newline_ret;
+ #else
+ 	const char *p;
+ 	char nflag = 1;
+@@ -107,9 +109,7 @@ int bb_echo(char **argv)
+ 		putchar(' ');
+ 	}
+ 
+-#if ENABLE_FEATURE_FANCY_ECHO
+  newline_ret:
+-#endif
+ 	if (nflag) {
+ 		putchar('\n');
+ 	}

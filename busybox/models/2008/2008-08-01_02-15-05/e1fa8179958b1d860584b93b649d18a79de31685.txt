@@ -1,0 +1,586 @@
+2008-08-01 02:15:05 +0000
+diff --git a/miscutils/makedevs.c b/miscutils/makedevs.c
+index ed08f7e..91da169 100644
+--- a/miscutils/makedevs.c
++++ b/miscutils/makedevs.c
+@@ -10,26 +10,39 @@
+ #include "libbb.h"
+ 
+ #if ENABLE_FEATURE_MAKEDEVS_LEAF
++/*
++makedevs NAME TYPE MAJOR MINOR FIRST LAST [s]
++TYPEs:
++b       Block device
++c       Character device
++p       FIFO
++
++FIRST..LAST specify numbers appended to NAME.
++If 's' is the last argument, the base device is created as well.
++Examples:
++        makedevs /dev/ttyS c 4 66 2 63   ->  ttyS2-ttyS63
++        makedevs /dev/hda b 3 0 0 8 s    ->  hda,hda1-hda8
++*/
+ int makedevs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int makedevs_main(int argc, char **argv)
+ {
+ 	mode_t mode;
+-	char *basedev, *type, *nodname, buf[255];
++	char *basedev, *type, *nodname, *buf;
+ 	int Smajor, Sminor, S, E;
+ 
+-	if (argc < 7 || *argv[1]=='-')
++	if (argc < 7 || argv[1][0] == '-')
+ 		bb_show_usage();
+ 
+ 	basedev = argv[1];
++	buf = xasprintf("%s%u", argv[1], (unsigned)-1);
+ 	type = argv[2];
+ 	Smajor = xatoi_u(argv[3]);
+ 	Sminor = xatoi_u(argv[4]);
+ 	S = xatoi_u(argv[5]);
+ 	E = xatoi_u(argv[6]);
+-	nodname = argc == 8 ? basedev : buf;
++	nodname = argv[7] ? basedev : buf;
+ 
+ 	mode = 0660;
+-
+ 	switch (type[0]) {
+ 	case 'c':
+ 		mode |= S_IFCHR;
+@@ -45,18 +58,14 @@ int makedevs_main(int argc, char **argv)
+ 	}
+ 
+ 	while (S <= E) {
+-		int sz;
+-
+-		sz = snprintf(buf, sizeof(buf), "%s%d", basedev, S);
+-		if (sz < 0 || sz >= sizeof(buf))  /* libc different */
+-			bb_error_msg_and_die("%s too large", basedev);
+-
+-	/* if mode != S_IFCHR and != S_IFBLK third param in mknod() ignored */
++		sprintf(buf, "%s%u", basedev, S);
+ 
++		/* if mode != S_IFCHR and != S_IFBLK,
++		 * third param in mknod() ignored */
+ 		if (mknod(nodname, mode, makedev(Smajor, Sminor)))
+-			bb_error_msg("failed to create: %s", nodname);
++			bb_perror_msg("can't create %s", nodname);
+ 
+-		if (nodname == basedev) /* ex. /dev/hda - to /dev/hda1 ... */
++		/*if (nodname == basedev)*/ /* ex. /dev/hda - to /dev/hda1 ... */
+ 			nodname = buf;
+ 		S++;
+ 		Sminor++;
+@@ -70,34 +79,31 @@ int makedevs_main(int argc, char **argv)
+ /* Licensed under the GPL v2 or later, see the file LICENSE in this tarball. */
+ 
+ int makedevs_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+-int makedevs_main(int argc, char **argv)
++int makedevs_main(int argc UNUSED_PARAM, char **argv)
+ {
+-	FILE *table = stdin;
++	parser_t *parser;
+ 	char *rootdir = NULL;
+-	char *line = NULL;
+-	int linenum = 0;
++	char *line = (char *)"-";
++	int linenum;
+ 	int ret = EXIT_SUCCESS;
+ 
++	opt_complementary = "=1"; /* exactly one param */
+ 	getopt32(argv, "d:", &line);
+-	if (line)
+-		table = xfopen_for_read(line);
+-
+-	if (optind >= argc || (rootdir=argv[optind])==NULL) {
+-		bb_error_msg_and_die("root directory not specified");
+-	}
++	rootdir = argv[optind];
++	parser = config_open(line);
+ 
+ 	xchdir(rootdir);
+ 
+ 	umask(0);
+ 
+ 	printf("rootdir=%s\n", rootdir);
+-	if (line) {
++	if (NOT_LONE_DASH(line)) {
+ 		printf("table='%s'\n", line);
+ 	} else {
+ 		printf("table=<stdin>\n");
+ 	}
+ 
+-	while ((line = xmalloc_fgetline(table)) != NULL) {
++	while (config_read(parser, &line, 1, 1, "# \t", PARSE_NORMAL)) {
+ 		char type;
+ 		unsigned mode = 0755;
+ 		unsigned major = 0;
+@@ -112,22 +118,17 @@ int makedevs_main(int argc, char **argv)
+ 		uid_t uid;
+ 		gid_t gid;
+ 
+-		linenum++;
++		linenum = parser->lineno;
+ 
+-		if ((2 > sscanf(line, "%40s %c %o %40s %40s %u %u %u %u %u", name,
+-						&type, &mode, user, group, &major,
+-						&minor, &start, &increment, &count)) ||
+-				((major | minor | start | count | increment) > 255))
+-		{
+-			if (*line=='\0' || *line=='#' || isspace(*line))
+-				continue;
++		if ((2 > sscanf(line, "%40s %c %o %40s %40s %u %u %u %u %u",
++					name, &type, &mode, user, group,
++					&major,	&minor, &start, &increment, &count))
++		 || ((unsigned)(major | minor | start | count | increment) > 255)
++		) {
+ 			bb_error_msg("invalid line %d: '%s'", linenum, line);
+ 			ret = EXIT_FAILURE;
+ 			continue;
+ 		}
+-		if (name[0] == '#') {
+-			continue;
+-		}
+ 
+ 		gid = (*group) ? get_ug_id(group, xgroup2gid) : getgid();
+ 		uid = (*user) ? get_ug_id(user, xuname2uid) : getuid();
+@@ -136,12 +137,14 @@ int makedevs_main(int argc, char **argv)
+ 		if (type == 'd') {
+ 			bb_make_directory(full_name, mode | S_IFDIR, FILEUTILS_RECUR);
+ 			if (chown(full_name, uid, gid) == -1) {
+-				bb_perror_msg("line %d: chown failed for %s", linenum, full_name);
++ chown_fail:
++				bb_perror_msg("line %d: can't chown %s", linenum, full_name);
+ 				ret = EXIT_FAILURE;
+ 				goto loop;
+ 			}
+ 			if (chmod(full_name, mode) < 0) {
+-				bb_perror_msg("line %d: chmod failed for %s", linenum, full_name);
++ chmod_fail:
++				bb_perror_msg("line %d: can't chmod %s", linenum, full_name);
+ 				ret = EXIT_FAILURE;
+ 				goto loop;
+ 			}
+@@ -152,26 +155,20 @@ int makedevs_main(int argc, char **argv)
+ 				ret = EXIT_FAILURE;
+ 				goto loop;
+ 			}
+-			if (chown(full_name, uid, gid) == -1) {
+-				bb_perror_msg("line %d: chown failed for %s", linenum, full_name);
+-				ret = EXIT_FAILURE;
+-				goto loop;
+-			}
+-			if (chmod(full_name, mode) < 0) {
+-				bb_perror_msg("line %d: chmod failed for %s", linenum, full_name);
+-				ret = EXIT_FAILURE;
+-				goto loop;
+-			}
++			if (chown(full_name, uid, gid) < 0)
++				goto chown_fail;
++			if (chmod(full_name, mode) < 0)
++				goto chmod_fail;
+ 		} else {
+ 			dev_t rdev;
++			unsigned i;
++			char *full_name_inc;
+ 
+ 			if (type == 'p') {
+ 				mode |= S_IFIFO;
+-			}
+-			else if (type == 'c') {
++			} else if (type == 'c') {
+ 				mode |= S_IFCHR;
+-			}
+-			else if (type == 'b') {
++			} else if (type == 'b') {
+ 				mode |= S_IFBLK;
+ 			} else {
+ 				bb_error_msg("line %d: unsupported file type %c", linenum, type);
+@@ -179,49 +176,30 @@ int makedevs_main(int argc, char **argv)
+ 				goto loop;
+ 			}
+ 
+-			if (count > 0) {
+-				unsigned i;
+-				char *full_name_inc;
+-
+-				full_name_inc = xmalloc(strlen(full_name) + 4);
+-				for (i = start; i < count; i++) {
+-					sprintf(full_name_inc, "%s%d", full_name, i);
+-					rdev = makedev(major, minor + (i * increment - start));
+-					if (mknod(full_name_inc, mode, rdev) == -1) {
+-						bb_perror_msg("line %d: cannot create node %s", linenum, full_name_inc);
+-						ret = EXIT_FAILURE;
+-					}
+-					else if (chown(full_name_inc, uid, gid) == -1) {
+-						bb_perror_msg("line %d: chown failed for %s", linenum, full_name_inc);
+-						ret = EXIT_FAILURE;
+-					}
+-					if (chmod(full_name_inc, mode) < 0) {
+-						bb_perror_msg("line %d: chmod failed for %s", linenum, full_name_inc);
+-						ret = EXIT_FAILURE;
+-					}
+-				}
+-				free(full_name_inc);
+-			} else {
+-				rdev = makedev(major, minor);
+-				if (mknod(full_name, mode, rdev) == -1) {
+-					bb_perror_msg("line %d: cannot create node %s", linenum, full_name);
++			full_name_inc = xmalloc(strlen(full_name) + sizeof(int)*3 + 2);
++			if (count)
++				count--;
++			for (i = start; i <= start + count; i++) {
++				sprintf(full_name_inc, count ? "%s%u" : "%s", full_name, i);
++				rdev = makedev(major, minor + (i - start) * increment);
++				if (mknod(full_name_inc, mode, rdev) < 0) {
++					bb_perror_msg("line %d: can't create node %s", linenum, full_name_inc);
+ 					ret = EXIT_FAILURE;
+-				}
+-				else if (chown(full_name, uid, gid) == -1) {
+-					bb_perror_msg("line %d: chown failed for %s", linenum, full_name);
++				} else if (chown(full_name_inc, uid, gid) < 0) {
++					bb_perror_msg("line %d: can't chown %s", linenum, full_name_inc);
+ 					ret = EXIT_FAILURE;
+-				}
+-				if (chmod(full_name, mode) < 0) {
+-					bb_perror_msg("line %d: chmod failed for %s", linenum, full_name);
++				} else if (chmod(full_name_inc, mode) < 0) {
++					bb_perror_msg("line %d: can't chmod %s", linenum, full_name_inc);
+ 					ret = EXIT_FAILURE;
+ 				}
+ 			}
++			free(full_name_inc);
+ 		}
+ loop:
+-		free(line);
+ 		free(full_name);
+ 	}
+-	fclose(table);
++	if (ENABLE_FEATURE_CLEAN_UP)
++		config_close(parser);
+ 
+ 	return ret;
+ }
+diff --git a/testsuite/makedevs.device_table.txt b/testsuite/makedevs.device_table.txt
+new file mode 100644
+index 0000000..8ca5a88
+--- /dev/null
++++ b/testsuite/makedevs.device_table.txt
+@@ -0,0 +1,172 @@
++# When building a target filesystem, it is desirable to not have to
++# become root and then run 'mknod' a thousand times.  Using a device 
++# table you can create device nodes and directories "on the fly".
++#
++# This is a sample device table file for use with genext2fs.  You can
++# do all sorts of interesting things with a device table file.  For
++# example, if you want to adjust the permissions on a particular file
++# you can just add an entry like:
++#   /sbin/foobar        f       2755    0       0       -       -       -       -       -
++# and (assuming the file /sbin/foobar exists) it will be made setuid
++# root (regardless of what its permissions are on the host filesystem.
++# Furthermore, you can use a single table entry to create a many device
++# minors.  For example, if I wanted to create /dev/hda and /dev/hda[0-15]
++# I could just use the following two table entries:
++#   /dev/hda    b       640     0       0       3       0       0       0       -
++#   /dev/hda    b       640     0       0       3       1       1       1       15
++# 
++# Device table entries take the form of:
++# <name>    <type>      <mode>  <uid>   <gid>   <major> <minor> <start> <inc>   <count>
++# where name is the file name,  type can be one of: 
++#       f       A regular file
++#       d       Directory
++#       c       Character special device file
++#       b       Block special device file
++#       p       Fifo (named pipe)
++# uid is the user id for the target file, gid is the group id for the
++# target file.  The rest of the entries (major, minor, etc) apply only 
++# to device special files.
++
++# Have fun
++# -Erik Andersen <andersen@codepoet.org>
++#
++
++#<name>		<type>	<mode>	<uid>	<gid>	<major>	<minor>	<start>	<inc>	<count>
++/dev		d	755	0	0	-	-	-	-	-
++/dev/pts	d	755	0	0	-	-	-	-	-
++/dev/shm	d	755	0	0	-	-	-	-	-
++/tmp		d	1777	0	0	-	-	-	-	-
++/etc		d	755	0	0	-	-	-	-	-
++/home/default	d	2755	1000	1000	-	-	-	-	-
++#<name>					<type>	<mode>	<uid>	<gid>	<major>	<minor>	<start>	<inc>	<count>
++###/bin/busybox				f	4755	0	0	-	-	-	-	-
++###/etc/shadow				f	600	0	0	-	-	-	-	-
++###/etc/passwd				f	644	0	0	-	-	-	-	-
++/etc/network/if-up.d			d	755	0	0	-	-	-	-	-
++/etc/network/if-pre-up.d		d	755	0	0	-	-	-	-	-
++/etc/network/if-down.d			d	755	0	0	-	-	-	-	-
++/etc/network/if-post-down.d		d	755	0	0	-	-	-	-	-
++###/usr/share/udhcpc/default.script	f	755	0	0	-	-	-	-	-
++# uncomment this to allow starting x as non-root
++#/usr/X11R6/bin/Xfbdev		f	4755	0	0	-	-	-	-	-
++
++# Normal system devices
++# <name>    <type>      <mode>  <uid>   <gid>   <major> <minor> <start> <inc>   <count>
++/dev/mem	c	640	0	0	1	1	0	0	-
++/dev/kmem	c	640	0	0	1	2	0	0	-
++/dev/null	c	666	0	0	1	3	0	0	-
++/dev/zero	c	666	0	0	1	5	0	0	-
++/dev/random	c	666	0	0	1	8	0	0	-
++/dev/urandom	c	666	0	0	1	9	0	0	-
++/dev/ram	b	640	0	0	1	1	0	0	-
++/dev/ram	b	640	0	0	1	0	0	1	4
++/dev/loop	b	640	0	0	7	0	0	1	2
++/dev/rtc	c	640	0	0	10	135	-	-	-
++/dev/console	c	666	0	0	5	1	-	-	-
++/dev/tty	c	666	0	0	5	0	-	-	-
++/dev/tty	c	666	0	0	4	0	0	1	8
++/dev/ttyp	c	666	0	0	3	0	0	1	10
++/dev/ptyp	c       666     0       0       2       0       0       1       10
++/dev/ptmx	c	666	0	0	5	2	-	-	-
++/dev/ttyP	c	666	0	0	57	0	0	1	4
++/dev/ttyS	c	666	0	0	4	64	0	1	4
++/dev/fb		c	640	0	5	29	0	0	32	4
++#/dev/ttySA	c	666	0	0	204	5	0	1	3
++/dev/psaux	c	666	0	0	10	1	0	0	-
++#/dev/ppp	c	666	0	0	108	0	-	-	-
++
++# Input stuff
++/dev/input	d	755	0	0	-	-	-	-	-
++/dev/input/mice	c	640	0	0	13	63	0	0	-
++/dev/input/mouse c	660	0	0	13	32	0	1	4
++/dev/input/event c	660	0	0	13	64	0	1	4
++#/dev/input/js	c	660	0	0	13	0	0	1	4
++
++
++# MTD stuff
++/dev/mtd	c	640	0	0	90	0	0	2	4
++/dev/mtdblock	b	640	0	0	31	0	0	1	4
++
++#Tun/tap driver
++/dev/net	d	755	0	0	-	-	-	-	-
++/dev/net/tun	c	660	0	0	10	200	-	-	-
++
++# Audio stuff
++#/dev/audio	c	666	0	29	14	4	-	-	-
++#/dev/audio1	c	666	0	29	14	20	-	-	-
++#/dev/dsp	c	666	0	29	14	3	-	-	-
++#/dev/dsp1	c	666	0	29	14	19	-	-	-
++#/dev/sndstat	c	666	0	29	14	6	-	-	-
++
++# User-mode Linux stuff
++#/dev/ubda	b	640	0	0	98	0	0	0	-
++#/dev/ubda	b	640	0	0	98	1	1	1	15
++
++# IDE Devices
++/dev/hda	b	640	0	0	3	0	0	0	-
++/dev/hda	b	640	0	0	3	1	1	1	15
++/dev/hdb	b	640	0	0	3	64	0	0	-
++/dev/hdb	b	640	0	0	3	65	1	1	15
++#/dev/hdc	b	640	0	0	22	0	0	0	-
++#/dev/hdc	b	640	0	0	22	1	1	1	15
++#/dev/hdd	b	640	0	0	22	64	0	0	-
++#/dev/hdd	b	640	0	0	22	65	1	1	15
++#/dev/hde	b	640	0	0	33	0	0	0	-
++#/dev/hde	b	640	0	0	33	1	1	1	15
++#/dev/hdf	b	640	0	0	33	64	0	0	-
++#/dev/hdf	b	640	0	0	33	65	1	1	15
++#/dev/hdg	b	640	0	0	34	0	0	0	-
++#/dev/hdg	b	640	0	0	34	1	1	1	15
++#/dev/hdh	b	640	0	0	34	64	0	0	-
++#/dev/hdh	b	640	0	0	34	65	1	1	15
++
++# SCSI Devices
++#/dev/sda	b	640	0	0	8	0	0	0	-
++#/dev/sda	b	640	0	0	8	1	1	1	15
++#/dev/sdb	b	640	0	0	8	16	0	0	-
++#/dev/sdb	b	640	0	0	8	17	1	1	15
++#/dev/sdc	b	640	0	0	8	32	0	0	-
++#/dev/sdc	b	640	0	0	8	33	1	1	15
++#/dev/sdd	b	640	0	0	8	48	0	0	-
++#/dev/sdd	b	640	0	0	8	49	1	1	15
++#/dev/sde	b	640	0	0	8	64	0	0	-
++#/dev/sde	b	640	0	0	8	65	1	1	15
++#/dev/sdf	b	640	0	0	8	80	0	0	-
++#/dev/sdf	b	640	0	0	8	81	1	1	15
++#/dev/sdg	b	640	0	0	8	96	0	0	-
++#/dev/sdg	b	640	0	0	8	97	1	1	15
++#/dev/sdh	b	640	0	0	8	112	0	0	-
++#/dev/sdh	b	640	0	0	8	113	1	1	15
++#/dev/sg	c	640	0	0	21	0	0	1	15
++#/dev/scd	b	640	0	0	11	0	0	1	15
++#/dev/st	c	640	0	0	9	0	0	1	8
++#/dev/nst	c	640	0	0	9	128	0	1	8
++#/dev/st	c	640	0	0	9	32	1	1	4
++#/dev/st	c	640	0	0	9	64	1	1	4
++#/dev/st	c	640	0	0	9	96	1	1	4
++
++# Floppy disk devices
++#/dev/fd	b	640	0	0	2	0	0	1	2
++#/dev/fd0d360	b	640	0	0	2	4	0	0	-
++#/dev/fd1d360	b	640	0	0	2	5	0	0	-
++#/dev/fd0h1200	b	640	0	0	2	8	0	0	-
++#/dev/fd1h1200	b	640	0	0	2	9	0	0	-
++#/dev/fd0u1440	b	640	0	0	2	28	0	0	-
++#/dev/fd1u1440	b	640	0	0	2	29	0	0	-
++#/dev/fd0u2880	b	640	0	0	2	32	0	0	-
++#/dev/fd1u2880	b	640	0	0	2	33	0	0	-
++
++# All the proprietary cdrom devices in the world
++#/dev/aztcd	b	640	0	0	29	0	0	0	-
++#/dev/bpcd	b	640	0	0	41	0	0	0	-
++#/dev/capi20	c	640	0	0	68	0	0	1	2
++#/dev/cdu31a	b	640	0	0	15	0	0	0	-
++#/dev/cdu535	b	640	0	0	24	0	0	0	-
++#/dev/cm206cd	b	640	0	0	32	0	0	0	-
++#/dev/sjcd	b	640	0	0	18	0	0	0	-
++#/dev/sonycd	b	640	0	0	15	0	0	0	-
++#/dev/gscd	b	640	0	0	16	0	0	0	-
++#/dev/sbpcd	b	640	0	0	25	0	0	0	-
++#/dev/sbpcd	b	640	0	0	25	0	0	1	4
++#/dev/mcd	b	640	0	0	23	0	0	0	-
++#/dev/optcd	b	640	0	0	17	0	0	0	-
+diff --git a/testsuite/makedevs.tests b/testsuite/makedevs.tests
+new file mode 100755
+index 0000000..9e068bd
+--- /dev/null
++++ b/testsuite/makedevs.tests
+@@ -0,0 +1,139 @@
++#!/bin/sh
++# Copyright 2008 by Denys Vlasenko
++# Licensed under GPL v2, see file LICENSE for details.
++
++. testing.sh
++
++# ls -ln is showing date. Need to remove that, it's variable
++# sed: (1) "maj, min" -> "maj,min" (2) coalesce spaces
++# cut: remove date
++FILTER_LS="sed -e 's/,  */,/g' -e 's/  */ /g' | cut -d' ' -f 1-5,9-"
++# cut: remove size+date
++FILTER_LS2="sed -e 's/,  */,/g' -e 's/  */ /g' | cut -d' ' -f 1-4,9-"
++
++# testing "test name" "options" "expected result" "file input" "stdin"
++
++rm -rf makedevs.testdir
++mkdir makedevs.testdir
++
++testing "makedevs -d ../makedevs.device_table.txt ." \
++	"(cd makedevs.testdir && makedevs -d ../makedevs.device_table.txt . 2>&1);
++	find makedevs.testdir ! -type d | sort | xargs ls -lnR | $FILTER_LS" \
++"\
++rootdir=.
++table='../makedevs.device_table.txt'
++crw-rw-rw- 1 0 0 5,1 makedevs.testdir/dev/console
++crw-r----- 1 0 5 29,0 makedevs.testdir/dev/fb0
++crw-r----- 1 0 5 29,32 makedevs.testdir/dev/fb1
++crw-r----- 1 0 5 29,64 makedevs.testdir/dev/fb2
++crw-r----- 1 0 5 29,96 makedevs.testdir/dev/fb3
++brw-r----- 1 0 0 3,0 makedevs.testdir/dev/hda
++brw-r----- 1 0 0 3,1 makedevs.testdir/dev/hda1
++brw-r----- 1 0 0 3,10 makedevs.testdir/dev/hda10
++brw-r----- 1 0 0 3,11 makedevs.testdir/dev/hda11
++brw-r----- 1 0 0 3,12 makedevs.testdir/dev/hda12
++brw-r----- 1 0 0 3,13 makedevs.testdir/dev/hda13
++brw-r----- 1 0 0 3,14 makedevs.testdir/dev/hda14
++brw-r----- 1 0 0 3,15 makedevs.testdir/dev/hda15
++brw-r----- 1 0 0 3,2 makedevs.testdir/dev/hda2
++brw-r----- 1 0 0 3,3 makedevs.testdir/dev/hda3
++brw-r----- 1 0 0 3,4 makedevs.testdir/dev/hda4
++brw-r----- 1 0 0 3,5 makedevs.testdir/dev/hda5
++brw-r----- 1 0 0 3,6 makedevs.testdir/dev/hda6
++brw-r----- 1 0 0 3,7 makedevs.testdir/dev/hda7
++brw-r----- 1 0 0 3,8 makedevs.testdir/dev/hda8
++brw-r----- 1 0 0 3,9 makedevs.testdir/dev/hda9
++brw-r----- 1 0 0 3,64 makedevs.testdir/dev/hdb
++brw-r----- 1 0 0 3,65 makedevs.testdir/dev/hdb1
++brw-r----- 1 0 0 3,74 makedevs.testdir/dev/hdb10
++brw-r----- 1 0 0 3,75 makedevs.testdir/dev/hdb11
++brw-r----- 1 0 0 3,76 makedevs.testdir/dev/hdb12
++brw-r----- 1 0 0 3,77 makedevs.testdir/dev/hdb13
++brw-r----- 1 0 0 3,78 makedevs.testdir/dev/hdb14
++brw-r----- 1 0 0 3,79 makedevs.testdir/dev/hdb15
++brw-r----- 1 0 0 3,66 makedevs.testdir/dev/hdb2
++brw-r----- 1 0 0 3,67 makedevs.testdir/dev/hdb3
++brw-r----- 1 0 0 3,68 makedevs.testdir/dev/hdb4
++brw-r----- 1 0 0 3,69 makedevs.testdir/dev/hdb5
++brw-r----- 1 0 0 3,70 makedevs.testdir/dev/hdb6
++brw-r----- 1 0 0 3,71 makedevs.testdir/dev/hdb7
++brw-r----- 1 0 0 3,72 makedevs.testdir/dev/hdb8
++brw-r----- 1 0 0 3,73 makedevs.testdir/dev/hdb9
++crw-rw---- 1 0 0 13,64 makedevs.testdir/dev/input/event0
++crw-rw---- 1 0 0 13,65 makedevs.testdir/dev/input/event1
++crw-rw---- 1 0 0 13,66 makedevs.testdir/dev/input/event2
++crw-rw---- 1 0 0 13,67 makedevs.testdir/dev/input/event3
++crw-r----- 1 0 0 13,63 makedevs.testdir/dev/input/mice
++crw-rw---- 1 0 0 13,32 makedevs.testdir/dev/input/mouse0
++crw-rw---- 1 0 0 13,33 makedevs.testdir/dev/input/mouse1
++crw-rw---- 1 0 0 13,34 makedevs.testdir/dev/input/mouse2
++crw-rw---- 1 0 0 13,35 makedevs.testdir/dev/input/mouse3
++crw-r----- 1 0 0 1,2 makedevs.testdir/dev/kmem
++brw-r----- 1 0 0 7,0 makedevs.testdir/dev/loop0
++brw-r----- 1 0 0 7,1 makedevs.testdir/dev/loop1
++crw-r----- 1 0 0 1,1 makedevs.testdir/dev/mem
++crw-r----- 1 0 0 90,0 makedevs.testdir/dev/mtd0
++crw-r----- 1 0 0 90,2 makedevs.testdir/dev/mtd1
++crw-r----- 1 0 0 90,4 makedevs.testdir/dev/mtd2
++crw-r----- 1 0 0 90,6 makedevs.testdir/dev/mtd3
++brw-r----- 1 0 0 31,0 makedevs.testdir/dev/mtdblock0
++brw-r----- 1 0 0 31,1 makedevs.testdir/dev/mtdblock1
++brw-r----- 1 0 0 31,2 makedevs.testdir/dev/mtdblock2
++brw-r----- 1 0 0 31,3 makedevs.testdir/dev/mtdblock3
++crw-rw---- 1 0 0 10,200 makedevs.testdir/dev/net/tun
++crw-rw-rw- 1 0 0 1,3 makedevs.testdir/dev/null
++crw-rw-rw- 1 0 0 10,1 makedevs.testdir/dev/psaux
++crw-rw-rw- 1 0 0 5,2 makedevs.testdir/dev/ptmx
++crw-rw-rw- 1 0 0 2,0 makedevs.testdir/dev/ptyp0
++crw-rw-rw- 1 0 0 2,1 makedevs.testdir/dev/ptyp1
++crw-rw-rw- 1 0 0 2,2 makedevs.testdir/dev/ptyp2
++crw-rw-rw- 1 0 0 2,3 makedevs.testdir/dev/ptyp3
++crw-rw-rw- 1 0 0 2,4 makedevs.testdir/dev/ptyp4
++crw-rw-rw- 1 0 0 2,5 makedevs.testdir/dev/ptyp5
++crw-rw-rw- 1 0 0 2,6 makedevs.testdir/dev/ptyp6
++crw-rw-rw- 1 0 0 2,7 makedevs.testdir/dev/ptyp7
++crw-rw-rw- 1 0 0 2,8 makedevs.testdir/dev/ptyp8
++crw-rw-rw- 1 0 0 2,9 makedevs.testdir/dev/ptyp9
++brw-r----- 1 0 0 1,1 makedevs.testdir/dev/ram
++brw-r----- 1 0 0 1,0 makedevs.testdir/dev/ram0
++brw-r----- 1 0 0 1,1 makedevs.testdir/dev/ram1
++brw-r----- 1 0 0 1,2 makedevs.testdir/dev/ram2
++brw-r----- 1 0 0 1,3 makedevs.testdir/dev/ram3
++crw-rw-rw- 1 0 0 1,8 makedevs.testdir/dev/random
++crw-r----- 1 0 0 10,135 makedevs.testdir/dev/rtc
++crw-rw-rw- 1 0 0 5,0 makedevs.testdir/dev/tty
++crw-rw-rw- 1 0 0 4,0 makedevs.testdir/dev/tty0
++crw-rw-rw- 1 0 0 4,1 makedevs.testdir/dev/tty1
++crw-rw-rw- 1 0 0 4,2 makedevs.testdir/dev/tty2
++crw-rw-rw- 1 0 0 4,3 makedevs.testdir/dev/tty3
++crw-rw-rw- 1 0 0 4,4 makedevs.testdir/dev/tty4
++crw-rw-rw- 1 0 0 4,5 makedevs.testdir/dev/tty5
++crw-rw-rw- 1 0 0 4,6 makedevs.testdir/dev/tty6
++crw-rw-rw- 1 0 0 4,7 makedevs.testdir/dev/tty7
++crw-rw-rw- 1 0 0 57,0 makedevs.testdir/dev/ttyP0
++crw-rw-rw- 1 0 0 57,1 makedevs.testdir/dev/ttyP1
++crw-rw-rw- 1 0 0 57,2 makedevs.testdir/dev/ttyP2
++crw-rw-rw- 1 0 0 57,3 makedevs.testdir/dev/ttyP3
++crw-rw-rw- 1 0 0 4,64 makedevs.testdir/dev/ttyS0
++crw-rw-rw- 1 0 0 4,65 makedevs.testdir/dev/ttyS1
++crw-rw-rw- 1 0 0 4,66 makedevs.testdir/dev/ttyS2
++crw-rw-rw- 1 0 0 4,67 makedevs.testdir/dev/ttyS3
++crw-rw-rw- 1 0 0 3,0 makedevs.testdir/dev/ttyp0
++crw-rw-rw- 1 0 0 3,1 makedevs.testdir/dev/ttyp1
++crw-rw-rw- 1 0 0 3,2 makedevs.testdir/dev/ttyp2
++crw-rw-rw- 1 0 0 3,3 makedevs.testdir/dev/ttyp3
++crw-rw-rw- 1 0 0 3,4 makedevs.testdir/dev/ttyp4
++crw-rw-rw- 1 0 0 3,5 makedevs.testdir/dev/ttyp5
++crw-rw-rw- 1 0 0 3,6 makedevs.testdir/dev/ttyp6
++crw-rw-rw- 1 0 0 3,7 makedevs.testdir/dev/ttyp7
++crw-rw-rw- 1 0 0 3,8 makedevs.testdir/dev/ttyp8
++crw-rw-rw- 1 0 0 3,9 makedevs.testdir/dev/ttyp9
++crw-rw-rw- 1 0 0 1,9 makedevs.testdir/dev/urandom
++crw-rw-rw- 1 0 0 1,5 makedevs.testdir/dev/zero
++" \
++	"" ""
++
++# clean up
++rm -rf makedevs.testdir
++
++exit $FAILCOUNT

@@ -1,0 +1,14 @@
+2009-11-04 18:49:08 -0500
+diff --git a/testsuite/all_sourcecode.tests b/testsuite/all_sourcecode.tests
+index c0a1f86..94f4360 100755
+--- a/testsuite/all_sourcecode.tests
++++ b/testsuite/all_sourcecode.tests
+@@ -33,7 +33,7 @@ rm -f src.usage.escaped
+ # verify the applet order is correct in applets.h, otherwise
+ # applets won't be called properly.
+ #
+-sed -n -e '/^IF_[A-Z]*(APPLET/{s:,.*::;s:.*(::;s:"::g;p}' \
++sed -n -e 's:^//::' -e '/^IF_[A-Z]*(APPLET/{s:,.*::;s:.*(::;s:"::g;p}' \
+ 	$srcdir/../include/applets.h > applet.order.current
+ LC_ALL=C sort applet.order.current > applet.order.correct
+ testing "Applet order" "diff -u applet.order.current applet.order.correct" "" "" ""

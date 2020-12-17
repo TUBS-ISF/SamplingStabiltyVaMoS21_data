@@ -1,0 +1,15 @@
+2007-08-23 14:11:30 +0000
+diff --git a/scripts/kconfig/confdata.c b/scripts/kconfig/confdata.c
+index 79bb4a3..4837f61 100644
+--- a/scripts/kconfig/confdata.c
++++ b/scripts/kconfig/confdata.c
+@@ -222,7 +222,8 @@ int conf_read_simple(const char *name)
+ 					sym->user.val = strdup(p);
+ 					sym->flags &= ~SYMBOL_NEW;
+ 				} else {
+-					conf_warning("symbol value '%s' invalid for %s", p, sym->name);
++					if (p[0]) /* bbox */
++						conf_warning("symbol value '%s' invalid for %s", p, sym->name);
+ 					continue;
+ 				}
+ 				break;

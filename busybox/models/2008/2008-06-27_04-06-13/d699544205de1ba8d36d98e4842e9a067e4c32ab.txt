@@ -1,0 +1,14 @@
+2008-06-27 04:06:13 +0000
+diff --git a/editors/vi.c b/editors/vi.c
+index 1b335d9..81baa89 100644
+--- a/editors/vi.c
++++ b/editors/vi.c
+@@ -1894,7 +1894,7 @@ static char *text_hole_make(char *p, int size)	// at "p", make a 'size' byte hol
+ 		p           = new_text + (p           - text);
+ 		text = new_text;
+ 	}
+-	memmove(p + size, p, end - p);
++	memmove(p + size, p, end - size - p);
+ 	memset(p, ' ', size);	// clear new hole
+ 	file_modified++;
+ 	return p;

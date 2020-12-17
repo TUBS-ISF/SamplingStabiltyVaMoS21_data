@@ -1,0 +1,99 @@
+2008-06-05 12:06:00 +0000
+diff --git a/debianutils/mktemp.c b/debianutils/mktemp.c
+index b011fc1..de27d30 100644
+--- a/debianutils/mktemp.c
++++ b/debianutils/mktemp.c
+@@ -9,34 +9,53 @@
+  * Licensed under the GPL v2 or later, see the file LICENSE in this tarball.
+  */
+ 
++/* Coreutils 6.12 man page says:
++ *        mktemp [OPTION]... [TEMPLATE]
++ * Create a temporary file or directory, safely, and print its name. If
++ * TEMPLATE is not specified, use tmp.XXXXXXXXXX.
++ * -d, --directory
++ *        create a directory, not a file
++ * -q, --quiet
++ *        suppress diagnostics about file/dir-creation failure
++ * -u, --dry-run
++ *        do not create anything; merely print a name (unsafe)
++ * --tmpdir[=DIR]
++ *        interpret TEMPLATE relative to DIR. If DIR is not specified,
++ *        use  $TMPDIR if set, else /tmp.  With this option, TEMPLATE must
++ *        not be an absolute name. Unlike with -t, TEMPLATE may contain
++ *        slashes, but even here, mktemp still creates only the final com-
++ *        ponent.
++ * -p DIR use DIR as a prefix; implies -t [deprecated]
++ * -t     interpret TEMPLATE as a single file name component, relative  to
++ *        a  directory:  $TMPDIR, if set; else the directory specified via
++ *        -p; else /tmp [deprecated]
++ */
++
++
+ #include "libbb.h"
+ 
+ int mktemp_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int mktemp_main(int argc ATTRIBUTE_UNUSED, char **argv)
+ {
+-	// -d      Make a directory instead of a file
+-	// -q      Fail silently if an error occurs [bbox: ignored]
+-	// -t      Generate a path rooted in temporary directory
+-	// -p DIR  Use DIR as a temporary directory (implies -t)
+ 	const char *path;
+ 	char *chp;
+-	unsigned flags;
++	unsigned opt;
+ 
+-	opt_complementary = "=1"; /* exactly one arg */
+-	flags = getopt32(argv, "dqtp:", &path);
+-	chp = argv[optind];
++	opt_complementary = "?1"; /* 1 argument max */
++	opt = getopt32(argv, "dqtp:", &path);
++	chp = argv[optind] ? argv[optind] : xstrdup("tmp.XXXXXXXXXX");
+ 
+-	if (flags & (4|8)) { /* -t and/or -p */
++	if (opt & (4|8)) { /* -t and/or -p */
+ 		const char *dir = getenv("TMPDIR");
+ 		if (dir && *dir != '\0')
+ 			path = dir;
+-		else if (!(flags & 8)) /* No -p */
++		else if (!(opt & 8)) /* no -p */
+ 			path = "/tmp/";
+ 		/* else path comes from -p DIR */
+ 		chp = concat_path_file(path, chp);
+ 	}
+ 
+-	if (flags & 1) { /* -d */
++	if (opt & 1) { /* -d */
+ 		if (mkdtemp(chp) == NULL)
+ 			return EXIT_FAILURE;
+ 	} else {
+diff --git a/include/usage.h b/include/usage.h
+index 2e53213..f9a831e 100644
+--- a/include/usage.h
++++ b/include/usage.h
+@@ -2542,19 +2542,18 @@
+ #endif
+ 
+ #define mktemp_trivial_usage \
+-       "[-dt] [-p DIR] TEMPLATE"
++       "[-dt] [-p DIR] [TEMPLATE]"
+ #define mktemp_full_usage "\n\n" \
+-       "Create a temporary file with its name based on TEMPLATE.\n" \
+-       "TEMPLATE is any name with six 'Xs' (i.e., /tmp/temp.XXXXXX).\n" \
++       "Create a temporary file with name based on TEMPLATE and print its name.\n" \
++       "TEMPLATE must end with XXXXXX (i.e., /tmp/temp.XXXXXX).\n" \
+      "\nOptions:" \
+      "\n	-d	Make a directory instead of a file" \
+ /*   "\n	-q	Fail silently if an error occurs" - we ignore it */ \
+      "\n	-t	Generate a path rooted in temporary directory" \
+      "\n	-p DIR	Use DIR as a temporary directory (implies -t)" \
+      "\n" \
+-     "\n" \
+-       "For -t or -p, directory is chosen as follows:\n" \
+-       "$TMPDIR if set, else -p DIR, else /tmp" \
++     "\nFor -t or -p, directory is chosen as follows:" \
++     "\n$TMPDIR if set, else -p DIR, else /tmp" \
+ 
+ #define mktemp_example_usage \
+        "$ mktemp /tmp/temp.XXXXXX\n" \

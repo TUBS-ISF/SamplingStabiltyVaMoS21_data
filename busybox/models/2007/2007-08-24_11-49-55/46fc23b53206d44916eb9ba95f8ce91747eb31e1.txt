@@ -1,0 +1,23 @@
+2007-08-24 11:49:55 +0000
+diff --git a/docs/busybox.net/news.html b/docs/busybox.net/news.html
+index 0db69e5..1dbf219 100644
+--- a/docs/busybox.net/news.html
++++ b/docs/busybox.net/news.html
+@@ -25,7 +25,7 @@
+     <p>udhcp[cd]:
+       <ul>
+ 	<li>add -f "foreground" and -S "syslog" options
+-	<li>fixed "ifupdown + udhcpc_without_pidpile_creation" bug
++	<li>fixed "ifupdown + udhcpc_without_pidfile_creation" bug
+ 	<li>new config option "Rewrite the lease file at every new acknowledge" (Mats Erik Andersson &lt;mats@blue2net.com&gt; (Blue2Net AB))
+ 	<li>consistently treat server_config.start/end IPs as host-order
+ 	<li>fix IP parsing for 64bit machines
+@@ -33,7 +33,7 @@
+ 	<li>do not chdir to / when daemonizing
+       </ul>
+ 
+-    <p>top, ps, killall, pidof
++    <p>top, ps, killall, pidof:
+       <ul>
+ 	<li>simpler loadavg processing
+ 	<li>truncate usernames to 8 chars

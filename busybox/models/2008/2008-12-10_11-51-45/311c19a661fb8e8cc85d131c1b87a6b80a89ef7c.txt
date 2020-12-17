@@ -1,0 +1,22 @@
+2008-12-10 11:51:45 +0000
+diff --git a/coreutils/printf.c b/coreutils/printf.c
+index 76524f7..b0a48cd 100644
+--- a/coreutils/printf.c
++++ b/coreutils/printf.c
+@@ -359,8 +359,15 @@ int printf_main(int argc UNUSED_PARAM, char **argv)
+ 	 * We will mimic coreutils. */
+ 	if (argv[1] && argv[1][0] == '-' && argv[1][1] == '-' && !argv[1][2])
+ 		argv++;
+-	if (!argv[1])
++	if (!argv[1]) {
++		if (ENABLE_ASH_BUILTIN_PRINTF
++		 && applet_name[0] != 'p'
++		) {
++			bb_error_msg("usage: printf FORMAT [ARGUMENT...]");
++			return 2; /* bash compat */
++		}
+ 		bb_show_usage();
++	}
+ 
+ 	format = argv[1];
+ 	argv2 = argv + 2;

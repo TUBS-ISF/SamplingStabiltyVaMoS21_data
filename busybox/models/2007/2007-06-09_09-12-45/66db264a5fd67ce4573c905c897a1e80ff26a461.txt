@@ -1,0 +1,15 @@
+2007-06-09 09:12:45 +0000
+diff --git a/docs/busybox.net/news.html b/docs/busybox.net/news.html
+index 0eee9fc..39f44c4 100644
+--- a/docs/busybox.net/news.html
++++ b/docs/busybox.net/news.html
+@@ -3,7 +3,8 @@
+ <ul>
+   <li><b>1 June 2007 -- BusyBox 1.6.0 (unstable)</b>
+     <p><a href=http://busybox.net/downloads/busybox-1.6.0.tar.bz2>BusyBox 1.6.0</a>.
+-    (<a href=http://busybox.net/downloads/fixes-1.6.0/>patches</a>,
++    (<a href=http://busybox.net/cgi-bin/viewcvs.cgi/branches/busybox_1_6_stable/>svn</a>,
++    <a href=http://busybox.net/downloads/fixes-1.6.0/>patches</a>,
+     <a href=http://busybox.net/fix.html>how to add a patch</a>)</p>
+ 
+     <p>Since this is a x.x.0 release, it probably does not deserve "stable"

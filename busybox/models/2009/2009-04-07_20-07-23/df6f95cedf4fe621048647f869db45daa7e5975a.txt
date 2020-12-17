@@ -1,0 +1,14 @@
+2009-04-07 20:07:23 +0000
+diff --git a/coreutils/Config.in b/coreutils/Config.in
+index 03e6b6a..b047ce5 100644
+--- a/coreutils/Config.in
++++ b/coreutils/Config.in
+@@ -189,7 +189,7 @@ config ECHO
+ config FEATURE_FANCY_ECHO
+ 	bool "Enable echo options (-n and -e)"
+ 	default y
+-	depends on ECHO || ASH_BUILTIN_ECHO
++	depends on ECHO || ASH_BUILTIN_ECHO || HUSH
+ 	help
+ 	  This adds options (-n and -e) to echo.
+ 

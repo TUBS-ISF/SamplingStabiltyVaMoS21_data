@@ -1,0 +1,25 @@
+2008-07-01 10:55:45 +0000
+diff --git a/libbb/xvfork.c b/libbb/xvfork.c
+new file mode 100644
+index 0000000..a74b49f
+--- /dev/null
++++ b/libbb/xvfork.c
+@@ -0,0 +1,18 @@
++/* vi: set sw=4 ts=4: */
++/*
++ * Utility routines.
++ *
++ * Copyright (C) 2007 Denys Vlasenko
++ *
++ * Licensed under GPL version 2, see file LICENSE in this tarball for details.
++ */
++
++#include "libbb.h"
++
++pid_t FAST_FUNC xvfork(void)
++{
++	pid_t pid = vfork();
++	if (pid < 0)
++		bb_perror_msg_and_die("vfork");
++	return pid;
++}

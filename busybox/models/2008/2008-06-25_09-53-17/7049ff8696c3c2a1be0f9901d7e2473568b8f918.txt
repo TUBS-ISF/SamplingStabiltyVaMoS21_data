@@ -1,0 +1,426 @@
+2008-06-25 09:53:17 +0000
+diff --git a/coreutils/ls.c b/coreutils/ls.c
+index 83ad8cd..7fddefe 100644
+--- a/coreutils/ls.c
++++ b/coreutils/ls.c
+@@ -169,12 +169,12 @@ enum {
+ #endif
+ #define current_time_t (G.current_time_t)
+ /* memset: we have to zero it out because of NOEXEC */
+-#define INIT_G() { \
++#define INIT_G() do { \
+ 	memset(&G, 0, sizeof(G)); \
+ 	USE_FEATURE_AUTOWIDTH(tabstops = COLUMN_GAP;) \
+ 	USE_FEATURE_AUTOWIDTH(terminal_width = TERMINAL_WIDTH;) \
+ 	USE_FEATURE_LS_TIMESTAMPS(time(&current_time_t);) \
+-}
++} while (0)
+ 
+ 
+ #if ENABLE_FEATURE_ASSUME_UNICODE
+diff --git a/coreutils/stty.c b/coreutils/stty.c
+index a17955a..c9f11a8 100644
+--- a/coreutils/stty.c
++++ b/coreutils/stty.c
+@@ -627,11 +627,10 @@ struct globals {
+ 	char buf[10];
+ };
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+-#define INIT_G() \
+-	do { \
+-		G.device_name = bb_msg_standard_input; \
+-		G.max_col = 80; \
+-	} while (0)
++#define INIT_G() do { \
++	G.device_name = bb_msg_standard_input; \
++	G.max_col = 80; \
++} while (0)
+ 
+ 
+ /* Return a string that is the printable representation of character CH */
+diff --git a/debianutils/start_stop_daemon.c b/debianutils/start_stop_daemon.c
+index 6d7e61b..86ec710 100644
+--- a/debianutils/start_stop_daemon.c
++++ b/debianutils/start_stop_daemon.c
+@@ -105,11 +105,10 @@ struct globals {
+ #define pidfile           (G.pidfile             )
+ #define user_id           (G.user_id             )
+ #define signal_nr         (G.signal_nr           )
+-#define INIT_G() \
+-        do { \
+-		user_id = -1; \
+-		signal_nr = 15; \
+-        } while (0)
++#define INIT_G() do { \
++	user_id = -1; \
++	signal_nr = 15; \
++} while (0)
+ 
+ #ifdef OLDER_VERSION_OF_X
+ /* -x,--exec EXECUTABLE
+diff --git a/findutils/grep.c b/findutils/grep.c
+index fc78938..9792ce4 100644
+--- a/findutils/grep.c
++++ b/findutils/grep.c
+@@ -103,12 +103,11 @@ struct globals {
+ 	const char *cur_file;    /* the current file we are reading */
+ };
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+-#define INIT_G() \
+-	do { \
+-		struct G_sizecheck { \
+-			char G_sizecheck[sizeof(G) > COMMON_BUFSIZE ? -1 : 1]; \
+-		}; \
+-	} while (0)
++#define INIT_G() do { \
++	struct G_sizecheck { \
++		char G_sizecheck[sizeof(G) > COMMON_BUFSIZE ? -1 : 1]; \
++	}; \
++} while (0)
+ #define max_matches       (G.max_matches         )
+ #define reflags           (G.reflags             )
+ #define invert_search     (G.invert_search       )
+diff --git a/miscutils/dc.c b/miscutils/dc.c
+index 193929c..bd93ef6 100644
+--- a/miscutils/dc.c
++++ b/miscutils/dc.c
+@@ -19,8 +19,7 @@ enum { STACK_SIZE = (COMMON_BUFSIZE - offsetof(struct globals, stack)) / sizeof(
+ #define pointer   (G.pointer   )
+ #define base      (G.base      )
+ #define stack     (G.stack     )
+-#define INIT_G() do { \
+-} while (0)
++#define INIT_G() do { } while (0)
+ 
+ 
+ static void push(double a)
+diff --git a/miscutils/fbsplash.c b/miscutils/fbsplash.c
+index 626cefb..07350b0 100644
+--- a/miscutils/fbsplash.c
++++ b/miscutils/fbsplash.c
+@@ -50,10 +50,9 @@ struct globals {
+ 	struct fb_fix_screeninfo scr_fix;
+ };
+ #define G (*ptr_to_globals)
+-#define INIT_G() \
+-	do { \
+-		SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
+-	} while (0)
++#define INIT_G() do { \
++	SET_PTR_TO_GLOBALS(xzalloc(sizeof(G))); \
++} while (0)
+ 
+ 
+ #if DEBUG
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index 983de6d..a5d5b05 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -1251,7 +1251,7 @@ static void dump_identity(const struct hd_driveid *id)
+ 			.masks = { 0x100, 0x001, 0x200, 0x002, 0x400, 0x004 },
+ 			.labels = "*\0""udma0 \0""*\0""udma1 \0""*\0""udma2 \0",
+ 		};
+-			
++
+ 		printf("\n UDMA modes: ");
+ 		print_flags(&ultra_modes1, id->dma_ultra);
+ #ifdef __NEW_HD_DRIVE_ID
+diff --git a/modutils/depmod.c b/modutils/depmod.c
+index 4998d64..fdeb7dc 100644
+--- a/modutils/depmod.c
++++ b/modutils/depmod.c
+@@ -174,7 +174,7 @@ int depmod_main(int ATTRIBUTE_UNUSED argc, char **argv)
+ 	/* Fixup the module names in the depends list */
+ 	while (mods) {
+ 		llist_t *deps = NULL, *old_deps = mods->dependencies;
+-		
++
+ 		while (old_deps) {
+ 			dep_lst_t *all = G.lst;
+ 			char *longname = NULL;
+@@ -262,7 +262,7 @@ int depmod_main(int ATTRIBUTE_UNUSED argc, char **argv)
+ 			char *tmp = strrstr(shortname, ".ko");
+ 
+ 			*tmp = '\0';
+-		
++
+ 			while (mods->aliases) {
+ 				fprintf(filedes, "alias %s %s\n",
+ 					(char*)llist_pop(&mods->aliases),
+diff --git a/networking/arping.c b/networking/arping.c
+index 2db2ff4..0a444f1 100644
+--- a/networking/arping.c
++++ b/networking/arping.c
+@@ -61,10 +61,9 @@ struct globals {
+ #define received   (G.received  )
+ #define brd_recv   (G.brd_recv  )
+ #define req_recv   (G.req_recv  )
+-#define INIT_G() \
+-	do { \
+-		count = -1; \
+-	} while (0)
++#define INIT_G() do { \
++	count = -1; \
++} while (0)
+ 
+ // If GNUisms are not available...
+ //static void *mempcpy(void *_dst, const void *_src, int n)
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index be3d5a6..f732d02 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -27,7 +27,7 @@ struct globals {
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+ enum { BUFSZ = COMMON_BUFSIZE - offsetof(struct globals, buf) };
+ struct BUG_G_too_big {
+-        char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
++	char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
+ };
+ #define user           (G.user          )
+ #define password       (G.password      )
+@@ -36,8 +36,7 @@ struct BUG_G_too_big {
+ #define verbose_flag   (G.verbose_flag  )
+ #define do_continue    (G.do_continue   )
+ #define buf            (G.buf           )
+-#define INIT_G() do { \
+-} while (0)
++#define INIT_G() do { } while (0)
+ 
+ 
+ static void ftp_die(const char *msg) ATTRIBUTE_NORETURN;
+diff --git a/networking/ifenslave.c b/networking/ifenslave.c
+index fed1869..4c7eadc 100644
+--- a/networking/ifenslave.c
++++ b/networking/ifenslave.c
+@@ -147,7 +147,7 @@ static int ioctl_on_skfd(unsigned request, struct ifreq *ifr)
+ 
+ static int set_ifrname_and_do_ioctl(unsigned request, struct ifreq *ifr, const char *ifname)
+ {
+-        strncpy_IFNAMSIZ(ifr->ifr_name, ifname);
++	strncpy_IFNAMSIZ(ifr->ifr_name, ifname);
+ 	return ioctl_on_skfd(request, ifr);
+ }
+ 
+diff --git a/networking/libiproute/iproute.c b/networking/libiproute/iproute.c
+index 6977a09..354442c 100644
+--- a/networking/libiproute/iproute.c
++++ b/networking/libiproute/iproute.c
+@@ -582,7 +582,7 @@ static int iproute_list_or_flush(char **argv, int flush)
+ 				if (rtnl_rttable_a2n(&tid, *argv))
+ 					invarg(*argv, "table");
+ 				filter.tb = tid;
+-#else				
++#else
+ 				invarg(*argv, "table");
+ #endif
+ 			}
+diff --git a/networking/slattach.c b/networking/slattach.c
+index 96dec7e..02ecb5e 100644
+--- a/networking/slattach.c
++++ b/networking/slattach.c
+@@ -25,7 +25,7 @@ struct globals {
+ #define handle       (G.handle      )
+ #define saved_disc   (G.saved_disc  )
+ #define saved_state  (G.saved_state )
+-#define INIT_G() do {} while (0)
++#define INIT_G() do { } while (0)
+ 
+ 
+ /*
+diff --git a/networking/tcpudp.c b/networking/tcpudp.c
+index 07a87b8..561d132 100644
+--- a/networking/tcpudp.c
++++ b/networking/tcpudp.c
+@@ -59,11 +59,10 @@ struct globals {
+ #define cmax         (G.cmax        )
+ #define env_cur      (G.env_cur     )
+ #define env_var      (G.env_var     )
+-#define INIT_G() \
+-	do { \
+-		cmax = 30; \
+-		env_cur = &env_var[0]; \
+-	} while (0)
++#define INIT_G() do { \
++	cmax = 30; \
++	env_cur = &env_var[0]; \
++} while (0)
+ 
+ 
+ /* We have to be careful about leaking memory in repeated setenv's */
+diff --git a/networking/tftp.c b/networking/tftp.c
+index 63e045d..c61cde9 100644
+--- a/networking/tftp.c
++++ b/networking/tftp.c
+@@ -92,9 +92,7 @@ struct globals {
+ #define block_buf        (G.block_buf   )
+ #define user_opt         (G.user_opt    )
+ #define error_pkt        (G.error_pkt   )
+-#define INIT_G() \
+-	do { \
+-	} while (0)
++#define INIT_G() do { } while (0)
+ 
+ #define error_pkt_reason (error_pkt[3])
+ #define error_pkt_str    (error_pkt + 4)
+diff --git a/networking/udhcp/clientpacket.c b/networking/udhcp/clientpacket.c
+index c562c12..3e45619 100644
+--- a/networking/udhcp/clientpacket.c
++++ b/networking/udhcp/clientpacket.c
+@@ -64,7 +64,7 @@ static void add_param_req_option(struct dhcpMessage *packet)
+ 
+ 	for (i = 0; (c = dhcp_options[i].code) != 0; i++) {
+ 		if (((dhcp_options[i].flags & OPTION_REQ)
+-                     && !client_config.no_default_options)
++		     && !client_config.no_default_options)
+ 		 || (client_config.opt_mask[c >> 3] & (1 << (c & 7)))
+ 		) {
+ 			packet->options[end + OPT_DATA + len] = c;
+diff --git a/procps/top.c b/procps/top.c
+index b861deb..0e1b333 100644
+--- a/procps/top.c
++++ b/procps/top.c
+@@ -89,12 +89,11 @@ struct globals {
+ enum { LINE_BUF_SIZE = COMMON_BUFSIZE - offsetof(struct globals, line_buf) };
+ 
+ #define G (*(struct globals*)&bb_common_bufsiz1)
+-#define INIT_G() \
+-	do { \
+-		struct G_sizecheck { \
+-			char G_sizecheck[sizeof(G) > COMMON_BUFSIZE ? -1 : 1]; \
+-		}; \
+-	} while (0)
++#define INIT_G() do { \
++	struct G_sizecheck { \
++		char G_sizecheck[sizeof(G) > COMMON_BUFSIZE ? -1 : 1]; \
++	}; \
++} while (0)
+ #define top              (G.top               )
+ #define ntop             (G.ntop              )
+ #define sort_field       (G.sort_field        )
+diff --git a/runit/runsv.c b/runit/runsv.c
+index e3b507d..6981fa7 100644
+--- a/runit/runsv.c
++++ b/runit/runsv.c
+@@ -103,10 +103,9 @@ struct globals {
+ #define logpipe      (G.logpipe     )
+ #define dir          (G.dir         )
+ #define svd          (G.svd         )
+-#define INIT_G() \
+-	do { \
+-		pidchanged = 1; \
+-	} while (0)
++#define INIT_G() do { \
++	pidchanged = 1; \
++} while (0)
+ 
+ static void fatal2_cannot(const char *m1, const char *m2)
+ {
+diff --git a/shell/hush.c b/shell/hush.c
+index ace0cda..032482c 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -1063,7 +1063,7 @@ static int o_save_ptr_helper(o_string *o, int n)
+ 			/* list[n] points to string_start, make space for 16 more pointers */
+ 			o->maxlen += 0x10 * sizeof(list[0]);
+ 			o->data = xrealloc(o->data, o->maxlen + 1);
+-    			list = (char**)o->data;
++			list = (char**)o->data;
+ 			memmove(list + n + 0x10, list + n, string_len);
+ 			o->length += 0x10 * sizeof(list[0]);
+ 		} else
+@@ -3018,7 +3018,7 @@ static void done_pipe(struct p_context *ctx, pipe_style type)
+ 		/* Create the memory for child, roughly:
+ 		 * ctx->pipe->progs = new struct child_prog;
+ 		 * ctx->pipe->progs[0].family = ctx->pipe;
+-    		 * ctx->child = &ctx->pipe->progs[0];
++		 * ctx->child = &ctx->pipe->progs[0];
+ 		 */
+ 		done_command(ctx);
+ 	}
+diff --git a/sysklogd/logread.c b/sysklogd/logread.c
+index ace246f..1753ce3 100644
+--- a/sysklogd/logread.c
++++ b/sysklogd/logread.c
+@@ -39,10 +39,9 @@ struct globals {
+ #define SMrup (G.SMrup)
+ #define SMrdn (G.SMrdn)
+ #define shbuf (G.shbuf)
+-#define INIT_G() \
+-	do { \
+-		memcpy(SMrup, init_sem, sizeof(init_sem)); \
+-	} while (0)
++#define INIT_G() do { \
++	memcpy(SMrup, init_sem, sizeof(init_sem)); \
++} while (0)
+ 
+ static void error_exit(const char *str) ATTRIBUTE_NORETURN;
+ static void error_exit(const char *str)
+diff --git a/util-linux/fsck_minix.c b/util-linux/fsck_minix.c
+index 3ebc076..dba5241 100644
+--- a/util-linux/fsck_minix.c
++++ b/util-linux/fsck_minix.c
+@@ -244,15 +244,15 @@ static ALWAYS_INLINE unsigned div_roundup(unsigned size, unsigned n)
+ 	return (size + n-1) / n;
+ }
+ 
+-#if ENABLE_FEATURE_MINIX2
+-#define INODE_BLOCKS div_roundup(INODES, (version2 ? MINIX2_INODES_PER_BLOCK \
+-				    : MINIX1_INODES_PER_BLOCK))
++#if !ENABLE_FEATURE_MINIX2
++#define INODE_BLOCKS            div_roundup(INODES, MINIX1_INODES_PER_BLOCK)
+ #else
+-#define INODE_BLOCKS div_roundup(INODES, MINIX1_INODES_PER_BLOCK)
++#define INODE_BLOCKS            div_roundup(INODES, \
++                                (version2 ? MINIX2_INODES_PER_BLOCK : MINIX1_INODES_PER_BLOCK))
+ #endif
+ 
+-#define INODE_BUFFER_SIZE (INODE_BLOCKS * BLOCK_SIZE)
+-#define NORM_FIRSTZONE    (2 + IMAPS + ZMAPS + INODE_BLOCKS)
++#define INODE_BUFFER_SIZE       (INODE_BLOCKS * BLOCK_SIZE)
++#define NORM_FIRSTZONE          (2 + IMAPS + ZMAPS + INODE_BLOCKS)
+ 
+ /* Before you ask "where they come from?": */
+ /* setbit/clrbit are supplied by sys/param.h */
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index 057b9e4..e1edd20 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -300,9 +300,9 @@ static void make_device(char *path, int delete)
+ 
+ /* File callback for /sys/ traversal */
+ static int fileAction(const char *fileName,
+-                      struct stat *statbuf ATTRIBUTE_UNUSED,
+-                      void *userData,
+-                      int depth ATTRIBUTE_UNUSED)
++		struct stat *statbuf ATTRIBUTE_UNUSED,
++		void *userData,
++		int depth ATTRIBUTE_UNUSED)
+ {
+ 	size_t len = strlen(fileName) - 4; /* can't underflow */
+ 	char *scratch = userData;
+@@ -320,9 +320,9 @@ static int fileAction(const char *fileName,
+ 
+ /* Directory callback for /sys/ traversal */
+ static int dirAction(const char *fileName ATTRIBUTE_UNUSED,
+-                      struct stat *statbuf ATTRIBUTE_UNUSED,
+-                      void *userData ATTRIBUTE_UNUSED,
+-                      int depth)
++		struct stat *statbuf ATTRIBUTE_UNUSED,
++		void *userData ATTRIBUTE_UNUSED,
++		int depth)
+ {
+ 	return (depth >= MAX_SYSFS_DEPTH ? SKIP : TRUE);
+ }
+diff --git a/util-linux/mkfs_minix.c b/util-linux/mkfs_minix.c
+index 60031a5..49b1d4c 100644
+--- a/util-linux/mkfs_minix.c
++++ b/util-linux/mkfs_minix.c
+@@ -149,7 +149,7 @@ static ALWAYS_INLINE unsigned div_roundup(unsigned size, unsigned n)
+ #else
+ # define SB_ZONES               (version2 ? SB.s_zones : SB.s_nzones)
+ # define INODE_BLOCKS           div_roundup(SB_INODES, \
+-                                version2 ? MINIX2_INODES_PER_BLOCK : MINIX1_INODES_PER_BLOCK)
++                                (version2 ? MINIX2_INODES_PER_BLOCK : MINIX1_INODES_PER_BLOCK))
+ #endif
+ 
+ #define INODE_BUFFER_SIZE       (INODE_BLOCKS * BLOCK_SIZE)

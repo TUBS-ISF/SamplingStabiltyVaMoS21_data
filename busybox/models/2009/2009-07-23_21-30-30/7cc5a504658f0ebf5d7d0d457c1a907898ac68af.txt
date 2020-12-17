@@ -1,0 +1,19 @@
+2009-07-23 21:30:30 +0200
+diff --git a/examples/depmod b/examples/depmod
+old mode 100644
+new mode 100755
+diff --git a/examples/udhcp/sample.script b/examples/udhcp/sample.script
+old mode 100644
+new mode 100755
+diff --git a/examples/udhcp/simple.script b/examples/udhcp/simple.script
+old mode 100644
+new mode 100755
+diff --git a/examples/undeb b/examples/undeb
+old mode 100644
+new mode 100755
+diff --git a/examples/unrpm b/examples/unrpm
+old mode 100644
+new mode 100755
+diff --git a/examples/zcip.script b/examples/zcip.script
+old mode 100644
+new mode 100755

@@ -1,0 +1,385 @@
+2008-02-16 13:18:17 +0000
+diff --git a/archival/libunarchive/data_align.c b/archival/libunarchive/data_align.c
+index 9803199..d98dc57 100644
+--- a/archival/libunarchive/data_align.c
++++ b/archival/libunarchive/data_align.c
+@@ -3,14 +3,12 @@
+  * Licensed under GPLv2 or later, see file LICENSE in this tarball for details.
+  */
+ 
+-//#include <sys/types.h>
+-
+ #include "libbb.h"
+ #include "unarchive.h"
+ 
+-void data_align(archive_handle_t *archive_handle, const unsigned short boundary)
++void data_align(archive_handle_t *archive_handle, unsigned boundary)
+ {
+-	const unsigned short skip_amount = (boundary - (archive_handle->offset % boundary)) % boundary;
++	unsigned skip_amount = (boundary - (archive_handle->offset % boundary)) % boundary;
+ 
+ 	archive_handle->seek(archive_handle, skip_amount);
+ 	archive_handle->offset += skip_amount;
+diff --git a/archival/tar.c b/archival/tar.c
+index 6b37383..a8ff7b8 100644
+--- a/archival/tar.c
++++ b/archival/tar.c
+@@ -546,13 +546,16 @@ static int writeTarFile(const int tar_fd, const int verboseFlag,
+ 
+ 		if (gzipPid == 0) {
+ 			/* child */
+-			xmove_fd(tbInfo.tarFd, 1);
+-			xmove_fd(gzipDataPipe.rd, 0);
++			/* NB: close _first_, then move fds! */
+ 			close(gzipDataPipe.wr);
+ #if WAIT_FOR_CHILD
+ 			close(gzipStatusPipe.rd);
++			/* gzipStatusPipe.wr will close only on exec -
++			 * parent waits for this close to happen */
+ 			fcntl(gzipStatusPipe.wr, F_SETFD, FD_CLOEXEC);
+ #endif
++			xmove_fd(gzipDataPipe.rd, 0);
++			xmove_fd(tbInfo.tarFd, 1);
+ 			/* exec gzip/bzip2 program/applet */
+ 			BB_EXECLP(zip_exec, zip_exec, "-f", NULL);
+ 			vfork_exec_errno = errno;
+@@ -570,7 +573,7 @@ static int writeTarFile(const int tar_fd, const int verboseFlag,
+ 
+ 			/* Wait until child execs (or fails to) */
+ 			n = full_read(gzipStatusPipe.rd, &buf, 1);
+-			if ((n < 0) && (/*errno == EAGAIN ||*/ errno == EINTR))
++			if (n < 0 /* && errno == EAGAIN */)
+ 				continue;	/* try it again */
+ 
+ 		}
+diff --git a/coreutils/Kbuild b/coreutils/Kbuild
+index 8ada8b0..b9ed0d7 100644
+--- a/coreutils/Kbuild
++++ b/coreutils/Kbuild
+@@ -12,6 +12,7 @@ lib-$(CONFIG_CAL)       += cal.o
+ lib-$(CONFIG_CAT)       += cat.o
+ lib-$(CONFIG_MORE)      += cat.o # more uses it if stdout isn't a tty
+ lib-$(CONFIG_LESS)      += cat.o # less too
++lib-$(CONFIG_CRONTAB)   += cat.o # crontab -l
+ lib-$(CONFIG_CATV)      += catv.o
+ lib-$(CONFIG_CHGRP)     += chgrp.o chown.o
+ lib-$(CONFIG_CHMOD)     += chmod.o
+diff --git a/editors/sed.c b/editors/sed.c
+index 0f5cab2..4334182 100644
+--- a/editors/sed.c
++++ b/editors/sed.c
+@@ -76,7 +76,7 @@ typedef struct sed_cmd_s {
+ 	FILE *sw_file;          /* File (sw) command writes to, -1 for none. */
+ 	char *string;           /* Data string for (saicytb) commands. */
+ 
+-	unsigned short which_match; /* (s) Which match to replace (0 for all) */
++	unsigned which_match;   /* (s) Which match to replace (0 for all) */
+ 
+ 	/* Bitfields (gcc won't group them if we don't) */
+ 	unsigned invert:1;      /* the '!' after the address */
+@@ -353,7 +353,7 @@ static int parse_subst_cmd(sed_cmd_t *sed_cmd, const char *substr)
+ 				/* Match 0 treated as all, multiple matches we take the last one. */
+ 				const char *pos = substr + idx;
+ /* FIXME: error check? */
+-				sed_cmd->which_match = (unsigned short)strtol(substr+idx, (char**) &pos, 10);
++				sed_cmd->which_match = (unsigned)strtol(substr+idx, (char**) &pos, 10);
+ 				idx = pos - substr;
+ 			}
+ 			continue;
+@@ -364,7 +364,8 @@ static int parse_subst_cmd(sed_cmd_t *sed_cmd, const char *substr)
+ 		switch (substr[idx]) {
+ 		/* Replace all occurrences */
+ 		case 'g':
+-			if (match[0] != '^') sed_cmd->which_match = 0;
++			if (match[0] != '^')
++				sed_cmd->which_match = 0;
+ 			break;
+ 		/* Print pattern space */
+ 		case 'p':
+@@ -683,7 +684,8 @@ static int do_subst_command(sed_cmd_t *sed_cmd, char **line)
+ 		altered++;
+ 
+ 		/* if we're not doing this globally, get out now */
+-		if (sed_cmd->which_match) break;
++		if (sed_cmd->which_match)
++			break;
+ 	} while (*oldline && (regexec(current_regex, oldline, 10, G.regmatch, 0) != REG_NOMATCH));
+ 
+ 	/* Copy rest of string into output pipeline */
+diff --git a/include/libbb.h b/include/libbb.h
+index b405df5..3175c8e 100644
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -595,14 +595,14 @@ int bb_execvp(const char *file, char *const argv[]);
+ pid_t spawn(char **argv);
+ pid_t xspawn(char **argv);
+ 
+-/* Unlike waitpid, waits ONLY for one process,
++int safe_waitpid(int pid, int *wstat, int options);
++/* Unlike waitpid, waits ONLY for one process.
+  * It's safe to pass negative 'pids' from failed [v]fork -
+  * wait4pid will return -1 (and will not clobber [v]fork's errno).
+  * IOW: rc = wait4pid(spawn(argv));
+  *      if (rc < 0) bb_perror_msg("%s", argv[0]);
+  *      if (rc > 0) bb_error_msg("exit code: %d", rc);
+  */
+-int safe_waitpid(int pid, int *wstat, int options);
+ int wait4pid(int pid);
+ int wait_any_nohang(int *wstat);
+ #define wait_crashed(w) ((w) & 127)
+diff --git a/include/unarchive.h b/include/unarchive.h
+index 4ed2ccd..8b76217 100644
+--- a/include/unarchive.h
++++ b/include/unarchive.h
+@@ -97,7 +97,7 @@ extern void seek_by_read(const archive_handle_t *archive_handle, const unsigned
+ 
+ extern ssize_t archive_xread_all_eof(archive_handle_t *archive_handle, unsigned char *buf, size_t count);
+ 
+-extern void data_align(archive_handle_t *archive_handle, const unsigned short boundary);
++extern void data_align(archive_handle_t *archive_handle, unsigned boundary);
+ extern const llist_t *find_list_entry(const llist_t *list, const char *filename);
+ extern const llist_t *find_list_entry2(const llist_t *list, const char *filename);
+ 
+diff --git a/miscutils/hdparm.c b/miscutils/hdparm.c
+index bacbe05..0aaff45 100644
+--- a/miscutils/hdparm.c
++++ b/miscutils/hdparm.c
+@@ -1168,7 +1168,7 @@ static const char BuffType[] ALIGN1 =
+ static void dump_identity(const struct hd_driveid *id)
+ {
+ 	int i;
+-	const unsigned short int *id_regs = (const void*) id;
++	const unsigned short *id_regs = (const void*) id;
+ 
+ 	printf("\n Model=%.40s, FwRev=%.8s, SerialNo=%.20s\n Config={",
+ 				id->model, id->fw_rev, id->serial_no);
+diff --git a/networking/ftpgetput.c b/networking/ftpgetput.c
+index de11f91..91f6fcd 100644
+--- a/networking/ftpgetput.c
++++ b/networking/ftpgetput.c
+@@ -72,7 +72,7 @@ static int ftpcmd(const char *s1, const char *s2, FILE *stream, char *buf)
+ static int xconnect_ftpdata(ftp_host_info_t *server, char *buf)
+ {
+ 	char *buf_ptr;
+-	unsigned short port_num;
++	unsigned port_num;
+ 
+ 	/* Response is "NNN garbageN1,N2,N3,N4,P1,P2[)garbage]
+ 	 * Server's IP is N1.N2.N3.N4 (we ignore it)
+diff --git a/networking/httpd.c b/networking/httpd.c
+index 779f070..1ac49e7 100644
+--- a/networking/httpd.c
++++ b/networking/httpd.c
+@@ -1409,10 +1409,11 @@ static void send_cgi_and_exit(
+ 		/* Child process */
+ 		xfunc_error_retval = 242;
+ 
++		/* NB: close _first_, then move fds! */
++		close(toCgi.wr);
++		close(fromCgi.rd);
+ 		xmove_fd(toCgi.rd, 0);  /* replace stdin with the pipe */
+ 		xmove_fd(fromCgi.wr, 1);  /* replace stdout with the pipe */
+-		close(fromCgi.rd);
+-		close(toCgi.wr);
+ 		/* User seeing stderr output can be a security problem.
+ 		 * If CGI really wants that, it can always do dup itself. */
+ 		/* dup2(1, 2); */
+diff --git a/networking/libiproute/ll_proto.c b/networking/libiproute/ll_proto.c
+index 6933ce2..62262c9 100644
+--- a/networking/libiproute/ll_proto.c
++++ b/networking/libiproute/ll_proto.c
+@@ -102,7 +102,7 @@ const char *ll_proto_n2a(unsigned short id, char *buf, int len)
+ 
+ 	id = ntohs(id);
+ 
+-	for (i=0; i < ARRAY_SIZE(llproto_names); i++) {
++	for (i = 0; i < ARRAY_SIZE(llproto_names); i++) {
+ 		 if (llproto_names[i].id == id)
+ 			return llproto_names[i].name;
+ 	}
+@@ -113,7 +113,7 @@ const char *ll_proto_n2a(unsigned short id, char *buf, int len)
+ int ll_proto_a2n(unsigned short *id, char *buf)
+ {
+ 	int i;
+-	for (i=0; i < ARRAY_SIZE(llproto_names); i++) {
++	for (i = 0; i < ARRAY_SIZE(llproto_names); i++) {
+ 		 if (strcasecmp(llproto_names[i].name, buf) == 0) {
+ 			 *id = htons(llproto_names[i].id);
+ 			 return 0;
+diff --git a/networking/libiproute/utils.h b/networking/libiproute/utils.h
+index cd65049..50a6c20 100644
+--- a/networking/libiproute/utils.h
++++ b/networking/libiproute/utils.h
+@@ -42,8 +42,8 @@ typedef struct
+ #endif
+ 
+ struct dn_naddr {
+-	unsigned short          a_len;
+-	unsigned char a_addr[DN_MAXADDL];
++	unsigned short a_len;
++	unsigned char  a_addr[DN_MAXADDL];
+ };
+ 
+ #define IPX_NODE_LEN 6
+diff --git a/shell/hush.c b/shell/hush.c
+index 3f46103..8afa15e 100644
+--- a/shell/hush.c
++++ b/shell/hush.c
+@@ -3243,7 +3243,7 @@ static FILE *generate_stream_from_list(struct pipe *head)
+ 	if (pid == 0) { /* child */
+ 		if (ENABLE_HUSH_JOB)
+ 			die_sleep = 0; /* let nofork's xfuncs die */
+-		close(channel[0]);
++		close(channel[0]); /* NB: close _first_, then move fd! */
+ 		xmove_fd(channel[1], 1);
+ 		/* Prevent it from trying to handle ctrl-z etc */
+ #if ENABLE_HUSH_JOB
+diff --git a/shell/msh.c b/shell/msh.c
+index 6555604..fd287f1 100644
+--- a/shell/msh.c
++++ b/shell/msh.c
+@@ -2797,15 +2797,13 @@ static int forkexec(struct op *t, int *pin, int *pout, int no_fork, char **wp)
+ 			if (!bltin)
+ 				export(lookup(cp));
+ 
+-	if (pin) {
++	if (pin) { /* NB: close _first_, then move fds! */
++		close(pin[1]);
+ 		xmove_fd(pin[0], 0);
+-		if (pin[1] != 0)
+-			close(pin[1]);
+ 	}
+ 	if (pout) {
++		close(pout[0]);
+ 		xmove_fd(pout[1], 1);
+-		if (pout[0] > 1)
+-			close(pout[0]);
+ 	}
+ 
+ 	iopp = t->ioact;
+diff --git a/util-linux/fdisk_aix.c b/util-linux/fdisk_aix.c
+index 69aef97..0b9fa2b 100644
+--- a/util-linux/fdisk_aix.c
++++ b/util-linux/fdisk_aix.c
+@@ -29,8 +29,8 @@ typedef struct {
+   *      Some fixes
+ */
+ 
+-static int aix_other_endian;
+-static short aix_volumes = 1;
++static smallint aix_other_endian; /* bool */
++static smallint aix_volumes = 1; /* max 15 */
+ 
+ /*
+  * only dealing with free blocks here
+diff --git a/util-linux/fdisk_sgi.c b/util-linux/fdisk_sgi.c
+index f0bd195..7826bb7 100644
+--- a/util-linux/fdisk_sgi.c
++++ b/util-linux/fdisk_sgi.c
+@@ -1,5 +1,7 @@
+ #if ENABLE_FEATURE_SGI_LABEL
+ 
++#define SGI_DEBUG 0
++
+ /*
+  * Copyright (C) Andreas Neuper, Sep 1998.
+  *      This file may be modified and redistributed under
+@@ -117,9 +119,8 @@ typedef struct {
+  */
+ 
+ 
+-static int sgi_other_endian;
+-static int debug;
+-static short sgi_volumes = 1;
++static smallint sgi_other_endian; /* bool */
++static smallint sgi_volumes = 1; /* max 15 */
+ 
+ /*
+  * only dealing with free blocks here
+@@ -318,7 +319,7 @@ sgi_list_table(int xtra)
+ 		"Pt# %*s  Info     Start       End   Sectors  Id  System\n",
+ 		w + 2, "Device");
+ 	for (i = 0; i < g_partitions; i++) {
+-		if (sgi_get_num_sectors(i) || debug ) {
++		if (sgi_get_num_sectors(i) || SGI_DEBUG) {
+ 			uint32_t start = sgi_get_start_sector(i);
+ 			uint32_t len = sgi_get_num_sectors(i);
+ 			kpi++;              /* only count nonempty partitions */
+@@ -514,7 +515,7 @@ verify_sgi(int verbose)
+ 				"at block 0,\n"
+ 				"not at diskblock %d\n",
+ 				sgi_get_start_sector(Index[0]));
+-		if (debug)      /* I do not understand how some disks fulfil it */
++		if (SGI_DEBUG)      /* I do not understand how some disks fulfil it */
+ 			if ((sgi_get_num_sectors(Index[0]) != lastblock) && verbose)
+ 				printf("The entire disk partition is only %d diskblock large,\n"
+ 					"but the disk is %d diskblocks long\n",
+@@ -523,7 +524,7 @@ verify_sgi(int verbose)
+ 	} else {
+ 		if (verbose)
+ 			printf("One Partition (#11) should cover the entire disk\n");
+-		if (debug > 2)
++		if (SGI_DEBUG > 2)
+ 			printf("sysid=%d\tpartition=%d\n",
+ 				sgi_get_sysid(Index[0]), Index[0]+1);
+ 	}
+@@ -531,13 +532,13 @@ verify_sgi(int verbose)
+ 		int cylsize = sgi_get_nsect() * sgi_get_ntrks();
+ 
+ 		if ((sgi_get_start_sector(Index[i]) % cylsize) != 0) {
+-			if (debug)      /* I do not understand how some disks fulfil it */
++			if (SGI_DEBUG)      /* I do not understand how some disks fulfil it */
+ 				if (verbose)
+ 					printf("Partition %d does not start on cylinder boundary\n",
+ 						Index[i]+1);
+ 		}
+ 		if (sgi_get_num_sectors(Index[i]) % cylsize != 0) {
+-			if (debug)      /* I do not understand how some disks fulfil it */
++			if (SGI_DEBUG)      /* I do not understand how some disks fulfil it */
+ 				if (verbose)
+ 					printf("Partition %d does not end on cylinder boundary\n",
+ 						Index[i]+1);
+@@ -562,7 +563,7 @@ verify_sgi(int verbose)
+ 		}
+ 		start = sgi_get_start_sector(Index[i])
+ 			   + sgi_get_num_sectors(Index[i]);
+-		if (debug > 1) {
++		if (SGI_DEBUG > 1) {
+ 			if (verbose)
+ 				printf("%2d:%12d\t%12d\t%12d\n", Index[i],
+ 					sgi_get_start_sector(Index[i]),
+@@ -805,7 +806,7 @@ create_sgilabel(void)
+ 				old[i].start = get_start_sect(get_part_table(i));
+ 				old[i].nsect = get_nr_sects(get_part_table(i));
+ 				printf("Trying to keep parameters of partition %d\n", i);
+-				if (debug)
++				if (SGI_DEBUG)
+ 					printf("ID=%02x\tSTART=%d\tLENGTH=%d\n",
+ 				old[i].sysid, old[i].start, old[i].nsect);
+ 			}
+diff --git a/util-linux/ipcrm.c b/util-linux/ipcrm.c
+index a9400d1..8d5f63c 100644
+--- a/util-linux/ipcrm.c
++++ b/util-linux/ipcrm.c
+@@ -24,7 +24,7 @@
+ union semun {
+ 	int val;
+ 	struct semid_ds *buf;
+-	unsigned short int *array;
++	unsigned short *array;
+ 	struct seminfo *__buf;
+ };
+ #endif
+diff --git a/util-linux/ipcs.c b/util-linux/ipcs.c
+index c7b46f5..97b98f3 100644
+--- a/util-linux/ipcs.c
++++ b/util-linux/ipcs.c
+@@ -68,7 +68,7 @@ struct shm_info {
+ union semun {
+ 	int val;
+ 	struct semid_ds *buf;
+-	unsigned short int *array;
++	unsigned short *array;
+ 	struct seminfo *__buf;
+ };
+ #endif

@@ -1,0 +1,79 @@
+2009-04-13 02:25:40 +0000
+diff --git a/modutils/insmod.c b/modutils/insmod.c
+index 2c7f647..90ed87a 100644
+--- a/modutils/insmod.c
++++ b/modutils/insmod.c
+@@ -35,7 +35,7 @@ int insmod_main(int argc UNUSED_PARAM, char **argv)
+ 
+ 	rc = bb_init_module(filename, parse_cmdline_module_options(argv));
+ 	if (rc)
+-		bb_error_msg("cannot insert '%s': %s", filename, moderror(rc));
++		bb_error_msg("can't insert '%s': %s", filename, moderror(rc));
+ 
+ 	return rc;
+ }
+diff --git a/modutils/modprobe-small.c b/modutils/modprobe-small.c
+index d3fde0e..6eb950f 100644
+--- a/modutils/modprobe-small.c
++++ b/modutils/modprobe-small.c
+@@ -776,7 +776,7 @@ int modprobe_main(int argc UNUSED_PARAM, char **argv)
+ 			USE_FEATURE_MODPROBE_SMALL_OPTIONS_ON_CMDLINE(options ? options : "")
+ 			SKIP_FEATURE_MODPROBE_SMALL_OPTIONS_ON_CMDLINE("")
+ 				) != 0)
+-			bb_error_msg_and_die("cannot insert '%s': %s",
++			bb_error_msg_and_die("can't insert '%s': %s",
+ 					*argv, moderror(errno));
+ 		return 0;
+ 	}
+diff --git a/modutils/modutils-24.c b/modutils/modutils-24.c
+index 4b0e786..a16cb1b 100644
+--- a/modutils/modutils-24.c
++++ b/modutils/modutils-24.c
+@@ -3803,7 +3803,7 @@ int FAST_FUNC bb_init_module_24(const char *m_filename, const char *options)
+ 		if (m_has_modinfo) {
+ 			int m_version = new_get_module_version(f, m_strversion);
+ 			if (m_version == -1) {
+-				bb_error_msg_and_die("cannot find the kernel version "
++				bb_error_msg_and_die("can't find the kernel version "
+ 					"the module was compiled for");
+ 			}
+ 		}
+diff --git a/modutils/rmmod.c b/modutils/rmmod.c
+index cdc690a..ee32dfd 100644
+--- a/modutils/rmmod.c
++++ b/modutils/rmmod.c
+@@ -15,12 +15,11 @@ int rmmod_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+ int rmmod_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	int n;
+-	unsigned int flags = O_NONBLOCK|O_EXCL;
++	unsigned flags = O_NONBLOCK | O_EXCL;
+ 
+ 	/* Parse command line. */
+ 	n = getopt32(argv, "wfas"); // -s ignored
+ 	argv += optind;
+-
+ 	if (n & 1)	// --wait
+ 		flags &= ~O_NONBLOCK;
+ 	if (n & 2)	// --force
+@@ -35,11 +34,18 @@ int rmmod_main(int argc UNUSED_PARAM, char **argv)
+ 	if (!*argv)
+ 		bb_show_usage();
+ 
++	n = ENABLE_FEATURE_2_4_MODULES && get_linux_version_code() < KERNEL_VERSION(2,6,0);
+ 	while (*argv) {
+ 		char modname[MODULE_NAME_LEN];
+-		filename2modname(bb_basename(*argv++), modname);
++		const char *bname;
++
++		bname = bb_basename(*argv++);
++		if (n)
++			safe_strncpy(modname, bname, MODULE_NAME_LEN);
++		else
++			filename2modname(bname, modname);
+ 		if (bb_delete_module(modname, flags))
+-			bb_error_msg_and_die("cannot unload '%s': %s",
++			bb_error_msg_and_die("can't unload '%s': %s",
+ 					     modname, moderror(errno));
+ 	}
+ 

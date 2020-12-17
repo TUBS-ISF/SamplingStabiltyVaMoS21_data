@@ -1,0 +1,14 @@
+2007-10-16 22:01:23 +0000
+diff --git a/networking/telnetd.c b/networking/telnetd.c
+index f06bff8..8cadc63 100644
+--- a/networking/telnetd.c
++++ b/networking/telnetd.c
+@@ -262,7 +262,7 @@ make_new_session(
+ 	if (pid < 0) {
+ 		free(ts);
+ 		close(fd);
+-		/* sock_r and sock_w will be closed by caller */
++		/* sock will be closed by caller */
+ 		bb_perror_msg("vfork");
+ 		return NULL;
+ 	}
